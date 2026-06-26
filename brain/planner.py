@@ -1,0 +1,711 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Tuple, Any
+import time
+
+from config import CONFIG
+from constants import C, ICO
+
+
+# ============================================================
+# Tool I/O Schema — what each tool needs and produces
+# ============================================================
+
+@dataclass
+class ToolIO:
+    name: str
+    inputs: List[str]           # data this tool needs (target, url, port, domain, etc.)
+    outputs: List[str]          # data this tool can discover
+    prerequisites: List[str]    # conditions like "port_80", "tech_wordpress", "domain_known"
+    unlocks: List[str]          # tools that become relevant after this one
+    category: str = "general"
+    phase: str = "recon"        # recon, web_enum, vuln_scan, exploit
+    description: str = ""
+
+
+# Map: tool_name → ToolIO
+TOOL_IO: Dict[str, ToolIO] = {
+    # ---- RECON ----
+    "nmap": ToolIO("nmap",
+        inputs=["target"],
+        outputs=["ports", "services", "os_info", "tech_stack", "host_status"],
+        prerequisites=[],
+        unlocks=["whatweb", "gobuster", "nuclei", "enum4linux", "searchsploit", "testssl"],
+        category="port_scan", phase="recon",
+        description="Discover open ports, running services, OS fingerprint"),
+    "masscan": ToolIO("masscan",
+        inputs=["target"],
+        outputs=["ports"],
+        prerequisites=[],
+        unlocks=["nmap"],
+        category="port_scan", phase="recon",
+        description="Fast full-port TCP scan (faster but less detail than nmap)"),
+    "whatweb": ToolIO("whatweb",
+        inputs=["url"],
+        outputs=["tech_stack", "cms", "version", "framework"],
+        prerequisites=["port_80", "port_443", "port_8080", "port_8443"],
+        unlocks=["wpscan", "joomscan", "droopescan", "sqlmap", "nuclei"],
+        category="fingerprint", phase="recon",
+        description="Identify web tech stack, CMS, framework, server versions"),
+    "subfinder": ToolIO("subfinder",
+        inputs=["domain"],
+        outputs=["subdomains"],
+        prerequisites=["domain_known"],
+        unlocks=["httpx", "gospider"],
+        category="subdomain", phase="recon",
+        description="Passive subdomain discovery via multiple OSINT sources"),
+    "amass": ToolIO("amass",
+        inputs=["domain"],
+        outputs=["subdomains"],
+        prerequisites=["domain_known"],
+        unlocks=["httpx"],
+        category="subdomain", phase="recon",
+        description="Deep subdomain enumeration (passive + active)"),
+
+    # ---- WEB ENUM ----
+    "gobuster": ToolIO("gobuster",
+        inputs=["url"],
+        outputs=["endpoints", "directories", "files"],
+        prerequisites=["port_80", "port_443", "port_8080", "port_8443"],
+        unlocks=["nuclei", "curl"],
+        category="dirbust", phase="web_enum",
+        description="Directory/file brute force on web servers"),
+    "ffuf": ToolIO("ffuf",
+        inputs=["url"],
+        outputs=["endpoints", "parameters", "vhosts"],
+        prerequisites=["port_80", "port_443", "port_8080", "port_8443"],
+        unlocks=["nuclei", "arjun"],
+        category="dirbust", phase="web_enum",
+        description="Fast web fuzzer for directories, parameters, vhosts"),
+    "gospider": ToolIO("gospider",
+        inputs=["url"],
+        outputs=["endpoints", "forms", "links", "js_files"],
+        prerequisites=["port_80", "port_443"],
+        unlocks=["dalfox", "arjun"],
+        category="crawl", phase="web_enum",
+        description="Web crawler to discover endpoints, forms, JS files"),
+    "katana": ToolIO("katana",
+        inputs=["url"],
+        outputs=["endpoints", "js_files", "api_routes"],
+        prerequisites=["port_80", "port_443"],
+        unlocks=["dalfox", "kiterunner"],
+        category="crawl", phase="web_enum",
+        description="JS-aware web crawler with form extraction"),
+    "arjun": ToolIO("arjun",
+        inputs=["url"],
+        outputs=["parameters"],
+        prerequisites=["port_80", "port_443"],
+        unlocks=["sqlmap", "dalfox"],
+        category="param", phase="web_enum",
+        description="HTTP parameter discovery for web endpoints"),
+
+    # ---- VULN SCAN ----
+    "nuclei": ToolIO("nuclei",
+        inputs=["url"],
+        outputs=["cves", "misconfigs", "exposures", "vulnerabilities"],
+        prerequisites=["port_80", "port_443"],
+        unlocks=["searchsploit", "sqlmap"],
+        category="scanner", phase="vuln_scan",
+        description="Template-based vulnerability scanner (CVEs, misconfigs)"),
+    "searchsploit": ToolIO("searchsploit",
+        inputs=["service_version", "cve_id", "keyword"],
+        outputs=["exploit_code", "exploit_path", "cve_matches"],
+        prerequisites=["ports", "tech_stack"],
+        unlocks=["msfconsole", "sqlmap"],
+        category="exploit_search", phase="vuln_scan",
+        description="Search ExploitDB for known exploits by service/version"),
+    "sqlmap": ToolIO("sqlmap",
+        inputs=["url", "parameter"],
+        outputs=["sql_injection", "database_dump", "credentials"],
+        prerequisites=["port_80", "port_443", "web_param_detected"],
+        unlocks=[],
+        category="web_exploit", phase="vuln_scan",
+        description="Automated SQL injection detection & exploitation"),
+    "dalfox": ToolIO("dalfox",
+        inputs=["url", "parameter"],
+        outputs=["xss", "dom_xss"],
+        prerequisites=["port_80", "port_443"],
+        unlocks=[],
+        category="web_exploit", phase="vuln_scan",
+        description="Advanced XSS scanner with DOM verification"),
+    "testssl": ToolIO("testssl",
+        inputs=["host", "port"],
+        outputs=["ssl_vulns", "ciphers", "cert_info"],
+        prerequisites=["port_443", "port_8443"],
+        unlocks=[],
+        category="crypto", phase="vuln_scan",
+        description="SSL/TLS security testing (Heartbleed, Poodle, etc.)"),
+
+    # ---- SMB / AD / AUTH ----
+    "enum4linux": ToolIO("enum4linux",
+        inputs=["target"],
+        outputs=["smb_shares", "users", "os_info", "policies"],
+        prerequisites=["port_445", "port_139"],
+        unlocks=["smbmap", "netexec", "crackmapexec"],
+        category="smb", phase="web_enum",
+        description="SMB/NetBIOS/AD enumeration"),
+    "smbmap": ToolIO("smbmap",
+        inputs=["target"],
+        outputs=["smb_shares", "files", "permissions"],
+        prerequisites=["port_445"],
+        unlocks=[],
+        category="smb", phase="web_enum",
+        description="SMB share enumeration with recursive file listing"),
+    "netexec": ToolIO("netexec",
+        inputs=["target", "user", "password"],
+        outputs=["smb_shares", "credentials", "ad_info"],
+        prerequisites=["port_445"],
+        unlocks=["impacket-secretsdump"],
+        category="smb", phase="vuln_scan",
+        description="SMB/AD post-exploitation enumeration"),
+    "ldapsearch": ToolIO("ldapsearch",
+        inputs=["target", "domain"],
+        outputs=["ad_objects", "users", "groups", "dns_entries"],
+        prerequisites=["port_389"],
+        unlocks=["bloodhound-python", "certipy"],
+        category="ad", phase="web_enum",
+        description="LDAP directory query and AD object enumeration"),
+    "bloodhound-python": ToolIO("bloodhound-python",
+        inputs=["target", "domain", "user", "password"],
+        outputs=["ad_relationships", "attack_paths", "privileged_users"],
+        prerequisites=["port_389", "domain_known"],
+        unlocks=["certipy", "impacket-secretsdump"],
+        category="ad", phase="vuln_scan",
+        description="BloodHound AD collector for attack path mapping"),
+    "impacket-secretsdump": ToolIO("impacket-secretsdump",
+        inputs=["target", "domain", "user", "password"],
+        outputs=["password_hashes", "kerberos_tickets", "domain_sids"],
+        prerequisites=["port_445", "credentials_known"],
+        unlocks=[],
+        category="ad", phase="exploit",
+        description="DCSync — dump domain password hashes from DC"),
+    "impacket-GetNPUsers": ToolIO("impacket-GetNPUsers",
+        inputs=["target", "domain"],
+        outputs=["asrep_hashes", "no_preauth_users"],
+        prerequisites=["port_389"],
+        unlocks=["john", "hashcat"],
+        category="ad", phase="vuln_scan",
+        description="AS-REP roasting — find Kerberos pre-auth disabled accounts"),
+    "impacket-GetUserSPNs": ToolIO("impacket-GetUserSPNs",
+        inputs=["target", "domain", "user", "password"],
+        outputs=["tgs_hashes", "service_accounts"],
+        prerequisites=["port_389", "credentials_known"],
+        unlocks=["john", "hashcat"],
+        category="ad", phase="vuln_scan",
+        description="Kerberoasting — crack service account TGS tickets"),
+    "certipy": ToolIO("certipy",
+        inputs=["target", "domain", "user", "password"],
+        outputs=["ad_cs_vulns", "certificates", "esc_misconfigs"],
+        prerequisites=["port_389", "credentials_known"],
+        unlocks=["impacket-secretsdump"],
+        category="ad", phase="vuln_scan",
+        description="AD CS certificate service abuse (ESC1-8)"),
+    "hydra": ToolIO("hydra",
+        inputs=["target", "service", "user", "password_list"],
+        outputs=["valid_credentials"],
+        prerequisites=["port_22", "port_21", "port_3389", "port_445"],
+        unlocks=[],
+        category="auth", phase="vuln_scan",
+        description="Online password brute forcing (SSH, FTP, RDP, SMB)"),
+    "kerbrute": ToolIO("kerbrute",
+        inputs=["target", "domain", "user_list"],
+        outputs=["valid_users"],
+        prerequisites=["port_88"],
+        unlocks=["impacket-GetNPUsers"],
+        category="ad", phase="vuln_scan",
+        description="Kerberos user enumeration and password spraying"),
+
+    # ---- EXPLOIT ----
+    "msfconsole": ToolIO("msfconsole",
+        inputs=["exploit", "target", "port", "payload", "lhost"],
+        outputs=["exploit_session", "shell"],
+        prerequisites=["vuln_confirmed"],
+        unlocks=[],
+        category="exploit_framework", phase="exploit",
+        description="Metasploit Framework exploit execution"),
+    "msfvenom": ToolIO("msfvenom",
+        inputs=["payload", "lhost", "lport"],
+        outputs=["payload_binary"],
+        prerequisites=["lhost_configured"],
+        unlocks=[],
+        category="exploit_framework", phase="exploit",
+        description="Payload generation for reverse shells and stagers"),
+
+    # ---- PRIVESC ----
+    "linpeas": ToolIO("linpeas",
+        inputs=["target"],
+        outputs=["privesc_vectors", "suid_binaries", "cron_jobs", "vuln_services"],
+        prerequisites=["os_linux"],
+        unlocks=[],
+        category="privesc", phase="exploit",
+        description="Linux privilege escalation enumeration (PEASS-ng)"),
+    "winpeas": ToolIO("winpeas",
+        inputs=["target"],
+        outputs=["privesc_vectors", "service_perms", "registry_issues"],
+        prerequisites=["os_windows"],
+        unlocks=[],
+        category="privesc", phase="exploit",
+        description="Windows privilege escalation enumeration (PEASS-ng)"),
+
+    # ---- CLOUD ----
+    "cloud_metadata": ToolIO("cloud_metadata",
+        inputs=["target"],
+        outputs=["cloud_provider", "instance_metadata", "iam_credentials"],
+        prerequisites=["port_80"],
+        unlocks=["s3scanner"],
+        category="cloud", phase="vuln_scan",
+        description="Check for cloud metadata service SSRF"),
+
+    # ---- MOBILE ----
+    "apktool": ToolIO("apktool",
+        inputs=["apk_path"],
+        outputs=["smali_code", "manifest", "resources"],
+        prerequisites=["file_apk"],
+        unlocks=["jadx"],
+        category="mobile", phase="web_enum",
+        description="APK decompilation to smali code"),
+    "jadx": ToolIO("jadx",
+        inputs=["apk_path"],
+        outputs=["java_source"],
+        prerequisites=["file_apk"],
+        unlocks=[],
+        category="mobile", phase="web_enum",
+        description="APK/DEX decompilation to readable Java source"),
+}
+
+
+# ============================================================
+# Methodology templates — attack chains per target type
+# ============================================================
+
+METHODOLOGIES = {
+    "web": [
+        {
+            "phase": "recon",
+            "description": "Discover ports, web tech stack, and surface area",
+            "tools": ["nmap", "masscan"],
+            "branch": [
+                {"if": "port_80|443|8080|8443", "tools": ["whatweb", "gobuster", "ffuf"]},
+                {"if": "domain_known", "tools": ["subfinder", "amass"]},
+            ],
+            "unlock": ["nuclei", "searchsploit"],
+        },
+        {
+            "phase": "web_enum",
+            "description": "Crawl, fuzz, and discover endpoints/params",
+            "tools": ["gospider", "katana", "arjun"],
+            "branch": [
+                {"if": "tech_wordpress", "tools": ["wpscan"]},
+                {"if": "tech_joomla", "tools": ["joomscan"]},
+                {"if": "tech_drupal", "tools": ["droopescan"]},
+            ],
+            "unlock": ["nuclei", "sqlmap", "dalfox"],
+        },
+        {
+            "phase": "vuln_scan",
+            "description": "Scan for vulnerabilities matching the tech stack",
+            "tools": ["nuclei", "searchsploit", "testssl"],
+            "branch": [
+                {"if": "endpoint_sql", "tools": ["sqlmap"]},
+                {"if": "endpoint_xss", "tools": ["dalfox"]},
+                {"if": "port_443", "tools": ["testssl"]},
+            ],
+            "unlock": ["msfconsole"],
+        },
+        {
+            "phase": "exploit",
+            "description": "Confirm and exploit confirmed vulnerabilities",
+            "tools": ["sqlmap", "msfconsole", "searchsploit"],
+            "unlock": [],
+        },
+    ],
+    "ad": [
+        {
+            "phase": "recon",
+            "description": "Discover AD ports, domain info, and surface",
+            "tools": ["nmap"],
+            "branch": [
+                {"if": "port_389", "tools": ["ldapsearch"]},
+                {"if": "port_445", "tools": ["enum4linux", "smbmap"]},
+                {"if": "port_88", "tools": ["kerbrute"]},
+            ],
+            "unlock": ["bloodhound-python", "impacket-GetNPUsers"],
+        },
+        {
+            "phase": "vuln_scan",
+            "description": "Enumerate AD objects and find privilege escalation paths",
+            "tools": ["bloodhound-python", "certipy", "impacket-GetNPUsers"],
+            "branch": [
+                {"if": "credentials_known", "tools": ["impacket-GetUserSPNs", "impacket-secretsdump"]},
+            ],
+            "unlock": ["impacket-secretsdump"],
+        },
+        {
+            "phase": "exploit",
+            "description": "Exploit AD weaknesses for domain dominance",
+            "tools": ["impacket-secretsdump", "impacket-smbexec", "impacket-wmiexec"],
+            "unlock": [],
+        },
+    ],
+    "ctf": [
+        {
+            "phase": "recon",
+            "description": "Quick port scan and web surface discovery",
+            "tools": ["nmap", "whatweb"],
+            "branch": [
+                {"if": "port_80|443", "tools": ["gobuster", "ffuf"]},
+                {"if": "port_22", "tools": ["ssh_scan"]},
+            ],
+            "unlock": ["searchsploit", "nuclei"],
+        },
+        {
+            "phase": "vuln_scan",
+            "description": "Check for known CVEs and misconfigs",
+            "tools": ["nuclei", "searchsploit"],
+            "branch": [
+                {"if": "cve_found", "tools": ["searchsploit"]},
+            ],
+            "unlock": ["msfconsole"],
+        },
+        {
+            "phase": "exploit",
+            "description": "Run exploit and capture flag",
+            "tools": ["sqlmap", "msfconsole", "curl"],
+            "unlock": [],
+        },
+    ],
+    "cloud": [
+        {
+            "phase": "recon",
+            "description": "Check metadata endpoints and bucket discovery",
+            "tools": ["cloud_metadata", "curl"],
+            "unlock": [],
+        },
+    ],
+    "network": [
+        {
+            "phase": "recon",
+            "description": "Full port scan and service fingerprint",
+            "tools": ["nmap", "masscan"],
+            "branch": [
+                {"if": "port_80|443", "tools": ["whatweb", "gobuster"]},
+                {"if": "port_445|139", "tools": ["enum4linux", "smbmap"]},
+                {"if": "port_22", "tools": ["ssh_scan"]},
+                {"if": "port_389", "tools": ["ldapsearch"]},
+                {"if": "port_3389", "tools": ["rdp_scan"]},
+                {"if": "port_21", "tools": ["ftp_enum"]},
+            ],
+            "unlock": ["searchsploit", "nuclei"],
+        },
+        {
+            "phase": "vuln_scan",
+            "description": "Check services for known vulnerabilities",
+            "tools": ["searchsploit", "nuclei"],
+            "branch": [
+                {"if": "port_443", "tools": ["testssl"]},
+                {"if": "credentials_known", "tools": ["hydra"]},
+            ],
+            "unlock": [],
+        },
+    ],
+}
+
+
+DEFAULT_PHASE_ORDER = ["recon", "web_enum", "vuln_scan", "exploit"]
+
+
+def detect_target_type(model_ports: List[Dict],
+                       model_tech: Dict[str, str],
+                       subdomains: List[str],
+                       user_target_type: str = "auto") -> str:
+    """Auto-detect the methodology to use based on target model state."""
+    if user_target_type in ("ctf", "lab"):
+        return "ctf"
+    if user_target_type == "authorized":
+        ad_ports = {389, 445, 88, 464, 636, 3268, 3269}
+        ports = {p.get("port") for p in model_ports if isinstance(p, dict)}
+        if ports & ad_ports:
+            return "ad"
+        cloud_tech = any(k in (model_tech or {}) for k in ("aws", "azure", "gcp", "cloud"))
+        if cloud_tech:
+            return "cloud"
+        if any(p in (80, 443, 8080, 8443) for p in ports):
+            return "web"
+        if ports:
+            return "network"
+        return "web"
+    return "web"
+
+
+def generate_structured_hypotheses(
+    model: Any,
+    target: str,
+    service_attacks: Dict[Any, List[Any]],
+) -> List[Any]:
+    """Inspect target model and generate specific, testable hypotheses."""
+    from loop import StructuredHypothesis
+    hyps: List[Any] = []
+    seen: set = set()
+    all_ports = {p["port"]: p.get("service", "").lower() for p in getattr(model, "ports", []) or [] if isinstance(p, dict)}
+    tech_raw = " ".join(f"{k} {v}" for k, v in (getattr(model, "tech_stack", {}) or {}).items()).lower()
+    host = target.strip().lower()
+    host = re.sub(r'^https?://', '', host).split('/')[0]
+
+    for port, attacks in service_attacks.items():
+        if port not in all_ports:
+            continue
+        for technique, cmd_tpl, expected, interpretation, priority in attacks:
+            cmd = cmd_tpl.format(host=host, domain=host)
+            title = f"{technique} on {host}:{port}"
+            if title in seen:
+                continue
+            seen.add(title)
+            hyps.append(StructuredHypothesis(
+                title=title, service=all_ports[port], technique=technique,
+                command=cmd, expected=expected, interpretation=interpretation,
+                port=port, priority=priority
+            ))
+
+    known_tests: List[tuple] = []
+    known_tests.append(("WordPress CVE check", "WordPress", "wpscan --url http://{port_host} --enumerate vp,vt,u --no-banner 2>/dev/null", "vulnerable plugins/themes/users", "WPScan output reveals outdated components with known CVEs", 0.8))
+    known_tests.append(("Laravel debug", "Laravel", "curl -sik 'http://{port_host}/' 2>/dev/null | grep -i laravel; curl -sik 'http://{port_host}/.env' --max-time 5 | head -20", "APP_KEY or DB credentials leak", "Laravel .env exposure reveals secrets", 0.9))
+    known_tests.append(("Django admin", "Django", "curl -sik 'http://{port_host}/admin/' --max-time 5", "admin login page or redirect", "Django admin accessible = potential auth bypass", 0.6))
+    known_tests.append(("Spring Actuator", "Spring", "curl -sik 'http://{port_host}/actuator/' --max-time 5; curl -sik 'http://{port_host}/actuator/env' --max-time 5", "actuator index + env dump", "Spring actuator exposes config, secrets, routes", 0.9))
+    known_tests.append(("Flask debug", "Flask", "curl -sik 'http://{port_host}/console' --max-time 5", "Werkzeug debug console", "Werkzeug debug = RCE via Python console", 0.9))
+    known_tests.append(("GraphQL introspection", "GraphQL", "curl -sik -X POST 'http://{port_host}/graphql' -H 'Content-Type: application/json' -d '{{\"query\":\"query {{ __schema {{ types {{ name }}}}}}\"}}' --max-time 5 | head -30", "schema types in response", "Introspection enabled = full schema leak", 0.8))
+    known_tests.append(("Nuxt/Next SSR Leak", "Next.js", "curl -sik 'http://{port_host}/_next/data/develop/index.json' --max-time 5", "JSON with props", "SSR data leak endpoint exposes server-side props", 0.7))
+    known_tests.append(("PHP info leak", "PHP", "curl -sik 'http://{port_host}/phpinfo.php' --max-time 5; curl -sik 'http://{port_host}/info.php' --max-time 5", "PHP info page", "phpinfo() exposes all server configuration", 0.5))
+    known_tests.append(("Git exposure", "Git", "curl -sik 'http://{port_host}/.git/HEAD' --max-time 5", "ref: refs/heads/...", "Git repo exposed = full source code access", 0.9))
+    known_tests.append(("S3 bucket", "AWS", "curl -sik 'http://{host}.s3.amazonaws.com/' --max-time 5; curl -sik 'http://s3.amazonaws.com/{host}' --max-time 5", "ListBucketResult XML", "Public S3 bucket = data leak", 0.7))
+    known_tests.append(("Env backup", "Env", "curl -sik 'http://{port_host}/.env.bak' --max-time 5; curl -sik 'http://{port_host}/.env.save' --max-time 5; curl -sik 'http://{port_host}/.env.old' --max-time 5", "env file content", "Environment backup = secrets leak", 0.8))
+    known_tests.append(("Backup zip", "Backup", "curl -sik 'http://{port_host}/backup.zip' --max-time 5 -o /dev/null -w '%{{http_code}}'; curl -sik 'http://{port_host}/backup.tar.gz' --max-time 5 -o /dev/null -w '%{{http_code}}'", "200 or 301", "Backup archive download = full app code + data", 0.8))
+
+    for title, tech_key, cmd_tpl, expected, interpretation, priority in known_tests:
+        if tech_key.lower() not in tech_raw:
+            continue
+        cmd = cmd_tpl.format(host=host, port_host=port_host)
+        if title in seen:
+            continue
+        seen.add(title)
+        hyps.append(StructuredHypothesis(
+            title=title, service=tech_key.lower(), technique="tech_check",
+            command=cmd, expected=expected, interpretation=interpretation,
+            priority=priority
+        ))
+
+    hyps.sort(key=lambda h: h.priority, reverse=True)
+    return hyps
+
+
+@dataclass
+class ChainStep:
+    tool: str
+    rationale: str
+    phase: str
+    prerequisites: List[str] = field(default_factory=list)
+    depends_on: List[str] = field(default_factory=list)
+    completed: bool = False
+    result_summary: str = ""
+
+
+@dataclass
+class ToolChain:
+    methodology: str
+    target_type: str
+    steps: List[ChainStep] = field(default_factory=list)
+    current_index: int = 0
+
+    @property
+    def current_step(self) -> Optional[ChainStep]:
+        if 0 <= self.current_index < len(self.steps):
+            return self.steps[self.current_index]
+        return None
+
+    @property
+    def pending_steps(self) -> List[ChainStep]:
+        return [s for s in self.steps if not s.completed]
+
+    @property
+    def completed_steps(self) -> List[ChainStep]:
+        return [s for s in self.steps if s.completed]
+
+
+class Planner:
+    """Generates and tracks attack chains based on tool I/O models and target state."""
+
+    def __init__(self):
+        self.chain: Optional[ToolChain] = None
+        self._used_tools: Set[str] = set()
+        self._completed_checks: Set[str] = set()
+        self._findings: Dict[str, str] = {}  # key -> value from tool outputs
+        
+        # Evidence caching to avoid duplicate tool runs
+        self._evidence_cache: Dict[str, Tuple[Any, float]] = {}  # tool_name -> (result, timestamp)
+        self._cache_ttl: float = 300.0  # 5 minutes default TTL
+        
+        # Hypothesis-weighted tool selection for smarter planning
+        self._hypothesis_weights: Dict[str, float] = {}  # hypothesis -> weight (0.0-1.0)
+        self._tool_hypothesis_map: Dict[str, List[str]] = {}  # tool -> [hypotheses it supports]
+        
+        # Timestamp tracking to prevent duplicate actions
+        self._tool_timestamps: Dict[str, float] = {}  # tool_name -> last_run_timestamp
+        self._min_tool_interval: float = 60.0  # Minimum seconds between tool runs
+
+    def build_chain(self, model, target_type: str = "auto") -> ToolChain:
+        method_name = detect_target_type(
+            getattr(model, "ports", []),
+            getattr(model, "tech_stack", {}),
+            getattr(model, "subdomains", []),
+            target_type,
+        )
+        methodology = METHODOLOGIES.get(method_name, METHODOLOGIES["web"])
+
+        steps: List[ChainStep] = []
+        seen_tools: set = set()
+        for checkpoint in methodology:
+            phase = checkpoint["phase"]
+            for tool_name in checkpoint.get("tools", []):
+                if tool_name not in seen_tools:
+                    seen_tools.add(tool_name)
+                    io = TOOL_IO.get(tool_name)
+                    prereqs = io.prerequisites if io else []
+                    rationale = io.description if io else f"Run {tool_name}"
+                    steps.append(ChainStep(
+                        tool=tool_name,
+                        rationale=rationale,
+                        phase=phase,
+                        prerequisites=prereqs,
+                    ))
+            for branch in checkpoint.get("branch", []):
+                condition = branch["if"]
+                for tool_name in branch.get("tools", []):
+                    if tool_name not in seen_tools:
+                        seen_tools.add(tool_name)
+                        io = TOOL_IO.get(tool_name)
+                        rationale = io.description if io else f"Run {tool_name}"
+                        prereqs = [condition]
+                        steps.append(ChainStep(
+                            tool=tool_name,
+                            rationale=rationale,
+                            phase=phase,
+                            prerequisites=prereqs,
+                        ))
+
+        self.chain = ToolChain(
+            methodology=method_name,
+            target_type=target_type,
+            steps=steps,
+        )
+        return self.chain
+
+    def mark_step_complete(self, tool: str, summary: str = ""):
+        self._used_tools.add(tool)
+        if self.chain:
+            for step in self.chain.steps:
+                if step.tool == tool and not step.completed:
+                    step.completed = True
+                    step.result_summary = summary
+                    break
+            while (self.chain.current_index < len(self.chain.steps) and
+                   self.chain.steps[self.chain.current_index].completed):
+                self.chain.current_index += 1
+
+    def suggest_next_tools(self, model, limit: int = 5) -> List[ChainStep]:
+        if not self.chain:
+            self.build_chain(model)
+
+        pending = []
+        for step in self.chain.pending_steps:
+            if self._prerequisites_met(step, model):
+                pending.append(step)
+            if len(pending) >= limit:
+                break
+
+        if not pending and self.chain:
+            self.build_chain(model, self.chain.target_type)
+            pending = [s for s in self.chain.pending_steps
+                       if self._prerequisites_met(s, model)][:limit]
+
+        return pending
+
+    def _prerequisites_met(self, step: ChainStep, model) -> bool:
+        if not step.prerequisites:
+            return True
+        ports = {p.get("port") for p in getattr(model, "ports", []) if isinstance(p, dict)}
+        tech = set((getattr(model, "tech_stack", {}) or {}).keys())
+        subdomains = bool(getattr(model, "subdomains", []))
+        credentials = bool(getattr(model, "credentials", []))
+        endpoints = bool(getattr(model, "endpoints", []))
+        os_info = (getattr(model, "os_info", "") or "").lower()
+
+        for prereq in step.prerequisites:
+            if prereq.startswith("port_"):
+                port_nums = prereq.replace("port_", "").split("|")
+                if port_nums:
+                    port_ints = {int(p) for p in port_nums if p.isdigit()}
+                    if port_ints and not (ports & port_ints):
+                        return False
+            elif prereq.startswith("tech_"):
+                tech_name = prereq.replace("tech_", "").lower()
+                if tech_name not in {t.lower() for t in tech}:
+                    return False
+            elif prereq == "domain_known":
+                if not subdomains and not getattr(model, "hostname", ""):
+                    return False
+            elif prereq == "credentials_known":
+                if not credentials:
+                    return False
+            elif prereq == "vuln_confirmed":
+                if not any(f.severity in ("high", "critical") for f in getattr(model, "findings", [])):
+                     return False
+            elif prereq == "os_linux":
+                if "linux" not in os_info:
+                    return False
+            elif prereq == "os_windows":
+                if "windows" not in os_info:
+                    return False
+            elif prereq.startswith("endpoint_"):
+                if not endpoints:
+                    return False
+                ep_type = prereq.replace("endpoint_", "").lower()
+                ep_list = [e.lower() for e in (getattr(model, "endpoints", []) or [])]
+                if not any(ep_type in e for e in ep_list):
+                    return False
+
+        return True
+
+    def chain_context(self, model) -> str:
+        parts = ["ATTACK CHAIN:"]
+
+        if self.chain:
+            steps = self.chain.steps
+            completed = [s for s in steps if s.completed]
+            pending = [s for s in steps if not s.completed]
+
+            if completed:
+                parts.append("  COMPLETED:")
+                for s in completed[-5:]:
+                    summary = s.result_summary[:60] if s.result_summary else ""
+                    parts.append(f"    ✓ {s.tool:<20} [{s.phase}] {summary}")
+
+            suggestions = self.suggest_next_tools(model, limit=5)
+            if suggestions:
+                parts.append("  NEXT STEPS (recommended chain):")
+                for s in suggestions:
+                    prereq_hint = ""
+                    if s.prerequisites and not self._prerequisites_met(s, model):
+                        prereq_hint = f" (needs: {', '.join(s.prerequisites)})"
+                    parts.append(f"    → {s.tool:<20} [{s.phase}] {s.rationale[:80]}{prereq_hint}")
+            elif pending:
+                parts.append("  BLOCKED STEPS (prerequisites not met):")
+                for s in pending[:3]:
+                    parts.append(f"    ⏸ {s.tool:<20} [{s.phase}] needs: {', '.join(s.prerequisites)}")
+            else:
+                parts.append("  ✓ All steps completed — consider setting completed=true")
+        else:
+            parts.append("  No attack chain built yet — start with reconnaissance.")
+
+        parts.append(f"\n  METHODOLOGY: {self.chain.methodology if self.chain else 'auto-detect'}")
+
+        return "\n".join(parts)

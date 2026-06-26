@@ -1,0 +1,14 @@
+# Core
+requests>=2.31.0
+chromadb>=1.5.0
+duckduckgo_search>=8.0.0
+selenium>=4.15.0
+pypdf>=3.0.0
+
+# Optional (install if needed):
+# interactsh    — OOB interaction testing (from x19.attacks)
+# PyJWT         — JWT attack module (from x19.attacks)
+# mitmproxy     — Proxy/traffic capture (from x19.network)
+# playwright    — Headless browser crawling (from x19.tools)
+# psycopg2-binary — PostgreSQL vector memory (from x19.memory)
+# sentence-transformers  — Local embeddings (from x19.memory)

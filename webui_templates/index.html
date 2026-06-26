@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>X19</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#1c2333;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--text3:#6e7681;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff;--cyan:#39d2c0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px}
+.header h1{font-size:17px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.header h1 span{color:var(--accent)}
+.header-right{display:flex;gap:10px;align-items:center}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.badge .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.badge .dot.green{background:var(--green)}
+.badge .dot.red{background:var(--red)}
+.badge .dot.yellow{background:var(--orange)}
+.tab-nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:0}
+.tab-nav button{padding:11px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.tab-nav button:hover{color:var(--text);background:var(--bg3)}
+.tab-nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-content{display:none;padding:20px 24px;height:calc(100vh - 102px);overflow-y:auto}
+.tab-content.active{display:block}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card h3{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:10px;font-weight:600}
+.stat{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)}
+.stat:last-child{border-bottom:none}
+.stat-label{font-size:13px;color:var(--text2)}
+.stat-value{font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.stat-value.green{color:var(--green)}
+.stat-value.red{color:var(--red)}
+.stat-value.orange{color:var(--orange)}
+.stat-value.accent{color:var(--accent)}
+.sev-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.sev-tag{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.sev-tag.critical{background:#2d1115;color:var(--red);border:1px solid #4d1f24}
+.sev-tag.high{background:#2d1a0e;color:var(--orange);border:1px solid #4d2d15}
+.sev-tag.medium{background:#2d260e;color:#d29922;border:1px solid #4d4015}
+.sev-tag.low{background:#0d1f2d;color:var(--accent);border:1px solid #15354d}
+.sev-tag.info{background:#1a1a1a;color:var(--text2);border:1px solid var(--border)}
+.btn{padding:7px 18px;border:none;border-radius:6px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;background:var(--accent);color:#0d1117;transition:opacity .15s}
+.btn:hover{opacity:.8}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.gray{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.btn.gray:hover{background:var(--border)}
+.btn.danger{background:var(--red);color:#fff}
+.btn.small{padding:4px 12px;font-size:12px}
+.form-group{margin-bottom:10px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px}
+.form-group input,.form-group select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;outline:none;background:var(--bg3);color:var(--text);transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
+.form-group .hint{font-size:11px;color:var(--text3);margin-top:2px}
+.form-group .ok{color:var(--green)}
+.form-group .no{color:var(--red)}
+.ftable{width:100%;border-collapse:collapse;font-size:13px}
+.ftable th{text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.ftable td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+.ftable tr:hover td{background:var(--bg3)}
+.console-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg2);display:flex;flex-direction:column}
+.console-head{padding:7px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text2);font-weight:500}
+.console-body{flex:1;padding:7px 12px;font-size:12px;line-height:1.6;overflow-y:auto;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-all;background:var(--bg);color:var(--text2);min-height:100px}
+.console-body .l{color:var(--text2)}
+.console-body .l.cmd{color:var(--accent)}
+.console-body .l.ok{color:var(--green)}
+.console-body .l.err{color:var(--red);background:#1c1012}
+.console-body .l.info{color:var(--purple)}
+.console-body .l.warn{color:var(--orange)}
+.console-body .l.find{color:var(--green);font-weight:500}
+.dash-grid{display:grid;grid-template-columns:280px 1fr;gap:20px;height:100%}
+.dash-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.dash-stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+.dash-stat-card .num{font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.dash-stat-card .lbl{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.dash-stat-card .num.green{color:var(--green)}
+.dash-stat-card .num.red{color:var(--red)}
+.dash-stat-card .num.accent{color:var(--accent)}
+.dash-stat-card .num.orange{color:var(--orange)}
+.chat-layout{display:grid;grid-template-columns:1fr 280px;gap:20px;height:100%}
+.chat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.chat-header .title{font-size:13px;font-weight:600;color:var(--text2)}
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.sess-layout{display:grid;grid-template-columns:300px 1fr;gap:0;height:100%;margin:-20px -24px}
+.sess-list{background:var(--bg2);border-right:1px solid var(--border);padding:12px;overflow-y:auto}
+.sess-list h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:8px}
+.sess-item{padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;margin-bottom:2px;transition:background .1s}
+.sess-item:hover{background:var(--bg3)}
+.sess-item.active{background:var(--bg3);border-left:2px solid var(--accent)}
+.sess-item .t{font-size:13px;font-weight:500;color:var(--text)}
+.sess-item .d{font-size:11px;color:var(--text3);margin-top:2px}
+.sess-detail{padding:20px;overflow-y:auto}
+.sess-detail h3{font-size:18px;font-weight:600;margin-bottom:4px;color:var(--text)}
+.sess-detail .meta{display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text3);flex-wrap:wrap}
+.chat-box{flex:1;border:1px solid var(--border);border-radius:10px;background:var(--bg2);padding:12px;overflow-y:auto;margin-bottom:10px}
+.chat-msg{padding:9px 12px;margin-bottom:7px;border-radius:6px;font-size:13px;line-height:1.5;background:var(--bg3)}
+.chat-msg.system{background:transparent;color:var(--text3);text-align:center;font-size:12px}
+.chat-msg.user{background:#1c2c42;border:1px solid #1f3a5f;margin-left:40px}
+.chat-msg.user::before{content:"> ";color:var(--accent);font-weight:600}
+.chat-msg.agent{background:var(--bg2);border:1px solid var(--border);margin-right:40px}
+.chat-msg.agent::before{content:"# ";color:var(--purple);font-weight:600}
+.chat-input{display:flex;gap:8px}
+.chat-input input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;outline:none;background:var(--bg3);color:var(--text);transition:border-color .15s}
+.chat-input input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
+.chat-input button{padding:8px 18px;border:none;border-radius:6px;background:var(--accent);color:#0d1117;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.chat-input button:hover{opacity:.8}
+.chat-input button:disabled{opacity:.4;cursor:not-allowed}
+.chat-input button.danger{background:var(--red);color:#fff}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;background:#21262d;color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.toast.error{background:#2d1115;border-color:var(--red)}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+.empty-state{padding:40px 20px;text-align:center;color:var(--text3)}
+.empty-state .icon{font-size:32px;margin-bottom:8px;opacity:.4}
+.empty-state p{font-size:13px}
+.tool-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:var(--bg3);color:var(--text2);margin:2px}
+.tool-tag.ok{background:#0f2d1a;color:var(--green);border:1px solid #1a4d2d}
+.tool-tag.missing{background:#2d1115;color:var(--red);border:1px solid #4d1f24}
+.progress-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin:8px 0}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:2px;transition:width .5s}
+.cmd-hint{font-size:11px;color:var(--text3);margin-top:6px;text-align:center}
+.cmd-hint code{background:var(--bg3);padding:1px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:10px}
+.cmd-hint a{color:var(--accent);cursor:pointer;text-decoration:none}
+.cmd-hint a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> X19 <span>| Pentest Agent</span></h1>
+  <div class="header-right">
+    <span class="badge"><span class="dot green" id="hdStatusDot"></span><span id="hdStatus">Online</span></span>
+    <span class="badge" id="hdSession">No session</span>
+    <span class="badge" id="hdFindings" title="Total findings">0 findings</span>
+    <span class="badge" id="hdProvider">-</span>
+  </div>
+</div>
+<div class="tab-nav">
+  <button class="active" data-tab="dashboard">Dashboard</button>
+  <button data-tab="chat">Chat</button>
+  <button data-tab="config">Settings</button>
+  <button data-tab="sessions">Sessions</button>
+</div>
+
+<div class="tab-content active" id="tab-dashboard">
+<div class="dash-grid">
+  <div style="overflow-y:auto">
+    <div class="card">
+      <h3>Overview</h3>
+      <div id="dashStatus"></div>
+    </div>
+    <div class="card" style="margin-top:12px;padding:10px">
+      <h3>Findings by Severity</h3>
+      <div class="sev-row" id="dashSev"></div>
+      <div style="margin-top:8px;text-align:center;color:#5a5f6b;font-size:12px" id="dashSevTotal"></div>
+    </div>
+    <div class="card" style="margin-top:12px;padding:10px">
+      <h3>System</h3>
+      <div id="dashSys"></div>
+    </div>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="switchTab('chat')">New Assessment</button>
+    <button class="btn gray" style="width:100%;margin-top:6px" onclick="location.reload()">Refresh Dashboard</button>
+  </div>
+  <div style="display:flex;flex-direction:column;min-height:0">
+    <div class="dash-stats-grid" id="dashStatsGrid">
+      <div class="dash-stat-card"><div class="num accent" id="dsSessions">0</div><div class="lbl">Sessions</div></div>
+      <div class="dash-stat-card"><div class="num green" id="dsCommands">0</div><div class="lbl">Commands</div></div>
+      <div class="dash-stat-card"><div class="num orange" id="dsRunning">0</div><div class="lbl">Running</div></div>
+      <div class="dash-stat-card"><div class="num red" id="dsFindings">0</div><div class="lbl">Findings</div></div>
+    </div>
+    <div class="console-wrap" style="flex:1">
+      <div class="console-head"><span>Console</span><span id="logCount">0 lines</span></div>
+      <div class="console-body" id="consoleBody"></div>
+    </div>
+    <div class="card" style="margin-top:12px;padding:10px;flex-shrink:0;max-height:200px;overflow-y:auto">
+      <h3>Latest Findings</h3>
+      <div id="dashFindings" style="font-size:13px;color:#5a5f6b">None yet</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="tab-content" id="tab-chat">
+<div class="chat-layout">
+  <div class="chat-main" style="display:flex;flex-direction:column">
+    <div class="chat-header">
+      <span class="title">Chat</span>
+      <button class="btn gray small" onclick="newChat()" style="font-size:11px">New Chat</button>
+    </div>
+    <div class="chat-box" id="chatBox">
+      <div class="chat-msg system">Commands: <a onclick="doHelp()">/help</a>, /clear, /status, /memory</div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Target, /help, or /engage &lt;target&gt;..." autocomplete="off" onkeydown="if(event.key==='Enter')doChat()">
+      <button id="chatBtnSend" onclick="doChat()">Send</button>
+      <button id="chatBtnStop" class="danger" onclick="doStop()" disabled>Stop</button>
+    </div>
+    <div class="cmd-hint">Commands: <code>/clear</code> <code>/status</code> <code>/memory</code> <code>/help</code> &mdash; or just type a target</div>
+  </div>
+  <div>
+    <div class="card">
+      <h3>Session Info</h3>
+      <div id="chatInfo">
+        <div class="stat"><span class="stat-label">Status</span><span class="stat-value" id="ciStatus">Idle</span></div>
+        <div class="stat"><span class="stat-label">Target</span><span class="stat-value" id="ciTarget">-</span></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3>Quick Actions</h3>
+      <button class="btn gray small" style="width:100%;margin-bottom:4px" onclick="startEngage('example.com')">Quick: example.com</button>
+      <button class="btn gray small" style="width:100%;margin-bottom:4px" onclick="startEngage('scanme.nmap.org')">Quick: scanme.nmap.org</button>
+      <button class="btn gray small" style="width:100%" onclick="switchTab('sessions')">View Sessions</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="tab-content" id="tab-config">
+<div class="config-grid">
+  <div>
+    <div class="card">
+      <h3>AI Provider</h3>
+      <div class="form-group"><label>Provider</label><select id="cfgProv" onchange="cfgProvChange()"></select></div>
+      <div class="form-group"><label>Model</label><input type="text" id="cfgModel" placeholder="e.g. gpt-4o"><div class="hint">Leave empty for provider default</div></div>
+      <div class="form-group"><label>API Key</label><input type="password" id="cfgKey" placeholder="Enter API key"><div class="hint" id="cfgKeyHint"></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn" onclick="saveProv()">Save Provider</button>
+        <button class="btn gray" onclick="cfgProvChange()">Check Key</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>MCP</h3>
+      <div class="form-group"><label>Kali MCP Server Name</label><input type="text" id="cfgMCP" placeholder="kali"></div>
+      <button class="btn" onclick="saveMCP()">Save MCP</button>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h3>General</h3>
+      <div class="form-group"><label>Target Type</label><select id="cfgTT"><option value="auto">Auto</option><option value="web">Web</option><option value="network">Network</option><option value="api">API</option><option value="ctf">CTF</option></select></div>
+      <div class="form-group"><label>Fast Mode</label><select id="cfgFast"><option value="false">Off</option><option value="true">On</option></select></div>
+      <div class="form-group"><label>Max Iterations</label><input type="number" id="cfgIter" min="1" max="500"></div>
+      <button class="btn" onclick="saveGeneral()">Save Settings</button>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>Plugins</h3>
+      <div id="pluginList" style="font-size:13px;color:#5a5f6b">Loading...</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="tab-content" id="tab-sessions">
+<div class="sess-layout">
+  <div class="sess-list">
+    <h3>Recent Sessions</h3>
+    <div id="sessList"></div>
+  </div>
+  <div class="sess-detail" id="sessDetail">
+    <div class="empty-state">
+      <div class="icon">&#128269;</div>
+      <p>Select a session on the left to view details.</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var allLogs = [];
+var agentRunning = false;
+var sseConnected = false;
+var pollTimer = null;
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+function toast(msg, err) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (err ? ' error' : '');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+function switchTab(name) {
+  var buttons = document.querySelectorAll('.tab-nav button');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].classList.toggle('active', buttons[i].dataset.tab === name);
+  }
+  var contents = document.querySelectorAll('.tab-content');
+  for (var i = 0; i < contents.length; i++) {
+    contents[i].classList.toggle('active', contents[i].id === 'tab-' + name);
+  }
+  if (name === 'config') { loadConfig(); }
+  if (name === 'sessions') { loadSessions(); }
+}
+
+(function() {
+  var buttons = document.querySelectorAll('.tab-nav button');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener('click', function() { switchTab(this.dataset.tab); });
+  }
+})();
+
+function stripAnsi(s) {
+  return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][0-9;]*[^\x1b]*(\x1b\\)?/g, '').replace(/\x1b[^A-Za-z]/g, '');
+}
+
+function lineClass(l) {
+  var s = l.toLowerCase();
+  if (s.indexOf('[finding]') !== -1 || s.indexOf('[+]') !== -1 && (s.indexOf('found') !== -1 || s.indexOf('detected') !== -1)) { return 'find'; }
+  if (s.indexOf('error') !== -1 || s.indexOf('fail') !== -1 || s.indexOf('traceback') !== -1 || s.indexOf('[!]') !== -1) { return 'err'; }
+  if (s.indexOf('warning') !== -1 || s.indexOf('warn') !== -1) { return 'warn'; }
+  if (s.indexOf('[*]') !== -1 || s.indexOf('completed') !== -1 || s.indexOf('ok') !== -1) { return 'ok'; }
+  if (s.indexOf('EXEC:') === 0 || s.indexOf('[tool') !== -1 || s.indexOf('toold') !== -1) { return 'cmd'; }
+  if (l.charAt(0) === '[') { return 'info'; }
+  return '';
+}
+
+function addLogs(lines) {
+  var body = $('consoleBody');
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i];
+    var l = stripAnsi(raw);
+    allLogs.push(l);
+    var cls = lineClass(l);
+    var div = document.createElement('div');
+    div.className = 'l' + (cls ? ' ' + cls : '');
+    div.textContent = l;
+    body.appendChild(div);
+  }
+  body.scrollTop = body.scrollHeight;
+  $('logCount').textContent = allLogs.length + ' lines';
+}
+
+function startSSE() {
+  var es = new EventSource('/api/stream/logs');
+  es.onmessage = function(e) {
+    if (!e.data || e.data === ': heartbeat') { return; }
+    try {
+      var d = JSON.parse(e.data);
+      if (d.lines && d.lines.length) {
+        addLogs(d.lines);
+        var chat = $('chatBox');
+        for (var i = 0; i < d.lines.length; i++) {
+          var raw = d.lines[i];
+          var l = stripAnsi(raw);
+          if (l.indexOf('[!]') !== -1 || l.indexOf('[+]') === 0 || l.indexOf('Error') !== -1 || l.indexOf('completed') !== -1 || l.indexOf('found') !== -1) {
+            var m = document.createElement('div');
+            m.className = 'chat-msg agent';
+            m.textContent = l.substring(0, 200);
+            chat.appendChild(m);
+          }
+        }
+        chat.scrollTop = chat.scrollHeight;
+      }
+    } catch(_) {}
+  };
+  es.onopen = function() { sseConnected = true; };
+  es.onerror = function() { sseConnected = false; setTimeout(startSSE, 3000); };
+}
+
+function refreshHeader() {
+  fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+    var dot = $('hdStatusDot');
+    if (d.agent_running) { dot.className = 'dot yellow'; $('hdStatus').textContent = 'Running'; }
+    else { dot.className = 'dot green'; $('hdStatus').textContent = 'Online'; }
+    var a = d.sessions.find(function(s) { return s.status === 'active'; });
+    $('hdSession').textContent = a ? (a.target || 'Active') : 'No session';
+    $('hdProvider').textContent = d.config.ai_provider || '-';
+    if (d.session_count !== undefined) {
+      var total = 0;
+      for (var i = 0; i < d.sessions.length; i++) {
+        total += (d.sessions[i].findings_count || 0);
+      }
+      $('hdFindings').textContent = total + ' findings';
+    }
+  }).catch(function() {
+    $('hdStatusDot').className = 'dot red';
+    $('hdStatus').textContent = 'Offline';
+  });
+}
+
+function refreshDash() {
+  fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+    var html = '';
+    var a = d.sessions.find(function(s) { return s.status === 'active'; });
+    html += '<div class="stat"><span class="stat-label">Target</span><span class="stat-value" id="dTarget">' + esc(a ? a.target : '-') + '</span></div>';
+    html += '<div class="stat"><span class="stat-label">Agent</span><span class="stat-value' + (d.agent_running ? ' orange' : '') + '">' + (d.agent_running ? 'Running' : 'Idle') + '</span></div>';
+    if (a) {
+      html += '<div class="stat"><span class="stat-label">Commands</span><span class="stat-value green">' + (a.commands_count || 0) + '</span></div>';
+      html += '<div class="stat"><span class="stat-label">Findings</span><span class="stat-value red">' + (a.findings_count || 0) + '</span></div>';
+    }
+    html += '<div class="stat"><span class="stat-label">DB Sessions</span><span class="stat-value accent">' + (d.session_count || 0) + '</span></div>';
+    $('dashStatus').innerHTML = html;
+
+    var sysHtml = '';
+    sysHtml += '<div class="stat"><span class="stat-label">Provider</span><span class="stat-value accent" style="font-size:12px">' + esc(d.config.ai_provider || '-') + '</span></div>';
+    sysHtml += '<div class="stat"><span class="stat-label">Model</span><span class="stat-value" style="font-size:12px">' + esc(d.config.ai_model || 'default') + '</span></div>';
+    sysHtml += '<div class="stat"><span class="stat-label">Kali MCP</span><span class="stat-value" style="font-size:12px">' + esc(d.config.kali_mcp || 'disabled') + '</span></div>';
+    sysHtml += '<div class="stat"><span class="stat-label">Workspace</span><span class="stat-value" style="font-size:12px">' + esc(d.config.workspace || '') + '</span></div>';
+    $('dashSys').innerHTML = sysHtml;
+  }).catch(function() {});
+
+  fetch('/api/stats').then(function(r) { return r.json(); }).then(function(d) {
+    var s = $('dashSev');
+    s.innerHTML = '';
+    var sev = d.findings_by_severity || {};
+    var total = 0;
+    var order = ['critical', 'high', 'medium', 'low', 'info'];
+    for (var oi = 0; oi < order.length; oi++) {
+      var key = order[oi];
+      if (sev[key]) {
+        var t = document.createElement('span');
+        t.className = 'sev-tag ' + key;
+        t.textContent = key.toUpperCase() + ': ' + sev[key];
+        s.appendChild(t);
+        total += sev[key];
+      }
+    }
+    $('dashSevTotal').textContent = total + ' total findings';
+    $('dsSessions').textContent = d.total_sessions || 0;
+    $('dsCommands').textContent = d.total_commands || 0;
+    $('dsFindings').textContent = d.total_findings || 0;
+    $('dsRunning').textContent = d.total_sessions_active || 0;
+  }).catch(function() {});
+
+  fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.active_session) {
+      $('dashFindings').innerHTML = '<div style="text-align:center;padding:10px;color:#5a5f6b">No active session</div>';
+      return;
+    }
+    fetch('/api/session/' + d.active_session).then(function(r) { return r.json(); }).then(function(s) {
+      var b = $('dashFindings');
+      b.innerHTML = '';
+      var findings = s.findings || [];
+      if (findings.length === 0) {
+        b.innerHTML = '<div style="text-align:center;padding:10px;color:#5a5f6b">No findings yet</div>';
+        return;
+      }
+      var h = '<table class="ftable"><thead><tr><th style="width:80px">Severity</th><th>Title</th></tr></thead><tbody>';
+      for (var i = 0; i < Math.min(findings.length, 10); i++) {
+        var f = findings[i];
+        h += '<tr><td><span class="sev-tag ' + (f.severity || 'info') + '">' + esc(f.severity || 'info') + '</span></td><td>' + esc(f.title || f.detail || '').substring(0, 100) + '</td></tr>';
+      }
+      h += '</tbody></table>';
+      b.innerHTML = h;
+    }).catch(function() {});
+  }).catch(function() {});
+}
+
+function addMsg(text, type) {
+  var c = $('chatBox');
+  var d = document.createElement('div');
+  d.className = 'chat-msg ' + type;
+  d.textContent = text;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+
+function newChat() {
+  $('chatBox').innerHTML = '<div class="chat-msg system">Chat cleared. Type a target or <a onclick="doHelp()">/help</a>.</div>';
+  toast('Chat cleared');
+}
+
+function doHelp() {
+  addMsg('/help — show this message', 'system');
+  addMsg('/clear — clear chat messages', 'system');
+  addMsg('/status — show agent status info', 'system');
+  addMsg('/memory — show memory/db stats', 'system');
+  addMsg('/engage <target> — start assessment', 'system');
+  addMsg('Or just type a target name directly', 'system');
+}
+
+function doClear() {
+  newChat();
+}
+
+function doStatus() {
+  addMsg('/status', 'user');
+  $('chatBtnSend').disabled = true;
+  fetch('/api/status').then(function(r){return r.json()}).then(function(d){
+    var html = 'Agent: ' + (d.agent_running ? 'Running' : 'Idle') + '\n';
+    html += 'Session: ' + (d.active_session || 'none') + '\n';
+    html += 'Uptime: ' + (d.uptime || '0') + 's';
+    addMsg(html, 'system');
+    if (d.active_session) {
+      fetch('/api/session/' + d.active_session).then(function(r){return r.json()}).then(function(s){
+        addMsg('Target: ' + (s.target || '?') + ' | Commands: ' + (s.commands_done || 0) + '/' + (s.commands_total || '?') + ' | Findings: ' + (s.findings ? s.findings.length : 0), 'system');
+      }).catch(function(){});
+    }
+  }).catch(function(){addMsg('Could not fetch status', 'system')})
+  .then(function(){$('chatBtnSend').disabled = false});
+}
+
+function doMemory() {
+  addMsg('/memory', 'user');
+  $('chatBtnSend').disabled = true;
+  fetch('/api/stats').then(function(r){return r.json()}).then(function(d){
+    var html = 'Total sessions: ' + (d.total_sessions || 0) + '\n';
+    html += 'Active sessions: ' + (d.total_sessions_active || 0) + '\n';
+    html += 'Total commands: ' + (d.total_commands || 0) + '\n';
+    html += 'Total findings: ' + (d.total_findings || 0) + '\n';
+    if (d.findings_by_severity) {
+      var s = d.findings_by_severity;
+      var parts = [];
+      if (s.critical) parts.push('Critical: ' + s.critical);
+      if (s.high) parts.push('High: ' + s.high);
+      if (s.medium) parts.push('Medium: ' + s.medium);
+      if (s.low) parts.push('Low: ' + s.low);
+      if (s.info) parts.push('Info: ' + s.info);
+      html += 'By severity: ' + parts.join(', ');
+    }
+    addMsg(html, 'system');
+  }).catch(function(){addMsg('Could not fetch memory stats', 'system')})
+  .then(function(){$('chatBtnSend').disabled = false});
+}
+
+function doChat() {
+  var input = $('chatInput');
+  var text = input.value.trim();
+  if (!text) { return; }
+  input.value = '';
+  var lower = text.toLowerCase();
+  if (lower.indexOf('/engage ') === 0 || lower.indexOf('engage ') === 0) {
+    var parts = text.split(/\s+/);
+    parts.shift();
+    startEngage(parts.join(' '));
+    return;
+  }
+  if (lower === '/clear') { doClear(); return; }
+  if (lower === '/help') { doHelp(); return; }
+  if (lower === '/status') { doStatus(); return; }
+  if (lower === '/memory') { doMemory(); return; }
+  if (lower === '/engage') { addMsg(text, 'user'); addMsg('Usage: /engage <target>', 'system'); return; }
+  if (lower.indexOf('/') === 0) {
+    addMsg(text, 'user');
+    addMsg('Unknown command. Type /help for available commands.', 'system');
+    return;
+  }
+  startEngage(text);
+}
+
+function startEngage(target) {
+  addMsg('Engaging: ' + target, 'user');
+  addMsg('Starting agent...', 'system');
+  $('chatBtnSend').disabled = true;
+  fetch('/api/engage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target: target })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error) {
+      addMsg('Error: ' + d.error, 'system');
+      $('chatBtnSend').disabled = false;
+      return;
+    }
+    addMsg('Agent started (PID: ' + d.pid + ')', 'system');
+    $('chatBtnStop').disabled = false;
+    agentRunning = true;
+    refreshHeader();
+    pollAgent();
+    var ci = $('chatInfo');
+    ci.innerHTML = '<div class="stat"><span class="stat-label">Status</span><span class="stat-value orange">Running</span></div><div class="stat"><span class="stat-label">Target</span><span class="stat-value">' + esc(target) + '</span></div><div class="progress-bar"><div class="fill" style="width:100%"></div></div>';
+  }).catch(function(e) {
+    addMsg('Failed: ' + e.message, 'system');
+    $('chatBtnSend').disabled = false;
+  });
+}
+
+function doStop() {
+  fetch('/api/engage/stop', { method: 'POST' }).then(function() {
+    addMsg('Agent stopped.', 'system');
+    agentRunning = false;
+    $('chatBtnSend').disabled = false;
+    $('chatBtnStop').disabled = true;
+    refreshHeader();
+    var ci = $('chatInfo');
+    ci.innerHTML = '<div class="stat"><span class="stat-label">Status</span><span class="stat-value">Idle</span></div><div class="stat"><span class="stat-label">Target</span><span class="stat-value">-</span></div>';
+  }).catch(function(e) {
+    toast('Stop failed: ' + e.message, true);
+  });
+}
+
+function pollAgent() {
+  if (!agentRunning) { return; }
+  fetch('/api/engage/status').then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.running) {
+      agentRunning = false;
+      $('chatBtnSend').disabled = false;
+      $('chatBtnStop').disabled = true;
+      var ec = d.exit_code;
+      addMsg('Agent finished (exit: ' + (ec !== undefined && ec !== null ? ec : '?') + ')', 'system');
+      refreshHeader();
+      var ci = $('chatInfo');
+      ci.innerHTML = '<div class="stat"><span class="stat-label">Status</span><span class="stat-value' + (ec === 0 ? ' green' : ' red') + '">Finished (exit: ' + (ec !== undefined && ec !== null ? ec : '?') + ')</span></div><div class="stat"><span class="stat-label">Target</span><span class="stat-value">-</span></div>';
+      return;
+    }
+    fetch('/api/status').then(function(r) { return r.json(); }).then(function(sd) {
+      if (sd.active_session) {
+        var s = sd.sessions.find(function(x) { return x.session_id === sd.active_session; });
+        if (s) {
+          var ci = $('chatInfo');
+          ci.innerHTML = '<div class="stat"><span class="stat-label">Status</span><span class="stat-value orange">Running</span></div><div class="stat"><span class="stat-label">Commands</span><span class="stat-value green">' + (s.commands_count || 0) + '</span></div><div class="stat"><span class="stat-label">Findings</span><span class="stat-value red">' + (s.findings_count || 0) + '</span></div><div class="progress-bar"><div class="fill" style="width:100%"></div></div>';
+        }
+      }
+      setTimeout(pollAgent, 3000);
+    }).catch(function() { setTimeout(pollAgent, 5000); });
+  }).catch(function() { setTimeout(pollAgent, 5000); });
+}
+
+function loadConfig() {
+  fetch('/api/providers').then(function(r) { return r.json(); }).then(function(d) {
+    var s = $('cfgProv');
+    s.innerHTML = '';
+    for (var i = 0; i < d.providers.length; i++) {
+      var p = d.providers[i];
+      var o = document.createElement('option');
+      o.value = p.id;
+      o.textContent = p.name + (p.key_set ? ' (key set)' : '');
+      if (p.active) { o.selected = true; }
+      s.appendChild(o);
+    }
+    $('cfgModel').value = d.active_model || '';
+    cfgProvChange();
+  }).catch(function() {});
+  fetch('/api/config').then(function(r) { return r.json(); }).then(function(d) {
+    $('cfgMCP').value = d.kali_mcp || '';
+    $('cfgTT').value = d.target_type || 'auto';
+    $('cfgFast').value = d.fast_mode ? 'true' : 'false';
+    $('cfgIter').value = d.max_iterations || 100;
+  }).catch(function() {});
+  fetch('/api/plugins').then(function(r) { return r.json(); }).then(function(d) {
+    var el = $('pluginList');
+    if (d.length === 0) { el.innerHTML = '<span style="color:#5a5f6b">No custom plugins installed</span>'; return; }
+    var html = '';
+    for (var i = 0; i < d.length; i++) {
+      html += '<div style="padding:4px 0;border-bottom:1px solid #eef0f2;font-size:13px"><b>' + esc(d[i].name) + '</b> <span style="color:#5a5f6b;font-size:12px">' + esc(d[i].file) + '</span></div>';
+    }
+    el.innerHTML = html;
+  }).catch(function() {});
+}
+
+function cfgProvChange() {
+  var pid = $('cfgProv').value;
+  fetch('/api/providers').then(function(r) { return r.json(); }).then(function(d) {
+    for (var i = 0; i < d.providers.length; i++) {
+      if (d.providers[i].id === pid) {
+        var s = $('cfgKeyHint');
+        if (d.providers[i].needs_key) {
+          s.textContent = d.providers[i].key_set ? 'API key is configured' : 'API key not set';
+          s.className = 'hint ' + (d.providers[i].key_set ? 'ok' : 'no');
+        } else {
+          s.textContent = 'No API key required (local/Ollama)';
+          s.className = 'hint';
+        }
+        break;
+      }
+    }
+  }).catch(function() {});
+}
+
+function saveProv() {
+  var pid = $('cfgProv').value;
+  var model = $('cfgModel').value.trim();
+  var key = $('cfgKey').value.trim();
+  var body = { ai_provider: pid };
+  if (model) { body.ai_model = model; }
+  if (key) { body.provider_id = pid; body.api_key = key; }
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.status === 'saved') {
+      toast('Provider saved');
+      $('cfgKey').value = '';
+      cfgProvChange();
+      refreshHeader();
+    } else {
+      toast('Save failed', true);
+    }
+  }).catch(function(e) { toast('Save failed: ' + e.message, true); });
+}
+
+function saveMCP() {
+  var v = $('cfgMCP').value.trim();
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kali_mcp: v || 'kali' }) }).then(function() {
+    toast('MCP saved');
+    refreshHeader();
+  }).catch(function(e) { toast('Save failed: ' + e.message, true); });
+}
+
+function saveGeneral() {
+  var body = {
+    target_type: $('cfgTT').value,
+    fast_mode: $('cfgFast').value === 'true',
+    max_iterations: parseInt($('cfgIter').value) || 100
+  };
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function() {
+    toast('Settings saved');
+  }).catch(function(e) { toast('Save failed: ' + e.message, true); });
+}
+
+function loadSessions() {
+  fetch('/api/sessions').then(function(r) { return r.json(); }).then(function(d) {
+    var b = $('sessList');
+    if (d.length === 0) {
+      b.innerHTML = '<div class="empty-state"><div class="icon">&#128196;</div><p>No sessions yet. Start an assessment from the Chat tab.</p></div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < d.length; i++) {
+      var s = d[i];
+      var statusIcon = s.status === 'active' ? '&#9679;' : '&#9675;';
+      var statusColor = s.status === 'active' ? '#16a34a' : '#5a5f6b';
+      html += '<div class="sess-item" onclick="showSession(\'' + s.session_id + '\')"><div class="t"><span style="color:' + statusColor + '">' + statusIcon + '</span> ' + esc(s.target || '-') + '</div><div class="d">' + esc(s.started || '') + ' &middot; ' + esc(s.status || '') + ' &middot; ' + (s.findings_count || 0) + ' findings</div></div>';
+    }
+    b.innerHTML = html;
+  }).catch(function() {
+    $('sessList').innerHTML = '<div class="empty-state"><p>Failed to load sessions.</p></div>';
+  });
+}
+
+function showSession(sid) {
+  fetch('/api/session/' + sid).then(function(r) { return r.json(); }).then(function(d) {
+    var s = d.session || {};
+    var el = $('sessDetail');
+    var html = '<h3>' + esc(s.target || sid) + '</h3>';
+    html += '<div class="meta"><span>ID: ' + esc(s.session_id || '').substring(0, 20) + '...</span><span>Status: <strong>' + esc(s.status || '') + '</strong></span><span>Started: ' + esc(s.started || '') + '</span>' + (s.ended ? '<span>Ended: ' + esc(s.ended) + '</span>' : '') + '</div>';
+
+    if (d.ports && d.ports.length) {
+      html += '<div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">';
+      for (var i = 0; i < d.ports.length; i++) {
+        var p = d.ports[i];
+        html += '<span style="background:#eef0f2;padding:3px 10px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:13px">' + esc(String(p.port || '')) + '/' + esc(p.proto || 'tcp') + ' <span style="color:#5a5f6b">' + esc(p.service || '') + '</span></span>';
+      }
+      html += '</div>';
+    }
+
+    if (d.findings && d.findings.length) {
+      html += '<div class="card" style="padding:10px;margin-bottom:12px"><h3>Findings (' + d.findings.length + ')</h3><table class="ftable"><thead><tr><th style="width:80px">Sev</th><th>Title</th></tr></thead><tbody>';
+      var order = ['critical', 'high', 'medium', 'low', 'info'];
+      var sorted = [];
+      for (var oi = 0; oi < order.length; oi++) {
+        for (var fi = 0; fi < d.findings.length; fi++) {
+          if (d.findings[fi].severity === order[oi]) { sorted.push(d.findings[fi]); }
+        }
+      }
+      for (var i = 0; i < sorted.length; i++) {
+        var f = sorted[i];
+        html += '<tr><td><span class="sev-tag ' + (f.severity || 'info') + '">' + esc(f.severity || 'info') + '</span></td><td>' + esc(f.title || f.detail || '').substring(0, 150) + '</td></tr>';
+      }
+      html += '</tbody></table></div>';
+    } else {
+      html += '<p style="color:#5a5f6b;margin-bottom:12px">No findings.</p>';
+    }
+
+    if (d.commands && d.commands.length) {
+      html += '<div class="card" style="padding:10px"><h3>Commands (' + d.commands.length + ')</h3><table class="ftable"><thead><tr><th>Command</th><th>Category</th><th>Exit</th></tr></thead><tbody>';
+      for (var i = 0; i < Math.min(d.commands.length, 100); i++) {
+        var c = d.commands[i];
+        var rcColor = c.returncode === 0 ? '#16a34a' : '#dc2626';
+        html += '<tr><td style="font-family:JetBrains Mono,monospace;font-size:12px;color:#2563eb">' + esc((c.cmd || '').substring(0, 90)) + '</td><td style="font-size:12px;color:#5a5f6b">' + esc(c.category || '') + '</td><td style="font-weight:600;color:' + rcColor + '">' + (c.returncode !== null && c.returncode !== undefined ? c.returncode : '') + '</td></tr>';
+      }
+      html += '</tbody></table></div>';
+    } else {
+      html += '<p style="color:#5a5f6b;margin-bottom:12px">No commands executed.</p>';
+    }
+
+    el.innerHTML = html;
+  }).catch(function(e) {
+    $('sessDetail').innerHTML = '<h3>Error</h3><p style="color:#dc2626">' + esc(e.message) + '</p>';
+  });
+}
+
+(function() {
+  startSSE();
+  refreshDash();
+  refreshHeader();
+  setInterval(function() { refreshDash(); refreshHeader(); }, 5000);
+  $('chatInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') { doChat(); } });
+})();
+</script>
+</body>
+</html>
