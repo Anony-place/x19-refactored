@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Any
 import time
+import re
 
 from config import CONFIG
 from constants import C, ICO
@@ -443,60 +444,29 @@ def generate_structured_hypotheses(
     target: str,
     service_attacks: Dict[Any, List[Any]],
 ) -> List[Any]:
-    """Inspect target model and generate specific, testable hypotheses."""
-    from loop import StructuredHypothesis
-    hyps: List[Any] = []
-    seen: set = set()
-    all_ports = {p["port"]: p.get("service", "").lower() for p in getattr(model, "ports", []) or [] if isinstance(p, dict)}
-    tech_raw = " ".join(f"{k} {v}" for k, v in (getattr(model, "tech_stack", {}) or {}).items()).lower()
-    host = target.strip().lower()
-    host = re.sub(r'^https?://', '', host).split('/')[0]
-
-    for port, attacks in service_attacks.items():
-        if port not in all_ports:
-            continue
-        for technique, cmd_tpl, expected, interpretation, priority in attacks:
-            cmd = cmd_tpl.format(host=host, domain=host)
-            title = f"{technique} on {host}:{port}"
-            if title in seen:
-                continue
-            seen.add(title)
-            hyps.append(StructuredHypothesis(
-                title=title, service=all_ports[port], technique=technique,
-                command=cmd, expected=expected, interpretation=interpretation,
-                port=port, priority=priority
-            ))
-
-    known_tests: List[tuple] = []
-    known_tests.append(("WordPress CVE check", "WordPress", "wpscan --url http://{port_host} --enumerate vp,vt,u --no-banner 2>/dev/null", "vulnerable plugins/themes/users", "WPScan output reveals outdated components with known CVEs", 0.8))
-    known_tests.append(("Laravel debug", "Laravel", "curl -sik 'http://{port_host}/' 2>/dev/null | grep -i laravel; curl -sik 'http://{port_host}/.env' --max-time 5 | head -20", "APP_KEY or DB credentials leak", "Laravel .env exposure reveals secrets", 0.9))
-    known_tests.append(("Django admin", "Django", "curl -sik 'http://{port_host}/admin/' --max-time 5", "admin login page or redirect", "Django admin accessible = potential auth bypass", 0.6))
-    known_tests.append(("Spring Actuator", "Spring", "curl -sik 'http://{port_host}/actuator/' --max-time 5; curl -sik 'http://{port_host}/actuator/env' --max-time 5", "actuator index + env dump", "Spring actuator exposes config, secrets, routes", 0.9))
-    known_tests.append(("Flask debug", "Flask", "curl -sik 'http://{port_host}/console' --max-time 5", "Werkzeug debug console", "Werkzeug debug = RCE via Python console", 0.9))
-    known_tests.append(("GraphQL introspection", "GraphQL", "curl -sik -X POST 'http://{port_host}/graphql' -H 'Content-Type: application/json' -d '{{\"query\":\"query {{ __schema {{ types {{ name }}}}}}\"}}' --max-time 5 | head -30", "schema types in response", "Introspection enabled = full schema leak", 0.8))
-    known_tests.append(("Nuxt/Next SSR Leak", "Next.js", "curl -sik 'http://{port_host}/_next/data/develop/index.json' --max-time 5", "JSON with props", "SSR data leak endpoint exposes server-side props", 0.7))
-    known_tests.append(("PHP info leak", "PHP", "curl -sik 'http://{port_host}/phpinfo.php' --max-time 5; curl -sik 'http://{port_host}/info.php' --max-time 5", "PHP info page", "phpinfo() exposes all server configuration", 0.5))
-    known_tests.append(("Git exposure", "Git", "curl -sik 'http://{port_host}/.git/HEAD' --max-time 5", "ref: refs/heads/...", "Git repo exposed = full source code access", 0.9))
-    known_tests.append(("S3 bucket", "AWS", "curl -sik 'http://{host}.s3.amazonaws.com/' --max-time 5; curl -sik 'http://s3.amazonaws.com/{host}' --max-time 5", "ListBucketResult XML", "Public S3 bucket = data leak", 0.7))
-    known_tests.append(("Env backup", "Env", "curl -sik 'http://{port_host}/.env.bak' --max-time 5; curl -sik 'http://{port_host}/.env.save' --max-time 5; curl -sik 'http://{port_host}/.env.old' --max-time 5", "env file content", "Environment backup = secrets leak", 0.8))
-    known_tests.append(("Backup zip", "Backup", "curl -sik 'http://{port_host}/backup.zip' --max-time 5 -o /dev/null -w '%{{http_code}}'; curl -sik 'http://{port_host}/backup.tar.gz' --max-time 5 -o /dev/null -w '%{{http_code}}'", "200 or 301", "Backup archive download = full app code + data", 0.8))
-
-    for title, tech_key, cmd_tpl, expected, interpretation, priority in known_tests:
-        if tech_key.lower() not in tech_raw:
-            continue
-        cmd = cmd_tpl.format(host=host, port_host=port_host)
-        if title in seen:
-            continue
-        seen.add(title)
-        hyps.append(StructuredHypothesis(
-            title=title, service=tech_key.lower(), technique="tech_check",
-            command=cmd, expected=expected, interpretation=interpretation,
-            priority=priority
-        ))
-
-    hyps.sort(key=lambda h: h.priority, reverse=True)
-    return hyps
-
+    """DEPRECATED: This function generated hypotheses from hardcoded templates.
+    
+    Hypothesis generation is now done by the LLM through genuine reasoning.
+    The LLM examines the World Model state and generates testable hypotheses
+    based on discovered services, technologies, and information gaps.
+    
+    SERVICE_ATTACKS and known_tests remain as REFERENCE KNOWLEDGE that can be
+    mentioned in context to the LLM, but they NEVER directly generate hypotheses.
+    
+    Returns empty list - hypotheses come from LLM reasoning instead.
+    """
+    # All hypothesis generation now flows through the LLM decision pipeline:
+    # 1. World Model contains discovered ports, services, technologies
+    # 2. Planner builds context showing what's known and potential attack surfaces
+    # 3. LLM reasons about which hypotheses are worth testing
+    # 4. LLM generates specific, testable hypotheses with commands
+    #
+    # The SERVICE_ATTACKS dict (constants.py:236-309) and known_tests templates
+    # are retained as reference knowledge that the Planner can mention in context,
+    # but they NEVER directly generate executable hypotheses or commands.
+    #
+    # No template-based hypotheses here - that would defeat autonomy.
+    return []
 
 @dataclass
 class ChainStep:
