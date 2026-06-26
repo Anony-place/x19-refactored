@@ -1,15 +1,75 @@
 ```
-# Python
-__pycache__/
+# Compiled and build artifacts
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+__pycache__/
+*.o
+*.obj
+*.out
+*.class
+*.so
+*.dll
+*.exe
+
+# Dependencies
 .venv/
-.ENV
-.venv.bak/
+venv/
+.env
+.env.local
+.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Editors
+.vscode/
+.idea/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.whl
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.nox/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Java/Maven
+target/
+.gradle/
+*.class
+*.jar
+*.war
+
+# Python specific
+*.py[cod]
+*$py.class
+*$pyc
+*$pyo
+*.so
+.Python
+*.egg
+*.eggs
+*.egg-info/
+.egg-info/
+.installed.cfg
+*.egg-link
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/
@@ -20,49 +80,33 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
-*.pot
-*.pyc
-*.pyo
-*~
+.git/modules/
+*.sublime-workspace
+.pybuilder/
 .pytest_cache/
-.mypy_cache/
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# IDEs
-.vscode/
-.idea/
+.hypothesis/
+.coverage*
+.venv.bak
+venv.bak
+.env.bak
+*.env.bak
 *.swp
 *.swo
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# OS generated files
+*~
+.project
+.pydevproject
+.vscode/
+.idea/
+.settings/
+bin/
+gen/
+gen-java/
+target/
+build/
+dist/
+*.dmg
+*.tar.gz
+*.zip
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 ```
