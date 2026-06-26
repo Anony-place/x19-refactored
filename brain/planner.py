@@ -277,10 +277,12 @@ TOOL_IO: Dict[str, ToolIO] = {
 
 
 # ============================================================
-# Methodology templates — attack chains per target type
+# Methodology templates — REFERENCE KNOWLEDGE ONLY
+# These are NEVER executed directly. They serve as documentation
+# that the LLM may consider during genuine reasoning.
 # ============================================================
 
-METHODOLOGIES = {
+METHODOLOGIES_REFERENCE = {
     "web": [
         {
             "phase": "recon",
@@ -523,49 +525,35 @@ class Planner:
         self._min_tool_interval: float = 60.0  # Minimum seconds between tool runs
 
     def build_chain(self, model, target_type: str = "auto") -> ToolChain:
-        method_name = detect_target_type(
-            getattr(model, "ports", []),
-            getattr(model, "tech_stack", {}),
-            getattr(model, "subdomains", []),
-            target_type,
-        )
-        methodology = METHODOLOGIES.get(method_name, METHODOLOGIES["web"])
-
-        steps: List[ChainStep] = []
-        seen_tools: set = set()
-        for checkpoint in methodology:
-            phase = checkpoint["phase"]
-            for tool_name in checkpoint.get("tools", []):
-                if tool_name not in seen_tools:
-                    seen_tools.add(tool_name)
-                    io = TOOL_IO.get(tool_name)
-                    prereqs = io.prerequisites if io else []
-                    rationale = io.description if io else f"Run {tool_name}"
-                    steps.append(ChainStep(
-                        tool=tool_name,
-                        rationale=rationale,
-                        phase=phase,
-                        prerequisites=prereqs,
-                    ))
-            for branch in checkpoint.get("branch", []):
-                condition = branch["if"]
-                for tool_name in branch.get("tools", []):
-                    if tool_name not in seen_tools:
-                        seen_tools.add(tool_name)
-                        io = TOOL_IO.get(tool_name)
-                        rationale = io.description if io else f"Run {tool_name}"
-                        prereqs = [condition]
-                        steps.append(ChainStep(
-                            tool=tool_name,
-                            rationale=rationale,
-                            phase=phase,
-                            prerequisites=prereqs,
-                        ))
-
+        """DEPRECATED: This method built deterministic attack chains from METHODOLOGIES.
+        
+        Attack chain generation is now done by the LLM through genuine reasoning.
+        The LLM examines the World Model state and decides which tools to use
+        based on discovered services, technologies, and information gaps.
+        
+        METHODOLOGIES_REFERENCE remains as REFERENCE KNOWLEDGE that can be
+        mentioned in context to the LLM, but it NEVER directly generates
+        executable tool chains or command sequences.
+        
+        Returns an empty ToolChain - actual planning flows through LLM reasoning.
+        """
+        # All attack planning now flows through the LLM decision pipeline:
+        # 1. World Model contains discovered ports, services, technologies
+        # 2. Planner builds context showing what's known and potential attack surfaces
+        # 3. LLM reasons about which tools and approaches are most appropriate
+        # 4. LLM generates specific commands with rationale
+        #
+        # The METHODOLOGIES_REFERENCE dict is retained as reference knowledge
+        # that the Planner can mention in context, but it NEVER directly
+        # generates executable tool chains or command sequences.
+        #
+        # No template-based chain building here - that would defeat autonomy.
+        
+        # Return empty chain - real planning happens via LLM reasoning
         self.chain = ToolChain(
-            methodology=method_name,
+            methodology="llm_reasoned",
             target_type=target_type,
-            steps=steps,
+            steps=[],
         )
         return self.chain
 
@@ -582,22 +570,24 @@ class Planner:
                 self.chain.current_index += 1
 
     def suggest_next_tools(self, model, limit: int = 5) -> List[ChainStep]:
-        if not self.chain:
-            self.build_chain(model)
-
-        pending = []
-        for step in self.chain.pending_steps:
-            if self._prerequisites_met(step, model):
-                pending.append(step)
-            if len(pending) >= limit:
-                break
-
-        if not pending and self.chain:
-            self.build_chain(model, self.chain.target_type)
-            pending = [s for s in self.chain.pending_steps
-                       if self._prerequisites_met(s, model)][:limit]
-
-        return pending
+        """DEPRECATED: This method suggested tools from the deterministic chain.
+        
+        Tool suggestion is now done by the LLM through genuine reasoning.
+        The LLM examines the World Model state and decides which tools to use
+        based on discovered services, technologies, and information gaps.
+        
+        Returns empty list - tool selection flows through LLM reasoning instead.
+        """
+        # All tool selection now flows through the LLM decision pipeline:
+        # 1. World Model contains discovered ports, services, technologies
+        # 2. Planner builds context showing what's known and potential attack surfaces
+        # 3. LLM reasons about which tools are most appropriate
+        # 4. LLM generates specific commands with rationale
+        #
+        # No template-based tool suggestions here - that would defeat autonomy.
+        
+        # Return empty list - real tool selection happens via LLM reasoning
+        return []
 
     def _prerequisites_met(self, step: ChainStep, model) -> bool:
         if not step.prerequisites:
@@ -646,36 +636,30 @@ class Planner:
         return True
 
     def chain_context(self, model) -> str:
-        parts = ["ATTACK CHAIN:"]
-
-        if self.chain:
-            steps = self.chain.steps
-            completed = [s for s in steps if s.completed]
-            pending = [s for s in steps if not s.completed]
-
-            if completed:
-                parts.append("  COMPLETED:")
-                for s in completed[-5:]:
-                    summary = s.result_summary[:60] if s.result_summary else ""
-                    parts.append(f"    ✓ {s.tool:<20} [{s.phase}] {summary}")
-
-            suggestions = self.suggest_next_tools(model, limit=5)
-            if suggestions:
-                parts.append("  NEXT STEPS (recommended chain):")
-                for s in suggestions:
-                    prereq_hint = ""
-                    if s.prerequisites and not self._prerequisites_met(s, model):
-                        prereq_hint = f" (needs: {', '.join(s.prerequisites)})"
-                    parts.append(f"    → {s.tool:<20} [{s.phase}] {s.rationale[:80]}{prereq_hint}")
-            elif pending:
-                parts.append("  BLOCKED STEPS (prerequisites not met):")
-                for s in pending[:3]:
-                    parts.append(f"    ⏸ {s.tool:<20} [{s.phase}] needs: {', '.join(s.prerequisites)}")
-            else:
-                parts.append("  ✓ All steps completed — consider setting completed=true")
-        else:
-            parts.append("  No attack chain built yet — start with reconnaissance.")
-
-        parts.append(f"\n  METHODOLOGY: {self.chain.methodology if self.chain else 'auto-detect'}")
-
+        """DEPRECATED: This method displayed the deterministic attack chain.
+        
+        Attack chain context is now generated dynamically by examining the
+        World Model state and LLM reasoning history.
+        
+        Returns a message indicating that planning is LLM-driven.
+        """
+        # All attack planning now flows through the LLM decision pipeline.
+        # The chain_context method previously displayed predefined steps from
+        # METHODOLOGIES, but this would bias the LLM toward scripted behavior.
+        #
+        # Instead, we return a simple message indicating that the LLM will
+        # reason about next steps based on the current World Model state.
+        
+        parts = ["PLANNING MODE: LLM-REASONED"]
+        parts.append("  The Planner examines the World Model state and")
+        parts.append("  generates hypotheses through genuine AI reasoning.")
+        parts.append("  No predefined attack chains are used.")
+        parts.append(f"  Target type: {getattr(model, 'target_type', 'auto')}")
+        parts.append(f"  Known ports: {len(getattr(model, 'ports', []) or [])}")
+        parts.append(f"  Known technologies: {len(getattr(model, 'tech_stack', {}) or {})}")
+        parts.append(f"  Known findings: {len(getattr(model, 'findings', []) or [])}")
+        parts.append("")
+        parts.append("  Next action will be determined by LLM reasoning")
+        parts.append("  based on information gaps and hypothesis testing.")
+        
         return "\n".join(parts)

@@ -4668,12 +4668,22 @@ Analyze the output carefully. Return JSON ONLY:
         print(f"{C.D}[Tools] {n_avail} available, {n_miss} missing (install hints available){C.N}")
 
     def _build_attack_chain(self):
-        """Build or refresh the attack plan based on current model state."""
-        self.planner.build_chain(self.model, self.target_type)
-        if self.planner.chain:
-            m = self.planner.chain.methodology
-            n = len(self.planner.chain.steps)
-            print(f"{C.D}[Plan] {m} methodology — {n} steps in chain{C.N}")
+        """DEPRECATED: This method built deterministic attack chains.
+        
+        Attack planning is now done by the LLM through genuine reasoning.
+        The LLM examines the World Model state and decides which tools to use
+        based on discovered services, technologies, and information gaps.
+        
+        This method now just logs that planning is LLM-driven.
+        """
+        # All attack planning now flows through the LLM decision pipeline.
+        # The build_chain method previously created predefined steps from
+        # METHODOLOGIES, but this would bias the system toward scripted behavior.
+        #
+        # Instead, we log that planning is LLM-reasoned and let the actual
+        # planning happen during the LLM call in _plan_next_step().
+        
+        print(f"{C.D}[Plan] LLM-reasoned methodology — steps determined dynamically{C.N}")
 
     def _lessons_context(self) -> str:
         """Return recent lessons and failure patterns from this + past sessions."""
