@@ -15,7 +15,7 @@ from brain.world_model import (
     WorldModel,
     WorldModelSnapshot,
 )
-from brain.planner import Planner, ToolIO, TOOL_IO, METHODOLOGIES, detect_target_type, generate_structured_hypotheses
+from brain.planner import Planner, ToolIO, TOOL_IO, METHODOLOGIES_REFERENCE, detect_target_type, generate_structured_hypotheses
 from brain.context_builder import (
     cve_context_block,
     session_outcomes_context,
@@ -38,7 +38,7 @@ __all__ = [
     "Planner",
     "ToolIO",
     "TOOL_IO",
-    "METHODOLOGIES",
+    "METHODOLOGIES_REFERENCE",
     "detect_target_type",
     "generate_structured_hypotheses",
     "cve_context_block",

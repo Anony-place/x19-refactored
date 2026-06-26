@@ -81,7 +81,7 @@ from utils import (
 )
 from planning import (
     Planner, ToolChain, ChainStep, ToolIO, TOOL_IO,
-    METHODOLOGIES, detect_target_type,
+    METHODOLOGIES_REFERENCE, detect_target_type,
 )
 from agent import X19
 from cli import main, _extract_longcat_commands, _extract_exec_commands, _parse_target_from_user_line, _android_device_id
