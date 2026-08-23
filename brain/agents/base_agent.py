@@ -1,6 +1,6 @@
 """
 X19 Swarm Base Agent Interface.
-Defines lifecycle, status, logging, and event contracts for all specialized agents.
+Defines lifecycle, status, logging, task processing, and event contracts for all specialized agents.
 """
 
 from __future__ import annotations

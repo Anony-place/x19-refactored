@@ -1,6 +1,7 @@
 """
 X19 Strict Transport-Level Scope Sandbox Guard.
 Ensures zero out-of-scope traffic leaves the agent at the socket and HTTP layer.
+Includes domain, IP, CIDR, URL, and redirect destination validation.
 """
 
 from __future__ import annotations
@@ -11,14 +12,14 @@ from typing import Set, Optional, Tuple, Union
 
 
 class ScopeViolationError(Exception):
-    """Raised when an out-of-scope target connection is attempted."""
+    """Raised when an out-of-scope target connection or redirect is attempted."""
     pass
 
 
 class ScopeGuard:
     """
     Enforces target boundaries deterministically at runtime.
-    Validates hostnames, IP addresses, CIDR ranges, and URLs.
+    Validates hostnames, IP addresses, CIDR ranges, URLs, and redirect targets.
     """
 
     def __init__(self, allowed_targets: Optional[Set[str]] = None, enforce: bool = True):
@@ -123,6 +124,27 @@ class ScopeGuard:
             return self.is_allowed_host(host)
         except Exception:
             return False
+
+    def validate_redirect(self, source_url: str, redirect_target: str) -> bool:
+        """Validate whether a redirect destination remains in scope.
+        Raises ScopeViolationError if the redirect escapes allowed scope.
+        """
+        if not self.enforce or not self.allowed_raw:
+            return True
+        if not redirect_target:
+            return True
+
+        # Relative paths stay on the same origin (in-scope)
+        if redirect_target.startswith("/") and not redirect_target.startswith("//"):
+            return True
+
+        # Resolve relative / absolute redirect against source
+        resolved = urllib.parse.urljoin(source_url, redirect_target)
+        if not self.is_allowed_url(resolved):
+            raise ScopeViolationError(
+                f"Redirect from '{source_url}' to out-of-scope destination '{redirect_target}' blocked."
+            )
+        return True
 
     def assert_allowed(self, target_or_url: str) -> None:
         """Raise ScopeViolationError if the target or URL is out of scope."""

@@ -1,7 +1,7 @@
 """
 X19 Swarm Coordinator (Meta-Agent).
 Coordinates parallel specialized agents, synchronizes findings with the World Model
-and Attack Graph, streams live events, and ensures fast, deterministic mission execution.
+and Attack Graph, streams live events, and manages prioritized task queue orchestration.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, Set
 
 from brain.agents.recon_agent import ReconAgent
 from brain.agents.web_agent import WebAgent
@@ -20,13 +20,14 @@ from brain.attack_graph import AttackGraph, GraphNode, GraphEdge
 from brain.evidence_ranking import EvidenceRankingEngine, RankedEvidence
 from brain.strategist_engine import StrategistEngine
 from brain.strategy_library import StrategyLibrary, TargetSignature
+from brain.task_queue import TaskQueue, AgentTask, TaskStatus
 from execution.native_vuln import VulnerabilityFinding
-from execution.scope_guard import ScopeGuard
+from execution.scope_guard import ScopeGuard, ScopeViolationError
 
 
 @dataclass
 class SwarmEvent:
-    event_type: str  # "log", "agent_status", "finding", "port", "endpoint", "graph_update"
+    event_type: str  # "log", "agent_status", "finding", "port", "endpoint", "task_update", "graph_update"
     sender: str
     data: Dict[str, Any]
     timestamp: float = field(default_factory=time.time)
@@ -37,7 +38,13 @@ class SwarmCoordinator:
 
     def __init__(self, target: str = "", scope_guard: Optional[ScopeGuard] = None):
         self.target = target
-        self.scope_guard = scope_guard or ScopeGuard(allowed_targets={target} if target else set(), enforce=bool(target))
+        self.scope_guard = scope_guard or ScopeGuard(
+            allowed_targets={target} if target else set(),
+            enforce=bool(target)
+        )
+
+        # Distributed Task Queue
+        self.task_queue = TaskQueue()
         
         # Swarm Agents
         self.recon_agent = ReconAgent(coordinator=self, scope_guard=self.scope_guard)
@@ -74,6 +81,8 @@ class SwarmCoordinator:
         self.start_time: float = 0.0
         self.end_time: float = 0.0
         self._lock = threading.Lock()
+        self._worker_threads: List[threading.Thread] = []
+        self._pipeline_thread: Optional[threading.Thread] = None
 
     def set_target(self, target: str) -> None:
         self.target = target
@@ -117,7 +126,7 @@ class SwarmCoordinator:
         
         self.is_running = True
         self.start_time = time.time()
-        self.publish_log("Coordinator", f"🚀 Launching Parallel Swarm Mission on target: {self.target}")
+        self.publish_log("Coordinator", f"🚀 Launching Prioritized Swarm Mission on target: {self.target}")
         
         # Initialize target node in attack graph
         self.target_node = self.attack_graph.add_node(
@@ -126,14 +135,54 @@ class SwarmCoordinator:
             value_score=1.0
         )
 
-        t = threading.Thread(target=self._run_pipeline, daemon=True, name="Coordinator-Pipeline")
-        t.start()
-        return t
+        # Seed initial tasks into queue
+        self._seed_initial_tasks()
+
+        self._pipeline_thread = threading.Thread(
+            target=self._run_pipeline,
+            daemon=True,
+            name="Coordinator-Pipeline"
+        )
+        self._pipeline_thread.start()
+        return self._pipeline_thread
+
+    def _seed_initial_tasks(self) -> None:
+        """Seed high-priority recon and web tasks."""
+        # Task 1: Network & port scan
+        recon_task = AgentTask(
+            priority=1,
+            task_id=f"task_recon_{int(time.time()*1000)}",
+            task_type="recon",
+            target=self.target,
+            params={"mode": "standard_ports"}
+        )
+        self.task_queue.push(recon_task)
+
+        # Task 2: Web surface discovery
+        web_task = AgentTask(
+            priority=2,
+            task_id=f"task_web_{int(time.time()*1000)}",
+            task_type="web_fuzz",
+            target=self.target,
+            params={"wordlist": "default"}
+        )
+        self.task_queue.push(web_task)
+
+        # Task 3: Metacognitive supervisor
+        critic_task = AgentTask(
+            priority=5,
+            task_id=f"task_critic_{int(time.time()*1000)}",
+            task_type="reflect",
+            target=self.target,
+            params={}
+        )
+        self.task_queue.push(critic_task)
 
     def _run_pipeline(self) -> None:
+        """Main event-driven reactive swarm loop."""
         try:
-            # Stage 1: Parallel Recon & Initial Web Crawling
-            self.publish_log("Coordinator", "⚡ STAGE 1: Launching ReconAgent and WebAgent in parallel...")
+            # Stage 1: Execute initial parallel tasks
+            self.publish_log("Coordinator", "⚡ STAGE 1: Processing Initial Recon & Surface Mapping...")
             t_recon = self.recon_agent.start_async(self.target)
             t_web = self.web_agent.start_async(self.target)
             self.critic_agent.start_async(self.target)
@@ -151,7 +200,10 @@ class SwarmCoordinator:
             t_verif = self.verifier_agent.start_async(self.target, findings=self.raw_findings)
             t_verif.join(timeout=45)
 
-            # Stage 4: Synthesis & Learning
+            # Stage 4: Process any dynamically queued tasks
+            self._process_dynamic_queue()
+
+            # Stage 5: Synthesis & Learning
             self._finalize_mission()
 
         except Exception as e:
@@ -162,9 +214,28 @@ class SwarmCoordinator:
             self.publish_log("Coordinator", f"🏁 Swarm mission finished in {self.end_time - self.start_time:.1f}s")
             self._emit("mission_completed", "Coordinator", self.get_summary())
 
+    def _process_dynamic_queue(self) -> None:
+        """Process any remaining tasks in task queue."""
+        while self.is_running and self.task_queue.pending_count() > 0:
+            task = self.task_queue.pop()
+            if not task:
+                break
+            try:
+                if task.task_type == "verify" and self.raw_findings:
+                    self.verifier_agent.run(task.target, findings=self.raw_findings)
+                    self.task_queue.mark_completed(task.task_id, "verified")
+                elif task.task_type == "vuln_audit":
+                    self.vuln_agent.run(task.target)
+                    self.task_queue.mark_completed(task.task_id, "audited")
+                else:
+                    self.task_queue.mark_completed(task.task_id, "processed")
+            except Exception as ex:
+                self.task_queue.mark_failed(task.task_id, str(ex))
+
     def stop_mission(self) -> None:
         """Emergency stop for all active agents in swarm."""
         self.publish_log("Coordinator", "🛑 Emergency stop triggered! Halting all agents.")
+        self.task_queue.cancel_all()
         for agent in self.agents:
             agent.stop()
         self.is_running = False
@@ -182,7 +253,7 @@ class SwarmCoordinator:
             if not target_node:
                 target_node = self.attack_graph.add_node("host", f"Target: {host}", value_score=1.0)
                 self.target_node = target_node
-
+                
             port_node = self.attack_graph.add_node(
                 node_type="service",
                 label=f"{service}:{port}",
@@ -193,6 +264,18 @@ class SwarmCoordinator:
                 target_node=port_node.id,
                 edge_type="runs"
             )
+
+        # Dynamic Reactive Dispatch: If port is HTTP/HTTPS, queue targeted web fuzz task
+        if port in (80, 443, 8000, 8080, 8443, 8888, 5000, 3000):
+            scheme = "https" if port in (443, 8443) else "http"
+            url_target = f"{scheme}://{host}:{port}" if port not in (80, 443) else f"{scheme}://{host}"
+            self.task_queue.push(AgentTask(
+                priority=2,
+                task_id=f"task_web_port_{port}_{int(time.time()*1000)}",
+                task_type="web_fuzz",
+                target=url_target,
+                params={"port": port}
+            ))
 
         self._emit("port_discovered", "ReconAgent", port_data)
 
@@ -221,11 +304,31 @@ class SwarmCoordinator:
                 edge_type="contains"
             )
 
+        # Dynamic Reactive Dispatch: Queue vuln audit for interesting endpoints
+        if is_interesting:
+            self.task_queue.push(AgentTask(
+                priority=2,
+                task_id=f"task_audit_ep_{hash(path)%100000}_{int(time.time()*1000)}",
+                task_type="vuln_audit",
+                target=target,
+                params={"path": path}
+            ))
+
         self._emit("endpoint_discovered", "WebAgent", ep_data)
 
     def register_finding(self, finding: VulnerabilityFinding) -> None:
         with self._lock:
             self.raw_findings.append(finding)
+        
+        # Dynamic Reactive Dispatch: Queue immediate PoC verification task
+        self.task_queue.push(AgentTask(
+            priority=1,
+            task_id=f"task_verify_{hash(finding.title)%100000}_{int(time.time()*1000)}",
+            task_type="verify",
+            target=finding.target,
+            params={"finding_title": finding.title, "endpoint": finding.endpoint}
+        ))
+
         self._emit("finding_detected", "VulnAgent", asdict(finding))
 
     def mark_finding_verified(self, finding: VulnerabilityFinding) -> None:
@@ -316,9 +419,11 @@ class SwarmCoordinator:
                     "open_ports": len(self.discovered_ports),
                     "endpoints": len(self.discovered_endpoints),
                     "raw_findings": len(self.raw_findings),
-                    "verified_findings": len(self.verified_findings)
+                    "verified_findings": len(self.verified_findings),
+                    "pending_tasks": self.task_queue.pending_count()
                 },
                 "verified_findings": [asdict(f) for f in self.verified_findings],
                 "ports": self.discovered_ports,
-                "endpoints": self.discovered_endpoints
+                "endpoints": self.discovered_endpoints,
+                "tasks": self.task_queue.get_all_tasks()
             }
