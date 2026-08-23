@@ -1118,7 +1118,9 @@ class GraphQLAttacker:
                     for f in t.get("fields", []):
                         # Build a minimal mutation: mutationName(input: "") { __typename }
                         arg_str = ",".join(f"${a['name']}:String" for a in f.get("args", []))
-                        mutations.append(f"mutation({arg_str}){{ {f['name']}({','.join(a['name']+':\"test\"' for a in f.get('args', []))}){{__typename}} }}")
+                        arg_pairs = ",".join(a['name'] + ':"test"' for a in f.get("args", []))
+                        fname = f['name']
+                        mutations.append(f"mutation({arg_str}){{ {fname}({arg_pairs}){{__typename}} }}")
                     break
             if mutations:
                 self.test_mutation_authz(mutations, cookie_low, cookie_high)

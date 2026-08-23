@@ -1,0 +1,55 @@
+{
+  "patterns": [
+    {
+      "pattern_id": "strat_0001",
+      "name": "Assessment on 127.0.0.1",
+      "description": "Swarm mission with 0 verified finding(s)",
+      "target_signature": "[[22, 111], [\"service-111\", \"ssh\"], [], \"network\"]",
+      "technique_chain": [
+        "native_recon",
+        "native_web_fuzz",
+        "native_vuln_audit",
+        "poc_verification"
+      ],
+      "success_count": 0,
+      "failure_count": 1,
+      "avg_iterations": 1.0,
+      "success_rate": 0.0,
+      "confidence": 0.25,
+      "last_success": null,
+      "last_failure": "2026-08-23T09:34:34.870017Z",
+      "contexts": [
+        "network"
+      ],
+      "prerequisites": [],
+      "risk_level": "medium",
+      "detection_probability": 0.5
+    },
+    {
+      "pattern_id": "strat_0002",
+      "name": "Assessment on 127.0.0.1",
+      "description": "Swarm mission with 0 verified finding(s)",
+      "target_signature": "[[22, 22, 111, 111], [\"service-111\", \"service-111\", \"ssh\", \"ssh\"], [], \"network\"]",
+      "technique_chain": [
+        "native_recon",
+        "native_web_fuzz",
+        "native_vuln_audit",
+        "poc_verification"
+      ],
+      "success_count": 0,
+      "failure_count": 1,
+      "avg_iterations": 1.0,
+      "success_rate": 0.0,
+      "confidence": 0.25,
+      "last_success": null,
+      "last_failure": "2026-08-23T09:43:59.671405Z",
+      "contexts": [
+        "network"
+      ],
+      "prerequisites": [],
+      "risk_level": "medium",
+      "detection_probability": 0.5
+    }
+  ],
+  "mission_history": []
+}
