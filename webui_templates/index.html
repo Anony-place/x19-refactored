@@ -45,7 +45,6 @@
       overflow-x: hidden;
     }
 
-    /* Ambient Background Glows */
     .glow-bg {
       position: fixed;
       top: -20%;
@@ -132,7 +131,7 @@
     main {
       padding: 24px 32px;
       display: grid;
-      grid-template-columns: 320px 1fr 380px;
+      grid-template-columns: 320px 1fr 420px;
       gap: 24px;
       flex: 1;
       z-index: 1;
@@ -206,17 +205,18 @@
     }
 
     .btn {
-      padding: 12px 18px;
-      border-radius: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
       border: none;
       font-weight: 700;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
       transition: all 0.2s;
+      text-decoration: none;
     }
 
     .btn-launch {
@@ -239,6 +239,20 @@
     .btn-stop:hover {
       background: var(--accent-red);
       color: #fff;
+    }
+
+    .btn-export {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-card);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      padding: 6px 10px;
+    }
+
+    .btn-export:hover {
+      background: rgba(0, 240, 255, 0.1);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
     }
 
     /* Swarm Agent Cards */
@@ -313,7 +327,7 @@
       border: 1px solid var(--border-card);
       border-radius: 12px;
       padding: 14px;
-      height: 250px;
+      height: 230px;
       overflow-y: auto;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8rem;
@@ -332,12 +346,35 @@
     .log-sender { color: var(--accent-cyan); font-weight: 600; }
     .log-msg { color: #e2e8f0; }
 
-    /* Findings List */
+    /* Findings List & Filter */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .filter-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-card);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      background: var(--accent-cyan);
+      color: #000;
+      font-weight: bold;
+    }
+
     .findings-list {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-height: 600px;
+      max-height: 560px;
       overflow-y: auto;
     }
 
@@ -354,9 +391,11 @@
       border-bottom: 1px solid var(--border-card);
     }
 
+    .finding-card.severity-critical { border-left-color: var(--accent-red); }
     .finding-card.severity-high { border-left-color: var(--accent-orange); }
-    .finding-card.severity-medium { border-left-color: var(--accent-cyan); }
-    .finding-card.severity-low { border-left-color: var(--text-muted); }
+    .finding-card.severity-medium { border-left-color: #eab308; }
+    .finding-card.severity-low { border-left-color: var(--accent-blue); }
+    .finding-card.severity-info { border-left-color: var(--text-muted); }
 
     .finding-header {
       display: flex;
@@ -444,6 +483,12 @@
       </div>
     </div>
     <div style="display: flex; gap: 16px; align-items: center;">
+      <!-- Export Report Dropdown -->
+      <div style="display: flex; gap: 6px;">
+        <a href="/api/report/html" target="_blank" class="btn btn-export"><i class="fa-solid fa-file-code"></i> HTML Report</a>
+        <a href="/api/report/markdown" target="_blank" class="btn btn-export"><i class="fa-solid fa-file-lines"></i> Markdown</a>
+        <a href="/api/report/json" target="_blank" class="btn btn-export"><i class="fa-solid fa-code"></i> JSON</a>
+      </div>
       <div id="mission-time" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--accent-cyan);">00:00:00</div>
       <div class="badge-live" id="live-indicator">SWARM READY</div>
     </div>
@@ -532,6 +577,16 @@
           <div class="card-title"><i class="fa-solid fa-shield-halved"></i> Verified Findings</div>
           <span style="font-size: 0.75rem; color: var(--accent-green);"><i class="fa-solid fa-check-double"></i> 0% False Positives</span>
         </div>
+
+        <!-- Filter Controls -->
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="filterFindings('all')">All</button>
+          <button class="filter-btn" onclick="filterFindings('critical')">Critical</button>
+          <button class="filter-btn" onclick="filterFindings('high')">High</button>
+          <button class="filter-btn" onclick="filterFindings('medium')">Medium</button>
+          <button class="filter-btn" onclick="filterFindings('low')">Low</button>
+        </div>
+
         <div class="findings-list" id="findings-container">
           <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 40px 0;">
             No findings detected yet. Launch swarm to audit.
@@ -546,6 +601,8 @@
     let eventSource = null;
     let timerInterval = null;
     let missionStartTime = null;
+    let allFindings = [];
+    let currentFilter = 'all';
 
     // Initialize Network Graph
     function initGraph() {
@@ -607,6 +664,43 @@
       document.getElementById('terminal-logs').innerHTML = '';
     }
 
+    function filterFindings(sev) {
+      currentFilter = sev;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.toLowerCase() === sev);
+      });
+      renderFindings();
+    }
+
+    function renderFindings() {
+      const container = document.getElementById('findings-container');
+      const filtered = allFindings.filter(f => currentFilter === 'all' || f.severity.toLowerCase() === currentFilter);
+      
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 30px 0;">No findings matching '${currentFilter}'.</div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      filtered.forEach(f => {
+        const fCard = document.createElement('div');
+        fCard.className = `finding-card severity-${f.severity.toLowerCase()}`;
+        fCard.innerHTML = `
+          <div class="finding-header">
+            <div class="finding-title">${f.title}</div>
+            <span class="severity-pill">${f.severity}</span>
+          </div>
+          <div class="finding-endpoint">${f.endpoint}</div>
+          <div style="font-size: 0.75rem; color: #94a3b8;">${f.description}</div>
+          ${f.poc_command ? `<div class="finding-poc" onclick="navigator.clipboard.writeText('${f.poc_command}'); alert('PoC command copied!');">
+            <code>${f.poc_command}</code>
+            <i class="fa-regular fa-copy"></i>
+          </div>` : ''}
+        `;
+        container.appendChild(fCard);
+      });
+    }
+
     async function updateDashboard() {
       try {
         const res = await fetch('/api/swarm/status');
@@ -648,28 +742,10 @@
           agentsContainer.appendChild(card);
         });
 
-        // Render Findings
-        const findingsContainer = document.getElementById('findings-container');
-        if (data.verified_findings.length > 0) {
-          findingsContainer.innerHTML = '';
-          data.verified_findings.forEach(f => {
-            const fCard = document.createElement('div');
-            fCard.className = `finding-card severity-${f.severity.toLowerCase()}`;
-            fCard.innerHTML = `
-              <div class="finding-header">
-                <div class="finding-title">${f.title}</div>
-                <span class="severity-pill">${f.severity}</span>
-              </div>
-              <div class="finding-endpoint">${f.endpoint}</div>
-              <div style="font-size: 0.75rem; color: #94a3b8;">${f.description}</div>
-              ${f.poc_command ? `<div class="finding-poc" onclick="navigator.clipboard.writeText('${f.poc_command}'); alert('PoC copied to clipboard!');">
-                <code>${f.poc_command}</code>
-                <i class="fa-regular fa-copy"></i>
-              </div>` : ''}
-            `;
-            findingsContainer.appendChild(fCard);
-          });
-        }
+        // Store & Render Findings
+        allFindings = data.verified_findings || [];
+        renderFindings();
+
       } catch (err) {
         console.error(err);
       }

@@ -29,6 +29,7 @@ from config import CONFIG, CONFIG_DIR, CONFIG_FILE, load_config, save_config, se
 from constants import PROVIDERS, PROVIDER_PRIORITY
 from brain.coordinator import SwarmCoordinator
 from learning.self_adaptation import SelfAdaptationEngine
+from reporting.report_generator import SecurityReportGenerator
 
 # ---------------------------------------------------------------------------
 # Restore saved config into environment
@@ -52,6 +53,52 @@ DB_PATH = Path(CONFIG.DB_SQLITE_PATH).expanduser()
 # Global Swarm Coordinator & Self-Adaptation Engine
 global_coordinator = SwarmCoordinator()
 self_adaptation_engine = SelfAdaptationEngine()
+
+
+# ---------------------------------------------------------------------------
+# Report Export Endpoints
+# ---------------------------------------------------------------------------
+
+@app.route("/api/report/markdown")
+def api_report_markdown():
+    summary = global_coordinator.get_summary()
+    generator = SecurityReportGenerator(
+        target=global_coordinator.target or "127.0.0.1",
+        findings=global_coordinator.verified_findings
+    )
+    md_content = generator.generate_markdown()
+    return Response(
+        md_content,
+        mimetype="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename=x19_report_{global_coordinator.target or 'local'}.md"}
+    )
+
+
+@app.route("/api/report/html")
+def api_report_html():
+    generator = SecurityReportGenerator(
+        target=global_coordinator.target or "127.0.0.1",
+        findings=global_coordinator.verified_findings
+    )
+    html_content = generator.generate_html()
+    return Response(
+        html_content,
+        mimetype="text/html",
+        headers={"Content-Disposition": f"attachment; filename=x19_report_{global_coordinator.target or 'local'}.html"}
+    )
+
+
+@app.route("/api/report/json")
+def api_report_json():
+    generator = SecurityReportGenerator(
+        target=global_coordinator.target or "127.0.0.1",
+        findings=global_coordinator.verified_findings
+    )
+    return Response(
+        generator.generate_json(),
+        mimetype="application/json",
+        headers={"Content-Disposition": f"attachment; filename=x19_report_{global_coordinator.target or 'local'}.json"}
+    )
 
 
 # ---------------------------------------------------------------------------
