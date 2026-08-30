@@ -160,6 +160,21 @@ class ControlledLabIntegrationTests(unittest.TestCase):
         self.assertTrue(any("Git" in t for t in titles))
         self.assertTrue(any("Environment" in t for t in titles))
 
+    def test_advanced_vuln_engine_checks(self):
+        guard = ScopeGuard(allowed_targets={"127.0.0.1:18888"}, enforce=False)
+        engine = NativeVulnEngine(scope_guard=guard, timeout=1.0)
+
+        # Test methods run without exceptions
+        host_findings = engine.check_host_header_injection("http://127.0.0.1:18888")
+        ssrf_findings = engine.check_ssrf_heuristic("http://127.0.0.1:18888")
+        ssti_findings = engine.check_ssti("http://127.0.0.1:18888")
+        key_findings = engine.check_api_key_leakage("http://127.0.0.1:18888")
+
+        self.assertIsInstance(host_findings, list)
+        self.assertIsInstance(ssrf_findings, list)
+        self.assertIsInstance(ssti_findings, list)
+        self.assertIsInstance(key_findings, list)
+
 
 class SwarmCoordinatorTests(unittest.TestCase):
     def test_coordinator_initialization_and_registration(self):
