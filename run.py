@@ -18,6 +18,8 @@ from tools import TOOLS, ToolExecutor
 install_builtin_tools(TOOLS, ToolExecutor)
 
 from cli import main
+from builtin_integration import install_phase_access
+install_phase_access()
 from logging_utils import log
 
 if __name__ == "__main__":
