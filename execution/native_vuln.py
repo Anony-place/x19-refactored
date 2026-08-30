@@ -57,6 +57,10 @@ class NativeVulnEngine:
         findings.extend(self.check_graphql_introspection(base_url))
         findings.extend(self.check_open_redirect(base_url))
         findings.extend(self.check_security_txt(base_url))
+        findings.extend(self.check_host_header_injection(base_url))
+        findings.extend(self.check_ssrf_heuristic(base_url))
+        findings.extend(self.check_ssti(base_url))
+        findings.extend(self.check_api_key_leakage(base_url))
         return findings
 
     def check_exposed_files(self, base_url: str) -> List[VulnerabilityFinding]:
@@ -91,6 +95,117 @@ class NativeVulnEngine:
                     ))
             except Exception:
                 pass
+        return findings
+
+    def check_host_header_injection(self, base_url: str) -> List[VulnerabilityFinding]:
+        findings: List[VulnerabilityFinding] = []
+        injected_host = "evil-attacker-host.com"
+        try:
+            resp = self.session.get(
+                base_url,
+                headers={"Host": injected_host, "X-Forwarded-Host": injected_host},
+                timeout=self.timeout,
+                verify=False,
+                allow_redirects=False
+            )
+            if injected_host in resp.text or injected_host in resp.headers.get("Location", ""):
+                findings.append(VulnerabilityFinding(
+                    title="Host Header Injection",
+                    severity="high",
+                    target=base_url,
+                    endpoint="/",
+                    description="The server reflects untrusted Host / X-Forwarded-Host headers in response body or redirects, enabling password reset poisoning / web cache poisoning.",
+                    evidence=f"Host: {injected_host} reflected in response body or Location header.",
+                    remediation="Validate Host headers against an explicit server-side whitelist.",
+                    cvss_score=7.3,
+                    cwe_id="CWE-644",
+                    poc_command=f"curl -sik -H 'Host: {injected_host}' {base_url}",
+                    confirmed=True
+                ))
+        except Exception:
+            pass
+        return findings
+
+    def check_ssrf_heuristic(self, base_url: str) -> List[VulnerabilityFinding]:
+        findings: List[VulnerabilityFinding] = []
+        ssrf_params = ["url", "dest", "uri", "fetch", "path", "domain", "callback", "feed"]
+        ssrf_payload = "http://169.254.169.254/latest/meta-data/"
+        for param in ssrf_params:
+            test_url = f"{base_url}/?{param}={urllib.parse.quote(ssrf_payload)}"
+            try:
+                resp = self.session.get(test_url, timeout=self.timeout, verify=False, allow_redirects=False)
+                if resp.status_code == 200 and any(k in resp.text.lower() for k in ["ami-id", "instance-id", "security-credentials", "iam"]):
+                    findings.append(VulnerabilityFinding(
+                        title="Server-Side Request Forgery (SSRF) Metadata Leak",
+                        severity="critical",
+                        target=base_url,
+                        endpoint=f"/?{param}=",
+                        description=f"Parameter '{param}' unsafely fetches cloud instance metadata.",
+                        evidence=f"Cloud metadata response signature found in body:\n{resp.text[:200]}",
+                        remediation="Filter out internal/loopback IP addresses and metadata endpoints using strict URL validation allowlists.",
+                        cvss_score=9.8,
+                        cwe_id="CWE-918",
+                        poc_command=f"curl -sik '{test_url}'",
+                        confirmed=True
+                    ))
+            except Exception:
+                pass
+        return findings
+
+    def check_ssti(self, base_url: str) -> List[VulnerabilityFinding]:
+        findings: List[VulnerabilityFinding] = []
+        ssti_params = ["q", "search", "name", "template", "view", "title"]
+        payload = "{{7*7}}"
+        for param in ssti_params:
+            test_url = f"{base_url}/?{param}={urllib.parse.quote(payload)}"
+            try:
+                resp = self.session.get(test_url, timeout=self.timeout, verify=False, allow_redirects=False)
+                if resp.status_code == 200 and "49" in resp.text and payload not in resp.text:
+                    findings.append(VulnerabilityFinding(
+                        title="Server-Side Template Injection (SSTI)",
+                        severity="critical",
+                        target=base_url,
+                        endpoint=f"/?{param}=",
+                        description=f"Parameter '{param}' evaluated server-side template expression {{7*7}} -> 49.",
+                        evidence=f"Expression '{{7*7}}' evaluated to '49' in response body.",
+                        remediation="Do not pass raw user input into template engine render contexts; use safe context variables.",
+                        cvss_score=9.8,
+                        cwe_id="CWE-1336",
+                        poc_command=f"curl -sik '{test_url}'",
+                        confirmed=True
+                    ))
+            except Exception:
+                pass
+        return findings
+
+    def check_api_key_leakage(self, base_url: str) -> List[VulnerabilityFinding]:
+        findings: List[VulnerabilityFinding] = []
+        try:
+            resp = self.session.get(base_url, timeout=self.timeout, verify=False)
+            patterns = [
+                (r'AIzaSy[A-Za-z0-9_-]{35}', "Exposed Google API Key", "high", "CWE-200", 7.5),
+                (r'sk-[A-Za-z0-9]{32,48}', "Exposed OpenAI / AI Provider Secret Key", "critical", "CWE-200", 9.1),
+                (r'ghp_[A-Za-z0-9]{36}', "Exposed GitHub Personal Access Token", "critical", "CWE-200", 9.1),
+                (r'AKIA[0-9A-Z]{16}', "Exposed AWS Access Key ID", "high", "CWE-200", 8.2),
+            ]
+            for pattern, title, severity, cwe, cvss in patterns:
+                match = re.search(pattern, resp.text)
+                if match:
+                    findings.append(VulnerabilityFinding(
+                        title=title,
+                        severity=severity,
+                        target=base_url,
+                        endpoint="/",
+                        description=f"Potential sensitive API key / token ({title}) discovered hardcoded in HTML/JS.",
+                        evidence=f"Matched token pattern: {match.group(0)[:12]}...",
+                        remediation="Revoke exposed credentials immediately and load secrets securely via environment variables or secret managers.",
+                        cvss_score=cvss,
+                        cwe_id=cwe,
+                        poc_command=f"curl -s {base_url} | grep -E '{pattern}'",
+                        confirmed=True
+                    ))
+        except Exception:
+            pass
         return findings
 
     def check_cors_misconfiguration(self, base_url: str) -> List[VulnerabilityFinding]:
