@@ -564,6 +564,15 @@ class X19:
                         cat = self._cmd_category(cmd)
                         if not result.ok:
                             self.failure_memory.record_failure(cmd, cat, result.stderr or result.stdout or "")
+                            try:
+                                self.critic_engine.criticize_failure(
+                                    technique=cmd.split()[0] if cmd.split() else "tool",
+                                    category=cat,
+                                    target_context=self.target,
+                                    failure_reason=result.stderr or result.stdout or "non-zero return code",
+                                )
+                            except Exception as e:
+                                _swallow(e)
                         self.session.add_cmd(cmd, result.text[:500], cat, result.returncode)
                         results.append({"step": b_i, "status": "done", "result": result, "action": "run"})
                     self._record_tool_effect([c for _, c, _ in runnable], self._model_size() > _psize)
