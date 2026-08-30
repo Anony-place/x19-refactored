@@ -43,6 +43,7 @@ from tools import TOOLS
 from tool_scanner import scan_available_tools, scan_missing_critical, build_tool_context
 from brain.planner import Planner
 import brain.planner as planning
+from brain import CriticEngine, StrategistEngine, StrategyLibrary
 
 class X19:
     def __init__(self, target: str = "", ai: Optional[AIBackend] = None):
@@ -83,8 +84,11 @@ class X19:
         self._available_tools = {}
         self._missing_tools = {}
         self._tools_scanned = False
-        # Attack planner
+        # Attack planner and cognitive engines
         self.planner = Planner()
+        self.critic_engine = CriticEngine()
+        self.strategist_engine = StrategistEngine()
+        self.strategy_library = StrategyLibrary()
         self.task_manager = TaskManager(self.exec, max_workers=8)
         # PoC tracking
         self.poc_chain: List[Dict] = []
@@ -1775,10 +1779,20 @@ Analyze the output carefully. Return JSON ONLY:
                         + "Select a FUNDAMENTALLY different strategy: authenticated testing, API/GraphQL abuse, "
                         "known-CVE exploitation on the identified stack, or origin-IP discovery behind Cloudflare.]")
 
-            # Update state database with current goal (use loop signal from prior iteration)
-            active_node = self.goal_tree.select_active_node(
-                self.model, self.target_type, self._forced_exploit, self._loop_sig, self.autonomy_profile
-            )
+            # Update state database with current goal (utilizing StrategistEngine attack graph analysis)
+            try:
+                strategist_analysis = self.strategist_engine.analyze_attack_graph(self.world_model)
+                if strategist_analysis and strategist_analysis.selected_goal:
+                    active_node = strategist_analysis.selected_goal.goal_id
+                else:
+                    active_node = self.goal_tree.select_active_node(
+                        self.model, self.target_type, self._forced_exploit, self._loop_sig, self.autonomy_profile
+                    )
+            except Exception as e:
+                log(f"[StrategistEngine] Goal synthesis fallback: {e}")
+                active_node = self.goal_tree.select_active_node(
+                    self.model, self.target_type, self._forced_exploit, self._loop_sig, self.autonomy_profile
+                )
             self.state_db.update_goal(active_node)
 
             # All-categories-exhausted check: bail gracefully instead of looping forever
