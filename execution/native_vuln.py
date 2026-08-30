@@ -295,6 +295,55 @@ class NativeVulnEngine:
                 pass
         return findings
 
+    def test_idor(self, url: str, baseline_token: str, target_user_id: str, headers: Optional[Dict[str, str]] = None) -> Optional[VulnerabilityFinding]:
+        """Test for IDOR / BOLA authorization vulnerability."""
+        req_headers = dict(headers or {})
+        if baseline_token:
+            req_headers["Authorization"] = f"Bearer {baseline_token}"
+        try:
+            resp = self.session.get(url, headers=req_headers, timeout=self.timeout, verify=False)
+            if resp.status_code == 200 and ("FLAG{" in resp.text or target_user_id in resp.text):
+                return VulnerabilityFinding(
+                    title="IDOR / BOLA Authorization Bypass",
+                    severity="high",
+                    target=url,
+                    endpoint=urllib.parse.urlparse(url).path,
+                    description="User token was able to access unauthorized resource belonging to another tenant.",
+                    evidence=resp.text[:300],
+                    remediation="Enforce object-level access control on the server side.",
+                    cvss_score=8.5,
+                    cwe_id="CWE-639",
+                    poc_command=f"curl -sik -H 'Authorization: Bearer {baseline_token}' {url}",
+                    confirmed=True
+                )
+        except Exception:
+            pass
+        return None
+
+    def test_sqli(self, url: str, param: str = "q") -> Optional[VulnerabilityFinding]:
+        """Test for SQL injection anomaly via response differential."""
+        payload = "' or '1'='1"
+        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
+        try:
+            resp = self.session.get(test_url, timeout=self.timeout, verify=False)
+            if resp.status_code == 500 or "SQL" in resp.text or "Syntax error" in resp.text:
+                return VulnerabilityFinding(
+                    title="SQL Injection Anomaly",
+                    severity="high",
+                    target=url,
+                    endpoint=urllib.parse.urlparse(url).path,
+                    description=f"Parameter '{param}' triggered SQL syntax error or server differential response.",
+                    evidence=resp.text[:300],
+                    remediation="Use parameterized prepared statements.",
+                    cvss_score=8.8,
+                    cwe_id="CWE-89",
+                    poc_command=f"curl -sik '{test_url}'",
+                    confirmed=True
+                )
+        except Exception:
+            pass
+        return None
+
     def check_security_txt(self, base_url: str) -> List[VulnerabilityFinding]:
         findings: List[VulnerabilityFinding] = []
         paths = ["/.well-known/security.txt", "/security.txt"]
