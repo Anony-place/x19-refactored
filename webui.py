@@ -27,6 +27,7 @@ apply_windows_utf8_bootstrap()
 
 from config import CONFIG, CONFIG_DIR, CONFIG_FILE, load_config, save_config, set_data
 from constants import PROVIDERS, PROVIDER_PRIORITY
+from providers import make_ai
 from brain.coordinator import SwarmCoordinator
 from learning.self_adaptation import SelfAdaptationEngine
 from reporting.report_generator import SecurityReportGenerator
@@ -147,6 +148,28 @@ def api_save_config():
     save_config(data)
     set_data(data, save=False)
     return jsonify({"status": "saved"})
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    data = request.get_json() or {}
+    message = data.get("message", "").strip()
+    system_prompt = data.get("system", "You are X19 General AI Assistant — an expert software engineer and security analyst helping the user debug code, analyze command outputs, and craft payloads.").strip()
+    provider = data.get("provider", "").strip()
+
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+
+    try:
+        ai = make_ai(provider if provider in PROVIDERS else "")
+        response_text = ai.chat(system_prompt, message)
+        return jsonify({
+            "response": response_text,
+            "provider": ai.name(),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
