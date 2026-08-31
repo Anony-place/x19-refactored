@@ -308,7 +308,15 @@ def main():
                         help="One-shot: store GROQ_API_KEY + set AI_PROVIDER=groq + AI_MODEL=llama-3.3-70b-versatile, then exit. Use: x19 --setup-groq gsk_...")
     parser.add_argument("--setup-cerebras", type=str, default="",
                         help="One-shot: store CEREBRAS_API_KEY + set AI_PROVIDER=cerebras + AI_MODEL=llama-3.3-70b, then exit. Get free key at https://cloud.cerebras.ai/")
+    parser.add_argument("--upgrade", action="store_true",
+                        help="Autonomous self-upgrade: clone to sandbox, run 100% research plan, apply upgrades, run tests, and import to main codebase if valid.")
     args = parser.parse_args()
+
+    if args.upgrade:
+        from x19upgrader import X19Upgrader
+        upgrader = X19Upgrader()
+        success = upgrader.run_pipeline()
+        sys.exit(0 if success else 1)
 
     if args.browser:
         res = getattr(BrowserAutomation(), args.browser)(args.url)
