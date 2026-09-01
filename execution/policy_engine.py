@@ -12,10 +12,11 @@ from execution.command_request import CommandRequest, PolicyVerdict
 
 @dataclass(frozen=True)
 class ExecutionPolicy:
-    """Policy options for the command gateway.
+    """Fail-closed policy for the command gateway.
 
-    Empty allowlists preserve legacy behavior. Supplying allowed_targets turns
-    on scope enforcement for hosts, IPs, CIDRs, and URLs found in commands.
+    An empty target allowlist is intentionally *not* permissive. A mission must
+    explicitly establish an authorized target before network-capable execution
+    is allowed. This keeps the policy boundary independent of LLM decisions.
     """
 
     allowed_targets: Set[str] = field(default_factory=set)
@@ -38,23 +39,30 @@ class PolicyEngine:
         if request.tool and request.tool.lower() in self.policy.blocked_tools:
             return PolicyVerdict(False, f"tool '{request.tool}' is blocked", "blocked_tool")
 
-        if self.policy.allowed_targets:
-            outside = sorted(self._out_of_scope_refs(request))
-            if outside:
-                return PolicyVerdict(False, f"out-of-scope reference(s): {', '.join(outside[:5])}", "scope")
-
-        return PolicyVerdict(True)
-
-    def _out_of_scope_refs(self, request: CommandRequest) -> Set[str]:
+        # Scope is mandatory for commands that carry a target or network-like
+        # reference. Do not silently fall back to legacy permissive behavior.
         refs = self._extract_refs(request.command)
         if request.target:
             refs.add(request.target)
-        return {ref for ref in refs if not self._is_allowed(ref)}
+        if not self.policy.allowed_targets:
+            if refs:
+                return PolicyVerdict(False, "no authorized scope configured", "scope_required")
+            return PolicyVerdict(True, rule="non_targeted_command")
+
+        outside = sorted(ref for ref in refs if not self._is_allowed(ref))
+        if outside:
+            return PolicyVerdict(
+                False,
+                f"out-of-scope reference(s): {', '.join(outside[:5])}",
+                "scope",
+            )
+
+        return PolicyVerdict(True, rule="scope")
 
     def _is_allowed(self, ref: str) -> bool:
         normalized = self._normalize_ref(ref)
         if not normalized:
-            return True
+            return False
 
         for allowed in self.policy.allowed_targets:
             candidate = self._normalize_ref(allowed)
@@ -120,13 +128,15 @@ class PolicyEngine:
 
 
 def policy_from_config(target: str = "") -> ExecutionPolicy:
-    """Build an execution policy from global config.
+    """Build an execution policy from the current mission scope.
 
-    Scope enforcement is opt-in for compatibility. When enabled, the mission
-    target is automatically included alongside X19_SCOPE_ALLOWLIST entries.
+    The explicit target is included only when scope enforcement is enabled;
+    otherwise the returned policy remains empty and the gateway will deny any
+    target-bearing/network-like request. This makes the legacy compatibility
+    switch visible rather than silently permissive.
     """
 
-    allowed = set()
+    allowed: Set[str] = set()
     if CONFIG.ENFORCE_SCOPE:
         if target:
             allowed.add(target)
