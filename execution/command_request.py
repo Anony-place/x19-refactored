@@ -12,11 +12,12 @@ def utc_now() -> str:
 
 @dataclass(frozen=True)
 class CommandRequest:
-    """A typed request to execute a tool command.
+    """Typed execution request carrying the reasoning provenance for an action.
 
-    This intentionally still carries a legacy shell command so the migration can
-    wrap existing behavior first. Future planners should fill in tool/args and
-    let the gateway render backend-specific commands.
+    The command field remains for compatibility with the legacy executor, but
+    autonomous planners should also provide hypothesis/evidence metadata so the
+    policy layer can verify that an action is justified by the current mission
+    state before it reaches execution.
     """
 
     command: str
@@ -26,6 +27,10 @@ class CommandRequest:
     risk: str = "normal"
     backend: str = "auto"
     reason: str = ""
+    hypothesis_id: str = ""
+    hypothesis: str = ""
+    expected_evidence: str = ""
+    evidence_required: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
     request_id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=utc_now)
@@ -40,6 +45,10 @@ class CommandRequest:
         reason: str = "",
         risk: str = "normal",
         backend: str = "auto",
+        hypothesis_id: str = "",
+        hypothesis: str = "",
+        expected_evidence: str = "",
+        evidence_required: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "CommandRequest":
         parts = (command or "").strip().split()
@@ -51,6 +60,10 @@ class CommandRequest:
             risk=risk,
             backend=backend,
             reason=reason,
+            hypothesis_id=hypothesis_id,
+            hypothesis=hypothesis,
+            expected_evidence=expected_evidence,
+            evidence_required=evidence_required,
             metadata=metadata or {},
         )
 
