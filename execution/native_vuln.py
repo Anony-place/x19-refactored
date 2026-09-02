@@ -61,6 +61,9 @@ class NativeVulnEngine:
         findings.extend(self.check_ssrf_heuristic(base_url))
         findings.extend(self.check_ssti(base_url))
         findings.extend(self.check_api_key_leakage(base_url))
+        findings.extend(self.check_jwt_vulnerabilities(base_url))
+        findings.extend(self.check_request_smuggling_headers(base_url))
+        findings.extend(self.check_subdomain_takeover(base_url))
         return findings
 
     def check_exposed_files(self, base_url: str) -> List[VulnerabilityFinding]:
@@ -458,6 +461,120 @@ class NativeVulnEngine:
         except Exception:
             pass
         return None
+
+    def check_jwt_vulnerabilities(self, base_url: str) -> List[VulnerabilityFinding]:
+        """Audit for exposed or weak JWT tokens in headers or response bodies."""
+        findings: List[VulnerabilityFinding] = []
+        try:
+            resp = self.session.get(base_url, timeout=self.timeout, verify=False)
+            jwt_pattern = r'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*'
+            matches = re.findall(jwt_pattern, resp.text + " " + str(resp.headers))
+            for jwt in matches[:3]:
+                parts = jwt.split(".")
+                if len(parts) >= 2:
+                    try:
+                        import base64
+                        import json
+                        header_json = base64.urlsafe_b64decode(parts[0] + "==").decode('utf-8', errors='ignore')
+                        payload_json = base64.urlsafe_b64decode(parts[1] + "==").decode('utf-8', errors='ignore')
+                        header = json.loads(header_json)
+                        if header.get("alg", "").lower() == "none":
+                            findings.append(VulnerabilityFinding(
+                                title="JWT Unsigned Token (alg: none)",
+                                severity="critical",
+                                target=base_url,
+                                endpoint="/",
+                                description="Discovered a JSON Web Token (JWT) with algorithm set to 'none', allowing unsigned token forgery.",
+                                evidence=f"JWT Token Header: {header_json}\nPayload: {payload_json}",
+                                remediation="Reject JWTs with 'alg: none' and enforce strong signature verification (e.g. RS256/HS256).",
+                                cvss_score=9.8,
+                                cwe_id="CWE-347",
+                                poc_command=f"curl -sik -H 'Authorization: Bearer {jwt}' {base_url}",
+                                confirmed=True
+                            ))
+                        else:
+                            findings.append(VulnerabilityFinding(
+                                title="Exposed JWT Token in Client Response",
+                                severity="medium",
+                                target=base_url,
+                                endpoint="/",
+                                description="JWT session/authentication token exposed in public HTTP response.",
+                                evidence=f"JWT Token snippet: {jwt[:30]}...\nHeader: {header_json[:100]}",
+                                remediation="Avoid exposing sensitive JWT tokens in unauthenticated public endpoints.",
+                                cvss_score=5.3,
+                                cwe_id="CWE-522",
+                                poc_command=f"curl -s {base_url}",
+                                confirmed=True
+                            ))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return findings
+
+    def check_request_smuggling_headers(self, base_url: str) -> List[VulnerabilityFinding]:
+        """Check for HTTP Request Smuggling header processing anomalies."""
+        findings: List[VulnerabilityFinding] = []
+        try:
+            # Send conflicting Content-Length and Transfer-Encoding headers
+            headers = {
+                "Content-Length": "6",
+                "Transfer-Encoding": "chunked",
+            }
+            resp = self.session.post(base_url, data="0\r\n\r\nG", headers=headers, timeout=self.timeout, verify=False)
+            if resp.status_code in (400, 501, 502):
+                # Standard rejection - safe
+                pass
+            elif resp.status_code == 200:
+                findings.append(VulnerabilityFinding(
+                    title="HTTP Request Smuggling Potential (CL.TE / TE.CL Anomaly)",
+                    severity="high",
+                    target=base_url,
+                    endpoint="/",
+                    description="Server accepted conflicting Content-Length and Transfer-Encoding headers without error (200 OK), indicating possible HTTP Request Smuggling.",
+                    evidence=f"Headers: Content-Length: 6 | Transfer-Encoding: chunked -> HTTP {resp.status_code}",
+                    remediation="Normalize HTTP headers at front-end reverse proxy/load balancer and disable duplicate length headers.",
+                    cvss_score=8.1,
+                    cwe_id="CWE-444",
+                    poc_command=f"curl -sik -X POST -H 'Content-Length: 6' -H 'Transfer-Encoding: chunked' -d $'0\\r\\n\\r\\nG' {base_url}",
+                    confirmed=False
+                ))
+        except Exception:
+            pass
+        return findings
+
+    def check_subdomain_takeover(self, base_url: str) -> List[VulnerabilityFinding]:
+        """Check for dangling CNAME pointers and cloud service takeover signatures."""
+        findings: List[VulnerabilityFinding] = []
+        takeover_fingerprints = [
+            ("GitHub Pages", "There isn't a GitHub Pages site here.", "high", 7.5),
+            ("AWS S3", "The specified bucket does not exist", "high", 7.5),
+            ("Heroku", "No such app", "high", 7.5),
+            ("Azure", "404 Web Site not found", "high", 7.5),
+            ("Shopify", "Sorry, this shop is currently unavailable.", "medium", 6.5),
+            ("Fastly", "Fastly error: unknown domain", "high", 7.5),
+            ("Ghost", "The thing you were looking for is gone.", "medium", 5.3),
+        ]
+        try:
+            resp = self.session.get(base_url, timeout=self.timeout, verify=False)
+            for service, fingerprint, severity, cvss in takeover_fingerprints:
+                if fingerprint in resp.text:
+                    findings.append(VulnerabilityFinding(
+                        title=f"Potential Subdomain Takeover ({service})",
+                        severity=severity,
+                        target=base_url,
+                        endpoint="/",
+                        description=f"Target page matched dangling cloud service fingerprint for {service}.",
+                        evidence=f"Fingerprint matched: '{fingerprint}' in response body.",
+                        remediation=f"Remove dangling DNS CNAME record or claim the orphaned {service} resource.",
+                        cvss_score=cvss,
+                        cwe_id="CWE-284",
+                        poc_command=f"curl -sik {base_url}",
+                        confirmed=True
+                    ))
+        except Exception:
+            pass
+        return findings
 
     def check_security_txt(self, base_url: str) -> List[VulnerabilityFinding]:
         findings: List[VulnerabilityFinding] = []

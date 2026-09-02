@@ -169,11 +169,17 @@ class ControlledLabIntegrationTests(unittest.TestCase):
         ssrf_findings = engine.check_ssrf_heuristic("http://127.0.0.1:18888")
         ssti_findings = engine.check_ssti("http://127.0.0.1:18888")
         key_findings = engine.check_api_key_leakage("http://127.0.0.1:18888")
+        jwt_findings = engine.check_jwt_vulnerabilities("http://127.0.0.1:18888")
+        smuggle_findings = engine.check_request_smuggling_headers("http://127.0.0.1:18888")
+        takeover_findings = engine.check_subdomain_takeover("http://127.0.0.1:18888")
 
         self.assertIsInstance(host_findings, list)
         self.assertIsInstance(ssrf_findings, list)
         self.assertIsInstance(ssti_findings, list)
         self.assertIsInstance(key_findings, list)
+        self.assertIsInstance(jwt_findings, list)
+        self.assertIsInstance(smuggle_findings, list)
+        self.assertIsInstance(takeover_findings, list)
 
 
 class SwarmCoordinatorTests(unittest.TestCase):
