@@ -29,6 +29,34 @@ from builtin_integration import install_phase_access
 install_phase_access()
 from logging_utils import log
 
+# Event-driven runtime is attached after cli/agent imports are complete.  The
+# runtime owns session lifecycle and runs the existing autonomous worker in a
+# daemon thread so the interactive UI is not blocked by a long assessment.
+try:
+    from agent import X19
+    from agent_runtime import install_runtime
+
+    _x19_init = X19.__init__
+    _x19_loop = X19.autonomous_loop
+
+    def _runtime_init(self, *args, **kwargs):
+        _x19_init(self, *args, **kwargs)
+        install_runtime(self)
+
+    def _runtime_autonomous_loop(self, target, *args, **kwargs):
+        runtime = install_runtime(self)
+        if runtime.running:
+            return
+        runtime.start(target, worker=lambda: _x19_loop(self, target, *args, **kwargs))
+
+    X19.__init__ = _runtime_init
+    X19.autonomous_loop = _runtime_autonomous_loop
+except Exception as _runtime_error:
+    # Runtime integration is deliberately fail-open: the legacy foreground
+    # agent remains usable if the optional lifecycle wrapper cannot initialize.
+    log(f"[AgentRuntime] integration skipped: {_runtime_error}")
+
+
 if __name__ == "__main__":
     try:
         if not setup_if_needed():
