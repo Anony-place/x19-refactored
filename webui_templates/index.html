@@ -873,8 +873,12 @@
             <option value="nvidia">NVIDIA NIM (Qwen/Nemotron)</option>
             <option value="deepseek">DeepSeek (V3 / R1)</option>
             <option value="together">Together AI</option>
+            <option value="cerebras">Cerebras (Fast Free Tier)</option>
+            <option value="dashscope">Alibaba DashScope (Qwen3)</option>
+            <option value="agentrouter">AgentRouter</option>
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic Claude</option>
+            <option value="huggingface">Hugging Face Inference</option>
             <option value="ollama">Ollama (Local Offline)</option>
           </select>
         </div>
@@ -912,6 +916,31 @@
         <div class="form-group">
           <label>Together API Key (`TOGETHER_API_KEY`)</label>
           <input type="password" id="cfg-together-key" placeholder="...">
+        </div>
+
+        <div class="form-group">
+          <label>Cerebras API Key (`CEREBRAS_API_KEY`)</label>
+          <input type="password" id="cfg-cerebras-key" placeholder="...">
+        </div>
+
+        <div class="form-group">
+          <label>DashScope API Key (`DASHSCOPE_API_KEY`)</label>
+          <input type="password" id="cfg-dashscope-key" placeholder="...">
+        </div>
+
+        <div class="form-group">
+          <label>OpenAI API Key (`OPENAI_API_KEY`)</label>
+          <input type="password" id="cfg-openai-key" placeholder="sk-proj-...">
+        </div>
+
+        <div class="form-group">
+          <label>Anthropic API Key (`ANTHROPIC_API_KEY`)</label>
+          <input type="password" id="cfg-anthropic-key" placeholder="sk-ant-...">
+        </div>
+
+        <div class="form-group">
+          <label>Hugging Face Token (`HF_TOKEN`)</label>
+          <input type="password" id="cfg-hf-token" placeholder="hf_...">
         </div>
       </div>
     </div>
@@ -1197,27 +1226,41 @@
       try {
         const res = await fetch('/api/config');
         const cfg = await res.json();
-        if (cfg.X19_AI_PROVIDER) document.getElementById('cfg-provider').value = cfg.X19_AI_PROVIDER;
-        if (cfg.X19_AI_MODEL) document.getElementById('cfg-model').value = cfg.X19_AI_MODEL;
+        const prov = cfg.X19_AI_PROVIDER || cfg.AI_PROVIDER;
+        const mod = cfg.X19_AI_MODEL || cfg.AI_MODEL;
+        if (prov) document.getElementById('cfg-provider').value = prov;
+        if (mod) document.getElementById('cfg-model').value = mod;
         if (cfg.GROQ_API_KEY) document.getElementById('cfg-groq-key').value = cfg.GROQ_API_KEY;
         if (cfg.OPENROUTER_API_KEY) document.getElementById('cfg-openrouter-key').value = cfg.OPENROUTER_API_KEY;
         if (cfg.GOOGLE_API_KEY) document.getElementById('cfg-google-key').value = cfg.GOOGLE_API_KEY;
         if (cfg.NVIDIA_API_KEY) document.getElementById('cfg-nvidia-key').value = cfg.NVIDIA_API_KEY;
         if (cfg.DEEPSEEK_API_KEY) document.getElementById('cfg-deepseek-key').value = cfg.DEEPSEEK_API_KEY;
         if (cfg.TOGETHER_API_KEY) document.getElementById('cfg-together-key').value = cfg.TOGETHER_API_KEY;
+        if (cfg.CEREBRAS_API_KEY) document.getElementById('cfg-cerebras-key').value = cfg.CEREBRAS_API_KEY;
+        if (cfg.DASHSCOPE_API_KEY) document.getElementById('cfg-dashscope-key').value = cfg.DASHSCOPE_API_KEY;
+        if (cfg.OPENAI_API_KEY) document.getElementById('cfg-openai-key').value = cfg.OPENAI_API_KEY;
+        if (cfg.ANTHROPIC_API_KEY) document.getElementById('cfg-anthropic-key').value = cfg.ANTHROPIC_API_KEY;
+        if (cfg.HF_TOKEN) document.getElementById('cfg-hf-token').value = cfg.HF_TOKEN;
       } catch (e) {}
     }
 
     async function saveConfigFromUI() {
       const payload = {
         X19_AI_PROVIDER: document.getElementById('cfg-provider').value,
+        AI_PROVIDER: document.getElementById('cfg-provider').value,
         X19_AI_MODEL: document.getElementById('cfg-model').value.trim(),
+        AI_MODEL: document.getElementById('cfg-model').value.trim(),
         GROQ_API_KEY: document.getElementById('cfg-groq-key').value.trim(),
         OPENROUTER_API_KEY: document.getElementById('cfg-openrouter-key').value.trim(),
         GOOGLE_API_KEY: document.getElementById('cfg-google-key').value.trim(),
         NVIDIA_API_KEY: document.getElementById('cfg-nvidia-key').value.trim(),
         DEEPSEEK_API_KEY: document.getElementById('cfg-deepseek-key').value.trim(),
         TOGETHER_API_KEY: document.getElementById('cfg-together-key').value.trim(),
+        CEREBRAS_API_KEY: document.getElementById('cfg-cerebras-key').value.trim(),
+        DASHSCOPE_API_KEY: document.getElementById('cfg-dashscope-key').value.trim(),
+        OPENAI_API_KEY: document.getElementById('cfg-openai-key').value.trim(),
+        ANTHROPIC_API_KEY: document.getElementById('cfg-anthropic-key').value.trim(),
+        HF_TOKEN: document.getElementById('cfg-hf-token').value.trim(),
       };
 
       await fetch('/api/config', {
