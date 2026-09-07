@@ -98,7 +98,9 @@ def save_config(data: Dict):
 def set_data(data: dict, save: bool = True):
     env_map = {
         "AI_PROVIDER": "X19_AI_PROVIDER",
+        "X19_AI_PROVIDER": "X19_AI_PROVIDER",
         "AI_MODEL": "X19_AI_MODEL",
+        "X19_AI_MODEL": "X19_AI_MODEL",
         "OPENROUTER_API_KEY": "OPENROUTER_API_KEY",
         "OPENAI_API_KEY": "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
@@ -107,9 +109,11 @@ def set_data(data: dict, save: bool = True):
         "DEEPSEEK_API_KEY": "DEEPSEEK_API_KEY",
         "TOGETHER_API_KEY": "TOGETHER_API_KEY",
         "AGENTROUTER_API_KEY": "AGENTROUTER_API_KEY",
+        "CEREBRAS_API_KEY": "CEREBRAS_API_KEY",
         "NVIDIA_API_KEY": "NVIDIA_API_KEY",
         "DASHSCOPE_API_KEY": "DASHSCOPE_API_KEY",
         "DASHSCOPE_BASE_URL": "DASHSCOPE_BASE_URL",
+        "HF_TOKEN": "HF_TOKEN",
         "TELEGRAM_BOT_TOKEN": "TELEGRAM_BOT_TOKEN",
         "ALLOWED_TELEGRAM_USERS": "ALLOWED_TELEGRAM_USERS",
         "TARGET": "X19_TARGET",
