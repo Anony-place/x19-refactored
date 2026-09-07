@@ -17,6 +17,9 @@ from builtin_tools import install as install_builtin_tools
 from tools import TOOLS, ToolExecutor
 install_builtin_tools(TOOLS, ToolExecutor)
 
+# First-run AI setup MUST happen before the runtime is initialized. This lets
+# the user choose primary + fallback providers/models and verifies each one.
+from provider_setup import setup_if_needed
 from cli import main
 from builtin_integration import install_phase_access
 install_phase_access()
@@ -24,6 +27,10 @@ from logging_utils import log
 
 if __name__ == "__main__":
     try:
+        # The setup wizard is skipped once a verified chain exists. A fresh
+        # install therefore cannot enter the agent with an unverified provider.
+        if not setup_if_needed():
+            sys.exit(1)
         main()
     except KeyboardInterrupt:
         print("\n[!] Stopped")
