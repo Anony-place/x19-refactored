@@ -228,7 +228,11 @@ class X19:
         ]
         self._current_waf_bypass_idx: int = -1
         self._current_ua: str = self._user_agents[0]
-        # Phase enforcement state
+        # Phase enforcement state (stateful advisory phase machine, names:
+        # recon/enum/vuln/exploit/report). The separately COMPUTED cognitive
+        # phase (names: recon/hypothesis/validation/exploitation) lives in the
+        # _cognitive_phase() method — it must not share this attribute name,
+        # or the instance attribute shadows the method.
         self._current_phase: str = "recon"
         self._phase_iterations: int = 0        # iterations stuck in current phase
         self._phase_attempts: dict = {}         # phase -> {tool: count}
@@ -853,6 +857,20 @@ Analyze the output carefully. Return JSON ONLY:
         ports = self._parse_ports(stdout)
         for p in ports:
             self.model.add_port(p["port"], p["proto"], p["service"], p.get("version", ""))
+
+        # Ports from builtin JSON recon output (x19_net_scan emits JSON, not nmap text)
+        if stdout.lstrip().startswith("{"):
+            try:
+                _payload = json.loads(stdout)
+                if isinstance(_payload, dict) and _payload.get("tool") == "x19_net_scan":
+                    for _p in _payload.get("open_ports", []):
+                        try:
+                            _port = int(_p["port"])
+                            self.model.add_port(_port, "tcp", _p.get("service") or f"service-{_port}")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
         # OS detection
         os_match = re.search(r'(?:OS|operating system)[:\s]+([^\n]+)', stdout, re.IGNORECASE)
@@ -2114,7 +2132,7 @@ Analyze the output carefully. Return JSON ONLY:
                     # Info gain — scored but NOT blocked (only exact duplicates/help are blocked by duplicate detector)
                     gain = self._info_gain_scorer(pc)
                 # Phase-aware check: flag plans with steps that don't match current phase
-                phase = self._current_phase()
+                phase = self._cognitive_phase()
                 phase_mismatches = []
                 for s in steps:
                     pc = s.get("command", "")
@@ -4197,6 +4215,28 @@ Analyze the output carefully. Return JSON ONLY:
         # Ultimate fallback
         return f"curl -sik --max-time 5 'http://{ip}/' 2>&1 | head -30"
 
+    def _force_next_planner_step(self) -> str:
+        """Forced probe used when the self-critique gate has blocked repeated
+        commands 3x in a row. Runs the next viable planner-chain step instead
+        of the rejected command, so the mission keeps making forward progress.
+        Falls back to the state-aware generic probe when the planner has
+        nothing executable.
+        """
+        try:
+            for step in self.planner.suggest_next_tools(self.model, limit=5):
+                name = (getattr(step, "tool", "") or "").strip()
+                if not name:
+                    continue
+                try:
+                    cmd, _desc, _to = self._legacy_exec.resolve_tool(name, self._target_host())
+                except Exception:
+                    continue
+                if cmd and cmd.split() and cmd.split()[0] != "echo":
+                    return cmd
+        except Exception as e:
+            log(f"[planner-force] {e}")
+        return self._generate_fallback_cmd()
+
     def _target_host(self, target: Optional[str] = None) -> str:
         raw = (target or self.target or "").strip()
         raw = re.sub(r'^https?://', '', raw)
@@ -4283,7 +4323,11 @@ Analyze the output carefully. Return JSON ONLY:
                 resp = self.ai.chat(system_prompt, wake_ctx)
                 if resp:
                     parsed = self._parse_decision(resp)
-                    if parsed and (parsed.get("next_command") or parsed.get("plan")):
+                    # Accept executable decisions AND terminal decisions
+                    # (finding + completed with no next_command) so a mission
+                    # can finish through the fallback path too.
+                    if parsed and (parsed.get("next_command") or parsed.get("plan")
+                                   or parsed.get("finding") or parsed.get("completed")):
                         return parsed
             except Exception as e:
                 log(f"[Loop] AI retry failed: {e}")
@@ -4482,12 +4526,12 @@ Analyze the output carefully. Return JSON ONLY:
             return "\n".join(lines) + "\n"
         return ""
 
-    def _param_fuzzing_context(self) -> str:
+    def _param_fuzzing_context(self, target: str = "") -> str:
         """Generate parameter fuzzing guidance based on discovered endpoints."""
         if not self.model.endpoints:
             return ""
         lines = ["=== PARAMETER FUZZING ==="]
-        host = re.sub(r'^https?://', '', self.target).split('/')[0]
+        host = re.sub(r'^https?://', '', target or self.target).split('/')[0]
         web_port = self._get_web_port()
         base_url = f"http://{host}:{web_port}" if web_port else f"http://{host}"
 
@@ -4503,11 +4547,12 @@ Analyze the output carefully. Return JSON ONLY:
         lines.append(f"  Try HTTP method override: curl -X PUT '{base_url}/api/endpoint'")
         return "\n".join(lines) + "\n"
 
-    def _js_analysis_context(self) -> str:
+    def _js_analysis_context(self, target: str = "") -> str:
         """Generate JavaScript analysis guidance for endpoint discovery."""
         endpoints = [e for e in self.model.endpoints if any(ext in e.get('url','').lower() for ext in ['.js', '.jsx', '.ts', '.tsx', '.vue', '.min.js'])]
         if not endpoints and not self.model.subdomains:
             return ""
+        host = re.sub(r'^https?://', '', target or self.target).split('/')[0]
         lines = ["=== JAVASCRIPT ANALYSIS ==="]
         lines.append("JS files contain hidden API endpoints, hardcoded secrets, and SPA routes.")
         if self._check_tool("linkfinder"):
@@ -4790,7 +4835,7 @@ Analyze the output carefully. Return JSON ONLY:
     def _methodology_context(self) -> str:
         """Generate attack methodology guidance based on current phase and target state."""
         model = self.model
-        phase = self._current_phase()
+        phase = self._cognitive_phase()
         has_ports = len(model.ports) > 0
         has_subdomains = len(model.subdomains) > 0
         has_endpoints = len(model.endpoints) > 0
@@ -4853,8 +4898,13 @@ Analyze the output carefully. Return JSON ONLY:
         lines.append("  7. Dead ends are valid results — document what was tested and move on.")
         return "\n".join(lines)
 
-    def _current_phase(self) -> str:
-        """Determine the current attack phase based on target model state."""
+    def _cognitive_phase(self) -> str:
+        """Determine the current attack phase based on target model state.
+
+        NOTE: intentionally named _cognitive_phase (not _current_phase) to
+        avoid colliding with the stateful self._current_phase attribute used
+        by the PHASE ENFORCEMENT section.
+        """
         model = self.model
         if self._forced_exploit:
             return "exploitation"
@@ -4892,7 +4942,7 @@ Analyze the output carefully. Return JSON ONLY:
         has_web_port = bool(open_ports & {80, 443, 8080, 8443, 8000, 3000, 5000})
 
         # Phase-aware tool distribution — sample tools based on current phase
-        phase = self._current_phase()
+        phase = self._cognitive_phase()
         phase_tools = get_tools_for_phase(target_type=target_type, phase=phase)
         phase_suggestions = ""
         if phase_tools:

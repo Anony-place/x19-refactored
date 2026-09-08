@@ -21,15 +21,24 @@ def parse_decision(raw: str) -> Optional[Dict[str, Any]]:
     if not raw:
         return None
 
-    # Try to find JSON block
-    m = re.search(r'\{.*?"completed".*?\}', raw, re.DOTALL)
-    block = m.group(0) if m else raw.strip()
-    for attempt in (block, re.sub(r',\s*([}\]])', r'\1', block)):
-        try:
-            d = json.loads(attempt)
-        except json.JSONDecodeError:
-            continue
+    # Robust JSON extraction: scan each '{' with a real decoder. This handles
+    # nested objects/arrays and braces inside strings correctly, unlike the old
+    # non-greedy regex which truncated at the first '}' and broke whenever a
+    # nested object (plan / finding / _mission_task) followed "completed".
+    d = _extract_json_object(raw)
+    if d is not None:
         return _normalize_decision(d)
+
+    # Fallback: legacy regex for the simple flat-decision case.
+    m = re.search(r'\{.*?"completed".*?\}', raw, re.DOTALL)
+    if m:
+        for attempt in (m.group(0), re.sub(r',\s*([}\]])', r'\1', m.group(0))):
+            try:
+                d = json.loads(attempt)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(d, dict):
+                return _normalize_decision(d)
 
     # Longcat tool call format
     longcat_cmds = _extract_longcat_commands(raw)
@@ -49,6 +58,27 @@ def parse_decision(raw: str) -> Optional[Dict[str, Any]]:
             "reasoning": "extracted from prose (model did not follow JSON format)",
         })
 
+    return None
+
+
+def _extract_json_object(raw: str) -> Optional[Dict[str, Any]]:
+    """Return the first JSON object in `raw` that contains a "completed" key.
+
+    Uses json.JSONDecoder.raw_decode at each '{' so nested objects, arrays,
+    escaped quotes, and braces inside strings are all handled correctly.
+    Returns None if no such object exists.
+    """
+    decoder = json.JSONDecoder()
+    idx = raw.find("{")
+    while idx != -1:
+        try:
+            obj, end = decoder.raw_decode(raw, idx)
+        except json.JSONDecodeError:
+            obj = None
+            end = idx + 1
+        if isinstance(obj, dict) and "completed" in obj:
+            return obj
+        idx = raw.find("{", end)
     return None
 
 

@@ -639,7 +639,13 @@ class Planner:
                 if not endpoints:
                     return False
                 ep_type = prereq.replace("endpoint_", "").lower()
-                ep_list = [e.lower() for e in (getattr(model, "endpoints", []) or [])]
+                # Endpoints may be legacy strings or {url, method, ...} dicts.
+                ep_list = []
+                for e in (getattr(model, "endpoints", []) or []):
+                    if isinstance(e, dict):
+                        ep_list.append(str(e.get("url", "")).lower())
+                    else:
+                        ep_list.append(str(e).lower())
                 if not any(ep_type in e for e in ep_list):
                     return False
 
