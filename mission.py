@@ -238,11 +238,21 @@ class AutonomyProfile:
         if kwargs.get("goal_node"):
             self.goal_node = kwargs["goal_node"]
         if kwargs.get("loop_sig"):
-            self.last_signal = kwargs["loop_sig"][:120]
+            # loop_sig may be a LoopSignal object (agent.py) or a legacy string.
+            ls = kwargs["loop_sig"]
+            if isinstance(ls, str):
+                self.last_signal = ls[:120]
+            else:
+                self.last_signal = (f"{ls.state}:{ls.category or 'stagnation'}:{ls.reason or ''}")[:120]
         if kwargs.get("memory_counts"):
             self.memory_counts = kwargs["memory_counts"]
-        if kwargs.get("failure_memory"):
-            self.failure_counts = dict(kwargs["failure_memory"])
+        if kwargs.get("failure_memory") is not None:
+            # failure_memory may be a FailureMemory object (agent.py) or a legacy dict.
+            fm = kwargs["failure_memory"]
+            cats = getattr(fm, "_data", fm)
+            cats = cats.get("categories", {}) if isinstance(cats, dict) else {}
+            if isinstance(cats, dict):
+                self.failure_counts = {k: int(v.get("count", 0)) for k, v in list(cats.items())[:8]}
         self.updated_ts = time.time()
         self._save()
         parts = []

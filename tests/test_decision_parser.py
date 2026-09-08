@@ -42,6 +42,37 @@ class DecisionParserTests(unittest.TestCase):
         self.assertIsNotNone(d)
         self.assertEqual(d["next_command"], "curl example.com")
 
+    def test_nested_object_after_completed(self):
+        # Regression (AUDIT_REPORT.md Bug #6): the old non-greedy regex
+        # truncated at the first '}', so any nested object following
+        # "completed" made the whole decision unparseable.
+        import json
+        raw = json.dumps({
+            "thinking": "recon",
+            "reasoning": "enumerate ports",
+            "next_command": "__x19_builtin__ net_scan 127.0.0.1 80",
+            "finding": None,
+            "completed": False,
+            "_mission_task": {"key": "k1", "goal": "task", "depends_on": []},
+        })
+        d = parse_decision(raw)
+        self.assertIsNotNone(d)
+        self.assertEqual(d["next_command"], "__x19_builtin__ net_scan 127.0.0.1 80")
+        self.assertIn("_mission_task", d)
+
+    def test_plan_object_after_completed(self):
+        import json
+        raw = json.dumps({
+            "thinking": "plan",
+            "reasoning": "multi step",
+            "next_command": "",
+            "completed": False,
+            "plan": {"steps": [{"command": "curl http://example.com/"}]},
+        })
+        d = parse_decision(raw)
+        self.assertIsNotNone(d)
+        self.assertIsInstance(d.get("plan"), dict)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -487,6 +487,7 @@ def nessus_scan(target: str) -> str:
         return f"[nessus] error: {e}"
 
 
+@dataclass
 class Finding:
     severity: str
     title: str
