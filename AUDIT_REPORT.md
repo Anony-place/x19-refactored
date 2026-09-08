@@ -1,6 +1,12 @@
 # X19 Refactored — Full Audit Report
 
 **Date:** 2026-09-08 · **Branch:** `arena/01a0811b-x19-refactored` @ `fb2be0f`
+> **Addendum (4.0.0):** the web UI findings in this report are historical.
+> `webui.py`, `webui_templates/` and the Flask dependency were removed — X19 is
+> now a terminal application only, so the "no auth on the web UI" and
+> "binds 0.0.0.0:5050" concerns no longer apply. The equivalent capability
+> lives in `ui/dashboard.py` and is exercised by `tests/test_cli_application.py`.
+
 **Method:** static code review + live runtime verification (real local vulnerable target, real test suite, real HTTP execution). No results in this report are assumed — every claim below was executed.
 
 ---

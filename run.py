@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""
-X19 - Autonomous AI Pentest Agent
-AI-driven decision making. No fixed phases, no prescribed tool order.
-The AI independently chooses every action, tool, and command.
+"""X19 — autonomous AI security assessment platform.
+
+Terminal application entry point. There is no web server: every capability is
+served by the CLI in :mod:`cli` and the terminal UI in :mod:`ui`.
+
+    python run.py --help
+    python run.py run -t <target>
+    python run.py dash -t <target>
 """
 
 import sys
@@ -21,24 +25,29 @@ install_builtin_tools(TOOLS, ToolExecutor)
 from runtime_bootstrap import install_runtime_fixes
 install_runtime_fixes()
 
-# First-run AI setup MUST happen before the runtime is initialized. This lets
-# the user choose primary + fallback providers/models and verifies each one.
-from provider_setup import setup_if_needed
-from cli import main
 from builtin_integration import install_phase_access
 install_phase_access()
+
 from logging_utils import log
+
+def main() -> int:
+    # Imported late so ``x19 --version`` / ``--help`` never pay for the agent
+    # import graph, and never trigger the first-run provider wizard.
+    from cli import main as cli_main
+
+    return cli_main()
+
 
 if __name__ == "__main__":
     try:
-        if not setup_if_needed():
-            sys.exit(1)
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         print("\n[!] Stopped")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n[!] {e}")
+        sys.exit(130)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"\n[!] {exc}")
         traceback.print_exc()
-        log(f"FATAL: {e}")
+        log(f"FATAL: {exc}")
         sys.exit(1)

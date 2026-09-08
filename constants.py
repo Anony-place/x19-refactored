@@ -425,9 +425,12 @@ Short commands. No verbatim repeats.
 CRITICAL: ONLY use AVAILABLE tools. Skip NOT AVAILABLE.
 PHASE STATE shows your phase. Max 2 uses per tool per phase."""
 
+# Version comes from version.py — never hard-code it here.
+from version import __version__ as _X19_VERSION
+
 BANNER = f"""
-{C.BOLD}{C.B}  X19  autonomous security assessment agent  v3.0{C.N}
-{C.D}  adaptive AI-driven testing — phase-enforced{C.N}
+{C.BOLD}{C.B}  X19  autonomous security assessment agent  v{_X19_VERSION}{C.N}
+{C.D}  terminal application — adaptive AI-driven testing, phase-enforced{C.N}
 """
 
 PROVIDER_PRIORITY = [

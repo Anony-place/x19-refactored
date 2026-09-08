@@ -1,4 +1,12 @@
- Architecture Review
+# Architecture Review
+
+> **Status (4.0.0):** this plan predates the terminal-only release. Everything
+> below that mentions a web UI (`webui.py`, the Flask dashboard, web-UI config)
+> is superseded: X19 is a CLI/TUI application and no web server ships with it.
+> The terminal application lives in `cli.py`, `cli_support.py` and `ui/`.
+> The rest of the plan (brain / execution / parsers / learning / reporting)
+> still describes the intended architecture.
+
 
 Current X19 is a capable but heavily centralized Python system. The repo already contains early versions of the proposed architecture: planner, mission graph, memory, MCP client, tool executor, reporting, plugins, web UI, self-improvement, anti-loop logic, and target model.
 

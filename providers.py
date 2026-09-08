@@ -945,9 +945,6 @@ def make_ai(provider_id: str = "") -> AIBackend:
             info = PROVIDERS[provider_id]
             fmt = info["format"]
             save_config({"AI_PROVIDER": provider_id, "AI_MODEL": ""})
-            info = PROVIDERS[provider_id]
-            fmt = info["format"]
-            save_config({"AI_PROVIDER": provider_id, "AI_MODEL": ""})
 
     # Get API key if needed
     key = ""
@@ -956,9 +953,10 @@ def make_ai(provider_id: str = "") -> AIBackend:
         if not key:
             # Non-interactive fail
             print(f"{C.R}[!] {info['name']} API key not found.{C.N}")
-            print(f"{C.Y}[*] Set it via:{C.N}")
-            print(f"  python x19.py --set-data '{{\"{info['api_key_env']}\": \"your-key\"}}'")
-            print(f"  Or set env var: {info['api_key_env']}=your-key")
+            print(f"{C.Y}[*] Configure one with:{C.N}")
+            print(f"  x19 config set {info['api_key_env']}=your-key")
+            print("  x19 setup                      # guided first-run wizard")
+            print(f"  or export {info['api_key_env']}=your-key")
             sys.exit(1)
 
     # Model selection (non-interactive when pre-configured)

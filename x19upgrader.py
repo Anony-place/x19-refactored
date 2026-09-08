@@ -25,6 +25,9 @@ class X19Upgrader:
     CORE_FILES = [
         "agent.py",
         "cli.py",
+        "cli_support.py",
+        "version.py",
+        "run.py",
         "self_improve.py",
         "tools.py",
         "config.py",
@@ -60,6 +63,7 @@ class X19Upgrader:
         "parsers",
         "reporting",
         "tests",
+        "ui",
     ]
 
     def __init__(self, root_dir: Optional[Path] = None, sandbox_dir: Optional[Path] = None):
