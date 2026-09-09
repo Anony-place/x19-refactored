@@ -1,0 +1,4 @@
+- fixed natural `target <host>` routing
+- added native OS fingerprinting
+- added direct OS fingerprint CLI command
+- strengthened cognitive tool-use contract
