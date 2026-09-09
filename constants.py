@@ -124,6 +124,21 @@ PROVIDERS = {
         "needs_key": False,
         "format": "ollama",
     },
+    # Any OpenAI-compatible endpoint: vLLM, llama.cpp server, LM Studio,
+    # Ollama's /v1 surface, or a self-hosted gateway. Set X19_AI_BASE_URL to
+    # enable. No cloud failover is attempted from this provider — the operator
+    # chose a specific endpoint, and silently abandoning it would send
+    # engagement data somewhere else.
+    "custom_openai": {
+        "name": "Custom endpoint (OpenAI-compatible)",
+        "desc": "Point X19 at your own inference server via X19_AI_BASE_URL",
+        "base_url": os.getenv("X19_AI_BASE_URL", ""),
+        "default_model": os.getenv("X19_AI_MODEL", "local"),
+        "api_key_env": "X19_AI_API_KEY",
+        "api_key_config": "X19_AI_API_KEY",
+        "needs_key": False,
+        "format": "openai",
+    },
     "huggingface": {
         "name": "Hugging Face Inference API",
         "desc": "HF Inference API (OpenAI-compatible). Set HF_TOKEN env. Free tier has rate limits.",

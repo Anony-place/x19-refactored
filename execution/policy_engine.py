@@ -23,6 +23,14 @@ class ExecutionPolicy:
     blocked_tools: Set[str] = field(default_factory=set)
     allow_raw_shell: bool = True
     max_timeout: int = 3600
+    #: Every targeted command must name the hypothesis it tests and the
+    #: evidence that would confirm it. Off by default so a mission started
+    #: before the planner is wired keeps running; an engagement profile turns
+    #: it on to make unjustified actions a hard failure instead of a log line.
+    require_hypothesis_mapping: bool = False
+    #: A request may not claim it produced evidence without citing what that
+    #: evidence is. Cheap honesty check on the planner's own output.
+    enforce_evidence_claims: bool = True
 
 
 class PolicyEngine:
@@ -57,7 +65,54 @@ class PolicyEngine:
                 "scope",
             )
 
+        # Hypothesis ↔ expected-evidence ↔ command mapping. The gateway is the
+        # last deterministic place to refuse an action that no hypothesis
+        # predicted, so an ungrounded probe never reaches the target.
+        verdict = self._evaluate_reasoning(request, targeted=bool(refs or request.target))
+        if verdict is not None:
+            return verdict
+
         return PolicyVerdict(True, rule="scope")
+
+    def _evaluate_reasoning(
+        self, request: CommandRequest, *, targeted: bool
+    ) -> "PolicyVerdict | None":
+        """Return a blocking verdict, or None when the mapping is satisfied."""
+        hypothesis = (request.hypothesis or "").strip()
+        hypothesis_id = (request.hypothesis_id or "").strip()
+        evidence = (request.expected_evidence or "").strip()
+
+        if request.evidence_required and not hypothesis and not evidence:
+            return PolicyVerdict(
+                False,
+                "request asserts evidence_required but cites no hypothesis or "
+                "expected evidence",
+                "evidence_claim",
+            )
+
+        if self.policy.enforce_evidence_claims and evidence and not hypothesis:
+            return PolicyVerdict(
+                False,
+                "expected_evidence given without the hypothesis it would confirm",
+                "evidence_claim",
+            )
+
+        if self.policy.require_hypothesis_mapping and targeted:
+            if not hypothesis:
+                return PolicyVerdict(
+                    False,
+                    "targeted command has no hypothesis; planner must justify "
+                    "every action against current world-model state",
+                    "hypothesis_mapping",
+                )
+            if not evidence:
+                return PolicyVerdict(
+                    False,
+                    f"hypothesis {hypothesis_id or '(unnamed)'} declares no "
+                    "expected evidence; nothing to verify the result against",
+                    "hypothesis_mapping",
+                )
+        return None
 
     def _is_allowed(self, ref: str) -> bool:
         normalized = self._normalize_ref(ref)
