@@ -8,6 +8,7 @@ is not used unless an operator explicitly invokes the legacy ``dash`` command.
     python run.py
     python run.py setup
     python run.py provider list
+    python run.py os <target>
     python run.py run -t <target>
     python run.py dash -t <target>   # explicit live UI only
 """
@@ -50,7 +51,7 @@ install_terminal_behavior()
 from logging_utils import log
 
 _RUNTIME_COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
-_PLAIN_COMMANDS = {"", "status", "workspace", "providers", "provider", "setup", "brain"}
+_PLAIN_COMMANDS = {"", "status", "workspace", "providers", "provider", "setup", "brain", "os"}
 
 
 def _maybe_promote_learning(argv, result: int) -> None:
