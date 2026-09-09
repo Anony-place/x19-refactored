@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Small, dependency-light terminal control plane for X19.
 
-This intentionally avoids the Rich workspace/full-screen UI.  It is the
+This intentionally avoids the Rich workspace/full-screen UI. It is the
 operator-facing surface for setup, provider management and runtime status.
 Actual assessments remain on the existing ``run`` command.
 """
@@ -36,6 +36,7 @@ def status() -> int:
     if chain:
         print("chain    " + " -> ".join(f"{x.get('provider')}/{x.get('model')}" for x in chain))
     print("commands: x19 setup | x19 provider list | x19 provider test | x19 provider use")
+    print("          x19 os <target>")
     print("          x19 run -t <target> [--engagement <name>]")
     return 0
 
@@ -54,12 +55,12 @@ def providers() -> int:
     return 0
 
 
-def _provider_args() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(add_help=False)
-    p.add_argument("provider")
-    p.add_argument("--model")
-    p.add_argument("--key")
-    return p
+def os_detect(target: str) -> int:
+    from os_fingerprint import detect_os
+
+    result = detect_os(target)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if result.get("ok") else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -68,6 +69,11 @@ def main(argv: list[str] | None = None) -> int:
         return status()
     if argv[0] == "providers":
         return providers()
+    if argv[0] == "os":
+        if len(argv) < 2:
+            print("usage: x19 os <target>")
+            return 2
+        return os_detect(argv[1])
     if argv[0] == "provider":
         from provider_manager import provider_command
         return provider_command(argv[1:])
