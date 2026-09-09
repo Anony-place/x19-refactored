@@ -6,7 +6,9 @@ agent retirement, and the default-deny validation gate.
 """
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -807,10 +809,19 @@ class _StubFactory:
         return {"active": 0, "max_parallel": 4, "retired": []}
 
 
+#: DEBRIEF really runs, and it persists learned strategies. Point the library at
+#: a scratch file so the suite never mutates the tracked data/strategy_library.json.
+_TMP_DIR = tempfile.mkdtemp(prefix="x19-workflow-tests-")
+
+
 def _coordinator(profile, tasks=()):
     from brain.coordinator import SwarmCoordinator
+    from brain.strategy_library import StrategyLibrary
 
     coordinator = SwarmCoordinator()
+    coordinator.strategy_library = StrategyLibrary(
+        library_path=os.path.join(_TMP_DIR, "strategy_library.json")
+    )
     coordinator.apply_profile(profile)
 
     # Offline: no recon network calls, but the plan still has to close the stage
