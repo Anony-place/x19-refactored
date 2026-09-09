@@ -52,7 +52,7 @@ class Config:
     CTF_MODE: bool = os.getenv("X19_CTF_MODE", "").strip().lower() in ("1", "true", "yes")
     AUTO_BOOTSTRAP: bool = os.getenv("X19_AUTO_BOOTSTRAP", "1").strip().lower() not in ("0", "false", "no")
 
-    PARALLEL_PLAN: bool = os.getenv("X19_PARALLEL_PLAN", "1").strip().lower() not in ("0", "false", "yes")
+    PARALLEL_PLAN: bool = os.getenv("X19_PARALLEL_PLAN", "1").strip().lower() not in ("0", "false", "no")
     PARALLEL_WORKERS: int = max(1, int(os.getenv("X19_PARALLEL_WORKERS", "6")))
     MIN_ITERATIONS: int = int(os.getenv("X19_MIN_ITERATIONS", "8"))
 
