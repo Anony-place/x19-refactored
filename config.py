@@ -37,12 +37,22 @@ class Config:
     VECTOR_MEMORY_TYPE: str = os.getenv("X19_VECTOR_MEMORY", "chromadb")  # "chromadb" or "pgvector"
     CHROMA_DIR: str = os.path.expanduser(os.getenv("X19_CHROMA_DIR", "~/.x19/memory"))
 
+    # Hermes-inspired persistent agent runtime
+    SKILLS_DIR: str = os.path.expanduser(os.getenv("X19_SKILLS_DIR", "~/.x19/skills"))
+    SUBAGENT_DIR: str = os.path.expanduser(os.getenv("X19_SUBAGENT_DIR", "~/.x19/subagents"))
+    SUBAGENT_MAX_CONCURRENT: int = max(1, int(os.getenv("X19_SUBAGENT_MAX_CONCURRENT", "3")))
+    SUBAGENT_MAX_ITERATIONS: int = max(1, int(os.getenv("X19_SUBAGENT_MAX_ITERATIONS", "12")))
+    SESSION_INDEX_DB: str = os.path.expanduser(os.getenv("X19_SESSION_INDEX_DB", "~/.x19/session_index.db"))
+    CRON_JOBS_FILE: str = os.path.expanduser(os.getenv("X19_CRON_JOBS_FILE", "~/.x19/cron_jobs.json"))
+    CRON_POLL_SECONDS: int = max(1, int(os.getenv("X19_CRON_POLL_SECONDS", "5")))
+    AUTO_LEARN_SKILLS: bool = os.getenv("X19_AUTO_LEARN_SKILLS", "1").strip().lower() not in ("0", "false", "no")
+
     # Bug bounty / CTF
     BUG_BOUNTY_MODE: bool = os.getenv("X19_BUG_BOUNTY_MODE", "").strip().lower() in ("1", "true", "yes")
     CTF_MODE: bool = os.getenv("X19_CTF_MODE", "").strip().lower() in ("1", "true", "yes")
     AUTO_BOOTSTRAP: bool = os.getenv("X19_AUTO_BOOTSTRAP", "1").strip().lower() not in ("0", "false", "no")
 
-    PARALLEL_PLAN: bool = os.getenv("X19_PARALLEL_PLAN", "1").strip().lower() not in ("0", "false", "no")
+    PARALLEL_PLAN: bool = os.getenv("X19_PARALLEL_PLAN", "1").strip().lower() not in ("0", "false", "yes")
     PARALLEL_WORKERS: int = max(1, int(os.getenv("X19_PARALLEL_WORKERS", "6")))
     MIN_ITERATIONS: int = int(os.getenv("X19_MIN_ITERATIONS", "8"))
 
@@ -125,6 +135,14 @@ def set_data(data: dict, save: bool = True):
         "PROVIDER": "X19_AI_PROVIDER",
         "MODEL": "X19_AI_MODEL",
         "TARGET_TYPE": "X19_TARGET_TYPE",
+        "SKILLS_DIR": "X19_SKILLS_DIR",
+        "SUBAGENT_DIR": "X19_SUBAGENT_DIR",
+        "SUBAGENT_MAX_CONCURRENT": "X19_SUBAGENT_MAX_CONCURRENT",
+        "SUBAGENT_MAX_ITERATIONS": "X19_SUBAGENT_MAX_ITERATIONS",
+        "SESSION_INDEX_DB": "X19_SESSION_INDEX_DB",
+        "CRON_JOBS_FILE": "X19_CRON_JOBS_FILE",
+        "CRON_POLL_SECONDS": "X19_CRON_POLL_SECONDS",
+        "AUTO_LEARN_SKILLS": "X19_AUTO_LEARN_SKILLS",
         "BUG_BOUNTY_MODE": "X19_BUG_BOUNTY_MODE",
         "CTF_MODE": "X19_CTF_MODE",
         "AUTO_BOOTSTRAP": "X19_AUTO_BOOTSTRAP",
@@ -141,7 +159,14 @@ def set_data(data: dict, save: bool = True):
         "SCOPE_ALLOWLIST": "X19_SCOPE_ALLOWLIST",
     }
 
-    _bool_keys = {"BUG_BOUNTY_MODE", "CTF_MODE", "AUTO_BOOTSTRAP", "PARALLEL_PLAN", "FAST_MODE", "FAST_SKIP_PROXY", "ENFORCE_SCOPE"}
+    _bool_keys = {
+        "BUG_BOUNTY_MODE", "CTF_MODE", "AUTO_BOOTSTRAP", "PARALLEL_PLAN", "FAST_MODE",
+        "FAST_SKIP_PROXY", "ENFORCE_SCOPE", "AUTO_LEARN_SKILLS",
+    }
+    _int_keys = {
+        "MIN_ITERATIONS", "AI_MAX_TOKENS", "AI_TIMEOUT", "SUBAGENT_MAX_CONCURRENT",
+        "SUBAGENT_MAX_ITERATIONS", "CRON_POLL_SECONDS",
+    }
 
     for key, value in data.items():
         key_upper = key.upper()
@@ -157,7 +182,7 @@ def set_data(data: dict, save: bool = True):
         if hasattr(CONFIG, attr_key):
             if attr_key in _bool_keys:
                 setattr(CONFIG, attr_key, str(value).lower() in ("1", "true", "yes"))
-            elif attr_key in ("MIN_ITERATIONS", "AI_MAX_TOKENS", "AI_TIMEOUT"):
+            elif attr_key in _int_keys:
                 setattr(CONFIG, attr_key, int(value))
             else:
                 setattr(CONFIG, attr_key, value)
