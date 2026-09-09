@@ -7,6 +7,13 @@ served by the CLI in :mod:`cli` and the terminal UI in :mod:`ui`.
     python run.py --help
     python run.py run -t <target>
     python run.py dash -t <target>
+
+Hermes-inspired runtime commands are also routed here:
+    python run.py runtime
+    python run.py skills
+    python run.py recall "previous SSRF findings"
+    python run.py delegate "analyze API auth" "review web surface"
+    python run.py cron list
 """
 
 import sys
@@ -30,7 +37,19 @@ install_phase_access()
 
 from logging_utils import log
 
+
+_RUNTIME_COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
+
+
 def main() -> int:
+    # The runtime layer is intentionally routed before cli import so lightweight
+    # capability commands do not initialize the full offensive agent graph.
+    argv = list(sys.argv[1:])
+    if argv and argv[0] in _RUNTIME_COMMANDS:
+        from runtime_cli import dispatch
+
+        return int(dispatch(argv) or 0)
+
     # Imported late so ``x19 --version`` / ``--help`` never pay for the agent
     # import graph, and never trigger the first-run provider wizard.
     from cli import main as cli_main
