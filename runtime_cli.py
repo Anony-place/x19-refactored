@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 
 from config import CONFIG
-from runtime.hermes_runtime import CronStore, SessionRecall, Skill, SkillStore, SubagentPool
+from runtime.hermes_runtime import CronStore, SessionRecall, SkillStore, SubagentPool
 
 
 COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
@@ -115,9 +115,10 @@ def cmd_delegate(args) -> int:
         root=CONFIG.SUBAGENT_DIR,
         max_workers=CONFIG.SUBAGENT_MAX_CONCURRENT,
     )
-    tasks = []
-    for goal in args.goal:
-        tasks.append({"goal": goal, "context": args.context, "role": args.role, "max_iterations": CONFIG.SUBAGENT_MAX_ITERATIONS})
+    tasks = [
+        {"goal": goal, "context": args.context, "role": args.role, "max_iterations": CONFIG.SUBAGENT_MAX_ITERATIONS}
+        for goal in args.goal
+    ]
     results = pool.run_parallel(tasks, max_workers=args.workers or CONFIG.SUBAGENT_MAX_CONCURRENT)
     payload = [r.__dict__ for r in results]
     text = "\n\n".join(
@@ -136,7 +137,11 @@ def cmd_cron(args) -> int:
             for j in jobs
         ) or "No cron jobs.")
     if args.action == "add":
-        job = store.add(args.command, args.interval, repeat=args.repeat)
+        command = ([args.job_id] if args.job_id else []) + list(args.command or [])
+        if not command:
+            print("usage: x19 cron add --interval 3600 run -t <target>", file=sys.stderr)
+            return 2
+        job = store.add(command, args.interval, repeat=args.repeat)
         return _json_or_print(args, job.__dict__, f"created {job.id}: every {job.interval_seconds}s → {' '.join(job.command)}")
     if args.action in {"pause", "resume", "remove"}:
         fn = {"pause": store.pause, "resume": store.resume, "remove": store.remove}[args.action]
@@ -196,7 +201,6 @@ def build_parser() -> argparse.ArgumentParser:
 def dispatch(argv: List[str]) -> int:
     if not argv or argv[0] not in COMMANDS:
         return -1
-    # Support both `x19 skills ...` and `x19 runtime skills ...`.
     if argv[0] == "runtime" and len(argv) > 1:
         argv = argv[1:]
     else:
