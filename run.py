@@ -41,6 +41,22 @@ from logging_utils import log
 _RUNTIME_COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
 
 
+def _maybe_promote_learning(argv, result: int) -> None:
+    """Promote completed assessment outcomes into reviewable skills."""
+    if not argv or argv[0] != "run" or result != 0:
+        return
+    try:
+        from runtime.learning_bridge import learn_from_latest_session
+
+        skill = learn_from_latest_session()
+        if skill:
+            print(f"[x19] learned skill promoted: {skill}")
+    except Exception as exc:
+        # Learning must never turn a successful security assessment into a
+        # failed command. Diagnostics are useful, but execution wins.
+        log(f"LEARNING_PROMOTION_FAILED: {type(exc).__name__}: {exc}")
+
+
 def main() -> int:
     # The runtime layer is intentionally routed before cli import so lightweight
     # capability commands do not initialize the full offensive agent graph.
@@ -54,7 +70,9 @@ def main() -> int:
     # import graph, and never trigger the first-run provider wizard.
     from cli import main as cli_main
 
-    return cli_main()
+    result = int(cli_main() or 0)
+    _maybe_promote_learning(argv, result)
+    return result
 
 
 if __name__ == "__main__":
