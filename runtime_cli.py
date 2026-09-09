@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -137,9 +138,13 @@ def cmd_cron(args) -> int:
             for j in jobs
         ) or "No cron jobs.")
     if args.action == "add":
-        command = ([args.job_id] if args.job_id else []) + list(args.command or [])
+        try:
+            command = shlex.split(args.command_text)
+        except ValueError as exc:
+            print(f"invalid cron command: {exc}", file=sys.stderr)
+            return 2
         if not command:
-            print("usage: x19 cron add --interval 3600 run -t <target>", file=sys.stderr)
+            print('usage: x19 cron add --interval 3600 --command "run -t <target>"', file=sys.stderr)
             return 2
         job = store.add(command, args.interval, repeat=args.repeat)
         return _json_or_print(args, job.__dict__, f"created {job.id}: every {job.interval_seconds}s → {' '.join(job.command)}")
@@ -191,7 +196,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("cron")
     s.add_argument("action", choices=["list", "add", "pause", "resume", "remove", "run", "daemon"])
     s.add_argument("job_id", nargs="?", default="")
-    s.add_argument("command", nargs="*", default=[])
+    s.add_argument("--command", dest="command_text", default="")
     s.add_argument("--interval", type=int, default=3600)
     s.add_argument("--repeat", type=int, default=0)
 
