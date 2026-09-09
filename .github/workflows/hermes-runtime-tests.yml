@@ -1,0 +1,27 @@
+name: Hermes runtime tests
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/**'
+      - 'runtime_cli.py'
+      - 'config.py'
+      - 'run.py'
+      - 'tests/test_hermes_runtime.py'
+  push:
+    branches:
+      - 'feature/hermes-inspired-runtime'
+
+jobs:
+  runtime-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run runtime tests
+        run: python -m unittest tests/test_hermes_runtime.py -v
+      - name: Compile runtime modules
+        run: python -m py_compile runtime/hermes_runtime.py runtime/learning_bridge.py runtime_cli.py
