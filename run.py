@@ -41,6 +41,12 @@ install_phase_access()
 from brain.cognitive_runtime import install as install_cognitive_runtime
 install_cognitive_runtime()
 
+# Plain phrases such as `target example.com` must enter the real assessment
+# path rather than ordinary LLM chat, where a model can incorrectly claim it
+# has no terminal/tool access.
+from terminal_behavior import install as install_terminal_behavior
+install_terminal_behavior()
+
 from logging_utils import log
 
 _RUNTIME_COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
