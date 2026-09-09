@@ -587,3 +587,123 @@ class AttackGraph:
                 lines.append(f"  - {t.label} (value: {t.value_score:.2f})")
         
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Dict-shaped read views
+    #
+    # brain/strategist_engine.py reasons over plain dicts (``graph.nodes``,
+    # ``graph.edges``, ``find_paths_to``). These adapters expose that view
+    # over the typed graph so the strategist can be called directly instead
+    # of being dead code. Read-only: mutation still goes through add_node /
+    # add_edge.
+    # ------------------------------------------------------------------
+
+    @property
+    def nodes(self) -> Dict[str, Dict[str, Any]]:
+        """All nodes as dicts keyed by node id.
+
+        Keys match what the strategist reads: id, type, state, value_score,
+        difficulty_score, confidence, category, technique, service, port.
+        """
+        view: Dict[str, Dict[str, Any]] = {}
+        for node_id, node in self._nodes.items():
+            props = node.properties or {}
+            view[node_id] = {
+                "id": node.id,
+                "type": node.node_type,
+                "label": node.label,
+                "state": props.get("state", "unknown"),
+                "value_score": node.value_score,
+                "difficulty_score": node.difficulty_score,
+                "priority": node.priority,
+                "confidence": props.get("confidence", 0.5),
+                "category": props.get("category", node.node_type),
+                "technique": props.get("technique", ""),
+                "service": props.get("service", ""),
+                "port": props.get("port", 0),
+                "source": node.source,
+                "properties": props,
+            }
+        return view
+
+    @property
+    def edges(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Outgoing edges per source node id, each already dict-shaped."""
+        view: Dict[str, List[Dict[str, Any]]] = {}
+        for source_id, edge_ids in self._edge_index.items():
+            collected = []
+            for edge_id in edge_ids:
+                edge = self._edges.get(edge_id)
+                if edge is not None:
+                    collected.append(edge.to_dict())
+            view[source_id] = collected
+        return view
+
+    def node_count(self) -> int:
+        """Number of nodes currently in the graph."""
+        return len(self._nodes)
+
+    def edge_count(self) -> int:
+        """Number of edges currently in the graph."""
+        return len(self._edges)
+
+    def find_paths_to(
+        self,
+        node_id: str,
+        max_depth: int = 5,
+        limit: int = 64,
+    ) -> List[List[str]]:
+        """Node-id paths that terminate at ``node_id``, shortest first.
+
+        Starts from entry points when the graph has any, otherwise from every
+        node. Bounded by ``max_depth`` nodes per path and ``limit`` results.
+        """
+        if not node_id or node_id not in self._nodes:
+            return []
+
+        depth = max(1, int(max_depth))
+        starts = [n.id for n in self.get_entry_points()] or list(self._nodes.keys())
+
+        found: List[List[str]] = []
+        seen = set()
+        for start in starts:
+            if len(found) >= limit:
+                break
+            self._collect_paths_to(start, node_id, [start], {start}, found, seen, depth, limit)
+
+        found.sort(key=len)
+        return found
+
+    def _collect_paths_to(
+        self,
+        current: str,
+        target: str,
+        path: List[str],
+        visited: Set[str],
+        out: List[List[str]],
+        seen: Set[Tuple[str, ...]],
+        max_depth: int,
+        limit: int,
+    ) -> None:
+        """Depth-first collection of simple paths ending at ``target``."""
+        if len(out) >= limit:
+            return
+        if current == target:
+            # A lone node is not a path: the target reached itself. Reporting it
+            # would make every entry point look trivially accessible.
+            if len(path) >= 2:
+                key = tuple(path)
+                if key not in seen:
+                    seen.add(key)
+                    out.append(list(path))
+            return
+        if len(path) >= max_depth:
+            return
+        for neighbor in self._adjacency.get(current, ()):  # type: ignore[arg-type]
+            if neighbor in visited:
+                continue
+            visited.add(neighbor)
+            path.append(neighbor)
+            self._collect_paths_to(neighbor, target, path, visited, out, seen, max_depth, limit)
+            path.pop()
+            visited.discard(neighbor)

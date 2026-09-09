@@ -18,7 +18,23 @@ from brain.agents.verifier_agent import VerifierAgent
 from brain.agents.critic_agent import CriticAgent
 from brain.attack_graph import AttackGraph, GraphNode, GraphEdge
 from brain.evidence_ranking import EvidenceRankingEngine, RankedEvidence
+from brain.hypothesis_engine import MultiHypothesisEngine
 from brain.strategist_engine import StrategistEngine
+from brain.workflow import (
+    ACTION_EXPLOIT,
+    ACTION_SWARM,
+    ACTION_TEST,
+    AgentFactory,
+    BudgetState,
+    ConfidenceGate,
+    LoopGuard,
+    MissionPlan,
+    PHASE_ACTIVE,
+    PHASE_DONE,
+    PHASE_SKIPPED,
+    WorkflowRun,
+    WorkflowStage,
+)
 from brain.strategy_library import StrategyLibrary, TargetSignature
 from brain.task_queue import TaskQueue, AgentTask, TaskStatus
 from execution.native_vuln import VulnerabilityFinding
@@ -66,6 +82,21 @@ class SwarmCoordinator:
         self.evidence_engine = EvidenceRankingEngine()
         self.strategist = StrategistEngine()
         self.strategy_library = StrategyLibrary()
+        self.hypothesis_engine = MultiHypothesisEngine()
+
+        # Workflow state. Initialised to usable defaults rather than None so a
+        # single stage can be driven on its own (and so a stage reached before
+        # run_workflow finished LEARN cannot crash on a missing attribute).
+        # run_workflow replaces each of these per mission.
+        self.profile = None  # EngagementProfile, set by apply_profile()
+        self.workflow = WorkflowRun(target=target)
+        self.plan = MissionPlan(target=target, objective="autonomous assessment")
+        self.loop_guard = LoopGuard()
+        self.budget_state = BudgetState()
+        self.confidence_gate = ConfidenceGate()
+        self.agent_factory = AgentFactory(coordinator=self, scope_guard=self.scope_guard)
+        self.last_confidence: float = 0.0
+        self._consumed_checkpoints: set = set()
         
         # State Data
         self.discovered_ports: List[Dict[str, Any]] = []
@@ -427,3 +458,416 @@ class SwarmCoordinator:
                 "endpoints": self.discovered_endpoints,
                 "tasks": self.task_queue.get_all_tasks()
             }
+
+    # ==================================================================
+    # Hybrid workflow: XBOW loop + confidence gate + Hermes guardrails
+    # ==================================================================
+    def apply_profile(self, profile: Any) -> None:
+        """LEARN stage — turn an EngagementProfile into scope and guidance."""
+        self.profile = profile
+        if profile is None:
+            return
+        for host in profile.scope_allowlist():
+            self.scope_guard.add_target(host)
+        self.scope_guard.enforce = True
+        if profile.target:
+            self.set_target(profile.target)
+        self.publish_log("Coordinator", "Engagement context loaded:\n" + profile.guidance_block())
+
+    def run_workflow(
+        self,
+        profile: Any = None,
+        target: Optional[str] = None,
+        max_cycles: int = 3,
+        on_cycle: Optional[Any] = None,
+    ) -> WorkflowRun:
+        """Run the Learn → Map → Coordinate → Attack → Validate → Debrief loop.
+
+        Unlike the legacy fixed pipeline this loop is *driven by the task queue
+        and the cognitive engines*: the strategist picks the next goal, the
+        evidence ranker scores what was found, the confidence gate chooses the
+        behaviour, the loop guard refuses repeated failures, and the budget
+        ends the run. Attack agents are fresh per cycle and retired afterwards.
+        """
+        if profile is not None:
+            self.apply_profile(profile)
+        if target:
+            self.set_target(target)
+
+        budget_cfg = getattr(profile, "budget", None)
+        guard_cfg = getattr(profile, "guardrails", None)
+        self.budget_state = BudgetState(
+            max_seconds=int(getattr(budget_cfg, "max_seconds", 1800) or 0),
+            max_llm_calls=int(getattr(budget_cfg, "max_llm_calls", 200) or 0),
+            max_commands=int(getattr(budget_cfg, "max_commands", 500) or 0),
+        )
+        self.loop_guard = LoopGuard(
+            warn_after=dict(getattr(guard_cfg, "warn_after", {}) or {}),
+            hard_stop_after=dict(getattr(guard_cfg, "hard_stop_after", {}) or {}),
+            hard_stop_enabled=bool(getattr(guard_cfg, "hard_stop_enabled", True)),
+        )
+        self.agent_factory = AgentFactory(
+            coordinator=self,
+            scope_guard=self.scope_guard,
+            max_parallel=int(getattr(guard_cfg, "max_parallel_agents", 4) or 4),
+        )
+        self.plan = MissionPlan(target=self.target, objective="autonomous assessment")
+        self.workflow = WorkflowRun(
+            target=self.target, profile=getattr(profile, "name", "") or ""
+        )
+        self._consumed_checkpoints = set()
+
+        self.is_running = True
+        self.start_time = time.time()
+        early_stop = int(getattr(budget_cfg, "early_stop_stalls", 3) or 3)
+
+        try:
+            self._stage_learn()
+            self._stage_map()
+
+            for cycle in range(1, max(1, int(max_cycles)) + 1):
+                exhausted, reason = self.budget_state.exhausted()
+                if exhausted:
+                    self.workflow.stopped_reason = reason
+                    self.publish_log("Coordinator", f"Budget stop: {reason}")
+                    break
+
+                self.workflow.cycles = cycle
+                if on_cycle:
+                    try:
+                        on_cycle(cycle, self.plan, self.budget_state)
+                    except Exception:
+                        pass
+
+                self._stage_coordinate(cycle)
+                self._stage_attack(cycle)
+                self._stage_validate(cycle)
+
+                progressed = self._cycle_progressed(cycle)
+                self.budget_state.spend(cycles=1)
+                if not progressed:
+                    self.workflow.stalls += 1
+                    self.publish_log("Coordinator", f"Cycle {cycle} produced no new evidence "
+                                                    f"(stall {self.workflow.stalls}/{early_stop})")
+                    if self.workflow.stalls >= early_stop:
+                        self.workflow.stopped_reason = f"early stop: {early_stop} cycles without progress"
+                        break
+                else:
+                    self.workflow.stalls = 0
+
+                if self.task_queue.pending_count() == 0 and self.workflow.stalls:
+                    self.workflow.stopped_reason = "task queue drained"
+                    break
+
+            if not self.workflow.stopped_reason:
+                self.workflow.stopped_reason = "all stages completed"
+            self._stage_debrief()
+        except Exception as exc:
+            self.workflow.stopped_reason = f"error: {type(exc).__name__}: {exc}"
+            self.publish_log("Coordinator", f"Workflow error: {exc}")
+        finally:
+            self.is_running = False
+            self.end_time = time.time()
+            self.workflow.ended_at = self.end_time
+            self.workflow.stages_completed = [
+                p.stage for p in self.plan.phases if p.status in (PHASE_DONE, PHASE_SKIPPED)
+            ]
+            self.workflow.guardrail_events = self.loop_guard.events if self.loop_guard else []
+            self.workflow.findings_total = len(self.raw_findings)
+            self.workflow.findings_verified = len(self.verified_findings)
+            self.workflow.plan = self.plan.to_dict() if self.plan else {}
+            self.workflow.budget = self.budget_state.to_dict() if self.budget_state else {}
+            self._emit("workflow_completed", "Coordinator", self.workflow.to_dict())
+        return self.workflow
+
+    # -- stages ------------------------------------------------------------
+    def _stage_learn(self) -> None:
+        self.plan.mark(WorkflowStage.LEARN, PHASE_ACTIVE)
+        profile = self.profile
+        if profile is None:
+            self.plan.mark(WorkflowStage.LEARN, PHASE_SKIPPED, "no engagement profile supplied")
+            return
+        notes = [
+            f"scope={len(profile.scope_allowlist())}",
+            f"out_of_scope={len(profile.out_of_scope)}",
+            f"credentials={len(profile.attack_surface.credentials)}",
+            f"canaries={len(profile.validation.canaries)}",
+            f"destructive={'allowed' if profile.strategy.allow_destructive else 'forbidden'}",
+        ]
+        for endpoint in profile.attack_surface.endpoints:
+            self.attack_graph.add_node(node_type="endpoint", label=f"{endpoint} [declared]", value_score=0.7)
+        self.plan.mark(WorkflowStage.LEARN, PHASE_DONE, " ".join(notes))
+        self.publish_log("Coordinator", f"LEARN complete — {' '.join(notes)}")
+
+    def _stage_map(self) -> None:
+        self.plan.mark(WorkflowStage.MAP, PHASE_ACTIVE)
+        self.publish_log("Coordinator", "MAP: spawning fresh recon + web agents")
+        agents = []
+        for kind in ("recon", "web"):
+            try:
+                agent = self.agent_factory.spawn(kind)
+            except Exception as exc:
+                self.publish_log("Coordinator", f"MAP: could not spawn {kind}: {exc}")
+                continue
+            agents.append((kind, agent))
+            agent.start_async(self.target)
+
+        for kind, agent in agents:
+            try:
+                if agent._thread:
+                    agent._thread.join(timeout=60)
+            except Exception:
+                pass
+            self.agent_factory.retire(agent)
+
+        self._seed_evidence()
+        self.plan.mark(
+            WorkflowStage.MAP,
+            PHASE_DONE,
+            f"{len(self.discovered_ports)} ports, {len(self.discovered_endpoints)} endpoints",
+        )
+        self.publish_log(
+            "Coordinator",
+            f"MAP complete — {len(self.discovered_ports)} ports, "
+            f"{len(self.discovered_endpoints)} endpoints, {self.task_queue.pending_count()} queued tasks",
+        )
+
+    def _stage_coordinate(self, cycle: int) -> None:
+        self.plan.mark(WorkflowStage.COORDINATE, PHASE_ACTIVE)
+        confidence = 0.5
+        goal_text = "no goal synthesised"
+        try:
+            recommendation = self.strategist.analyze_attack_graph(
+                self.attack_graph, None, self.critic_agent.critic_engine
+            )
+            goal = recommendation.primary_goal
+            confidence = float(getattr(goal, "confidence", 0.5) or 0.5)
+            goal_text = f"{goal.goal_type}: {goal.description}"
+            self.plan.mark(WorkflowStage.COORDINATE, PHASE_ACTIVE, goal_text)
+        except Exception as exc:
+            self.publish_log("Coordinator", f"COORDINATE: strategist unavailable ({exc})")
+
+        self.last_confidence = confidence
+        decision = self.confidence_gate.decide(confidence)
+        self.workflow.decisions.append(
+            {"cycle": cycle, "goal": goal_text, **decision.to_dict()}
+        )
+        self.publish_log(
+            "Coordinator",
+            f"COORDINATE[{cycle}]: {goal_text} | confidence={confidence:.2f} → {decision.action}",
+        )
+        self._emit("workflow_decision", "Coordinator", {"cycle": cycle, "goal": goal_text, **decision.to_dict()})
+
+        # Plan checkpoint: re-read the plan at each budget checkpoint. Each one
+        # fires exactly once, and is matched with >= rather than a narrow band so
+        # a cycle that jumps from 18 % to 27 % still triggers the 20 % review.
+        pct = self.budget_state.pct_used() if self.budget_state else 0.0
+        budget = getattr(self.profile, "budget", None)
+        if budget is not None:
+            point = budget.next_checkpoint(pct, self._consumed_checkpoints)
+            if point is not None:
+                self._consumed_checkpoints.add(point)
+                review = self.plan.checkpoint_review(pct)
+                self.publish_log("Coordinator", f"plan checkpoint {point}%:\n" + review)
+                self._emit(
+                    "workflow_checkpoint", "Coordinator",
+                    {"checkpoint": point, "pct_used": pct, "review": review},
+                )
+                if self.loop_guard:
+                    self.loop_guard.reset_cycle()
+        self._current_decision = decision
+        # Close the stage: leaving it active made the plan panel show the
+        # coordinator still working after the mission had already finished.
+        self.plan.mark(
+            WorkflowStage.COORDINATE, PHASE_DONE,
+            f"confidence {confidence:.2f} → {decision.action}",
+        )
+
+    def _stage_attack(self, cycle: int) -> None:
+        decision = getattr(self, "_current_decision", None)
+        action = getattr(decision, "action", ACTION_TEST)
+        self.plan.mark(WorkflowStage.ATTACK, PHASE_ACTIVE, f"cycle {cycle}: {action}")
+
+        if action == ACTION_SWARM:
+            self.publish_log("Coordinator", f"ATTACK[{cycle}]: confidence too low — deploying parallel mapping")
+            self._stage_map()
+            return
+        if self.profile is not None and not self.profile.strategy.allow_destructive:
+            self.publish_log("Coordinator", f"ATTACK[{cycle}]: non-destructive only (profile forbids destructive tests)")
+
+        # At exploit confidence the coordinator stops discovering and goes after
+        # the exploitation tasks; below it, fuzzing stays in the drain set.
+        if action == ACTION_EXPLOIT:
+            allowed_types = {"vuln_audit", "attack"}
+            self.publish_log(
+                "Coordinator",
+                f"ATTACK[{cycle}]: confidence above exploit threshold — running exploitation tasks only",
+            )
+        else:
+            allowed_types = {"vuln_audit", "attack", "web_fuzz"}
+
+        executed = 0
+        while self.task_queue.pending_count() > 0 and self.agent_factory.can_spawn():
+            task = self.task_queue.pop(allowed_types=allowed_types)
+            if task is None:
+                break
+            # Ask, do not record: the outcome is recorded after the agent runs.
+            verdict = self.loop_guard.would_allow(
+                task.task_type, {"target": task.target, "params": task.params}
+            )
+            if not verdict.allowed:
+                self.task_queue.mark_failed(task.task_id, verdict.reason)
+                self.publish_log("Coordinator", f"ATTACK blocked by guardrail: {verdict.reason}")
+                break
+            try:
+                agent = self.agent_factory.spawn("vuln" if task.task_type != "web_fuzz" else "web")
+            except Exception as exc:
+                self.task_queue.mark_failed(task.task_id, str(exc))
+                break
+            try:
+                agent.run(task.target)
+                succeeded = getattr(agent, "state", None) is not None
+                self.loop_guard.record(
+                    task.task_type, {"target": task.target},
+                    succeeded=bool(succeeded), result=len(getattr(agent, "findings", []) or []),
+                    progressed=bool(getattr(agent, "discovered_count", 0)),
+                )
+                self.task_queue.mark_completed(task.task_id, f"executed by {agent.name}")
+                executed += 1
+            except Exception as exc:
+                self.loop_guard.record(task.task_type, {"target": task.target}, succeeded=False, result=str(exc))
+                self.task_queue.mark_failed(task.task_id, str(exc))
+            finally:
+                self.agent_factory.retire(agent)
+            if self.budget_state:
+                self.budget_state.spend(commands=1)
+
+        self.plan.mark(WorkflowStage.ATTACK, PHASE_DONE, f"{executed} task(s) executed")
+        self.publish_log("Coordinator", f"ATTACK[{cycle}] complete — {executed} task(s) executed")
+
+    def _stage_validate(self, cycle: int) -> None:
+        self.plan.mark(WorkflowStage.VALIDATE, PHASE_ACTIVE)
+        if not self.raw_findings:
+            self.plan.mark(WorkflowStage.VALIDATE, PHASE_SKIPPED, "no candidate findings")
+            return
+        pending = self.get_unverified_findings()
+        if not pending:
+            self.plan.mark(WorkflowStage.VALIDATE, PHASE_DONE, "all candidates already adjudicated")
+            return
+        try:
+            agent = self.agent_factory.spawn("verify")
+        except Exception as exc:
+            self.publish_log("Coordinator", f"VALIDATE: could not spawn verifier ({exc})")
+            self.plan.mark(WorkflowStage.VALIDATE, PHASE_SKIPPED, str(exc))
+            return
+        try:
+            canaries = self.profile.validation.canary_values() if self.profile else []
+            agent.run(self.target, findings=pending, canaries=canaries)
+        except Exception as exc:
+            self.publish_log("Coordinator", f"VALIDATE failed: {exc}")
+        finally:
+            self.agent_factory.retire(agent)
+        self.plan.mark(
+            WorkflowStage.VALIDATE, PHASE_DONE,
+            f"{len(self.verified_findings)}/{len(self.raw_findings)} confirmed",
+        )
+        self.publish_log(
+            "Coordinator",
+            f"VALIDATE[{cycle}] — {len(self.verified_findings)}/{len(self.raw_findings)} findings confirmed",
+        )
+
+    def _stage_debrief(self) -> None:
+        self.plan.mark(WorkflowStage.DEBRIEF, PHASE_ACTIVE)
+        # Feed the critic so failures become penalties instead of being ignored.
+        try:
+            self.critic_agent.critic_engine.advance_iteration()
+            for finding in self.raw_findings:
+                if finding not in self.verified_findings:
+                    self.critic_agent.record_failure(
+                        technique=getattr(finding, "title", "unknown"),
+                        category=getattr(finding, "severity", "info"),
+                        context=self.target,
+                        reason="finding did not survive independent verification",
+                    )
+            for finding in self.verified_findings:
+                self.critic_agent.critic_engine.criticize_success(
+                    strategy_chain=[getattr(finding, "severity", "info"), getattr(finding, "title", "")],
+                    target_context=self.target,
+                )
+        except Exception as exc:
+            self.publish_log("Coordinator", f"DEBRIEF: critic feedback failed ({exc})")
+
+        try:
+            self._finalize_mission()
+        except Exception as exc:
+            self.publish_log("Coordinator", f"DEBRIEF: strategy learning failed ({exc})")
+        self.plan.mark(WorkflowStage.DEBRIEF, PHASE_DONE, "critic penalties + strategy library updated")
+        self.publish_log("Coordinator", "DEBRIEF complete")
+
+    # -- helpers -----------------------------------------------------------
+    def _seed_evidence(self) -> None:
+        """Feed everything discovered so far into the evidence ranker."""
+        for port in self.discovered_ports:
+            self.evidence_engine.add_evidence(
+                RankedEvidence(
+                    id=f"port-{port.get('port')}-{port.get('service')}",
+                    source="ReconAgent",
+                    kind="port",
+                    data={"port": port.get("port"), "service": port.get("service"),
+                          "banner": port.get("banner", ""), "proto": "tcp"},
+                )
+            )
+        for endpoint in self.discovered_endpoints:
+            self.evidence_engine.add_evidence(
+                RankedEvidence(
+                    id=f"endpoint-{endpoint.get('path')}",
+                    source="WebAgent",
+                    kind="endpoint",
+                    data={"url": endpoint.get("path"), "method": "GET",
+                          "status": endpoint.get("status_code"), "interesting": endpoint.get("is_interesting")},
+                )
+            )
+        for finding in self.raw_findings:
+            self.evidence_engine.add_evidence(
+                RankedEvidence(
+                    id=f"vuln-{getattr(finding, 'title', '')[:32]}",
+                    source="VulnAgent",
+                    kind="vulnerability",
+                    data={"title": getattr(finding, "title", ""), "severity": getattr(finding, "severity", "info"),
+                          "endpoint": getattr(finding, "endpoint", "")},
+                )
+            )
+
+    def _progress_signature(self) -> str:
+        return json.dumps(
+            {
+                "ports": len(self.discovered_ports),
+                "endpoints": len(self.discovered_endpoints),
+                "raw": len(self.raw_findings),
+                "verified": len(self.verified_findings),
+                "queued": self.task_queue.pending_count(),
+            },
+            sort_keys=True,
+        )
+
+    def _cycle_progressed(self, cycle: int) -> bool:
+        """Compare the discovery signature against the previous cycle."""
+        signature = self._progress_signature()
+        previous = getattr(self, "_last_progress_signature", None)
+        self._last_progress_signature = signature
+        return previous is None or previous != signature
+
+    def get_workflow_summary(self) -> Dict[str, Any]:
+        """Dashboard-friendly view of workflow state."""
+        return {
+            "active": self.workflow is not None,
+            "profile": getattr(self.profile, "name", "") if self.profile else "",
+            "target_type": getattr(self.profile, "target_type", "") if self.profile else "",
+            "confidence": round(self.last_confidence, 2),
+            "last_decision": (self.workflow.decisions[-1] if self.workflow and self.workflow.decisions else {}),
+            "plan": self.plan.to_dict() if self.plan else {},
+            "budget": self.budget_state.to_dict() if self.budget_state else {},
+            "guardrails": self.loop_guard.to_dict() if self.loop_guard else {},
+            "agents": self.agent_factory.to_dict() if self.agent_factory else {},
+            "run": self.workflow.to_dict() if self.workflow else {},
+        }

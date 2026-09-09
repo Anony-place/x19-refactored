@@ -1,3 +1,19 @@
+"""X19 command-line interface.
+
+Design goals (4.0.0):
+
+* **Subcommand CLI** — ``x19 <command>``, the shape every serious tool has.
+  Legacy flag-only invocations (``x19 -t host``) are still accepted and routed
+  to ``x19 run``.
+* **Terminal-native, application-grade UI** — every screen is rendered by
+  :mod:`ui`. There is no web server any more; the dashboard, findings triage,
+  provider management, diagnostics and report export all live in the terminal.
+* **Two output contracts** — styled output for humans, ``--json`` for machines.
+* **Cheap commands stay cheap** — ``--version``, ``--help``, ``doctor``,
+  ``config``, ``providers`` and ``report`` never trigger the first-run AI
+  wizard. Only commands that actually need a model do.
+"""
+
 import argparse
 import json
 import os
@@ -7,20 +23,15 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 from windows_bootstrap import apply_windows_utf8_bootstrap
 apply_windows_utf8_bootstrap()
 
-from constants import C, ICO, BANNER, PROVIDERS, PROVIDER_PRIORITY, _provider_has_key
-from agent import X19
-from providers import make_ai, is_bug_bounty_mode, is_ctf_mode, is_fast_mode
-from tools import BrowserAutomation
-from utils import validate_target
+from constants import PROVIDERS, PROVIDER_PRIORITY, _provider_has_key
 from config import CONFIG, CONFIG_FILE, load_config, save_config, set_data
-from logging_utils import log, swallow as _swallow
-from interactive import chat_loop, interactive
+from logging_utils import swallow as _swallow
+from version import __version__, version_info
 
 # Telegram is conditionally available — the class lives in the monolith and
 # will be extracted to x19.telegram during a later refactor.
@@ -28,6 +39,16 @@ try:
     from telegram import TelegramBot
 except ImportError:
     TelegramBot = None
+
+
+COMMANDS = (
+    "workspace", "run", "dash", "chat", "report", "findings", "sessions",
+    "engagement", "providers", "config", "doctor", "tools", "debug", "setup",
+    "upgrade", "version", "completion",
+)
+
+#: Commands that need a working AI provider before they can do anything.
+PROVIDER_COMMANDS = ("run", "chat")
 
 
 # ===================================================================
@@ -55,7 +76,7 @@ def _extract_longcat_commands(response: str) -> List[str]:
     """Extract shell commands from <longcat_tool_call> exec blocks (tool-call format some models emit instead of EXEC:)."""
     cmds = []
     for block in re.findall(r'<longcat_tool_call>(.*?)(?:</longcat_tool_call>|\Z)', response, re.DOTALL | re.IGNORECASE):
-        m = re.search(r'<longcat_arg_key>\s*(?:command|cmd|shell)\s*</longcat_arg_key>\s*<longcat_arg_value>\s*(.*?)\s*(?:</longcat_arg_value>|</longcat_tool_call>|<longcat_arg_key>|\Z)', block, re.DOTALL | re.IGNORECASE)
+        m = re.search(r'<longcat_arg_key>\s*(?:command|cmd|shell)\s*</longcat_arg_key>\s*<longcat_arg_value>\s*(.*?)\s*(?:</longcat_arg_value>|</longcat_tool_call>|</longcat_arg_key>|\Z)', block, re.DOTALL | re.IGNORECASE)
         if m and m.group(1).strip():
             cmds.append(m.group(1).strip())
     return cmds
@@ -86,7 +107,7 @@ def _extract_exec_commands(response: str) -> List[str]:
 # ===================================================================
 _PREPOSITIONS = {"on", "in", "for", "against", "with", "from", "into", "at", "to", "of"}
 _NON_TARGETS = _PREPOSITIONS | {
-    "the", "a", "an", "my", "this", "that", "please", "now", "do", "run", "test", "pentest",
+    "the", "a", "an", "my", "this", "that", "please", "now", "do", "run", "pentest",
     "scan", "target", "engage", "hack", "assess", "enumerate", "device", "android", "ios",
     "mobile", "app", "apk", "adb", "bug", "bounty", "ctf", "lab",
 }
@@ -160,6 +181,11 @@ def _android_device_id(line: str) -> Optional[str]:
 # ===================================================================
 def _interactive_setup() -> str:
     """Prompt user for provider, API key, model, and target — all in one terminal flow."""
+    from rich.prompt import Prompt
+
+    from ui.console import get_console, ok, warn
+
+    console = get_console()
     cfg = load_config()
     provider_id = cfg.get("AI_PROVIDER", CONFIG.AI_PROVIDER)
     model = cfg.get("AI_MODEL", CONFIG.AI_MODEL or PROVIDERS.get(provider_id, {}).get("default_model", ""))
@@ -168,41 +194,36 @@ def _interactive_setup() -> str:
         provider_id = ""
 
     if not provider_id:
-        print(f"\n{C.BOLD}{C.Y}Select AI Provider:{C.N}")
-        keys = sorted(PROVIDERS.keys())
-        for i, pid in enumerate(keys, 1):
-            info = PROVIDERS[pid]
-            print(f"  {C.G}[{i}]{C.N} {info['name']:20} {info['desc']}")
-        choice = input(f"\n{C.B}[?] Provider (1-{len(keys)}): {C.N}").strip()
-        try:
-            idx = int(choice) - 1
-            provider_id = keys[idx]
-        except (ValueError, IndexError):
-            provider_id = "openrouter"
+        from ui.screens import providers_screen
+
+        console.print(providers_screen(PROVIDERS))
+        choice = Prompt.ask("provider id", console=console, default="groq").strip()
+        provider_id = choice if choice in PROVIDERS else "openrouter"
         save_config({"AI_PROVIDER": provider_id})
-        print(f"{C.G}[+] Provider saved: {PROVIDERS[provider_id]['name']}{C.N}")
+        ok(f"provider saved: {PROVIDERS[provider_id]['name']}")
 
     info = PROVIDERS[provider_id]
 
     if info["needs_key"]:
         key = os.getenv(info["api_key_env"], "") or cfg.get(info["api_key_config"], "")
         if not key:
-            print(f"{C.Y}[!] {info['name']} API key not found.{C.N}")
-            key = input(f"{C.B}[?] {info['name']} API key: {C.N}").strip()
+            import getpass
+
+            warn(f"{info['name']} API key not found")
+            key = getpass.getpass(f"{info['name']} API key: ").strip()
             if key:
                 _save_key_for(provider_id, key)
-                print(f"{C.G}[+] API key saved{C.N}")
+                ok("API key saved")
 
     if not model:
         default = info["default_model"]
-        print(f"{C.Y}[*] Default model: {default}{C.N}")
-        custom = input(f"{C.B}[?] Model (press Enter for default): {C.N}").strip()
+        custom = Prompt.ask("model", console=console, default=default).strip()
         model = custom or default
         save_config({"AI_MODEL": model})
 
-    target = input(f"{C.B}[?] Target (IP or hostname): {C.N}").strip()
+    target = Prompt.ask("target (IP or hostname)", console=console).strip()
     while not target:
-        target = input(f"{C.B}[?] Target required: {C.N}").strip()
+        target = Prompt.ask("target required", console=console).strip()
     return target
 
 
@@ -210,6 +231,8 @@ def _interactive_setup() -> str:
 # Start Telegram bot if token and users are configured
 # ===================================================================
 def _maybe_start_telegram(agent) -> Optional[Any]:
+    from ui.console import info, warn
+
     has_token = os.getenv("TELEGRAM_BOT_TOKEN") or load_config().get("TELEGRAM_BOT_TOKEN")
     has_users = os.getenv("ALLOWED_TELEGRAM_USERS") or load_config().get("ALLOWED_TELEGRAM_USERS")
     if has_token and has_users and TelegramBot is not None:
@@ -217,289 +240,1509 @@ def _maybe_start_telegram(agent) -> Optional[Any]:
             tg = TelegramBot(agent)
             t = threading.Thread(target=tg.run, daemon=True)
             t.start()
-            print(f"{C.G}[+] Telegram bot active in background{C.N}")
+            info("Telegram bot active in background")
             return tg
         except RuntimeError as e:
-            print(f"{C.Y}[!] Telegram skipped: {e}{C.N}")
+            warn(f"Telegram skipped: {e}")
     return None
 
 
 # ===================================================================
-# Print AI provider chain banner
+# AI provider chain summary
 # ===================================================================
-def _print_ai_chain_banner():
-    """Print which providers X19 will try, in order. Helps user spot misconfig."""
+def provider_chain_summary() -> Dict[str, Any]:
+    """Which providers X19 will try, in order — as data, not print statements."""
     cfg = load_config()
     primary = cfg.get("AI_PROVIDER", CONFIG.AI_PROVIDER) or "openrouter"
     model = cfg.get("AI_MODEL") or PROVIDERS.get(primary, {}).get("default_model", "")
-    has_groq = bool(os.getenv("GROQ_API_KEY") or cfg.get("GROQ_API_KEY"))
-    has_or = bool(os.getenv("OPENROUTER_API_KEY") or cfg.get("OPENROUTER_API_KEY"))
-    keys = []
-    if has_groq:
-        keys.append("groq")
-    if has_or:
-        keys.append("openrouter")
-    chain = []
-    # Primary provider first, then others in priority order
-    if _provider_has_key(primary):
-        chain.append(primary)
+    chain = [primary] if _provider_has_key(primary) else []
     for pid in PROVIDER_PRIORITY:
         if pid == "ollama" or pid == primary:
             continue
         if _provider_has_key(pid):
             chain.append(pid)
-    if not chain:
-        chain_str = f"{C.R}no AI provider keys configured{C.N}"
+    return {
+        "primary": primary,
+        "model": model,
+        "chain": chain,
+        "configured": bool(chain),
+        "ollama": bool(shutil.which("ollama")),
+    }
+
+
+def _print_ai_chain_banner():
+    """Print which providers X19 will try, in order. Helps user spot misconfig."""
+    from ui.console import get_console, info, warn
+
+    summary = provider_chain_summary()
+    console = get_console()
+    if summary["chain"]:
+        chain_text = " [app.dim]→[/] ".join(f"[app.ok]{p}[/]" for p in summary["chain"][:5])
+        if len(summary["chain"]) > 5:
+            chain_text += f" [app.dim]→ …(+{len(summary['chain']) - 5})[/]"
     else:
-        chain_str = " -> ".join(f"{C.G}{p}{C.N}" for p in chain[:5])
-        if len(chain) > 5:
-            chain_str += f" -> {C.D}...({len(chain)-5} more){C.N}"
-    print(f"{C.BOLD}AI chain:{C.N} {chain_str}")
-    print(f"{C.D}  primary={primary}  model={model or '(provider default)'}{C.N}")
-    if not has_groq:
-        print(f"{C.Y}  Tip: free Llama 3.3 70B (no card) at https://console.groq.com/keys "
-              f"-> x19 --setup-groq gsk_...{C.N}")
-    has_cerebras = bool(os.getenv("CEREBRAS_API_KEY") or cfg.get("CEREBRAS_API_KEY"))
-    if not has_cerebras:
-        print(f"{C.Y}  Tip: free Cerebras inference (Llama 3.3 70B) at https://cloud.cerebras.ai/ "
-              f"-> x19 --setup-cerebras csk-...{C.N}")
-    has_hf = bool(os.getenv("HF_TOKEN") or cfg.get("HF_TOKEN"))
-    if not has_hf:
-        print(f"{C.Y}  Tip: free Hugging Face Inference API (Llama 3.1 8B) at https://huggingface.co/settings/tokens "
-              f"-> export HF_TOKEN=hf_...{C.N}")
+        chain_text = "[app.err]no AI provider keys configured[/]"
+    info(f"AI chain: {chain_text}")
+    console.print(
+        f"  [app.dim]primary={summary['primary']}  model={summary['model'] or '(provider default)'}[/]"
+    )
+    if not (os.getenv("GROQ_API_KEY") or load_config().get("GROQ_API_KEY")):
+        warn("free Llama 3.3 70B (no card): https://console.groq.com/keys → x19 setup")
+    if not (os.getenv("HF_TOKEN") or load_config().get("HF_TOKEN")):
+        warn("free Hugging Face inference: https://huggingface.co/settings/tokens → export HF_TOKEN=hf_…")
+
+
+# ===================================================================
+# First-run setup + workspace
+# ===================================================================
+#: Commands that must work before (or independently of) the mandatory setup.
+SETUP_EXEMPT = {
+    "setup", "version", "completion", "doctor", "config",
+    "providers", "debug", "upgrade", "tools", "engagement",
+}
+
+
+def _interactive_terminal() -> bool:
+    """True only when we can actually prompt a human."""
+    from ui.console import is_json_mode
+
+    return (
+        sys.stdin.isatty()
+        and sys.stdout.isatty()
+        and not is_json_mode()
+    )
+
+
+def first_run_pending() -> bool:
+    """True while the mandatory first-run setup is still outstanding."""
+    from cli_support import provider_configured
+
+    return not provider_configured()
+
+
+def first_run_setup(*, force: bool = False) -> bool:
+    """Mandatory first-run setup: provider chain → toolchain → engagement.
+
+    Resumable — every stage detects work that is already done and skips it, so
+    re-running picks up where a cancelled attempt stopped. Returns True only
+    when X19 is usable afterwards.
+    """
+    import cli_support
+    from config import CONFIG, CONFIG_FILE
+    from provider_setup import setup_if_needed
+    from ui import widgets
+    from ui.console import get_console, info, ok, rule, warn
+
+    console = get_console()
+    rule("[panel.title]x19 first-run setup[/]")
+    info("Four stages. Nothing is assessed and nothing leaves this machine "
+         "except the provider verification call.")
+
+    # -- 1/4 AI provider chain ---------------------------------------------
+    rule("[panel.title]1/4 · ai provider chain[/]")
+    if cli_support.provider_configured() and not force:
+        ok(f"already configured — {cli_support.resolve_provider()}")
+    else:
+        try:
+            if not setup_if_needed(force=force):
+                warn("provider chain incomplete — X19 cannot run an assessment without one")
+                return False
+        except (EOFError, KeyboardInterrupt):
+            warn("setup interrupted — re-run: x19 setup")
+            return False
+        except Exception as exc:
+            warn(f"provider setup failed: {exc}")
+            return False
+        ok(f"provider chain saved — {cli_support.resolve_provider()}")
+
+    # -- 2/4 toolchain ------------------------------------------------------
+    rule("[panel.title]2/4 · offensive toolchain[/]")
+    coverage = cli_support.toolchain_coverage()
+    console.print(
+        f"  installed [app.ok]{coverage['installed']}[/] / {coverage['total']}   "
+        f"preferred [app.warn]{coverage['preferred_installed']}[/] / {coverage['preferred_total']}"
+    )
+    missing = coverage.get("preferred_missing") or []
+    if missing:
+        warn("missing preferred tools: " + ", ".join(missing[:8]))
+        console.print(
+            "  [app.dim]X19 falls back to its built-in engines, but native tools are faster "
+            "and deeper. Install what you can, then re-check with: x19 tools[/]"
+        )
+    else:
+        ok("full preferred toolchain present")
+
+    # -- 3/4 engagement profile --------------------------------------------
+    rule("[panel.title]3/4 · engagement profile[/]")
+    import engagement as eng
+
+    existing = eng.list_profiles()
+    if existing and not force:
+        ok(f"{len(existing)} profile(s) already saved")
+        for row in existing[:5]:
+            console.print(
+                f"  [app.accent]{row['name']}[/] [app.dim]→[/] {row['target']} "
+                f"[app.dim]({row['target_type']})[/]"
+            )
+    else:
+        info("A profile is how you tell X19 what is in scope and how it may test it.")
+        try:
+            profile = engagement_wizard()
+        except (EOFError, KeyboardInterrupt):
+            profile = None
+            warn("engagement setup skipped")
+        if profile is not None:
+            ok(f"engagement saved: {profile.name}")
+
+    # -- 4/4 verify ---------------------------------------------------------
+    rule("[panel.title]4/4 · verify[/]")
+    resolved = cli_support.resolve_provider()
+    if not resolved:
+        warn("no usable provider resolved — run: x19 setup app")
+        return False
+    console.print(widgets.kv_table([
+        ("provider", f"[app.ok]{resolved}[/]"),
+        ("model", provider_chain_summary().get("model") or "provider default"),
+        ("config", str(CONFIG_FILE)),
+        ("engagements", str(eng.engagements_dir())),
+        ("sessions", str(getattr(CONFIG, "SESSIONS_DIR", ""))),
+    ]))
+    ok("setup complete — X19 is ready")
+    return True
+
+
+def _enforce_first_run(command: str) -> Optional[int]:
+    """Gate every real command behind the mandatory setup. Returns an exit code
+    when the command must not proceed, or ``None`` to let it run."""
+    from ui.console import is_json_mode, warn
+
+    if command in SETUP_EXEMPT or not first_run_pending():
+        return None
+    if not _interactive_terminal():
+        if not is_json_mode():
+            warn("X19 is not set up yet — run: x19 setup")
+        return 1
+    if not first_run_setup():
+        return 1
+    return None
+
+
+def workspace_snapshot() -> Dict[str, Any]:
+    """Everything the workspace screen needs, gathered as plain data."""
+    import cli_support
+    import engagement as eng
+    from config import CONFIG, CONFIG_FILE
+
+    sessions = cli_support.list_sessions(limit=5)
+    latest = cli_support.load_session(sessions[0]["id"]) if sessions else None
+    findings = list((latest or {}).get("findings") or [])
+
+    try:
+        health = cli_support.run_diagnostics()
+    except Exception:
+        health = {}
+
+    try:
+        from brain.frontier_gate import gate_status
+
+        chain = provider_chain_summary()
+        frontier = gate_status(chain.get("model"), CONFIG.TARGET_TYPE)
+    except Exception as exc:
+        frontier = {
+            "gated": False,
+            "label": f"gate unavailable ({type(exc).__name__}: {exc})",
+        }
+
+    return {
+        "provider": provider_chain_summary(),
+        "frontier": frontier,
+        "toolchain": cli_support.toolchain_coverage(),
+        "engagements": eng.list_profiles(),
+        "sessions": sessions,
+        "findings": findings,
+        "health": health,
+        "store_dir": str(eng.engagements_dir()),
+        "sessions_dir": str(getattr(CONFIG, "SESSIONS_DIR", "")),
+        "config_file": str(CONFIG_FILE),
+    }
+
+
+def workspace_next_actions(snapshot: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Contextual guidance derived from the actual state, not a fixed list."""
+    actions: List[Tuple[str, str]] = []
+    provider = snapshot.get("provider") or {}
+    toolchain = snapshot.get("toolchain") or {}
+    engagements = snapshot.get("engagements") or []
+
+    if not provider.get("chain"):
+        actions.append(("x19 setup app", "no AI provider key configured — nothing can run"))
+    if not engagements:
+        actions.append((
+            "x19 engagement new <name> -t <target> --target-type authorized",
+            "no engagement profile — agents would run without scope or guidance",
+        ))
+    missing = toolchain.get("preferred_missing") or []
+    if missing:
+        actions.append(("x19 tools", f"{len(missing)} preferred tool(s) missing — built-in fallbacks in use"))
+
+    name = engagements[0]["name"] if engagements else "<name>"
+    target = engagements[0]["target"] if engagements else "<target>"
+    if engagements:
+        actions.append((f"x19 dash -t {target} --engagement {name}", "start a live assessment"))
+    else:
+        actions.append(("x19 dash -t <target> --engagement <name>", "start a live assessment"))
+    actions.append(("x19 chat", "talk to the agent directly"))
+    actions.append(("x19 doctor", "re-check health after changing anything"))
+    return actions
+
+
+def cmd_workspace(args: argparse.Namespace) -> int:
+    from ui.console import emit_json, get_console
+    from ui.screens import workspace_screen
+
+    snapshot = workspace_snapshot()
+    if getattr(args, "json", False):
+        payload = dict(snapshot)
+        payload["version"] = __version__
+        payload["commands"] = [dict(row) for row in HELP_COMMANDS]
+        payload["next_actions"] = [
+            {"command": command, "why": why} for command, why in workspace_next_actions(snapshot)
+        ]
+        emit_json(payload)
+        return 0
+
+    get_console().print(workspace_screen(
+        version=__version__,
+        provider=snapshot["provider"],
+        toolchain=snapshot["toolchain"],
+        engagements=snapshot["engagements"],
+        sessions=snapshot["sessions"],
+        findings=snapshot["findings"],
+        commands=HELP_COMMANDS,
+        next_actions=workspace_next_actions(snapshot),
+        health=snapshot["health"],
+        frontier=snapshot.get("frontier"),
+        store_dir=snapshot["store_dir"],
+        sessions_dir=snapshot["sessions_dir"],
+    ))
+    return 0
+
+
+# ===================================================================
+# Parser
+# ===================================================================
+def _common_parser() -> argparse.ArgumentParser:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--json", action="store_true", help="machine-readable JSON on stdout")
+    common.add_argument("--no-color", action="store_true", help="disable ANSI colour")
+    common.add_argument("--plain", action="store_true", help="no live TUI, plain scrolling output")
+    common.add_argument("-q", "--quiet", action="store_true", help="only print results")
+    common.add_argument("-v", "--verbose", action="store_true", help="extra diagnostics")
+    return common
+
+
+def build_parser() -> argparse.ArgumentParser:
+    common = _common_parser()
+    parser = argparse.ArgumentParser(
+        prog="x19",
+        add_help=False,
+        parents=[common],
+        description="X19 — autonomous AI security assessment platform (terminal application)",
+    )
+    parser.add_argument("-h", "--help", action="store_true", help="show this help and exit")
+    parser.add_argument("-V", "--version", action="store_true", help="show version and exit")
+
+    sub = parser.add_subparsers(dest="command", metavar="<command>")
+
+    # -- workspace -------------------------------------------------------
+    sub.add_parser(
+        "workspace", parents=[common],
+        help="X19 workspace home: status, state and every function (default command)",
+        description="X19 workspace home — system status, AI chain, toolchain, engagements, "
+                    "recent activity, the full function index and what to do next.",
+    )
+
+    # -- run -------------------------------------------------------------
+    p = sub.add_parser("run", parents=[common], help="run an autonomous assessment against a target")
+    p.add_argument("-t", "--target", type=str, default="", help="target host, IP, URL or CIDR")
+    p.add_argument("--target-type", type=str, default="",
+                   choices=["auto", "public_real_world", "authorized", "ctf", "lab"],
+                   help="engagement classification")
+    p.add_argument("-b", "--bug-bounty", action="store_true", help="hands-free authorized bug bounty mode")
+    p.add_argument("-c", "--ctf", action="store_true", help="CTF mode: aggressive, flag hunting")
+    p.add_argument("-f", "--fast", action="store_true", help="fast decisions: smaller prompt/context")
+    p.add_argument("-p", "--provider", type=str, default="", help="AI provider id")
+    p.add_argument("-m", "--model", type=str, default="", help="AI model name")
+    p.add_argument("-k", "--api-key", type=str, default="", help="API key for the provider")
+    p.add_argument("-d", "--set-data", type=str, default="", help="pre-configure with a JSON object")
+    p.add_argument("--max-iterations", type=int, default=0, help="stop after N decision iterations")
+    p.add_argument("--swarm", action="store_true", help="use the swarm workflow + live dashboard")
+    p.add_argument("--engagement", type=str, default="", help="engagement profile name (x19 engagement list)")
+    p.add_argument("--max-cycles", type=int, default=3, help="max coordinate/attack/validate cycles")
+    p.add_argument("-i", "--interactive", action="store_true", help="legacy fixed-command console")
+    p.add_argument("--browser", type=str, default="", choices=["render", "forms", "screenshot"],
+                   help="run one headless-browser action and exit")
+    p.add_argument("--url", type=str, default="", help="URL for --browser")
+    p.add_argument("--setup-groq", type=str, default="", help="store a Groq key, set provider, exit")
+    p.add_argument("--setup-cerebras", type=str, default="", help="store a Cerebras key, set provider, exit")
+
+    # -- dash ------------------------------------------------------------
+    p = sub.add_parser("dash", parents=[common], help="live swarm mission control (full screen)")
+    p.add_argument("-t", "--target", type=str, default="", help="target to assess")
+    p.add_argument("--refresh", type=float, default=0.5, help="redraw interval in seconds")
+    p.add_argument("--once", action="store_true", help="render a single frame and exit")
+    p.add_argument("--no-tui", action="store_true", help="stream frames instead of full-screen")
+    p.add_argument("--timeout", type=float, default=0, help="stop after N seconds")
+    p.add_argument("--no-start", action="store_true", help="attach without launching the pipeline")
+    p.add_argument("--engagement", type=str, default="", help="engagement profile name (x19 engagement list)")
+    p.add_argument("--max-cycles", type=int, default=3, help="max coordinate/attack/validate cycles")
+    p.add_argument("--legacy", action="store_true", help="use the fixed 5-stage pipeline instead of the workflow")
+
+    # -- chat ------------------------------------------------------------
+    p = sub.add_parser("chat", parents=[common], help="interactive AI assistant console")
+    p.add_argument("--system", type=str, default="", help="override the system prompt")
+
+    # -- report ----------------------------------------------------------
+    p = sub.add_parser("report", parents=[common], help="export an assessment report")
+    p.add_argument("--format", type=str, default="markdown", choices=["markdown", "html", "json", "text"],
+                   help="output format")
+    p.add_argument("--session", type=str, default="", help="session id (default: latest)")
+    p.add_argument("--out", type=str, default="", help="write to a file instead of stdout")
+
+    # -- findings --------------------------------------------------------
+    p = sub.add_parser("findings", parents=[common], help="list recorded findings")
+    p.add_argument("--session", type=str, default="", help="session id (default: latest)")
+    p.add_argument("--severity", type=str, default="", help="filter by severity")
+
+    # -- sessions --------------------------------------------------------
+    p = sub.add_parser("sessions", parents=[common], help="inspect stored sessions")
+    p.add_argument("action", nargs="?", default="list", choices=["list", "show"], help="what to do")
+    p.add_argument("session", nargs="?", default="", help="session id for 'show'")
+
+    # -- providers -------------------------------------------------------
+    p = sub.add_parser("providers", parents=[common], help="manage AI providers")
+    p.add_argument("--use", type=str, default="", help="set the primary provider")
+    p.add_argument("--model", type=str, default="", help="set the default model")
+    p.add_argument("--test", action="store_true", help="round-trip the configured provider")
+    p.add_argument("--reveal", action="store_true", help="show configured keys in full")
+
+    # -- config ----------------------------------------------------------
+    p = sub.add_parser("config", parents=[common], help="show or change configuration")
+    p.add_argument("action", nargs="?", default="show", choices=["show", "get", "set", "unset", "path", "reset"])
+    p.add_argument("args", nargs="*", help="KEY [VALUE]")
+    p.add_argument("--reveal", action="store_true", help="do not mask secrets")
+
+    # -- doctor ----------------------------------------------------------
+    p = sub.add_parser("doctor", parents=[common], help="health check and self diagnostics")
+    p.add_argument("--network", action="store_true", help="also probe outbound network")
+
+    # -- tools -----------------------------------------------------------
+    p = sub.add_parser("tools", parents=[common], help="toolchain availability")
+    p.add_argument("--missing", action="store_true", help="only list binaries that are absent")
+
+    # -- engagement -------------------------------------------------------
+    p = sub.add_parser("engagement", parents=[common],
+                       help="manage engagement profiles (scope, guidance, budget)")
+    p.add_argument("action", nargs="?", default="list",
+                   choices=["list", "show", "new", "rm", "path", "wizard"],
+                   help="what to do")
+    p.add_argument("name", nargs="?", default="", help="profile name")
+    p.add_argument("-t", "--target", type=str, default="", help="primary target for 'new'")
+    p.add_argument("--scope", type=str, default="", help="comma-separated in-scope hosts")
+    p.add_argument("--out-of-scope", type=str, default="", help="comma-separated excluded hosts")
+    p.add_argument("--target-type", type=str, default="authorized",
+                   choices=["auto", "public_real_world", "authorized", "ctf", "lab"])
+    p.add_argument("--focus", type=str, default="", help="comma-separated priority areas")
+    p.add_argument("--vuln-classes", type=str, default="", help="comma-separated vuln classes")
+    p.add_argument("--spec", action="append", default=[], help="API spec / route file (repeatable)")
+    p.add_argument("--endpoint", action="append", default=[], help="declared endpoint (repeatable)")
+    p.add_argument("--canary", action="append", default=[], help="validation canary value (repeatable)")
+    p.add_argument("--weakness", action="append", default=[], help="known weakness hint (repeatable)")
+    p.add_argument("--rules", type=str, default="", help="rules of engagement, free text")
+    p.add_argument("--destructive", action="store_true", help="allow destructive testing")
+    p.add_argument("--min-severity", type=str, default="low",
+                   choices=["critical", "high", "medium", "low", "info"])
+    p.add_argument("--max-seconds", type=int, default=1800, help="budget: wall-clock ceiling")
+    p.add_argument("--max-commands", type=int, default=500, help="budget: command ceiling")
+    p.add_argument("--max-llm-calls", type=int, default=200, help="budget: LLM call ceiling")
+
+    # -- debug -----------------------------------------------------------
+    p = sub.add_parser("debug", parents=[common], help="source-code diagnostics and auto-fix")
+    p.add_argument("action", nargs="?", default="scan", choices=["scan", "fix", "check", "stats"],
+                   help="scan (read-only), fix, check or stats")
+
+    # -- setup -----------------------------------------------------------
+    p = sub.add_parser("setup", parents=[common], help="guided setup: app, engagement, or both")
+    p.add_argument("what", nargs="?", default="all", choices=["all", "app", "engagement"],
+                   help="app = AI provider chain, engagement = target profile, all = both")
+    p.add_argument("--force", action="store_true", help="re-run even when already configured")
+    p.add_argument("-t", "--target", type=str, default="", help="target for the engagement wizard")
+
+    # -- upgrade ---------------------------------------------------------
+    sub.add_parser("upgrade", parents=[common], help="autonomous self-upgrade pipeline")
+
+    # -- version ---------------------------------------------------------
+    sub.add_parser("version", parents=[common], help="show version and environment details")
+
+    # -- completion ------------------------------------------------------
+    p = sub.add_parser("completion", parents=[common], help="print a shell completion script")
+    p.add_argument("shell", nargs="?", default="bash", choices=["bash", "zsh", "fish"],
+                   help="shell flavour (default: bash)")
+
+    return parser
+
+
+# ===================================================================
+# Argument normalisation (legacy flag-first invocations)
+# ===================================================================
+_GLOBAL_FIRST = {"-h", "--help", "-V", "--version"}
+
+
+def normalize_argv(argv: List[str]) -> List[str]:
+    """Route legacy invocations to the matching subcommand.
+
+    ``x19 -t host``            → ``x19 run -t host``
+    ``x19 --json report``      → ``x19 report --json``
+    ``x19 --upgrade``          → ``x19 upgrade``
+    """
+    if not argv:
+        return []
+    if argv[0] in _GLOBAL_FIRST:
+        return argv
+    if argv[0] in COMMANDS:
+        return argv
+    if argv[0] == "--upgrade":
+        return ["upgrade"] + argv[1:]
+    for index, token in enumerate(argv):
+        if token in COMMANDS:
+            return [token] + argv[index + 1:] + argv[:index]
+    return ["run"] + argv
+
+
+# ===================================================================
+# Shared bootstrap
+# ===================================================================
+def _apply_runtime_config(args: argparse.Namespace) -> None:
+    """Translate run flags into the global config the agent reads."""
+    from ui.console import ok
+
+    set_data_raw = getattr(args, "set_data", "")
+    if set_data_raw:
+        try:
+            data = json.loads(set_data_raw)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"invalid --set-data JSON: {exc}")
+        set_data(data)
+        ok(f"data set: {len(data)} keys")
+
+    cli_data: Dict[str, Any] = {}
+    provider = getattr(args, "provider", "")
+    if provider:
+        if provider not in PROVIDERS:
+            valid = [p for p in PROVIDERS if p != "ollama"]
+            raise SystemExit(f"unknown provider '{provider}' — valid: {', '.join(valid)}")
+        cli_data["AI_PROVIDER"] = provider
+    model = getattr(args, "model", "")
+    if model:
+        cli_data["AI_MODEL"] = model
+    api_key = getattr(args, "api_key", "")
+    if api_key:
+        provider_id = provider or load_config().get("AI_PROVIDER", CONFIG.AI_PROVIDER)
+        if provider_id in PROVIDERS:
+            cli_data[PROVIDERS[provider_id]["api_key_env"]] = api_key
+    if cli_data:
+        set_data(cli_data)
+
+    target_type = getattr(args, "target_type", "")
+    if target_type:
+        set_data({"TARGET_TYPE": target_type})
+    if getattr(args, "bug_bounty", False):
+        set_data({
+            "BUG_BOUNTY_MODE": "1", "FAST_MODE": "1",
+            "TARGET_TYPE": target_type or "authorized",
+            "AUTO_BOOTSTRAP": "1", "PARALLEL_PLAN": "1",
+        })
+    if getattr(args, "ctf", False):
+        set_data({
+            "CTF_MODE": "1", "FAST_MODE": "1",
+            "TARGET_TYPE": target_type or "ctf",
+            "AUTO_BOOTSTRAP": "1", "PARALLEL_PLAN": "1",
+        })
+    if getattr(args, "fast", False):
+        set_data({"FAST_MODE": "1", "PARALLEL_PLAN": "1"})
+    if getattr(args, "max_iterations", 0):
+        set_data({"MAX_ITERATIONS": str(args.max_iterations)})
+
+
+def _make_agent():
+    from agent import X19
+    from providers import make_ai
+    from ui.console import ok, step
+
+    step("initialising AI provider")
+    ai = make_ai()
+    ok(f"AI: {ai.name()}")
+    step("loading agent")
+    agent = X19(ai=ai)
+    ok("agent ready")
+    return agent, ai
+
+
+# ===================================================================
+# Commands
+# ===================================================================
+def cmd_version(args: argparse.Namespace) -> int:
+    from ui.console import emit_json, get_console
+    from ui.screens import env_screen
+
+    data = version_info()
+    if getattr(args, "json", False):
+        emit_json(data)
+        return 0
+    get_console().print(env_screen(data))
+    get_console().print(
+        "[app.dim]x19 --help for commands · x19 doctor for a health check · "
+        "x19 report --format html to export[/]"
+    )
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    import cli_support
+    from ui.console import emit_json, get_console
+    from ui.screens import doctor_screen
+
+    result = cli_support.run_diagnostics(check_network=bool(getattr(args, "network", False)))
+    if getattr(args, "json", False):
+        payload = dict(result)
+        payload["toolchain"] = {k: v for k, v in result["toolchain"].items() if k != "rows"}
+        emit_json(payload)
+        return 0 if result["score"] >= 60 else 1
+    get_console().print(doctor_screen(result["checks"], score=result["score"]))
+    failed = [c for c in result["checks"] if c["status"] == "fail"]
+    if failed:
+        get_console().print(f"[app.err]✖ {len(failed)} check(s) failed[/]")
+        return 1
+    get_console().print("[app.ok]✔ healthy[/]")
+    return 0
+
+
+def cmd_tools(args: argparse.Namespace) -> int:
+    import cli_support
+    from ui.console import emit_json, get_console
+    from ui.screens import tools_screen
+
+    rows = cli_support.toolchain_rows()
+    if getattr(args, "missing", False):
+        rows = [row for row in rows if not row["available"]]
+    if getattr(args, "json", False):
+        emit_json(rows)
+        return 0
+    get_console().print(tools_screen(rows))
+    installed = sum(1 for row in rows if row["available"])
+    get_console().print(f"[app.dim]{installed}/{len(rows)} available[/]")
+    return 0
+
+
+def cmd_providers(args: argparse.Namespace) -> int:
+    from provider_setup import configured_chain
+    from ui.console import emit_json, get_console, ok, warn
+    from ui.screens import providers_screen
+
+    if getattr(args, "use", ""):
+        pid = args.use
+        if pid not in PROVIDERS:
+            warn(f"unknown provider '{pid}'")
+            return 1
+        set_data({"AI_PROVIDER": pid})
+        if args.model:
+            set_data({"AI_MODEL": args.model})
+        ok(f"primary provider set to {pid}")
+
+    if getattr(args, "model", "") and not getattr(args, "use", ""):
+        set_data({"AI_MODEL": args.model})
+        ok(f"model set to {args.model}")
+
+    chain = configured_chain()
+    summary = provider_chain_summary()
+
+    if getattr(args, "test", False):
+        from providers import make_ai
+
+        ai = make_ai()
+        reply = ai.chat("Reply with the single word: ready.", "ping")
+        if reply:
+            ok(f"{ai.name()} responded: {reply.strip()[:80]}")
+        else:
+            warn(f"{ai.name()} returned an empty response")
+
+    if getattr(args, "json", False):
+        emit_json({
+            "providers": {pid: {"name": i["name"], "needs_key": i["needs_key"],
+                                "default_model": i.get("default_model", ""),
+                                "configured": _provider_has_key(pid)}
+                          for pid, i in PROVIDERS.items()},
+            "chain": chain,
+            "resolved": summary,
+        })
+        return 0
+
+    cfg = load_config()
+    providers = {pid: dict(info, configured=_provider_has_key(pid)) for pid, info in PROVIDERS.items()}
+    get_console().print(providers_screen(
+        providers, current=cfg.get("AI_PROVIDER", ""), chain=chain, priority=PROVIDER_PRIORITY
+    ))
+    return 0
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    from ui.console import emit_json, get_console, ok, warn
+    from ui.screens import config_screen
+
+    action = getattr(args, "action", "show")
+    extra = list(getattr(args, "args", []) or [])
+    config = load_config()
+
+    if action == "path":
+        if getattr(args, "json", False):
+            emit_json({"path": str(CONFIG_FILE)})
+        else:
+            get_console().print(str(CONFIG_FILE))
+        return 0
+
+    if action == "reset":
+        try:
+            CONFIG_FILE.unlink()
+        except FileNotFoundError:
+            pass
+        ok(f"removed {CONFIG_FILE}")
+        return 0
+
+    if action == "unset":
+        if not extra:
+            warn("usage: x19 config unset KEY")
+            return 1
+        remaining = {k: v for k, v in config.items() if k.upper() != extra[0].upper()}
+        CONFIG_FILE.write_text(json.dumps(remaining, indent=2), encoding="utf-8")
+        ok(f"unset {extra[0]}")
+        return 0
+
+    if action == "get":
+        if not extra:
+            warn("usage: x19 config get KEY")
+            return 1
+        value = config.get(extra[0].upper(), config.get(extra[0], ""))
+        if getattr(args, "json", False):
+            emit_json({extra[0]: value})
+        else:
+            get_console().print(str(value))
+        return 0
+
+    if action == "set":
+        updates: Dict[str, str] = {}
+        for token in extra:
+            if "=" in token:
+                key, value = token.split("=", 1)
+                updates[key.strip().upper()] = value.strip()
+            else:
+                warn(f"expected KEY=VALUE, got '{token}'")
+        if updates:
+            set_data(updates)
+            ok("saved " + ", ".join(updates))
+            config = load_config()
+
+    if getattr(args, "json", False):
+        masked = dict(config)
+        if not getattr(args, "reveal", False):
+            from ui.screens import is_secret_key, mask_secret
+
+            masked = {k: (mask_secret(v) if is_secret_key(k) and v else v) for k, v in masked.items()}
+        emit_json(masked)
+        return 0
+
+    get_console().print(config_screen(config, path=str(CONFIG_FILE), reveal=bool(getattr(args, "reveal", False))))
+    return 0
+
+
+def _resolve_session(args: argparse.Namespace) -> Optional[Dict[str, Any]]:
+    import cli_support
+
+    session_id = getattr(args, "session", "")
+    if session_id:
+        return cli_support.load_session(session_id)
+    return cli_support.latest_session()
+
+
+def cmd_sessions(args: argparse.Namespace) -> int:
+    import cli_support
+    from ui.console import emit_json, get_console, warn
+    from ui.screens import session_detail_screen, sessions_screen
+
+    action = getattr(args, "action", "list")
+    if action == "show":
+        session_id = getattr(args, "session", "") or ""
+        data = cli_support.load_session(session_id) if session_id else cli_support.latest_session()
+        if not data:
+            warn(f"no such session: {session_id or '(none recorded)'}")
+            return 1
+        if getattr(args, "json", False):
+            emit_json(data)
+        else:
+            get_console().print(session_detail_screen(data, data.get("session_id", "")))
+        return 0
+
+    rows = cli_support.list_sessions()
+    if getattr(args, "json", False):
+        emit_json(rows)
+        return 0
+    get_console().print(sessions_screen(rows))
+    get_console().print(f"[app.dim]directory: {CONFIG.SESSIONS_DIR}[/]")
+    return 0
+
+
+def cmd_findings(args: argparse.Namespace) -> int:
+    from ui.console import emit_json, get_console, warn
+    from ui.screens import findings_screen
+
+    data = _resolve_session(args)
+    if not data:
+        warn("no session recorded — run: x19 run -t <target>")
+        return 1
+    findings = data.get("findings") or []
+    severity = getattr(args, "severity", "").lower()
+    if severity:
+        findings = [f for f in findings if str(f.get("severity", "")).lower() == severity]
+    if getattr(args, "json", False):
+        emit_json({"session": data.get("session_id"), "target": data.get("target"), "findings": findings})
+        return 0
+    get_console().print(findings_screen(findings, target=data.get("target", "")))
+    return 0
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    import cli_support
+    from ui.console import emit_json, get_console, warn
+
+    data = _resolve_session(args)
+    if not data:
+        warn("no session recorded — run: x19 run -t <target>")
+        return 1
+
+    fmt = getattr(args, "format", "markdown")
+    findings = cli_support.session_findings(data)
+    target = data.get("target", "unknown")
+
+    if fmt == "text":
+        from storage import Session
+
+        session = Session()
+        session.id = data.get("session_id")
+        session.data = data
+        content = session.report()
+    else:
+        from reporting.report_generator import SecurityReportGenerator
+
+        generator = SecurityReportGenerator(
+            target=target,
+            findings=findings,
+            metadata={
+                "session_id": data.get("session_id", ""),
+                "started": data.get("started", ""),
+                "iterations": data.get("iterations", 0),
+                "tool": f"X19 {__version__}",
+            },
+        )
+        content = {
+            "markdown": generator.generate_markdown,
+            "html": generator.generate_html,
+            "json": generator.generate_json,
+        }[fmt]()
+
+    out = getattr(args, "out", "")
+    if out:
+        from pathlib import Path
+
+        Path(out).write_text(content, encoding="utf-8")
+        get_console().print(f"[app.ok]✔ report written to {out}[/]")
+        return 0
+    if fmt == "json" or getattr(args, "json", False):
+        if fmt == "json":
+            sys.stdout.write(content + "\n")
+        else:
+            emit_json(json.loads(content) if fmt == "json" else data)
+        return 0
+    sys.stdout.write(content + "\n")
+    return 0
+
+
+def cmd_dash(args: argparse.Namespace) -> int:
+    from brain.coordinator import SwarmCoordinator
+    from ui import widgets
+    from ui.console import emit_json, get_console, info, is_plain_mode, warn
+    from ui.dashboard import MissionDashboard
+    from ui.screens import decision_table, workflow_panel
+
+    target = getattr(args, "target", "") or os.getenv("X19_TARGET", "")
+    if not target:
+        warn("target required — x19 dash -t <host>")
+        return 1
+
+    profile = _resolve_engagement(args)
+    coordinator = SwarmCoordinator()
+    dashboard = MissionDashboard(
+        coordinator,
+        version=__version__,
+        refresh=float(getattr(args, "refresh", 0.5) or 0.5),
+        console=get_console(),
+    )
+
+    legacy = bool(getattr(args, "legacy", False))
+    no_start = bool(getattr(args, "no_start", False))
+    holder: Dict[str, Any] = {}
+
+    if legacy:
+        dashboard.run(
+            target=target,
+            once=bool(getattr(args, "once", False)),
+            headless=True if (getattr(args, "no_tui", False) or is_plain_mode()) else None,
+            start=not no_start,
+            timeout=float(getattr(args, "timeout", 0) or 0) or None,
+        )
+    else:
+        if profile is not None:
+            coordinator.apply_profile(profile)
+        if not no_start:
+            # The workflow is synchronous by design; the dashboard needs it off
+            # this thread so the live view can render while it runs.
+            def _work() -> None:
+                try:
+                    holder["run"] = coordinator.run_workflow(
+                        profile,
+                        target=target,
+                        max_cycles=int(getattr(args, "max_cycles", 3) or 3),
+                    )
+                except Exception as exc:  # surfaced after the view closes
+                    holder["error"] = exc
+
+            worker = threading.Thread(target=_work, daemon=True, name="X19-Workflow")
+            worker.start()
+            deadline = time.time() + 3.0
+            while not coordinator.is_running and time.time() < deadline:
+                if "error" in holder:
+                    break
+                time.sleep(0.05)
+            info(f"workflow started — profile {profile.name if profile else 'ad-hoc'}, "
+                 f"type {getattr(profile, 'target_type', 'auto')}")
+
+        dashboard.run(
+            target=target,
+            once=bool(getattr(args, "once", False)),
+            headless=True if (getattr(args, "no_tui", False) or is_plain_mode()) else None,
+            start=False,
+            timeout=float(getattr(args, "timeout", 0) or 0) or None,
+        )
+
+    ran = not no_start and not getattr(args, "once", False)
+    summary = coordinator.get_workflow_summary()
+
+    if getattr(args, "json", False):
+        payload = {"summary": dashboard.refresh_state(), "workflow": summary}
+        if "error" in holder:
+            payload["error"] = f"{type(holder['error']).__name__}: {holder['error']}"
+        emit_json(payload)
+        return 0
+
+    if ran:
+        get_console().print(dashboard.report())
+        if summary.get("active"):
+            get_console().print(workflow_panel(summary))
+            run = summary.get("run") or {}
+            get_console().print(widgets.panel(
+                f"coordinator decisions · stopped: {run.get('stopped_reason', 'n/a')}",
+                decision_table(run.get("decisions") or []),
+            ))
+    if "error" in holder:
+        warn(f"workflow error: {type(holder['error']).__name__}: {holder['error']}")
+        return 1
+    return 0
+
+
+def _split_list(value: str) -> List[str]:
+    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
+def _profile_from_args(args: argparse.Namespace):
+    """Build an EngagementProfile from `x19 engagement new` flags."""
+    import engagement as eng
+
+    name = getattr(args, "name", "") or ""
+    target = getattr(args, "target", "") or ""
+    if not name:
+        raise SystemExit("profile name required — x19 engagement new <name> -t <target>")
+    eng.validate_name(name)
+
+    scope = _split_list(getattr(args, "scope", ""))
+    if target and target not in scope:
+        scope.insert(0, target)
+
+    profile = eng.EngagementProfile(
+        name=name,
+        target=target,
+        targets=scope or ([target] if target else []),
+        target_type=getattr(args, "target_type", "authorized"),
+        rules_of_engagement=getattr(args, "rules", "") or "",
+        out_of_scope=_split_list(getattr(args, "out_of_scope", "")),
+        attack_surface=eng.AttackSurface(
+            api_specs=list(getattr(args, "spec", []) or []),
+            endpoints=list(getattr(args, "endpoint", []) or []),
+        ),
+        priorities=eng.Priorities(
+            focus=_split_list(getattr(args, "focus", "")),
+            vuln_classes=_split_list(getattr(args, "vuln_classes", "")),
+        ),
+        strategy=eng.AttackStrategy(
+            known_weaknesses=list(getattr(args, "weakness", []) or []),
+            allow_destructive=bool(getattr(args, "destructive", False)),
+        ),
+        validation=eng.Validation(
+            canaries=[{"label": f"canary-{i + 1}", "value": value, "kind": "generic"}
+                      for i, value in enumerate(getattr(args, "canary", []) or [])],
+            require_poc=True,
+            min_severity=getattr(args, "min_severity", "low"),
+        ),
+        budget=eng.MissionBudget(
+            max_seconds=int(getattr(args, "max_seconds", 1800) or 0),
+            max_commands=int(getattr(args, "max_commands", 500) or 0),
+            max_llm_calls=int(getattr(args, "max_llm_calls", 200) or 0),
+        ),
+    )
+    return profile
+
+
+def cmd_engagement(args: argparse.Namespace) -> int:
+    import engagement as eng
+    from ui.console import emit_json, get_console, ok, warn
+    from ui.screens import engagement_detail_screen, engagement_list_screen
+
+    action = getattr(args, "action", "list")
+
+    if action == "path":
+        path = str(eng.engagements_dir())
+        if getattr(args, "json", False):
+            emit_json({"directory": path})
+        else:
+            get_console().print(path)
+        return 0
+
+    if action == "new":
+        profile = _profile_from_args(args)
+        problems = eng.validate_profile(profile)
+        profile.save()
+        if getattr(args, "json", False):
+            emit_json({"saved": str(eng.profile_path(profile.name)), "problems": problems})
+            return 0
+        ok(f"profile saved: {eng.profile_path(profile.name)}")
+        get_console().print(engagement_detail_screen(profile, problems=problems))
+        for problem in problems:
+            warn(problem)
+        return 0
+
+    if action == "rm":
+        name = getattr(args, "name", "")
+        if not name:
+            warn("usage: x19 engagement rm <name>")
+            return 1
+        if eng.delete_profile(name):
+            ok(f"removed profile {name}")
+            return 0
+        warn(f"no such profile: {name}")
+        return 1
+
+    if action == "wizard":
+        profile = engagement_wizard(target=getattr(args, "target", ""))
+        if profile is None:
+            return 1
+        if getattr(args, "json", False):
+            emit_json(profile.to_dict())
+            return 0
+        get_console().print(engagement_detail_screen(profile, problems=eng.validate_profile(profile)))
+        return 0
+
+    if action == "show":
+        name = getattr(args, "name", "")
+        profile = eng.load_profile(name) if name else None
+        if profile is None:
+            warn(f"no such profile: {name or '(none given)'}")
+            return 1
+        if getattr(args, "json", False):
+            emit_json(eng.redact(profile.to_dict()))
+            return 0
+        get_console().print(engagement_detail_screen(profile, problems=eng.validate_profile(profile)))
+        return 0
+
+    rows = eng.list_profiles()
+    if getattr(args, "json", False):
+        emit_json(rows)
+        return 0
+    get_console().print(engagement_list_screen(rows, directory=str(eng.engagements_dir())))
+    get_console().print("[app.dim]create one with: x19 engagement new <name> -t <target> --target-type authorized[/]")
+    return 0
+
+
+def engagement_wizard(target: str = "") -> Any:
+    """Guided engagement setup — the four XBOW guidance cards, one question at a time."""
+    import engagement as eng
+    from rich.prompt import Confirm, Prompt
+
+    from ui.console import get_console, info, ok, rule, warn
+
+    console = get_console()
+    rule("[panel.title]engagement setup[/]")
+    info("Answers are stored as a reusable profile; nothing is attacked during setup.")
+
+    name = Prompt.ask("profile name", console=console, default="default").strip().lower()
+    try:
+        eng.validate_name(name)
+    except ValueError as exc:
+        warn(str(exc))
+        return None
+
+    target = (target or Prompt.ask("primary target", console=console)).strip()
+    if not target:
+        warn("a target is required — nothing would be in scope")
+        return None
+
+    scope = Prompt.ask("additional in-scope hosts (comma separated)", console=console, default="").strip()
+    out = Prompt.ask("out-of-scope hosts (comma separated)", console=console, default="").strip()
+    target_type = Prompt.ask(
+        "engagement type", console=console, default="authorized",
+        choices=["public_real_world", "authorized", "ctf", "lab"],
+    )
+
+    info("card 1 · attack surface")
+    specs = Prompt.ask("API spec / route files (comma separated paths)", console=console, default="").strip()
+    endpoints = Prompt.ask("declared endpoints (comma separated)", console=console, default="").strip()
+
+    info("card 2 · priorities")
+    focus = Prompt.ask("focus areas (comma separated)", console=console, default="").strip()
+    vuln_classes = Prompt.ask("vulnerability classes (comma separated)", console=console, default="").strip()
+
+    info("card 3 · attack strategy")
+    weaknesses = Prompt.ask("known weaknesses (comma separated)", console=console, default="").strip()
+    destructive = Confirm.ask("allow destructive testing?", console=console, default=False)
+    if destructive and target_type == "public_real_world":
+        warn("destructive testing refused: target_type is public_real_world")
+        destructive = False
+
+    info("card 4 · validation")
+    canaries = Prompt.ask("canary values (comma separated)", console=console, default="").strip()
+    min_severity = Prompt.ask("minimum reportable severity", console=console, default="low",
+                              choices=list(eng.SEVERITIES))
+
+    info("budget")
+    max_seconds = int(Prompt.ask("max seconds", console=console, default="1800") or 0)
+    max_commands = int(Prompt.ask("max commands", console=console, default="500") or 0)
+
+    targets = [target] + [h.strip() for h in scope.split(",") if h.strip()]
+    profile = eng.EngagementProfile(
+        name=name,
+        target=target,
+        targets=targets,
+        target_type=target_type,
+        out_of_scope=[h.strip() for h in out.split(",") if h.strip()],
+        attack_surface=eng.AttackSurface(
+            api_specs=[x.strip() for x in specs.split(",") if x.strip()],
+            endpoints=[x.strip() for x in endpoints.split(",") if x.strip()],
+        ),
+        priorities=eng.Priorities(
+            focus=[x.strip() for x in focus.split(",") if x.strip()],
+            vuln_classes=[x.strip() for x in vuln_classes.split(",") if x.strip()],
+        ),
+        strategy=eng.AttackStrategy(
+            known_weaknesses=[x.strip() for x in weaknesses.split(",") if x.strip()],
+            allow_destructive=destructive,
+        ),
+        validation=eng.Validation(
+            canaries=[{"label": f"canary-{i + 1}", "value": value.strip(), "kind": "generic"}
+                      for i, value in enumerate(canaries.split(",")) if value.strip()],
+            require_poc=True,
+            min_severity=min_severity,
+        ),
+        budget=eng.MissionBudget(max_seconds=max_seconds, max_commands=max_commands),
+    )
+    path = profile.save()
+    ok(f"profile saved: {path}")
+    for problem in eng.validate_profile(profile):
+        warn(problem)
+    return profile
+
+
+def _resolve_engagement(args: argparse.Namespace):
+    """Load `--engagement <name>`, or synthesise a conservative ad-hoc profile."""
+    import engagement as eng
+    from ui.console import warn
+
+    name = getattr(args, "engagement", "") or ""
+    if name:
+        profile = eng.load_profile(name)
+        if profile is None:
+            raise SystemExit(f"no such engagement profile: {name} — see: x19 engagement list")
+        return profile
+    target = getattr(args, "target", "") or ""
+    if not target:
+        return None
+    profile = eng.ad_hoc_profile(target, target_type=getattr(args, "target_type", "auto") or "auto")
+    warn("no --engagement profile given — running with a conservative ad-hoc profile "
+         "(non-destructive, PoC required)")
+    return profile
+
+
+def cmd_debug(args: argparse.Namespace) -> int:
+    """Delegate to the standalone source diagnostics tool."""
+    import x19debugger
+
+    debugger = x19debugger.X19Debugger()
+    action = getattr(args, "action", "scan")
+    {
+        "scan": x19debugger.cmd_scan,
+        "fix": x19debugger.cmd_fix,
+        "check": x19debugger.cmd_check,
+        "stats": x19debugger.cmd_stats,
+    }[action](debugger)
+    return 0
+
+
+_COMPLETIONS = {
+    "bash": """# X19 bash completion — eval "$(x19 completion bash)"
+_x19_complete() {{
+    local cur cmds
+    COMPREPLY=()
+    cur="${{COMP_WORDS[COMP_CWORD]}}"
+    cmds="{commands}"
+    if [ "${{COMP_CWORD}}" -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "${{cmds}}" -- "${{cur}}") )
+    fi
+    return 0
+}}
+complete -F _x19_complete x19
+""",
+    "zsh": """# X19 zsh completion — eval "$(x19 completion zsh)"
+_x19() {{
+    local -a commands
+    commands=({zsh_commands})
+    if (( CURRENT == 2 )); then
+        _describe 'command' commands
+    fi
+}}
+compdef _x19 x19
+""",
+    "fish": """# X19 fish completion — x19 completion fish | source
+{fish_commands}
+""",
+}
+
+
+def cmd_completion(args: argparse.Namespace) -> int:
+    shell = getattr(args, "shell", "bash")
+    names = list(COMMANDS)
+    if shell == "bash":
+        script = _COMPLETIONS["bash"].format(commands=" ".join(names))
+    elif shell == "zsh":
+        script = _COMPLETIONS["zsh"].format(
+            zsh_commands=" ".join(f"'{name}:x19 {name}'" for name in names)
+        )
+    else:
+        script = _COMPLETIONS["fish"].format(
+            fish_commands="\n".join(
+                f"complete -c x19 -f -n '__fish_use_subcommand' -a '{name}'" for name in names
+            )
+        )
+    sys.stdout.write(script)
+    return 0
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    from ui.console import info, ok, rule, warn
+
+    what = getattr(args, "what", "all")
+
+    if what in ("all", "app"):
+        from provider_setup import setup_if_needed
+
+        if not setup_if_needed(force=bool(getattr(args, "force", False))):
+            warn("app setup cancelled — no working provider saved")
+            if what == "app":
+                return 1
+        else:
+            ok("provider chain saved")
+
+    if what in ("all", "engagement"):
+        rule("[panel.title]engagement setup[/]")
+        profile = engagement_wizard(target=getattr(args, "target", ""))
+        if profile is None:
+            return 1
+        info(f"run it with: x19 dash -t {profile.target} --engagement {profile.name}")
+    return 0
+
+
+def cmd_upgrade(args: argparse.Namespace) -> int:
+    from x19upgrader import X19Upgrader
+
+    return 0 if X19Upgrader().run_pipeline() else 1
+
+
+def cmd_chat(args: argparse.Namespace) -> int:
+    import ui.app as app_module
+    from ui.app import ConsoleApp
+    from ui.console import banner
+
+    if not _ensure_provider():
+        return 1
+
+    agent, ai = _make_agent()
+    _maybe_start_telegram(agent)
+    banner(__version__, subtitle=f"interactive console · {ai.name()}")
+    system = getattr(args, "system", "")
+    if system:
+        app_module.SYSTEM_PROMPT = system
+    return ConsoleApp(agent, version=__version__, ai=ai).run()
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    from providers import is_bug_bounty_mode, is_ctf_mode
+    from ui.console import banner, emit_json, get_console, info, ok, warn
+    from ui import widgets
+
+    # one-shot browser action (no agent required)
+    if getattr(args, "browser", ""):
+        from tools import BrowserAutomation
+
+        result = getattr(BrowserAutomation(), args.browser)(getattr(args, "url", ""))
+        if getattr(args, "json", False):
+            emit_json(result)
+        elif result.get("error"):
+            warn(result["error"])
+        elif args.browser == "render":
+            get_console().print(result.get("html", ""))
+        else:
+            get_console().print_json(json.dumps(result, default=str))
+        return 1 if result.get("error") else 0
+
+    # one-shot provider shortcuts
+    if getattr(args, "setup_groq", ""):
+        key = args.setup_groq.strip()
+        if not key.startswith("gsk_"):
+            warn(f"Groq keys start with 'gsk_' — got {key[:8]}…")
+            get_console().print("  [app.dim]free key: https://console.groq.com/keys[/]")
+            return 1
+        set_data({"AI_PROVIDER": "groq", "AI_MODEL": "llama-3.3-70b-versatile", "GROQ_API_KEY": key})
+        ok("Groq configured — provider=groq model=llama-3.3-70b-versatile")
+        return 0
+    if getattr(args, "setup_cerebras", ""):
+        key = args.setup_cerebras.strip()
+        if not key:
+            warn("empty key — get one at https://cloud.cerebras.ai/")
+            return 1
+        set_data({"AI_PROVIDER": "cerebras", "AI_MODEL": "llama-3.3-70b", "CEREBRAS_API_KEY": key})
+        ok("Cerebras configured — provider=cerebras model=llama-3.3-70b")
+        return 0
+
+    _apply_runtime_config(args)
+    _print_ai_chain_banner()
+
+    target = getattr(args, "target", "") or os.getenv("X19_TARGET", "")
+    if getattr(args, "target", ""):
+        set_data({"TARGET": args.target})
+
+    # swarm pipeline → the live dashboard owns the run
+    if getattr(args, "swarm", False):
+        if not target:
+            warn("target required — x19 run -t <host> --swarm")
+            return 1
+        return cmd_dash(args)
+
+    if not _ensure_provider():
+        return 1
+
+    if not getattr(args, "quiet", False):
+        banner(__version__, subtitle="autonomous assessment")
+
+    agent, ai = _make_agent()
+    _maybe_start_telegram(agent)
+
+    if not target:
+        from ui.app import ConsoleApp
+
+        app = ConsoleApp(agent, version=__version__, ai=ai)
+        return app.run()
+
+    if getattr(args, "interactive", False):
+        from interactive import interactive
+
+        interactive(agent)
+        get_console().print(f"[app.dim]sessions: {CONFIG.SESSIONS_DIR}[/]")
+        return 0
+
+    if is_bug_bounty_mode():
+        info(f"bug bounty mode — hands-free autonomous run on {target}")
+    elif is_ctf_mode():
+        info(f"CTF mode — flag hunting on {target}")
+    else:
+        info(f"auto-running assessment on {target}")
+
+    agent.autonomous_loop(target)
+    findings = agent.findings()
+    failed = agent.session.data.get("status") == "failed"
+    if getattr(args, "json", False):
+        emit_json({
+            "target": target,
+            "session": agent.session.id,
+            "status": agent.session.data.get("status"),
+            "iterations": agent.session.data.get("iterations", 0),
+            "findings": agent.session.data.get("findings", []),
+        })
+        return 1 if failed else 0
+
+    get_console().print(widgets.panel(
+        "assessment complete" if not failed else "assessment failed",
+        widgets.kv_table([
+            ("target", target),
+            ("session", agent.session.id or "—"),
+            ("iterations", agent.session.data.get("iterations", 0)),
+            ("findings", len(findings)),
+        ]),
+        border_style="bright_green" if not failed else "bright_red",
+    ))
+    get_console().print(f"[app.dim]sessions: {CONFIG.SESSIONS_DIR} · report: x19 report[/]")
+    return 1 if failed else 0
+
+
+def _ensure_provider() -> bool:
+    from cli_support import ensure_provider_configured, resolve_provider
+    from ui.console import info, warn
+
+    try:
+        configured = ensure_provider_configured()
+    except (EOFError, KeyboardInterrupt):
+        configured = False
+    except Exception as exc:
+        warn(f"provider setup failed: {exc}")
+        return False
+    if not configured:
+        warn("no AI provider configured — run: x19 setup")
+        return False
+    resolved = resolve_provider()
+    if resolved:
+        info(f"AI provider: [bold]{resolved}[/]")
+    return True
+
+
+HANDLERS = {
+    "workspace": cmd_workspace,
+    "run": cmd_run,
+    "dash": cmd_dash,
+    "chat": cmd_chat,
+    "report": cmd_report,
+    "findings": cmd_findings,
+    "sessions": cmd_sessions,
+    "providers": cmd_providers,
+    "config": cmd_config,
+    "doctor": cmd_doctor,
+    "tools": cmd_tools,
+    "engagement": cmd_engagement,
+    "debug": cmd_debug,
+    "setup": cmd_setup,
+    "upgrade": cmd_upgrade,
+    "version": cmd_version,
+    "completion": cmd_completion,
+}
+
+
+# ===================================================================
+# Help screen
+# ===================================================================
+HELP_COMMANDS = [
+    {"name": "workspace", "help": "X19 workspace home: status, state, every function (default)", "group": "interactive"},
+    {"name": "run", "help": "autonomous assessment against a target (-t, --bug-bounty, --ctf, --fast)", "group": "assessment"},
+    {"name": "dash", "help": "full-screen live swarm mission control", "group": "assessment"},
+    {"name": "findings", "help": "list recorded findings by severity", "group": "assessment"},
+    {"name": "report", "help": "export markdown / html / json / text reports", "group": "assessment"},
+    {"name": "chat", "help": "interactive AI assistant console", "group": "interactive"},
+    {"name": "sessions", "help": "list or inspect stored assessment sessions", "group": "interactive"},
+    {"name": "engagement", "help": "engagement profiles: scope, guidance cards, canaries, budget", "group": "configuration"},
+    {"name": "providers", "help": "list providers, set the primary, test connectivity", "group": "configuration"},
+    {"name": "config", "help": "show, get, set, unset or reset configuration", "group": "configuration"},
+    {"name": "setup", "help": "guided setup: app (AI providers) and/or engagement (target profile)", "group": "configuration"},
+    {"name": "doctor", "help": "health check, dependencies, toolchain, self diagnostics", "group": "operations"},
+    {"name": "tools", "help": "toolchain availability", "group": "operations"},
+    {"name": "debug", "help": "source-code diagnostics: scan / fix / check / stats", "group": "operations"},
+    {"name": "completion", "help": "print a bash / zsh / fish completion script", "group": "operations"},
+    {"name": "upgrade", "help": "autonomous self-upgrade pipeline", "group": "operations"},
+    {"name": "version", "help": "version and environment details", "group": "operations"},
+]
+
+
+def print_help(parser: argparse.ArgumentParser) -> None:
+    from ui.console import banner, get_console
+    from ui.screens import help_screen
+
+    banner(__version__, subtitle="terminal application · no web ui")
+    get_console().print(help_screen(HELP_COMMANDS, version=__version__))
+    get_console().print(
+        "[app.dim]global flags:[/] --json  --no-color  --plain  -q/--quiet  -v/--verbose  "
+        "-V/--version\n"
+        "[app.dim]examples:[/]   x19 run -t scanme.nmap.org --bug-bounty\n"
+        "           x19 dash -t 10.0.0.5\n"
+        "           x19 report --format html --out report.html\n"
+        "           x19 doctor --json | jq .score\n"
+    )
 
 
 # ===================================================================
 # Main entry point
 # ===================================================================
-def main():
-    os.system('clear' if os.name == 'posix' else 'cls')
-    print(BANNER)
+def main(argv: Optional[List[str]] = None) -> int:
+    from ui.console import get_console, init_console
 
-    import argparse
-    parser = argparse.ArgumentParser(description="X19 - Autonomous AI Pentest Agent")
-    parser.add_argument("--set-data", "-d", type=str, default="",
-                        help="Pre-configure agent with JSON data. E.g. '{\"AI_PROVIDER\":\"openrouter\",\"OPENROUTER_API_KEY\":\"sk-...\",\"TARGET\":\"10.0.0.1\"}'")
-    parser.add_argument("--target", "-t", type=str, default="",
-                        help="Target to scan (auto-starts assessment)")
-    parser.add_argument("--provider", "-p", type=str, default="",
-                        help="AI provider (openrouter, openai, anthropic, nvidia, etc.)")
-    parser.add_argument("--model", "-m", type=str, default="",
-                        help="AI model name")
-    parser.add_argument("--api-key", "-k", type=str, default="",
-                        help="API key for the AI provider")
-    parser.add_argument("--quiet", "-q", action="store_true",
-                        help="Minimal output")
-    parser.add_argument("--interactive", "-i", action="store_true",
-                        help="Force interactive console mode")
-    parser.add_argument("--target-type", type=str, default="",
-                        choices=["auto", "public_real_world", "authorized", "ctf", "lab"],
-                        help="Target classification: public_real_world (recon only), authorized/ctf/lab (full attack)")
-    parser.add_argument("--bug-bounty", "-b", action="store_true",
-                        help="Hands-free bug bounty mode: parallel bootstrap, authorized scope, faster loop")
-    parser.add_argument("--ctf", "-c", action="store_true",
-                        help="CTF mode: aggressive exploitation, flag hunting, parallel recon, authorized scope")
-    parser.add_argument("--fast", "-f", action="store_true",
-                        help="Fast decisions: smaller prompt/context, skip extra LLM verify")
-    parser.add_argument("--browser", type=str, default="", choices=["render", "forms", "screenshot"],
-                        help="Run a headless-browser action and exit")
-    parser.add_argument("--url", type=str, default="", help="URL for --browser")
-    parser.add_argument("--setup-groq", type=str, default="",
-                        help="One-shot: store GROQ_API_KEY + set AI_PROVIDER=groq + AI_MODEL=llama-3.3-70b-versatile, then exit. Use: x19 --setup-groq gsk_...")
-    parser.add_argument("--setup-cerebras", type=str, default="",
-                        help="One-shot: store CEREBRAS_API_KEY + set AI_PROVIDER=cerebras + AI_MODEL=llama-3.3-70b, then exit. Get free key at https://cloud.cerebras.ai/")
-    parser.add_argument("--upgrade", action="store_true",
-                        help="Autonomous self-upgrade: clone to sandbox, run 100% research plan, apply upgrades, run tests, and import to main codebase if valid.")
-    args = parser.parse_args()
+    argv = normalize_argv(list(sys.argv[1:] if argv is None else argv))
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
-    if args.upgrade:
-        from x19upgrader import X19Upgrader
-        upgrader = X19Upgrader()
-        success = upgrader.run_pipeline()
-        sys.exit(0 if success else 1)
-
-    if args.browser:
-        res = getattr(BrowserAutomation(), args.browser)(args.url)
-        if res.get("error"):
-            print(res["error"])
-        elif args.browser == "render":
-            print(res.get("html", ""))
-        else:
-            print(json.dumps(res, indent=2))
-        return
-
-    # Apply --setup-groq: one-shot config for the free, fast Groq provider
-    if args.setup_groq:
-        key = args.setup_groq.strip()
-        if not key.startswith("gsk_"):
-            print(f"{C.R}[!] Groq API keys start with 'gsk_'. Got: {key[:8]}...{C.N}")
-            print(f"{C.Y}    Get a free key (no card) at https://console.groq.com/keys{C.N}")
-            sys.exit(1)
-        set_data({
-            "AI_PROVIDER": "groq",
-            "AI_MODEL": "llama-3.3-70b-versatile",
-            "GROQ_API_KEY": key,
-        })
-        print(f"{C.G}[+] Groq configured: provider=groq, model=llama-3.3-70b-versatile{C.N}")
-        print(f"{C.G}[+] Key stored in $HOME/.x19/config.json. X19 will try Groq first,{C.N}")
-        print(f"{C.G}    then auto-fallback to other free models if Groq is down.{C.N}")
-        sys.exit(0)
-
-    # Apply --setup-cerebras: one-shot config for the free, fast Cerebras inference
-    if args.setup_cerebras:
-        key = args.setup_cerebras.strip()
-        if not key:
-            print(f"{C.R}[!] Empty key. Get one at https://cloud.cerebras.ai/{C.N}")
-            sys.exit(1)
-        set_data({
-            "AI_PROVIDER": "cerebras",
-            "AI_MODEL": "llama-3.3-70b",
-            "CEREBRAS_API_KEY": key,
-        })
-        print(f"{C.G}[+] Cerebras configured: provider=cerebras, model=llama-3.3-70b{C.N}")
-        print(f"{C.G}[+] Free tier ~1M tokens/day, very fast inference.{C.N}")
-        sys.exit(0)
-
-    # Apply --set-data first
-    if args.set_data:
-        try:
-            data = json.loads(args.set_data)
-            set_data(data)
-            print(f"{C.G}[+] Data set: {len(data)} keys{C.N}")
-        except json.JSONDecodeError as e:
-            print(f"{C.R}[!] Invalid --set-data JSON: {e}{C.N}")
-            sys.exit(1)
-
-    # Apply individual args
-    cli_data = {}
-    if args.provider:
-        if args.provider not in PROVIDERS:
-            valid = [p for p in PROVIDERS if p != "ollama"]
-            print(f"{C.R}[!] Unknown provider '{args.provider}'{C.N}")
-            print(f"{C.Y}    Valid providers: {', '.join(valid)}{C.N}")
-            sys.exit(1)
-        cli_data["AI_PROVIDER"] = args.provider
-    if args.model:
-        cli_data["AI_MODEL"] = args.model
-    if args.api_key:
-        provider_id = args.provider or load_config().get("AI_PROVIDER", CONFIG.AI_PROVIDER)
-        if provider_id in PROVIDERS:
-            cli_data[PROVIDERS[provider_id]["api_key_env"]] = args.api_key
-    if cli_data:
-        set_data(cli_data)
-
-    if args.target_type:
-        cli_data["TARGET_TYPE"] = args.target_type
-        set_data({"TARGET_TYPE": args.target_type})
-
-    # Print AI provider chain banner so user sees which models will be tried
-    _print_ai_chain_banner()
-
-    if args.target:
-        set_data({"TARGET": args.target})
-
-    if args.bug_bounty:
-        set_data({
-            "BUG_BOUNTY_MODE": "1",
-            "FAST_MODE": "1",
-            "TARGET_TYPE": args.target_type or "authorized",
-            "AUTO_BOOTSTRAP": "1",
-            "PARALLEL_PLAN": "1",
-        })
-
-    if args.ctf:
-        set_data({
-            "CTF_MODE": "1",
-            "FAST_MODE": "1",
-            "TARGET_TYPE": args.target_type or "ctf",
-            "AUTO_BOOTSTRAP": "1",
-            "PARALLEL_PLAN": "1",
-        })
-
-    if args.fast:
-        set_data({"FAST_MODE": "1", "PARALLEL_PLAN": "1"})
-
-    print(f"{ICO.GEAR} Config: {CONFIG_FILE}{C.N}")
-    print(f"{ICO.GEAR} Workspace: {CONFIG.WORKSPACE}{C.N}")
-
-    # Determine target
-    target = args.target or os.getenv("X19_TARGET") or ""
-
-    # First-run setup wizard: probe for any configured API key; if none found, walk the user through it.
-    cfg = load_config()
-    any_key = any(
-        os.getenv(info["api_key_env"]) or cfg.get(info["api_key_config"], "")
-        for pid, info in PROVIDERS.items() if info["needs_key"]
+    init_console(
+        no_color=bool(getattr(args, "no_color", False)),
+        plain=bool(getattr(args, "plain", False)),
+        json_mode=bool(getattr(args, "json", False)),
     )
-    explicit_provider = cfg.get("AI_PROVIDER", "")
-    ollama_available = bool(shutil.which("ollama"))
 
-    if not any_key and not explicit_provider and not ollama_available:
-        print(f"\n{C.BOLD}{C.Y}[!] No AI provider configured.{C.N}")
-        print(f"{C.Y}    X19 needs at least one API key to work.{C.N}")
-        print(f"{C.Y}    Let's set one up quickly.{C.N}\n")
+    if getattr(args, "help", False) and not getattr(args, "command", None):
+        print_help(parser)
+        return 0
+    if getattr(args, "version", False):
+        return cmd_version(args)
 
-        keys = sorted([p for p in PROVIDERS if PROVIDERS[p]["needs_key"] and p != "ollama"],
-                      key=lambda p: PROVIDERS[p]["name"])
-        print(f"{C.BOLD}Available Providers:{C.N}")
-        for i, pid in enumerate(keys, 1):
-            info = PROVIDERS[pid]
-            tag = f"{C.G}[FREE]{C.N}" if "free" in info.get("desc","").lower() else ""
-            key_hint = f" ({info['api_key_env']})"
-            print(f"  {C.G}[{i}]{C.N} {info['name']:20} {info['desc'][:50]} {tag}")
-        print(f"  {C.G}[0]{C.N} Skip (I'll configure later)")
+    command = getattr(args, "command", None)
+    if not command:
+        command = "workspace"
+        args.command = command
 
-        try:
-            choice = input(f"\n{C.B}[?] Select provider (0-{len(keys)}): {C.N}").strip()
-            idx = int(choice) - 1
-            if idx >= 0 and idx < len(keys):
-                pid = keys[idx]
-                info = PROVIDERS[pid]
-                print(f"\n{C.Y}[*] Selected: {info['name']}{C.N}")
-                print(f"{C.Y}[*] Get your API key from the provider's website{C.N}")
-                api_key = input(f"{C.B}[?] {info['name']} API key: {C.N}").strip()
-                if api_key:
-                    _save_key_for(pid, api_key)
-                    set_data({"AI_PROVIDER": pid, "AI_MODEL": info["default_model"]})
-                    print(f"{C.G}[+] {info['name']} configured!{C.N}")
-        except (ValueError, IndexError, EOFError):
-            print(f"{C.Y}[*] Skipping setup — run with --setup-groq or --setup-cerebras later.{C.N}")
+    handler = HANDLERS.get(command)
+    if handler is None:
+        parser.print_usage()
+        return 2
 
-    print(f"{ICO.BOLT} Initializing AI provider...{C.N}", flush=True)
-    ai = make_ai()
-    print(f"{ICO.OK} AI: {ai.name()}{C.N}", flush=True)
-    print(f"{ICO.GEAR} Loading agent...{C.N}", flush=True)
+    # A fresh install must be set up before it can do anything real.
+    gate = _enforce_first_run(command)
+    if gate is not None:
+        return int(gate)
 
-    # If fully configured via CLI, just run
-    if target:
-        agent = X19(ai=ai)
-        print(f"{ICO.OK} Agent ready{C.N}", flush=True)
-        _maybe_start_telegram(agent)
-        if is_bug_bounty_mode():
-            print(f"{ICO.BOLT} Bug bounty mode — hands-free autonomous run on: {target}{C.N}")
-        elif is_ctf_mode():
-            print(f"{ICO.FLAG} CTF mode — flag hunting on: {target}{C.N}")
-        else:
-            print(f"{ICO.BOLT} Auto-running assessment on: {target}{C.N}")
-        agent.autonomous_loop(target)
-        if agent.session.data.get("status") == "failed":
-            print(f"\n{ICO.FAIL} Assessment failed — see status above. {len(agent.findings())} findings.{C.N}")
-        else:
-            print(f"\n{ICO.OK} Assessment complete. {len(agent.findings())} findings.{C.N}")
-        print(f"{ICO.NODE} Report: {agent.session.report()[:1000]}{C.N}")
-        return
-
-    # Start Telegram if configured
-    agent = X19(ai=ai)
-    print(f"{ICO.OK} Agent ready{C.N}", flush=True)
-    _maybe_start_telegram(agent)
-
-    # --interactive flag goes to old fixed-command console
-    if args.interactive:
-        interactive(agent)
-        print(f"{ICO.NODE} Sessions: {CONFIG.SESSIONS_DIR}{C.N}")
-        return
-
-    # Default: AI chat loop
-    chat_loop(agent)
-    print(f"{ICO.NODE} Sessions: {CONFIG.SESSIONS_DIR}{C.N}")
+    try:
+        return int(handler(args) or 0)
+    except KeyboardInterrupt:
+        get_console().print("\n[app.warn]![/] interrupted")
+        return 130
+    except SystemExit as exc:
+        code = exc.code
+        if isinstance(code, str):
+            get_console().print(f"[app.err]✖ {code}[/]")
+            return 1
+        return int(code or 0)

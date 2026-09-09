@@ -86,3 +86,18 @@ from planning import (
 from agent import X19
 from cli import main, _extract_longcat_commands, _extract_exec_commands, _parse_target_from_user_line, _android_device_id
 from config import CONFIG, CONFIG_DIR, CONFIG_FILE, load_config, save_config, set_data, SCRIPTS_DIR, PAYLOADS_DIR, WORDLISTS_DIR
+
+# Version metadata — single source of truth lives in version.py.
+from version import (
+    __version__, VERSION, APP_NAME, RELEASE_NAME, SCHEMA_VERSION,
+    version_info, version_line,
+)
+from cli import COMMANDS, HANDLERS, build_parser, normalize_argv
+from cli_support import (
+    run_diagnostics, toolchain_rows, toolchain_coverage,
+    list_sessions, load_session, latest_session, session_findings,
+    usable_providers, resolve_provider, provider_configured,
+    ensure_provider_configured,
+)
+
+__all__ = [n for n in dir() if not n.startswith("_") or n in ("__version__",)]
