@@ -32,6 +32,7 @@ class X19Upgrader:
         "tools.py",
         "config.py",
         "constants.py",
+        "engagement.py",
         "loop.py",
         "mission.py",
         "memory.py",

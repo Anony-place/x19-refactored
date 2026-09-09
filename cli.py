@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from typing import Any, Dict, List, Optional
 
 from windows_bootstrap import apply_windows_utf8_bootstrap
@@ -42,7 +43,7 @@ except ImportError:
 
 COMMANDS = (
     "run", "dash", "chat", "report", "findings", "sessions",
-    "providers", "config", "doctor", "tools", "debug", "setup",
+    "engagement", "providers", "config", "doctor", "tools", "debug", "setup",
     "upgrade", "version", "completion",
 )
 
@@ -331,7 +332,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-k", "--api-key", type=str, default="", help="API key for the provider")
     p.add_argument("-d", "--set-data", type=str, default="", help="pre-configure with a JSON object")
     p.add_argument("--max-iterations", type=int, default=0, help="stop after N decision iterations")
-    p.add_argument("--swarm", action="store_true", help="use the parallel swarm pipeline + live dashboard")
+    p.add_argument("--swarm", action="store_true", help="use the swarm workflow + live dashboard")
+    p.add_argument("--engagement", type=str, default="", help="engagement profile name (x19 engagement list)")
+    p.add_argument("--max-cycles", type=int, default=3, help="max coordinate/attack/validate cycles")
     p.add_argument("-i", "--interactive", action="store_true", help="legacy fixed-command console")
     p.add_argument("--browser", type=str, default="", choices=["render", "forms", "screenshot"],
                    help="run one headless-browser action and exit")
@@ -347,6 +350,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-tui", action="store_true", help="stream frames instead of full-screen")
     p.add_argument("--timeout", type=float, default=0, help="stop after N seconds")
     p.add_argument("--no-start", action="store_true", help="attach without launching the pipeline")
+    p.add_argument("--engagement", type=str, default="", help="engagement profile name (x19 engagement list)")
+    p.add_argument("--max-cycles", type=int, default=3, help="max coordinate/attack/validate cycles")
+    p.add_argument("--legacy", action="store_true", help="use the fixed 5-stage pipeline instead of the workflow")
 
     # -- chat ------------------------------------------------------------
     p = sub.add_parser("chat", parents=[common], help="interactive AI assistant (default command)")
@@ -390,14 +396,43 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("tools", parents=[common], help="toolchain availability")
     p.add_argument("--missing", action="store_true", help="only list binaries that are absent")
 
+    # -- engagement -------------------------------------------------------
+    p = sub.add_parser("engagement", parents=[common],
+                       help="manage engagement profiles (scope, guidance, budget)")
+    p.add_argument("action", nargs="?", default="list",
+                   choices=["list", "show", "new", "rm", "path", "wizard"],
+                   help="what to do")
+    p.add_argument("name", nargs="?", default="", help="profile name")
+    p.add_argument("-t", "--target", type=str, default="", help="primary target for 'new'")
+    p.add_argument("--scope", type=str, default="", help="comma-separated in-scope hosts")
+    p.add_argument("--out-of-scope", type=str, default="", help="comma-separated excluded hosts")
+    p.add_argument("--target-type", type=str, default="authorized",
+                   choices=["auto", "public_real_world", "authorized", "ctf", "lab"])
+    p.add_argument("--focus", type=str, default="", help="comma-separated priority areas")
+    p.add_argument("--vuln-classes", type=str, default="", help="comma-separated vuln classes")
+    p.add_argument("--spec", action="append", default=[], help="API spec / route file (repeatable)")
+    p.add_argument("--endpoint", action="append", default=[], help="declared endpoint (repeatable)")
+    p.add_argument("--canary", action="append", default=[], help="validation canary value (repeatable)")
+    p.add_argument("--weakness", action="append", default=[], help="known weakness hint (repeatable)")
+    p.add_argument("--rules", type=str, default="", help="rules of engagement, free text")
+    p.add_argument("--destructive", action="store_true", help="allow destructive testing")
+    p.add_argument("--min-severity", type=str, default="low",
+                   choices=["critical", "high", "medium", "low", "info"])
+    p.add_argument("--max-seconds", type=int, default=1800, help="budget: wall-clock ceiling")
+    p.add_argument("--max-commands", type=int, default=500, help="budget: command ceiling")
+    p.add_argument("--max-llm-calls", type=int, default=200, help="budget: LLM call ceiling")
+
     # -- debug -----------------------------------------------------------
     p = sub.add_parser("debug", parents=[common], help="source-code diagnostics and auto-fix")
     p.add_argument("action", nargs="?", default="scan", choices=["scan", "fix", "check", "stats"],
                    help="scan (read-only), fix, check or stats")
 
     # -- setup -----------------------------------------------------------
-    p = sub.add_parser("setup", parents=[common], help="first-run AI provider configuration")
+    p = sub.add_parser("setup", parents=[common], help="guided setup: app, engagement, or both")
+    p.add_argument("what", nargs="?", default="all", choices=["all", "app", "engagement"],
+                   help="app = AI provider chain, engagement = target profile, all = both")
     p.add_argument("--force", action="store_true", help="re-run even when already configured")
+    p.add_argument("-t", "--target", type=str, default="", help="target for the engagement wizard")
 
     # -- upgrade ---------------------------------------------------------
     sub.add_parser("upgrade", parents=[common], help="autonomous self-upgrade pipeline")
@@ -798,14 +833,17 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 def cmd_dash(args: argparse.Namespace) -> int:
     from brain.coordinator import SwarmCoordinator
-    from ui.console import get_console, is_plain_mode, warn
+    from ui import widgets
+    from ui.console import emit_json, get_console, info, is_plain_mode, warn
     from ui.dashboard import MissionDashboard
+    from ui.screens import decision_table, workflow_panel
 
     target = getattr(args, "target", "") or os.getenv("X19_TARGET", "")
     if not target:
         warn("target required — x19 dash -t <host>")
         return 1
 
+    profile = _resolve_engagement(args)
     coordinator = SwarmCoordinator()
     dashboard = MissionDashboard(
         coordinator,
@@ -813,17 +851,306 @@ def cmd_dash(args: argparse.Namespace) -> int:
         refresh=float(getattr(args, "refresh", 0.5) or 0.5),
         console=get_console(),
     )
-    dashboard.run(
-        target=target,
-        once=bool(getattr(args, "once", False)),
-        headless=True if (getattr(args, "no_tui", False) or is_plain_mode()) else None,
-        start=not getattr(args, "no_start", False),
-        timeout=float(getattr(args, "timeout", 0) or 0) or None,
-    )
-    ran = not getattr(args, "no_start", False) and not getattr(args, "once", False)
-    if ran and not getattr(args, "json", False):
+
+    legacy = bool(getattr(args, "legacy", False))
+    no_start = bool(getattr(args, "no_start", False))
+    holder: Dict[str, Any] = {}
+
+    if legacy:
+        dashboard.run(
+            target=target,
+            once=bool(getattr(args, "once", False)),
+            headless=True if (getattr(args, "no_tui", False) or is_plain_mode()) else None,
+            start=not no_start,
+            timeout=float(getattr(args, "timeout", 0) or 0) or None,
+        )
+    else:
+        if profile is not None:
+            coordinator.apply_profile(profile)
+        if not no_start:
+            # The workflow is synchronous by design; the dashboard needs it off
+            # this thread so the live view can render while it runs.
+            def _work() -> None:
+                try:
+                    holder["run"] = coordinator.run_workflow(
+                        profile,
+                        target=target,
+                        max_cycles=int(getattr(args, "max_cycles", 3) or 3),
+                    )
+                except Exception as exc:  # surfaced after the view closes
+                    holder["error"] = exc
+
+            worker = threading.Thread(target=_work, daemon=True, name="X19-Workflow")
+            worker.start()
+            deadline = time.time() + 3.0
+            while not coordinator.is_running and time.time() < deadline:
+                if "error" in holder:
+                    break
+                time.sleep(0.05)
+            info(f"workflow started — profile {profile.name if profile else 'ad-hoc'}, "
+                 f"type {getattr(profile, 'target_type', 'auto')}")
+
+        dashboard.run(
+            target=target,
+            once=bool(getattr(args, "once", False)),
+            headless=True if (getattr(args, "no_tui", False) or is_plain_mode()) else None,
+            start=False,
+            timeout=float(getattr(args, "timeout", 0) or 0) or None,
+        )
+
+    ran = not no_start and not getattr(args, "once", False)
+    summary = coordinator.get_workflow_summary()
+
+    if getattr(args, "json", False):
+        payload = {"summary": dashboard.refresh_state(), "workflow": summary}
+        if "error" in holder:
+            payload["error"] = f"{type(holder['error']).__name__}: {holder['error']}"
+        emit_json(payload)
+        return 0
+
+    if ran:
         get_console().print(dashboard.report())
+        if summary.get("active"):
+            get_console().print(workflow_panel(summary))
+            run = summary.get("run") or {}
+            get_console().print(widgets.panel(
+                f"coordinator decisions · stopped: {run.get('stopped_reason', 'n/a')}",
+                decision_table(run.get("decisions") or []),
+            ))
+    if "error" in holder:
+        warn(f"workflow error: {type(holder['error']).__name__}: {holder['error']}")
+        return 1
     return 0
+
+
+def _split_list(value: str) -> List[str]:
+    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
+def _profile_from_args(args: argparse.Namespace):
+    """Build an EngagementProfile from `x19 engagement new` flags."""
+    import engagement as eng
+
+    name = getattr(args, "name", "") or ""
+    target = getattr(args, "target", "") or ""
+    if not name:
+        raise SystemExit("profile name required — x19 engagement new <name> -t <target>")
+    eng.validate_name(name)
+
+    scope = _split_list(getattr(args, "scope", ""))
+    if target and target not in scope:
+        scope.insert(0, target)
+
+    profile = eng.EngagementProfile(
+        name=name,
+        target=target,
+        targets=scope or ([target] if target else []),
+        target_type=getattr(args, "target_type", "authorized"),
+        rules_of_engagement=getattr(args, "rules", "") or "",
+        out_of_scope=_split_list(getattr(args, "out_of_scope", "")),
+        attack_surface=eng.AttackSurface(
+            api_specs=list(getattr(args, "spec", []) or []),
+            endpoints=list(getattr(args, "endpoint", []) or []),
+        ),
+        priorities=eng.Priorities(
+            focus=_split_list(getattr(args, "focus", "")),
+            vuln_classes=_split_list(getattr(args, "vuln_classes", "")),
+        ),
+        strategy=eng.AttackStrategy(
+            known_weaknesses=list(getattr(args, "weakness", []) or []),
+            allow_destructive=bool(getattr(args, "destructive", False)),
+        ),
+        validation=eng.Validation(
+            canaries=[{"label": f"canary-{i + 1}", "value": value, "kind": "generic"}
+                      for i, value in enumerate(getattr(args, "canary", []) or [])],
+            require_poc=True,
+            min_severity=getattr(args, "min_severity", "low"),
+        ),
+        budget=eng.MissionBudget(
+            max_seconds=int(getattr(args, "max_seconds", 1800) or 0),
+            max_commands=int(getattr(args, "max_commands", 500) or 0),
+            max_llm_calls=int(getattr(args, "max_llm_calls", 200) or 0),
+        ),
+    )
+    return profile
+
+
+def cmd_engagement(args: argparse.Namespace) -> int:
+    import engagement as eng
+    from ui.console import emit_json, get_console, ok, warn
+    from ui.screens import engagement_detail_screen, engagement_list_screen
+
+    action = getattr(args, "action", "list")
+
+    if action == "path":
+        path = str(eng.engagements_dir())
+        if getattr(args, "json", False):
+            emit_json({"directory": path})
+        else:
+            get_console().print(path)
+        return 0
+
+    if action == "new":
+        profile = _profile_from_args(args)
+        problems = eng.validate_profile(profile)
+        profile.save()
+        if getattr(args, "json", False):
+            emit_json({"saved": str(eng.profile_path(profile.name)), "problems": problems})
+            return 0
+        ok(f"profile saved: {eng.profile_path(profile.name)}")
+        get_console().print(engagement_detail_screen(profile, problems=problems))
+        for problem in problems:
+            warn(problem)
+        return 0
+
+    if action == "rm":
+        name = getattr(args, "name", "")
+        if not name:
+            warn("usage: x19 engagement rm <name>")
+            return 1
+        if eng.delete_profile(name):
+            ok(f"removed profile {name}")
+            return 0
+        warn(f"no such profile: {name}")
+        return 1
+
+    if action == "wizard":
+        profile = engagement_wizard(target=getattr(args, "target", ""))
+        if profile is None:
+            return 1
+        if getattr(args, "json", False):
+            emit_json(profile.to_dict())
+            return 0
+        get_console().print(engagement_detail_screen(profile, problems=eng.validate_profile(profile)))
+        return 0
+
+    if action == "show":
+        name = getattr(args, "name", "")
+        profile = eng.load_profile(name) if name else None
+        if profile is None:
+            warn(f"no such profile: {name or '(none given)'}")
+            return 1
+        if getattr(args, "json", False):
+            emit_json(eng.redact(profile.to_dict()))
+            return 0
+        get_console().print(engagement_detail_screen(profile, problems=eng.validate_profile(profile)))
+        return 0
+
+    rows = eng.list_profiles()
+    if getattr(args, "json", False):
+        emit_json(rows)
+        return 0
+    get_console().print(engagement_list_screen(rows, directory=str(eng.engagements_dir())))
+    get_console().print("[app.dim]create one with: x19 engagement new <name> -t <target> --target-type authorized[/]")
+    return 0
+
+
+def engagement_wizard(target: str = "") -> Any:
+    """Guided engagement setup — the four XBOW guidance cards, one question at a time."""
+    import engagement as eng
+    from rich.prompt import Confirm, Prompt
+
+    from ui.console import get_console, info, ok, rule, warn
+
+    console = get_console()
+    rule("[panel.title]engagement setup[/]")
+    info("Answers are stored as a reusable profile; nothing is attacked during setup.")
+
+    name = Prompt.ask("profile name", console=console, default="default").strip().lower()
+    try:
+        eng.validate_name(name)
+    except ValueError as exc:
+        warn(str(exc))
+        return None
+
+    target = (target or Prompt.ask("primary target", console=console)).strip()
+    if not target:
+        warn("a target is required — nothing would be in scope")
+        return None
+
+    scope = Prompt.ask("additional in-scope hosts (comma separated)", console=console, default="").strip()
+    out = Prompt.ask("out-of-scope hosts (comma separated)", console=console, default="").strip()
+    target_type = Prompt.ask(
+        "engagement type", console=console, default="authorized",
+        choices=["public_real_world", "authorized", "ctf", "lab"],
+    )
+
+    info("card 1 · attack surface")
+    specs = Prompt.ask("API spec / route files (comma separated paths)", console=console, default="").strip()
+    endpoints = Prompt.ask("declared endpoints (comma separated)", console=console, default="").strip()
+
+    info("card 2 · priorities")
+    focus = Prompt.ask("focus areas (comma separated)", console=console, default="").strip()
+    vuln_classes = Prompt.ask("vulnerability classes (comma separated)", console=console, default="").strip()
+
+    info("card 3 · attack strategy")
+    weaknesses = Prompt.ask("known weaknesses (comma separated)", console=console, default="").strip()
+    destructive = Confirm.ask("allow destructive testing?", console=console, default=False)
+    if destructive and target_type == "public_real_world":
+        warn("destructive testing refused: target_type is public_real_world")
+        destructive = False
+
+    info("card 4 · validation")
+    canaries = Prompt.ask("canary values (comma separated)", console=console, default="").strip()
+    min_severity = Prompt.ask("minimum reportable severity", console=console, default="low",
+                              choices=list(eng.SEVERITIES))
+
+    info("budget")
+    max_seconds = int(Prompt.ask("max seconds", console=console, default="1800") or 0)
+    max_commands = int(Prompt.ask("max commands", console=console, default="500") or 0)
+
+    targets = [target] + [h.strip() for h in scope.split(",") if h.strip()]
+    profile = eng.EngagementProfile(
+        name=name,
+        target=target,
+        targets=targets,
+        target_type=target_type,
+        out_of_scope=[h.strip() for h in out.split(",") if h.strip()],
+        attack_surface=eng.AttackSurface(
+            api_specs=[x.strip() for x in specs.split(",") if x.strip()],
+            endpoints=[x.strip() for x in endpoints.split(",") if x.strip()],
+        ),
+        priorities=eng.Priorities(
+            focus=[x.strip() for x in focus.split(",") if x.strip()],
+            vuln_classes=[x.strip() for x in vuln_classes.split(",") if x.strip()],
+        ),
+        strategy=eng.AttackStrategy(
+            known_weaknesses=[x.strip() for x in weaknesses.split(",") if x.strip()],
+            allow_destructive=destructive,
+        ),
+        validation=eng.Validation(
+            canaries=[{"label": f"canary-{i + 1}", "value": value.strip(), "kind": "generic"}
+                      for i, value in enumerate(canaries.split(",")) if value.strip()],
+            require_poc=True,
+            min_severity=min_severity,
+        ),
+        budget=eng.MissionBudget(max_seconds=max_seconds, max_commands=max_commands),
+    )
+    path = profile.save()
+    ok(f"profile saved: {path}")
+    for problem in eng.validate_profile(profile):
+        warn(problem)
+    return profile
+
+
+def _resolve_engagement(args: argparse.Namespace):
+    """Load `--engagement <name>`, or synthesise a conservative ad-hoc profile."""
+    import engagement as eng
+    from ui.console import warn
+
+    name = getattr(args, "engagement", "") or ""
+    if name:
+        profile = eng.load_profile(name)
+        if profile is None:
+            raise SystemExit(f"no such engagement profile: {name} — see: x19 engagement list")
+        return profile
+    target = getattr(args, "target", "") or ""
+    if not target:
+        return None
+    profile = eng.ad_hoc_profile(target, target_type=getattr(args, "target_type", "auto") or "auto")
+    warn("no --engagement profile given — running with a conservative ad-hoc profile "
+         "(non-destructive, PoC required)")
+    return profile
 
 
 def cmd_debug(args: argparse.Namespace) -> int:
@@ -891,13 +1218,26 @@ def cmd_completion(args: argparse.Namespace) -> int:
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
-    from provider_setup import setup_if_needed
-    from ui.console import ok, warn
+    from ui.console import info, ok, rule, warn
 
-    if not setup_if_needed(force=bool(getattr(args, "force", False))):
-        warn("setup cancelled — no working provider saved")
-        return 1
-    ok("provider chain saved")
+    what = getattr(args, "what", "all")
+
+    if what in ("all", "app"):
+        from provider_setup import setup_if_needed
+
+        if not setup_if_needed(force=bool(getattr(args, "force", False))):
+            warn("app setup cancelled — no working provider saved")
+            if what == "app":
+                return 1
+        else:
+            ok("provider chain saved")
+
+    if what in ("all", "engagement"):
+        rule("[panel.title]engagement setup[/]")
+        profile = engagement_wizard(target=getattr(args, "target", ""))
+        if profile is None:
+            return 1
+        info(f"run it with: x19 dash -t {profile.target} --engagement {profile.name}")
     return 0
 
 
@@ -1064,6 +1404,7 @@ HANDLERS = {
     "config": cmd_config,
     "doctor": cmd_doctor,
     "tools": cmd_tools,
+    "engagement": cmd_engagement,
     "debug": cmd_debug,
     "setup": cmd_setup,
     "upgrade": cmd_upgrade,
@@ -1082,9 +1423,10 @@ HELP_COMMANDS = [
     {"name": "report", "help": "export markdown / html / json / text reports", "group": "assessment"},
     {"name": "chat", "help": "interactive AI assistant (default when no command is given)", "group": "interactive"},
     {"name": "sessions", "help": "list or inspect stored assessment sessions", "group": "interactive"},
+    {"name": "engagement", "help": "engagement profiles: scope, guidance cards, canaries, budget", "group": "configuration"},
     {"name": "providers", "help": "list providers, set the primary, test connectivity", "group": "configuration"},
     {"name": "config", "help": "show, get, set, unset or reset configuration", "group": "configuration"},
-    {"name": "setup", "help": "first-run AI provider wizard", "group": "configuration"},
+    {"name": "setup", "help": "guided setup: app (AI providers) and/or engagement (target profile)", "group": "configuration"},
     {"name": "doctor", "help": "health check, dependencies, toolchain, self diagnostics", "group": "operations"},
     {"name": "tools", "help": "toolchain availability", "group": "operations"},
     {"name": "debug", "help": "source-code diagnostics: scan / fix / check / stats", "group": "operations"},

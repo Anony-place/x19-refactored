@@ -268,3 +268,231 @@ def env_screen(info: Dict[str, Any]) -> Any:
             ]
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Engagements
+# ---------------------------------------------------------------------------
+def engagement_list_screen(rows: Sequence[Dict[str, Any]], *, directory: str = "") -> Any:
+    table = Table(expand=True, title="[panel.title]engagement profiles[/]", title_justify="left")
+    table.add_column("profile", style="bold bright_cyan", no_wrap=True)
+    table.add_column("target", style="bright_white", ratio=2)
+    table.add_column("type", width=16)
+    table.add_column("hosts", width=6, justify="right")
+    table.add_column("context", ratio=2)
+    table.add_column("updated", style="grey62", width=19)
+    for row in rows:
+        flags = []
+        if row.get("has_canaries"):
+            flags.append("canaries")
+        if row.get("has_credentials"):
+            flags.append("creds")
+        table.add_row(
+            str(row.get("name", "?")),
+            widgets.truncate(row.get("target", ""), 30),
+            Text(str(row.get("target_type", "auto")), style="bold yellow"),
+            str(row.get("targets", 0)),
+            widgets.truncate(", ".join(flags) or "—", 24),
+            widgets.truncate(row.get("updated_at", ""), 19),
+        )
+    if not rows:
+        table.add_row("[app.dim]—[/]", "[app.dim]no profiles — run: x19 setup engagement[/]", "", "", "", "")
+    body = table
+    if directory:
+        body = Group(table, Text(directory, style="app.dim"))
+    return body
+
+
+def engagement_detail_screen(profile: Any, *, problems: Sequence[str] = ()) -> Any:
+    """Render an engagement profile as the four XBOW guidance cards + budget."""
+    surface = profile.attack_surface
+    head = widgets.panel(
+        f"engagement · {profile.name}",
+        widgets.kv_table(
+            [
+                ("target", profile.target or "—"),
+                ("in scope", ", ".join(profile.scope_allowlist()) or "—"),
+                ("out of scope", ", ".join(profile.out_of_scope) or "—"),
+                ("type", profile.target_type),
+                ("rules", profile.rules_of_engagement or "—"),
+                ("updated", profile.updated_at),
+            ]
+        ),
+    )
+
+    cards = Group(
+        widgets.panel(
+            "1 · attack surface",
+            widgets.kv_table(
+                [
+                    ("api specs", len(surface.api_specs)),
+                    ("docs", len(surface.docs)),
+                    ("endpoints", len(surface.endpoints)),
+                    ("source files", len(surface.source_files)),
+                    ("credentials", len(surface.credentials)),
+                    ("limit to listed", "yes" if surface.limit_to_listed else "no"),
+                ]
+            ),
+        ),
+        widgets.panel(
+            "2 · priorities",
+            widgets.kv_table(
+                [
+                    ("focus", ", ".join(profile.priorities.focus) or "—"),
+                    ("deprioritize", ", ".join(profile.priorities.deprioritize) or "—"),
+                    ("vuln classes", ", ".join(profile.priorities.vuln_classes) or "—"),
+                    ("max findings", profile.priorities.max_findings or "unlimited"),
+                ]
+            ),
+        ),
+        widgets.panel(
+            "3 · attack strategy",
+            widgets.kv_table(
+                [
+                    ("payload formats", ", ".join(profile.strategy.payload_formats) or "—"),
+                    ("known weaknesses", ", ".join(profile.strategy.known_weaknesses) or "—"),
+                    ("destructive", "ALLOWED" if profile.strategy.allow_destructive else "forbidden"),
+                    ("notes", profile.strategy.notes or "—"),
+                ]
+            ),
+        ),
+        widgets.panel(
+            "4 · validation",
+            widgets.kv_table(
+                [
+                    ("require poc", "yes" if profile.validation.require_poc else "no"),
+                    ("min severity", profile.validation.min_severity),
+                    ("canaries", len(profile.validation.canaries)),
+                ]
+            ),
+        ),
+    )
+
+    budget = widgets.panel(
+        "budget & guardrails",
+        widgets.kv_table(
+            [
+                ("max seconds", profile.budget.max_seconds),
+                ("max commands", profile.budget.max_commands),
+                ("max llm calls", profile.budget.max_llm_calls),
+                ("early stop stalls", profile.budget.early_stop_stalls),
+                ("checkpoints", ", ".join(f"{c}%" for c in profile.budget.checkpoints)),
+                ("hard stops", "on" if profile.guardrails.hard_stop_enabled else "off"),
+                ("max parallel agents", profile.guardrails.max_parallel_agents),
+            ]
+        ),
+    )
+
+    parts: List[Any] = [head, cards, budget]
+    if problems:
+        rows = Table.grid(padding=(0, 2))
+        rows.add_column(style="bold yellow", no_wrap=True)
+        rows.add_column(style="grey74")
+        for problem in problems:
+            rows.add_row("!", widgets.truncate(problem, 96))
+        parts.append(widgets.panel("validation warnings", rows, border_style="yellow"))
+    return Group(*parts)
+
+
+# ---------------------------------------------------------------------------
+# Workflow (hybrid orchestration state)
+# ---------------------------------------------------------------------------
+PHASE_STYLE = {
+    "pending": ("grey50", "·"),
+    "active": ("bold bright_cyan", "▶"),
+    "done": ("bold bright_green", "✔"),
+    "skipped": ("grey46", "↷"),
+}
+
+CONFIDENCE_STYLE = {
+    "exploit": "bold bright_red",
+    "test_hypothesis": "bold yellow",
+    "pivot": "cyan",
+    "deploy_swarm": "bold magenta",
+}
+
+
+def workflow_panel(summary: Dict[str, Any]) -> Any:
+    """Plan phases + confidence decision + budget burn for the dashboard."""
+    plan = summary.get("plan") or {}
+    phases = plan.get("phases") or []
+
+    table = Table.grid(padding=(0, 2))
+    table.add_column(width=2, no_wrap=True)
+    table.add_column(width=12, no_wrap=True)
+    table.add_column(ratio=1)
+    for phase in phases:
+        status = str(phase.get("status", "pending"))
+        style, glyph = PHASE_STYLE.get(status, PHASE_STYLE["pending"])
+        notes = phase.get("notes") or []
+        table.add_row(
+            Text(glyph, style=style),
+            Text(str(phase.get("stage", "")), style=style),
+            Text(widgets.truncate(notes[-1] if notes else phase.get("goal", ""), 70), style="grey66"),
+        )
+    if not phases:
+        table.add_row("", Text("no plan", style="app.dim"), "")
+    plan_panel = widgets.panel(
+        "mission plan",
+        table,
+        subtitle=f"{plan.get('pct_complete', 0)}% complete",
+    )
+
+    decision = summary.get("last_decision") or {}
+    action = str(decision.get("action", "") or "—")
+    confidence = summary.get("confidence", 0.0)
+    budget = summary.get("budget") or {}
+    guardrails = summary.get("guardrails") or {}
+    agents = summary.get("agents") or {}
+    events = guardrails.get("events") or []
+
+    state = widgets.panel(
+        "coordinator",
+        widgets.kv_table(
+            [
+                ("profile", summary.get("profile") or "—"),
+                ("engagement type", summary.get("target_type") or "—"),
+                ("confidence", f"{float(confidence):.2f}"),
+                ("decision", action.replace("_", " ")),
+                ("goal", widgets.truncate(decision.get("goal", "—"), 60)),
+                ("budget used", f"{budget.get('pct_used', 0)}%"),
+                ("cycles", budget.get("cycles", 0)),
+                ("commands", f"{budget.get('commands', 0)} / {budget.get('limits', {}).get('max_commands', '∞')}"),
+                ("agents live", f"{agents.get('active', 0)} / {agents.get('max_parallel', 0)}"),
+                ("agents retired", len(agents.get("retired") or [])),
+                ("guardrail events", len(events)),
+            ]
+        ),
+    )
+
+    event_rows: List[Text] = []
+    for event in events[-6:]:
+        line = Text()
+        level = str(event.get("level", ""))
+        line.append(f"{level.upper():<5} ", style="bold yellow" if level == "warn" else "bold red")
+        line.append(f"{str(event.get('guardrail', '')):<24} ", style="grey62")
+        line.append(widgets.truncate(event.get("reason", ""), 60), style="grey74")
+        event_rows.append(line)
+    if not event_rows:
+        event_rows.append(Text("no guardrail events", style="app.dim"))
+
+    return Group(plan_panel, state, widgets.panel("guardrails", Group(*event_rows)))
+
+
+def decision_table(decisions: Sequence[Dict[str, Any]]) -> Table:
+    table = Table(expand=True, box=None, pad_edge=False)
+    table.add_column("cycle", width=6, justify="right", style="grey50")
+    table.add_column("confidence", width=11, justify="right")
+    table.add_column("action", width=16)
+    table.add_column("goal", ratio=1)
+    for decision in decisions:
+        action = str(decision.get("action", ""))
+        table.add_row(
+            str(decision.get("cycle", "")),
+            Text(f"{float(decision.get('confidence', 0)):.2f}", style="bold bright_white"),
+            Text(action.replace("_", " "), style=CONFIDENCE_STYLE.get(action, "grey74")),
+            widgets.truncate(decision.get("goal", ""), 60),
+        )
+    if not decisions:
+        table.add_row("", "", "", "[app.dim]no coordinator decisions yet[/]")
+    return table
