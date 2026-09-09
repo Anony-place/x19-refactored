@@ -53,6 +53,10 @@ class CommandGateway:
         timeout: int = 120,
         reason: str = "",
         risk: str = "normal",
+        hypothesis_id: str = "",
+        hypothesis: str = "",
+        expected_evidence: str = "",
+        evidence_required: bool = False,
     ) -> CommandResult:
         request = CommandRequest.from_shell(
             command,
@@ -60,6 +64,10 @@ class CommandGateway:
             timeout=timeout,
             reason=reason,
             risk=risk,
+            hypothesis_id=hypothesis_id,
+            hypothesis=hypothesis,
+            expected_evidence=expected_evidence,
+            evidence_required=evidence_required,
         )
         return self.run(request)
 

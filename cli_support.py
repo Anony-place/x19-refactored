@@ -366,14 +366,24 @@ def usable_providers() -> List[str]:
 
     ``ollama`` only counts when the binary is on PATH — otherwise it would make
     every install look configured and the first-run wizard would never run.
+    ``custom_openai`` counts only when an endpoint has been named, for the same
+    reason.
     """
+    from config import load_config
     from constants import PROVIDERS, _provider_has_key
 
     ollama_available = shutil.which("ollama") is not None
+    custom_endpoint = bool(
+        os.getenv("X19_AI_BASE_URL", "").strip()
+        or load_config().get("X19_AI_BASE_URL", "")
+    )
     usable = []
     for pid, info in PROVIDERS.items():
         if pid == "ollama":
             if ollama_available:
+                usable.append(pid)
+        elif pid == "custom_openai":
+            if custom_endpoint:
                 usable.append(pid)
         elif _provider_has_key(pid):
             usable.append(pid)

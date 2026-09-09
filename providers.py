@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Any
 from collections import Counter
+from urllib.parse import urlparse
 
 from constants import C, ICO, PROVIDERS, PROVIDER_PRIORITY, _provider_has_key, _failover_disabled
 from config import CONFIG, CONFIG_DIR, load_config, save_config
@@ -170,6 +171,23 @@ class OpenAICompatBackend(AIBackend):
         self.base = info["base_url"].rstrip("/")
         if provider == "dashscope":
             self.base = os.getenv("DASHSCOPE_BASE_URL", self.base).rstrip("/")
+        if provider == "custom_openai":
+            # The whole point of custom_openai is the endpoint; an unset or
+            # malformed override must not silently degrade into a real cloud call.
+            override = os.getenv("X19_AI_BASE_URL", "").strip() or str(
+                load_config().get("X19_AI_BASE_URL", "")
+            ).strip()
+            parsed = urlparse(override)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                raise RuntimeError(
+                    "custom_openai requires X19_AI_BASE_URL to be a full http(s) "
+                    f"endpoint, got {override!r} (e.g. http://127.0.0.1:11434/v1)"
+                )
+            self.base = override.rstrip("/")
+            if not api_key:
+                # Local servers ignore the key; some require a non-empty bearer.
+                api_key = "x19-local"
+
         self.model = model or CONFIG.AI_MODEL or info["default_model"]
         self.api_key = api_key
         self.session = requests.Session()
@@ -978,6 +996,8 @@ def make_ai(provider_id: str = "") -> AIBackend:
     else:
         if fmt == "ollama":
             backend = OllamaBackend(provider_id, model)
+        elif fmt == "openai":
+            backend = OpenAICompatBackend(provider_id, key, model)
 
     if not backend:
         print(f"{C.R}[!] Unknown provider format: {fmt}{C.N}")
@@ -985,7 +1005,7 @@ def make_ai(provider_id: str = "") -> AIBackend:
 
     # Wrap in FailoverRouter for cross-provider auto-shift (free models, skip Ollama).
     # Set X19_DISABLE_FAILOVER=1 to disable and use the raw primary backend.
-    if not _failover_disabled() and provider_id != "ollama":
+    if not _failover_disabled() and provider_id not in ("ollama", "custom_openai"):
         # Stash the original provider_id on the backend so the router knows where to start
         if not hasattr(backend, "provider"):
             try:

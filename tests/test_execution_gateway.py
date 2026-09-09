@@ -109,5 +109,99 @@ class CommandGatewayTests(unittest.TestCase):
             CONFIG.SCOPE_ALLOWLIST = old_allowlist
 
 
+class ReasoningMappingPolicyTests(unittest.TestCase):
+    """TODO §5: the policy layer must verify hypothesis ↔ evidence ↔ command
+    before a request reaches execution, instead of only checking scope."""
+
+    def test_evidence_claim_without_any_grounding_is_blocked(self):
+        policy = ExecutionPolicy(allowed_targets={"127.0.0.1"})
+        request = CommandRequest.from_shell(
+            "curl -s http://127.0.0.1/.env",
+            target="127.0.0.1",
+            evidence_required=True,
+        )
+        verdict = PolicyEngine(policy).evaluate(request)
+
+        self.assertFalse(verdict.allowed)
+        self.assertEqual(verdict.rule, "evidence_claim")
+
+    def test_expected_evidence_without_hypothesis_is_blocked(self):
+        policy = ExecutionPolicy(allowed_targets={"127.0.0.1"})
+        request = CommandRequest.from_shell(
+            "curl -s http://127.0.0.1/.env",
+            target="127.0.0.1",
+            expected_evidence="AWS_ACCESS_KEY_ID present in body",
+        )
+        verdict = PolicyEngine(policy).evaluate(request)
+
+        self.assertFalse(verdict.allowed)
+        self.assertEqual(verdict.rule, "evidence_claim")
+
+    def test_full_mapping_is_allowed(self):
+        policy = ExecutionPolicy(allowed_targets={"127.0.0.1"})
+        request = CommandRequest.from_shell(
+            "curl -s http://127.0.0.1/.env",
+            target="127.0.0.1",
+            hypothesis_id="h-1",
+            hypothesis="Dotenv file is served by the web root",
+            expected_evidence="AWS_ACCESS_KEY_ID present in body",
+            evidence_required=True,
+        )
+        verdict = PolicyEngine(policy).evaluate(request)
+
+        self.assertTrue(verdict.allowed)
+
+    def test_blanket_requirement_blocks_unjustified_targeted_command(self):
+        policy = ExecutionPolicy(
+            allowed_targets={"127.0.0.1"}, require_hypothesis_mapping=True
+        )
+        request = CommandRequest.from_shell(
+            "nmap -sV 127.0.0.1", target="127.0.0.1"
+        )
+        verdict = PolicyEngine(policy).evaluate(request)
+
+        self.assertFalse(verdict.allowed)
+        self.assertEqual(verdict.rule, "hypothesis_mapping")
+
+    def test_blanket_requirement_still_lets_local_commands_through(self):
+        policy = ExecutionPolicy(
+            allowed_targets={"127.0.0.1"}, require_hypothesis_mapping=True
+        )
+        verdict = PolicyEngine(policy).evaluate(
+            CommandRequest.from_shell("echo hi", timeout=5)
+        )
+
+        self.assertTrue(verdict.allowed)
+
+    def test_scope_failure_wins_over_missing_mapping(self):
+        policy = ExecutionPolicy(
+            allowed_targets={"127.0.0.1"}, require_hypothesis_mapping=True
+        )
+        verdict = PolicyEngine(policy).evaluate(
+            CommandRequest.from_shell("nmap -sV 10.9.9.9", target="10.9.9.9")
+        )
+
+        self.assertFalse(verdict.allowed)
+        self.assertEqual(verdict.rule, "scope")
+
+    def test_gateway_forwards_hypothesis_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            gateway = CommandGateway(ToolExecutor(tmp))
+            result = gateway.run_shell(
+                "echo mapped-ok",
+                timeout=5,
+                hypothesis_id="h-7",
+                hypothesis="banner is spoofable",
+                expected_evidence="string 'mapped-ok'",
+                evidence_required=True,
+            )
+
+        self.assertTrue(result.policy.allowed)
+        self.assertEqual(result.request.hypothesis_id, "h-7")
+        self.assertEqual(result.request.hypothesis, "banner is spoofable")
+        self.assertEqual(result.request.expected_evidence, "string 'mapped-ok'")
+        self.assertTrue(result.request.evidence_required)
+
+
 if __name__ == "__main__":
     unittest.main()
