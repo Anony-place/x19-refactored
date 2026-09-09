@@ -24,6 +24,11 @@ from builtin_tools import install as install_builtin_tools
 from tools import TOOLS, ToolExecutor
 install_builtin_tools(TOOLS, ToolExecutor)
 
+# OS fingerprinting is a first-class recon primitive. It uses evidence and an
+# optional Nmap backend, while still working with the stdlib-only fallback.
+from os_fingerprint import install as install_os_fingerprint
+install_os_fingerprint(TOOLS, ToolExecutor)
+
 # Runtime compatibility fixes MUST be installed before cli imports agent.py.
 from runtime_bootstrap import install_runtime_fixes
 install_runtime_fixes()
