@@ -19,19 +19,37 @@ must be backed by real command output before they are reported.
 
 ```bash
 pip install -r requirements.txt     # requests, rich, PyJWT + research extras
-python run.py doctor                # verify the install, toolchain and config
-python run.py setup                 # one-time AI provider wizard
+python run.py                       # first run: full setup, then the workspace
 ```
 
 `x19` below means `python run.py` (or the `x19` entry point if you install the
 package).
 
+### First run
+
+The first time you run `x19` it walks you through setup before it will do
+anything else. Four stages, each one skippable only if it is already done:
+
+| Stage | What it configures |
+| --- | --- |
+| 1/4 | **AI provider chain** — provider, model and failover order, verified before it is saved |
+| 2/4 | **Offensive toolchain** — reports what is installed and what is missing |
+| 3/4 | **Engagement profile** — scope, guidance cards, canaries, budget |
+| 4/4 | **Verify** — resolves the provider and shows where every piece of state lives |
+
+Setup is resumable: re-running `x19` picks up where a cancelled attempt stopped
+and skips the stages that already completed. It is mandatory — `run`, `dash`,
+`chat` and `workspace` refuse to start until a working provider exists, while
+`doctor`, `config`, `providers`, `tools`, `engagement` and `version` stay
+available so you can diagnose a broken install.
+
 ## Quick start
 
 ```bash
-x19 run -t scanme.nmap.org                  # full autonomous assessment
-x19 run -t 10.0.0.5 --bug-bounty            # hands-free authorized run
-x19 dash  -t 10.0.0.5                       # full-screen live mission control
+x19                                         # workspace home: status + every function
+x19 engagement new acme -t acme.example.com --target-type authorized
+x19 dash -t acme.example.com --engagement acme   # live assessment, in scope
+x19 run  -t scanme.nmap.org                 # one-shot autonomous assessment
 x19 findings                                # what it found, by severity
 x19 report --format html --out report.html  # exportable report
 ```
@@ -40,15 +58,17 @@ x19 report --format html --out report.html  # exportable report
 
 | Command | What it does |
 | --- | --- |
+| `workspace` | X19 home — status, state, every function and next actions. **The default** |
 | `run` | Autonomous assessment (`-t`, `--bug-bounty`, `--ctf`, `--fast`, `--swarm`) |
-| `dash` | Full-screen live swarm mission control (`--once`, `--no-tui`, `--timeout`) |
-| `chat` | Interactive AI assistant — the default when no command is given |
+| `dash` | Full-screen live swarm mission control (`--once`, `--no-tui`, `--timeout`, `--engagement`) |
+| `chat` | Interactive AI assistant console |
 | `findings` | Findings by severity (`--severity`, `--session`) |
 | `report` | Export `markdown` / `html` / `json` / `text` (`--out FILE`) |
 | `sessions` | `list` or `show` stored assessment sessions |
+| `engagement` | Engagement profiles — scope, guidance cards, canaries, budget (`list`/`show`/`new`/`rm`/`wizard`) |
 | `providers` | List providers, `--use` one, `--test` connectivity |
 | `config` | `show` / `get` / `set` / `unset` / `reset` / `path` |
-| `setup` | First-run AI provider wizard (`--force` to re-run) |
+| `setup` | Guided setup — `all` (default), `app` or `engagement` (`--force` to re-run) |
 | `doctor` | Dependencies, module integrity, config, toolchain, health score |
 | `tools` | Toolchain availability (`--missing` for gaps) |
 | `debug` | Source-code diagnostics: `scan` / `fix` / `check` / `stats` |

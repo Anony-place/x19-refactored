@@ -23,7 +23,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from windows_bootstrap import apply_windows_utf8_bootstrap
 apply_windows_utf8_bootstrap()
@@ -42,7 +42,7 @@ except ImportError:
 
 
 COMMANDS = (
-    "run", "dash", "chat", "report", "findings", "sessions",
+    "workspace", "run", "dash", "chat", "report", "findings", "sessions",
     "engagement", "providers", "config", "doctor", "tools", "debug", "setup",
     "upgrade", "version", "completion",
 )
@@ -293,6 +293,229 @@ def _print_ai_chain_banner():
 
 
 # ===================================================================
+# First-run setup + workspace
+# ===================================================================
+#: Commands that must work before (or independently of) the mandatory setup.
+SETUP_EXEMPT = {
+    "setup", "version", "completion", "doctor", "config",
+    "providers", "debug", "upgrade", "tools", "engagement",
+}
+
+
+def _interactive_terminal() -> bool:
+    """True only when we can actually prompt a human."""
+    from ui.console import is_json_mode
+
+    return (
+        sys.stdin.isatty()
+        and sys.stdout.isatty()
+        and not is_json_mode()
+    )
+
+
+def first_run_pending() -> bool:
+    """True while the mandatory first-run setup is still outstanding."""
+    from cli_support import provider_configured
+
+    return not provider_configured()
+
+
+def first_run_setup(*, force: bool = False) -> bool:
+    """Mandatory first-run setup: provider chain → toolchain → engagement.
+
+    Resumable — every stage detects work that is already done and skips it, so
+    re-running picks up where a cancelled attempt stopped. Returns True only
+    when X19 is usable afterwards.
+    """
+    import cli_support
+    from config import CONFIG, CONFIG_FILE
+    from provider_setup import setup_if_needed
+    from ui import widgets
+    from ui.console import get_console, info, ok, rule, warn
+
+    console = get_console()
+    rule("[panel.title]x19 first-run setup[/]")
+    info("Four stages. Nothing is assessed and nothing leaves this machine "
+         "except the provider verification call.")
+
+    # -- 1/4 AI provider chain ---------------------------------------------
+    rule("[panel.title]1/4 · ai provider chain[/]")
+    if cli_support.provider_configured() and not force:
+        ok(f"already configured — {cli_support.resolve_provider()}")
+    else:
+        try:
+            if not setup_if_needed(force=force):
+                warn("provider chain incomplete — X19 cannot run an assessment without one")
+                return False
+        except (EOFError, KeyboardInterrupt):
+            warn("setup interrupted — re-run: x19 setup")
+            return False
+        except Exception as exc:
+            warn(f"provider setup failed: {exc}")
+            return False
+        ok(f"provider chain saved — {cli_support.resolve_provider()}")
+
+    # -- 2/4 toolchain ------------------------------------------------------
+    rule("[panel.title]2/4 · offensive toolchain[/]")
+    coverage = cli_support.toolchain_coverage()
+    console.print(
+        f"  installed [app.ok]{coverage['installed']}[/] / {coverage['total']}   "
+        f"preferred [app.warn]{coverage['preferred_installed']}[/] / {coverage['preferred_total']}"
+    )
+    missing = coverage.get("preferred_missing") or []
+    if missing:
+        warn("missing preferred tools: " + ", ".join(missing[:8]))
+        console.print(
+            "  [app.dim]X19 falls back to its built-in engines, but native tools are faster "
+            "and deeper. Install what you can, then re-check with: x19 tools[/]"
+        )
+    else:
+        ok("full preferred toolchain present")
+
+    # -- 3/4 engagement profile --------------------------------------------
+    rule("[panel.title]3/4 · engagement profile[/]")
+    import engagement as eng
+
+    existing = eng.list_profiles()
+    if existing and not force:
+        ok(f"{len(existing)} profile(s) already saved")
+        for row in existing[:5]:
+            console.print(
+                f"  [app.accent]{row['name']}[/] [app.dim]→[/] {row['target']} "
+                f"[app.dim]({row['target_type']})[/]"
+            )
+    else:
+        info("A profile is how you tell X19 what is in scope and how it may test it.")
+        try:
+            profile = engagement_wizard()
+        except (EOFError, KeyboardInterrupt):
+            profile = None
+            warn("engagement setup skipped")
+        if profile is not None:
+            ok(f"engagement saved: {profile.name}")
+
+    # -- 4/4 verify ---------------------------------------------------------
+    rule("[panel.title]4/4 · verify[/]")
+    resolved = cli_support.resolve_provider()
+    if not resolved:
+        warn("no usable provider resolved — run: x19 setup app")
+        return False
+    console.print(widgets.kv_table([
+        ("provider", f"[app.ok]{resolved}[/]"),
+        ("model", provider_chain_summary().get("model") or "provider default"),
+        ("config", str(CONFIG_FILE)),
+        ("engagements", str(eng.engagements_dir())),
+        ("sessions", str(getattr(CONFIG, "SESSIONS_DIR", ""))),
+    ]))
+    ok("setup complete — X19 is ready")
+    return True
+
+
+def _enforce_first_run(command: str) -> Optional[int]:
+    """Gate every real command behind the mandatory setup. Returns an exit code
+    when the command must not proceed, or ``None`` to let it run."""
+    from ui.console import is_json_mode, warn
+
+    if command in SETUP_EXEMPT or not first_run_pending():
+        return None
+    if not _interactive_terminal():
+        if not is_json_mode():
+            warn("X19 is not set up yet — run: x19 setup")
+        return 1
+    if not first_run_setup():
+        return 1
+    return None
+
+
+def workspace_snapshot() -> Dict[str, Any]:
+    """Everything the workspace screen needs, gathered as plain data."""
+    import cli_support
+    import engagement as eng
+    from config import CONFIG, CONFIG_FILE
+
+    sessions = cli_support.list_sessions(limit=5)
+    latest = cli_support.load_session(sessions[0]["id"]) if sessions else None
+    findings = list((latest or {}).get("findings") or [])
+
+    try:
+        health = cli_support.run_diagnostics()
+    except Exception:
+        health = {}
+
+    return {
+        "provider": provider_chain_summary(),
+        "toolchain": cli_support.toolchain_coverage(),
+        "engagements": eng.list_profiles(),
+        "sessions": sessions,
+        "findings": findings,
+        "health": health,
+        "store_dir": str(eng.engagements_dir()),
+        "sessions_dir": str(getattr(CONFIG, "SESSIONS_DIR", "")),
+        "config_file": str(CONFIG_FILE),
+    }
+
+
+def workspace_next_actions(snapshot: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Contextual guidance derived from the actual state, not a fixed list."""
+    actions: List[Tuple[str, str]] = []
+    provider = snapshot.get("provider") or {}
+    toolchain = snapshot.get("toolchain") or {}
+    engagements = snapshot.get("engagements") or []
+
+    if not provider.get("chain"):
+        actions.append(("x19 setup app", "no AI provider key configured — nothing can run"))
+    if not engagements:
+        actions.append((
+            "x19 engagement new <name> -t <target> --target-type authorized",
+            "no engagement profile — agents would run without scope or guidance",
+        ))
+    missing = toolchain.get("preferred_missing") or []
+    if missing:
+        actions.append(("x19 tools", f"{len(missing)} preferred tool(s) missing — built-in fallbacks in use"))
+
+    name = engagements[0]["name"] if engagements else "<name>"
+    target = engagements[0]["target"] if engagements else "<target>"
+    if engagements:
+        actions.append((f"x19 dash -t {target} --engagement {name}", "start a live assessment"))
+    else:
+        actions.append(("x19 dash -t <target> --engagement <name>", "start a live assessment"))
+    actions.append(("x19 chat", "talk to the agent directly"))
+    actions.append(("x19 doctor", "re-check health after changing anything"))
+    return actions
+
+
+def cmd_workspace(args: argparse.Namespace) -> int:
+    from ui.console import emit_json, get_console
+    from ui.screens import workspace_screen
+
+    snapshot = workspace_snapshot()
+    if getattr(args, "json", False):
+        payload = dict(snapshot)
+        payload["version"] = __version__
+        payload["commands"] = [dict(row) for row in HELP_COMMANDS]
+        payload["next_actions"] = [
+            {"command": command, "why": why} for command, why in workspace_next_actions(snapshot)
+        ]
+        emit_json(payload)
+        return 0
+
+    get_console().print(workspace_screen(
+        version=__version__,
+        provider=snapshot["provider"],
+        toolchain=snapshot["toolchain"],
+        engagements=snapshot["engagements"],
+        sessions=snapshot["sessions"],
+        findings=snapshot["findings"],
+        commands=HELP_COMMANDS,
+        next_actions=workspace_next_actions(snapshot),
+        health=snapshot["health"],
+        store_dir=snapshot["store_dir"],
+        sessions_dir=snapshot["sessions_dir"],
+    ))
+    return 0
+
+
+# ===================================================================
 # Parser
 # ===================================================================
 def _common_parser() -> argparse.ArgumentParser:
@@ -317,6 +540,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-V", "--version", action="store_true", help="show version and exit")
 
     sub = parser.add_subparsers(dest="command", metavar="<command>")
+
+    # -- workspace -------------------------------------------------------
+    sub.add_parser(
+        "workspace", parents=[common],
+        help="X19 workspace home: status, state and every function (default command)",
+        description="X19 workspace home — system status, AI chain, toolchain, engagements, "
+                    "recent activity, the full function index and what to do next.",
+    )
 
     # -- run -------------------------------------------------------------
     p = sub.add_parser("run", parents=[common], help="run an autonomous assessment against a target")
@@ -355,7 +586,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--legacy", action="store_true", help="use the fixed 5-stage pipeline instead of the workflow")
 
     # -- chat ------------------------------------------------------------
-    p = sub.add_parser("chat", parents=[common], help="interactive AI assistant (default command)")
+    p = sub.add_parser("chat", parents=[common], help="interactive AI assistant console")
     p.add_argument("--system", type=str, default="", help="override the system prompt")
 
     # -- report ----------------------------------------------------------
@@ -1394,6 +1625,7 @@ def _ensure_provider() -> bool:
 
 
 HANDLERS = {
+    "workspace": cmd_workspace,
     "run": cmd_run,
     "dash": cmd_dash,
     "chat": cmd_chat,
@@ -1417,11 +1649,12 @@ HANDLERS = {
 # Help screen
 # ===================================================================
 HELP_COMMANDS = [
+    {"name": "workspace", "help": "X19 workspace home: status, state, every function (default)", "group": "interactive"},
     {"name": "run", "help": "autonomous assessment against a target (-t, --bug-bounty, --ctf, --fast)", "group": "assessment"},
     {"name": "dash", "help": "full-screen live swarm mission control", "group": "assessment"},
     {"name": "findings", "help": "list recorded findings by severity", "group": "assessment"},
     {"name": "report", "help": "export markdown / html / json / text reports", "group": "assessment"},
-    {"name": "chat", "help": "interactive AI assistant (default when no command is given)", "group": "interactive"},
+    {"name": "chat", "help": "interactive AI assistant console", "group": "interactive"},
     {"name": "sessions", "help": "list or inspect stored assessment sessions", "group": "interactive"},
     {"name": "engagement", "help": "engagement profiles: scope, guidance cards, canaries, budget", "group": "configuration"},
     {"name": "providers", "help": "list providers, set the primary, test connectivity", "group": "configuration"},
@@ -1476,13 +1709,18 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     command = getattr(args, "command", None)
     if not command:
-        command = "chat"
+        command = "workspace"
         args.command = command
 
     handler = HANDLERS.get(command)
     if handler is None:
         parser.print_usage()
         return 2
+
+    # A fresh install must be set up before it can do anything real.
+    gate = _enforce_first_run(command)
+    if gate is not None:
+        return int(gate)
 
     try:
         return int(handler(args) or 0)

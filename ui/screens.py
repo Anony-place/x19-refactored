@@ -7,7 +7,7 @@ Every function returns a rich renderable (or prints nothing and returns data in
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from rich.console import Group
 from rich.table import Table
@@ -496,3 +496,228 @@ def decision_table(decisions: Sequence[Dict[str, Any]]) -> Table:
     if not decisions:
         table.add_row("", "", "", "[app.dim]no coordinator decisions yet[/]")
     return table
+
+
+# ---------------------------------------------------------------------------
+# Workspace home
+# ---------------------------------------------------------------------------
+GROUP_LABEL = {
+    "assessment": "assessment",
+    "interactive": "interactive",
+    "configuration": "configuration",
+    "operations": "operations",
+}
+GROUP_ORDER = ("assessment", "interactive", "configuration", "operations")
+
+
+def _two_column(left: Any, right: Any) -> Any:
+    grid = Table.grid(expand=True, padding=(0, 1))
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+    grid.add_row(left, right)
+    return grid
+
+
+def _status_row(label: str, value: Any, style: str = "bright_white") -> Tuple[str, Any]:
+    return (f"[app.dim]{label}[/]", f"[{style}]{value}[/]")
+
+
+def function_index(commands: Sequence[Dict[str, str]]) -> Table:
+    """Every X19 function, grouped, with its one-line purpose."""
+    table = Table(expand=True, box=None, pad_edge=False, show_header=False)
+    table.add_column(width=18, style="app.accent", no_wrap=True)
+    table.add_column(width=16, style="bold bright_white", no_wrap=True)
+    table.add_column(ratio=1, style="grey70")
+
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for row in commands:
+        grouped.setdefault(str(row.get("group", "operations")), []).append(row)
+
+    for group in GROUP_ORDER:
+        rows = grouped.pop(group, None)
+        if not rows:
+            continue
+        first = True
+        for row in rows:
+            table.add_row(
+                f"[app.dim]{GROUP_LABEL.get(group, group)}[/]" if first else "",
+                str(row.get("name", "")),
+                str(row.get("help", "")),
+            )
+            first = False
+    for group, rows in grouped.items():  # anything ungrouped still shows up
+        for row in rows:
+            table.add_row(f"[app.dim]{group}[/]", str(row.get("name", "")), str(row.get("help", "")))
+    return table
+
+
+def next_actions_panel(actions: Sequence[Tuple[str, str]]) -> Any:
+    """Contextual "do this next" list: ``(command, why)``."""
+    if not actions:
+        return Text("nothing outstanding — every subsystem is configured.", style="app.ok")
+    body = Table(expand=True, box=None, pad_edge=False, show_header=False)
+    body.add_column(width=3, no_wrap=True)
+    body.add_column(width=44, no_wrap=True)
+    body.add_column(ratio=1, style="grey62")
+    for index, (command, why) in enumerate(actions, 1):
+        body.add_row(f"[app.dim]{index}[/]", f"[app.key]{command}[/]", why)
+    return body
+
+
+def workspace_screen(
+    *,
+    version: str = "",
+    provider: Optional[Dict[str, Any]] = None,
+    toolchain: Optional[Dict[str, Any]] = None,
+    engagements: Sequence[Dict[str, Any]] = (),
+    sessions: Sequence[Dict[str, Any]] = (),
+    findings: Sequence[Dict[str, Any]] = (),
+    commands: Sequence[Dict[str, str]] = (),
+    next_actions: Sequence[Tuple[str, str]] = (),
+    health: Optional[Dict[str, Any]] = None,
+    store_dir: str = "",
+    sessions_dir: str = "",
+) -> Any:
+    """The X19 landing view: status, state and every function on one screen."""
+    provider = provider or {}
+    toolchain = toolchain or {}
+    health = health or {}
+
+    blocks: List[Any] = []
+    # No `mode` here: the model is shown in the ai-chain panel, and putting it in
+    # the header too forces the right cell wider than half the terminal, which
+    # squeezes the brand rule into an ellipsis.
+    blocks.append(widgets.header_bar(
+        version,
+        status="ready",
+        brand="WORKSPACE",
+        provider=str(provider.get("primary") or ""),
+    ))
+
+    chain = list(provider.get("chain") or [])
+    score = health.get("score")
+    blocks.append(widgets.metric_strip([
+        ("AI chain", f"{len(chain)} live" if chain else "none", "app.ok" if chain else "app.err"),
+        (
+            "tools",
+            f"{toolchain.get('installed', 0)}/{toolchain.get('total', 0)}",
+            "app.ok" if toolchain.get("installed") else "app.warn",
+        ),
+        ("engagements", len(engagements), "app.info" if engagements else "app.warn"),
+        ("sessions", len(sessions), "app.info" if sessions else "app.dim"),
+        (
+            "findings",
+            len(findings),
+            "app.warn" if findings else "app.dim",
+        ),
+        (
+            "health",
+            f"{score}/100" if isinstance(score, int) else "n/a",
+            "app.ok" if isinstance(score, int) and score >= 90 else "app.warn",
+        ),
+    ]))
+
+    # -- system + AI -------------------------------------------------------
+    left_rows = [
+        _status_row("version", f"X19 {version}"),
+        _status_row("interface", "terminal workspace"),
+        _status_row("engagements", store_dir or "n/a"),
+        _status_row("sessions", sessions_dir or "n/a"),
+    ]
+    checks = health.get("checks") or []
+    failed = [c for c in checks if str(c.get("status", "")).lower() not in ("pass", "ok")]
+    left_rows.append(_status_row(
+        "diagnostics",
+        f"{len(checks) - len(failed)}/{len(checks)} checks passing" if checks else "not run",
+        "app.ok" if checks and not failed else "app.warn",
+    ))
+
+    if chain:
+        chain_text = " [app.dim]→[/] ".join(f"[app.ok]{p}[/]" for p in chain[:4])
+        if len(chain) > 4:
+            chain_text += f" [app.dim]…(+{len(chain) - 4})[/]"
+    else:
+        chain_text = "[app.err]no provider key configured[/]"
+    right_rows = [
+        _status_row("chain", chain_text),
+        _status_row("primary", provider.get("primary") or "unset",
+                    "app.ok" if chain else "app.err"),
+        _status_row("model", provider.get("model") or "provider default"),
+        _status_row("local ollama", "available" if provider.get("ollama") else "not installed",
+                    "app.ok" if provider.get("ollama") else "app.dim"),
+    ]
+    blocks.append(_two_column(
+        widgets.panel("system", widgets.kv_table(left_rows)),
+        widgets.panel("ai chain", widgets.kv_table(right_rows)),
+    ))
+
+    # -- engagements + toolchain ------------------------------------------
+    if engagements:
+        eng_table = Table(expand=True, box=None, pad_edge=False, show_header=False)
+        eng_table.add_column(style="bold bright_white", no_wrap=True)
+        eng_table.add_column(style="grey70", no_wrap=True)
+        eng_table.add_column(style="app.info", no_wrap=True, justify="right")
+        eng_table.add_column(style="app.warn", no_wrap=True, justify="right")
+        for row in engagements[:5]:
+            eng_table.add_row(
+                str(row.get("name", "")),
+                str(row.get("target", "")) or "—",
+                str(row.get("target_type", "")) or "—",
+                "canary" if row.get("has_canaries") else "",
+            )
+        if len(engagements) > 5:
+            eng_table.add_row(f"[app.dim]+{len(engagements) - 5} more[/]", "", "", "")
+        engagement_body: Any = eng_table
+    else:
+        engagement_body = Text(
+            "no engagement profile yet\nx19 engagement new <name> -t <target> --target-type authorized",
+            style="app.warn",
+        )
+
+    preferred_missing = toolchain.get("preferred_missing") or []
+    tool_rows = [
+        _status_row("installed", f"{toolchain.get('installed', 0)} / {toolchain.get('total', 0)}"),
+        _status_row(
+            "preferred",
+            f"{toolchain.get('preferred_installed', 0)} / {toolchain.get('preferred_total', 0)}",
+            "app.ok" if not preferred_missing else "app.warn",
+        ),
+    ]
+    if preferred_missing:
+        tool_rows.append(_status_row(
+            "missing", ", ".join(preferred_missing[:6])
+            + (f" +{len(preferred_missing) - 6}" if len(preferred_missing) > 6 else ""),
+            "app.warn",
+        ))
+    tool_rows.append(_status_row(
+        "coverage",
+        widgets.progress_bar(
+            100.0 * toolchain.get("installed", 0) / max(1, int(toolchain.get("total", 0) or 1))
+        ),
+    ))
+    blocks.append(_two_column(
+        widgets.panel("engagements", engagement_body),
+        widgets.panel("toolchain", widgets.kv_table(tool_rows)),
+    ))
+
+    # -- recent activity ---------------------------------------------------
+    if sessions:
+        blocks.append(widgets.panel("recent missions", sessions_screen(sessions[:5])))
+    if findings:
+        blocks.append(widgets.panel(
+            "latest findings",
+            widgets.findings_table(findings[:6]),
+            subtitle=f"{len(findings)} recorded",
+        ))
+
+    # -- functions + next actions -----------------------------------------
+    blocks.append(widgets.panel(
+        "functions", function_index(commands), subtitle="x19 <function> --help",
+    ))
+    blocks.append(widgets.panel("next actions", next_actions_panel(next_actions)))
+    blocks.append(widgets.key_hint_bar([
+        ("x19 dash -t <target> --engagement <name>", "start an assessment"),
+        ("x19 chat", "interactive console"),
+        ("x19 -h", "all options"),
+    ]))
+    return Group(*blocks)

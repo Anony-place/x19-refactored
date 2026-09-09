@@ -93,12 +93,13 @@ def header_bar(
     elapsed: Optional[float] = None,
     mode: str = "",
     provider: str = "",
+    brand: str = "MISSION CONTROL",
 ) -> Table:
     """The always-present top bar: brand left, live status right."""
     left = Text()
     left.append("X19", style="bold bright_cyan")
     left.append(f" v{version}", style="grey50")
-    left.append("  MISSION CONTROL", style="bold white")
+    left.append(f"  {brand}", style="bold white")
 
     right = Text()
     if target:
@@ -107,7 +108,9 @@ def header_bar(
         right.append("   ", style="grey37")
     if mode:
         right.append("mode ", style="grey50")
-        right.append(mode, style="bold yellow")
+        # Truncated like the provider: an unbounded model name forces the right
+        # column wide and squeezes the brand rule into an ellipsis.
+        right.append(truncate(mode, 24), style="bold yellow")
         right.append("   ", style="grey37")
     if provider:
         right.append("ai ", style="grey50")
@@ -122,8 +125,8 @@ def header_bar(
     grid.add_column(justify="right", no_wrap=True)
     grid.add_row(left, right)
     grid.add_row(
-        Text("─" * 46, style="grey27"),
-        Text("─" * 46, style="grey27", justify="right"),
+        Text("─" * 34, style="grey27"),
+        Text("─" * 34, style="grey27", justify="right"),
     )
     return grid
 
