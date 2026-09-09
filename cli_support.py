@@ -32,6 +32,10 @@ CRITICAL_MODULES = [
     "execution.native_vuln",
     "learning.self_adaptation",
     "reporting.report_generator",
+    "reporting.compliance",
+    "reporting.remediation",
+    "brain.exploit_chain",
+    "brain.frontier_gate",
     "ui.dashboard",
     "ui.screens",
 ]
@@ -315,6 +319,34 @@ def run_diagnostics(*, check_network: bool = False) -> Dict[str, Any]:
             add("network egress", "pass", f"api.github.com → HTTP {response.status_code}")
         except Exception as exc:
             add("network egress", "warn", f"{type(exc).__name__}: {exc}")
+
+    # 10. frontier cyber-model gating. Vendors rate some models Critical for
+    # cyber and gate advanced workflows behind access tiers X19 cannot inspect,
+    # so the gate refuses exploitation unless the engagement is authorised.
+    try:
+        from brain.frontier_gate import gate_status
+        from config import CONFIG, load_config
+        from constants import PROVIDERS
+
+        cfg = load_config()
+        primary = cfg.get("AI_PROVIDER", CONFIG.AI_PROVIDER) or "openrouter"
+        active_model = (
+            cfg.get("AI_MODEL") or PROVIDERS.get(primary, {}).get("default_model", "")
+        )
+        status_info = gate_status(active_model, CONFIG.TARGET_TYPE)
+        if not status_info["gated"]:
+            add("frontier model gate", "pass",
+                f"{active_model or '(provider default)'} — {status_info['label']}")
+        elif status_info["exploitation_allowed"]:
+            add("frontier model gate", "pass",
+                f"{active_model} is Critical-tier cyber — target_type "
+                f"'{CONFIG.TARGET_TYPE}' authorises exploitation")
+        else:
+            add("frontier model gate", "warn",
+                f"{active_model} is Critical-tier cyber — exploitation blocked "
+                f"(target_type '{CONFIG.TARGET_TYPE}')")
+    except Exception as exc:  # a gate that cannot be read must not hide itself
+        add("frontier model gate", "fail", f"{type(exc).__name__}: {exc}", 10)
 
     add("x19 version", "pass", __version__)
 

@@ -442,8 +442,20 @@ def workspace_snapshot() -> Dict[str, Any]:
     except Exception:
         health = {}
 
+    try:
+        from brain.frontier_gate import gate_status
+
+        chain = provider_chain_summary()
+        frontier = gate_status(chain.get("model"), CONFIG.TARGET_TYPE)
+    except Exception as exc:
+        frontier = {
+            "gated": False,
+            "label": f"gate unavailable ({type(exc).__name__}: {exc})",
+        }
+
     return {
         "provider": provider_chain_summary(),
+        "frontier": frontier,
         "toolchain": cli_support.toolchain_coverage(),
         "engagements": eng.list_profiles(),
         "sessions": sessions,
@@ -509,6 +521,7 @@ def cmd_workspace(args: argparse.Namespace) -> int:
         commands=HELP_COMMANDS,
         next_actions=workspace_next_actions(snapshot),
         health=snapshot["health"],
+        frontier=snapshot.get("frontier"),
         store_dir=snapshot["store_dir"],
         sessions_dir=snapshot["sessions_dir"],
     ))

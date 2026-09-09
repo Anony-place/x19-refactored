@@ -575,6 +575,7 @@ def workspace_screen(
     commands: Sequence[Dict[str, str]] = (),
     next_actions: Sequence[Tuple[str, str]] = (),
     health: Optional[Dict[str, Any]] = None,
+    frontier: Optional[Dict[str, Any]] = None,
     store_dir: str = "",
     sessions_dir: str = "",
 ) -> Any:
@@ -646,6 +647,16 @@ def workspace_screen(
         _status_row("local ollama", "available" if provider.get("ollama") else "not installed",
                     "app.ok" if provider.get("ollama") else "app.dim"),
     ]
+    if frontier:
+        if frontier.get("gated"):
+            if frontier.get("exploitation_allowed"):
+                right_rows.append(_status_row(
+                    "exploit gate", f"open ({frontier.get('target_type', 'authorized')})", "app.ok"))
+            else:
+                right_rows.append(_status_row(
+                    "exploit gate", "blocked — not authorised", "app.err"))
+        else:
+            right_rows.append(_status_row("exploit gate", "unrestricted", "app.dim"))
     blocks.append(_two_column(
         widgets.panel("system", widgets.kv_table(left_rows)),
         widgets.panel("ai chain", widgets.kv_table(right_rows)),

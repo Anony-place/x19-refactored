@@ -63,7 +63,16 @@ class SecurityReportGeneratorTests(unittest.TestCase):
         self.assertIn("# 🛡️ X19 Security Assessment & Remediation Report", md)
         self.assertIn("Exposed Environment File (.env)", md)
         self.assertIn("curl -sik http://example.com/.env", md)
-        self.assertIn("Defensive Configuration Patch Guidance", md)
+        # The heading names the language the fix is actually written in. It used
+        # to be hardcoded to nginx, which mislabelled non-nginx snippets.
+        self.assertIn("**Fix (nginx):**", md)
+        self.assertNotIn("Defensive Configuration Patch Guidance", md)
+        # The new analysis sections
+        for section in ("## 2. Attack Chains", "## 4. Compliance Exposure",
+                        "## 5. Remediation Work List"):
+            self.assertIn(section, md)
+        self.assertIn("**Classification:** `exposed_file`", md)
+        self.assertIn("**SOC 2 TSC:** CC6.1", md)
 
     def test_html_generation(self):
         html = self.generator.generate_html()

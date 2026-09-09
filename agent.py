@@ -44,6 +44,7 @@ from tool_scanner import scan_available_tools, scan_missing_critical, build_tool
 from brain.planner import Planner
 import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
+from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
 
 class X19:
     def __init__(self, target: str = "", ai: Optional[AIBackend] = None):
@@ -966,6 +967,33 @@ Analyze the output carefully. Return JSON ONLY:
         except Exception:
             pass
 
+    def _frontier_verdict(self, phase: Optional[str] = None) -> "FrontierVerdict":
+        """Whether the model in use may run the current phase.
+
+        Vendors rate some models Critical for cyber and gate advanced workflows
+        behind access tiers X19 cannot inspect, so this fails closed: exploitation
+        is refused unless the engagement is explicitly authorised.
+        """
+        return check_model_for_phase(
+            getattr(self.ai, "model", ""),
+            self.target_type,
+            phase if phase is not None else getattr(self, "_current_phase", ""),
+        )
+
+    def _frontier_notice(self) -> List[str]:
+        """Lines to print at startup when exploitation will be refused."""
+        state = gate_status(getattr(self.ai, "model", ""), self.target_type)
+        if not (state["gated"] and not state["exploitation_allowed"]):
+            return []
+        lines = [
+            f"[FRONTIER MODEL GATE] {state['label']}",
+            f"    exploitation is blocked for target_type '{state['target_type']}'",
+        ]
+        if state["requires"]:
+            lines.append(f"    to permit it: {state['requires']}")
+        lines.append("    recon, enumeration and reporting continue normally")
+        return lines
+
     @staticmethod
     def _resolve_target_type(target: str, configured: str) -> str:
         """Auto-detect target type if configured as 'auto'."""
@@ -1754,6 +1782,11 @@ Analyze the output carefully. Return JSON ONLY:
             # CTF heuristics are available in Memory/Knowledge for the LLM to reference
             # but no commands are generated here - they come from the AI decision cycle
 
+        # Tell the operator up front if exploitation will be refused, rather than
+        # letting the first exploit command fail mid-run.
+        for line in self._frontier_notice():
+            print(f"{C.Y}{line}{C.N}")
+
         iteration = 0
         consec_fail = 0  # consecutive AI/parse/iteration failures — abort loudly, never silently
         decisions_ok = 0  # successful AI decisions — distinguish real completion from total failure
@@ -2338,6 +2371,27 @@ Analyze the output carefully. Return JSON ONLY:
                         previous_output = "[SYSTEM: Auth attack blocked. Target is public_real_world. Recon/enumeration only — no password attacks, credential stuffing, auth bypass, or hash cracking.]"
                         self.session.add_cmd(command, "[BLOCKED: auth attack on public target]", "blocked")
                         continue
+
+                # Frontier-model gate: models rated Critical for cyber by their
+                # vendor are gated for advanced cyber workflows. X19 cannot check
+                # the user's access tier, so it refuses to route exploitation
+                # through one unless the engagement is explicitly authorized.
+                frontier = self._frontier_verdict()
+                if not frontier.allowed:
+                    self._frontier_blocked = getattr(self, "_frontier_blocked", 0) + 1
+                    print(f"{C.R}[!] FRONTIER MODEL GATE — exploitation refused{C.N}")
+                    print(f"{C.Y}    {frontier.reason}{C.N}")
+                    if frontier.requires:
+                        print(f"{C.B}    Requires: {frontier.requires}{C.N}")
+                    previous_output = (
+                        f"[SYSTEM: Exploitation refused. {frontier.reason} "
+                        f"{frontier.requires}] Reconnaissance, enumeration and "
+                        f"reporting may continue."
+                    )
+                    self.session.add_cmd(
+                        command, "[BLOCKED: frontier model gate]", "blocked", -1
+                    )
+                    continue
 
                 # Command validation
                 is_valid, warning, fixes = self._validate_command(command)
