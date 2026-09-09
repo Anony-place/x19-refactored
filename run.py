@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """X19 — autonomous AI security assessment platform.
 
-Terminal application entry point. There is no web server: every capability is
-served by the CLI in :mod:`cli` and the terminal UI in :mod:`ui`.
+``run.py`` is the single supported entry point.  The default/control-plane
+surface is intentionally plain terminal output; the old full-screen workspace
+is not used unless an operator explicitly invokes the legacy ``dash`` command.
 
-    python run.py --help
+    python run.py
+    python run.py setup
+    python run.py provider list
     python run.py run -t <target>
-    python run.py dash -t <target>
-
-Hermes-inspired runtime commands are also routed here:
-    python run.py runtime
-    python run.py skills
-    python run.py recall "previous SSRF findings"
-    python run.py delegate "analyze API auth" "review web surface"
-    python run.py cron list
+    python run.py dash -t <target>   # explicit live UI only
 """
 
 import sys
@@ -35,10 +31,15 @@ install_runtime_fixes()
 from builtin_integration import install_phase_access
 install_phase_access()
 
+# Install the cognitive prompt contract before agent.py imports
+# utils.decision_system_prompt directly.
+from brain.cognitive_runtime import install as install_cognitive_runtime
+install_cognitive_runtime()
+
 from logging_utils import log
 
-
 _RUNTIME_COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
+_PLAIN_COMMANDS = {"", "status", "workspace", "providers", "provider", "setup", "brain"}
 
 
 def _maybe_promote_learning(argv, result: int) -> None:
@@ -58,16 +59,23 @@ def _maybe_promote_learning(argv, result: int) -> None:
 
 
 def main() -> int:
-    # The runtime layer is intentionally routed before cli import so lightweight
-    # capability commands do not initialize the full offensive agent graph.
     argv = list(sys.argv[1:])
+
+    # Hermes-style runtime commands stay lightweight and never load the full
+    # offensive graph.
     if argv and argv[0] in _RUNTIME_COMMANDS:
         from runtime_cli import dispatch
-
         return int(dispatch(argv) or 0)
 
-    # Imported late so ``x19 --version`` / ``--help`` never pay for the agent
-    # import graph, and never trigger the first-run provider wizard.
+    # Provider/setup/status commands use the plain control plane. This removes
+    # the Rich workspace from the normal operator path without deleting the
+    # assessment dashboard behind the explicit `dash` command.
+    if not argv or argv[0] in _PLAIN_COMMANDS:
+        from plain_cli import main as plain_main
+        return int(plain_main(argv) or 0)
+
+    # The existing CLI remains responsible for the security assessment command
+    # graph. The cognitive runtime is already installed before this import.
     from cli import main as cli_main
 
     result = int(cli_main() or 0)

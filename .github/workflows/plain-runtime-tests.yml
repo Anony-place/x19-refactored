@@ -1,0 +1,28 @@
+name: Plain runtime tests
+
+on:
+  push:
+    branches:
+      - main
+      - refactor/plain-terminal-provider-brain
+  pull_request:
+    paths:
+      - 'run.py'
+      - 'plain_cli.py'
+      - 'provider_manager.py'
+      - 'brain/**'
+      - 'tests/test_plain_provider_brain.py'
+      - '.github/workflows/plain-runtime-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile changed runtime modules
+        run: python -m py_compile run.py plain_cli.py provider_manager.py brain/cognitive_runtime.py
+      - name: Run focused tests
+        run: python -m unittest tests/test_plain_provider_brain.py -v

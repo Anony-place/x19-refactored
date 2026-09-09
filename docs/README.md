@@ -1,0 +1,1 @@
+The normal X19 operator path is plain terminal output. The full-screen dashboard is explicit via `dash`. Provider setup is live-verified and the cognitive runtime adds a state/hypothesis/evidence contract before the existing agent loop runs.
