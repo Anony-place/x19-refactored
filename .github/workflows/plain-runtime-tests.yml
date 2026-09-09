@@ -10,8 +10,11 @@ on:
       - 'run.py'
       - 'plain_cli.py'
       - 'provider_manager.py'
+      - 'os_fingerprint.py'
+      - 'terminal_behavior.py'
       - 'brain/**'
       - 'tests/test_plain_provider_brain.py'
+      - 'tests/test_os_fingerprint.py'
       - '.github/workflows/plain-runtime-tests.yml'
 
 jobs:
@@ -23,6 +26,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile changed runtime modules
-        run: python -m py_compile run.py plain_cli.py provider_manager.py brain/cognitive_runtime.py
+        run: python -m py_compile run.py plain_cli.py provider_manager.py os_fingerprint.py terminal_behavior.py brain/cognitive_runtime.py
       - name: Run focused tests
-        run: python -m unittest tests/test_plain_provider_brain.py -v
+        run: python -m unittest tests/test_plain_provider_brain.py tests/test_os_fingerprint.py -v
