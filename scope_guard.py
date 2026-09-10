@@ -1,15 +1,14 @@
 """Deterministic, passive engagement/scope discovery for X19.
 
-This module deliberately keeps authorization decisions out of the LLM.  It
-resolves a target against trusted, public program scope metadata and returns a
+This module deliberately keeps authorization decisions out of the LLM. It
+resolves a target against trusted public program scope metadata and returns a
 structured result that the terminal router can present to the user.
 
-It is a *scope discovery* layer, not a permission bypass: finding a public
+It is a scope-discovery layer, not a permission bypass: finding a public
 program does not grant permission to ignore that program's rules.
 """
 from __future__ import annotations
 
-import fnmatch
 import ipaddress
 import os
 import re
@@ -20,7 +19,7 @@ from urllib.parse import urlparse
 
 try:
     import requests
-except Exception:  # pragma: no cover - requests is already an X19 dependency
+except Exception:  # pragma: no cover
     requests = None
 
 
@@ -51,9 +50,6 @@ class ScopeResult:
         return self.state in {"verified_in_scope", "verified_out_of_scope"}
 
 
-# Trusted first-party sources.  More programs can be added without changing
-# the router.  For arbitrary programs, users can provide X19_SCOPE_URL rather
-# than trusting a search-engine result as authorization evidence.
 TRUSTED_SOURCES = (
     ProgramSource(
         name="Paytm Bug Bounty",
@@ -99,15 +95,17 @@ def normalize_target(value: str) -> str:
         return host
 
 
+def _pattern(pattern: str) -> str:
+    return str(pattern or "").strip().strip(".").lower()
+
+
 def _matches(host: str, pattern: str) -> bool:
-    pattern = normalize_target(pattern)
+    host = normalize_target(host)
+    pattern = _pattern(pattern)
     if not host or not pattern:
         return False
-    # fnmatch gives the expected wildcard semantics but does not make a
-    # wildcard automatically include the apex domain.  That distinction is
-    # important for bounty scopes such as *.example.com.
     if pattern.startswith("*."):
-        suffix = pattern[1:]
+        suffix = pattern[1:]  # .example.com
         return host.endswith(suffix) and host != suffix[1:]
     return host == pattern
 
@@ -115,9 +113,11 @@ def _matches(host: str, pattern: str) -> bool:
 def _extract_patterns(html: str) -> List[str]:
     """Extract conservative hostname patterns from a public scope page."""
     text = unescape(re.sub(r"<[^>]+>", " ", html))
-    candidates = set(re.findall(r"(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}", text, re.I))
-    # Keep this parser intentionally narrow: only domain-like values are
-    # accepted, and URLs/paths are stripped before matching.
+    candidates = set(re.findall(
+        r"(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}",
+        text,
+        re.I,
+    ))
     return sorted({c.lower().strip(".,") for c in candidates})
 
 
@@ -125,16 +125,13 @@ def _source_for_target(target: str, sources: Iterable[ProgramSource]) -> Optiona
     host = normalize_target(target)
     if not host:
         return None
-    # Prefer a source whose declared scope already matches.  Then fall back to
-    # registrable-domain hints so a program can still be surfaced when the
-    # exact target is out of scope (e.g. paytm.com vs *.paytm.com).
     for source in sources:
         if any(_matches(host, p) for p in source.patterns):
             return source
     labels = host.split(".")
     root = ".".join(labels[-2:]) if len(labels) >= 2 else host
     for source in sources:
-        if any(normalize_target(p).lstrip("*.").endswith(root) for p in source.patterns):
+        if any(_pattern(p).lstrip("*.").endswith(root) for p in source.patterns):
             return source
     return None
 
@@ -170,12 +167,7 @@ def _verify_source(target: str, source: ProgramSource) -> ScopeResult:
 
 
 def resolve_scope(target: str, *, scope_url: str = "", timeout: float = 8.0) -> ScopeResult:
-    """Resolve a target against trusted public scope metadata.
-
-    Resolution is passive: it fetches only a public scope document and never
-    sends attack payloads to the target.  If the source cannot be verified,
-    the result is ``unknown`` rather than an authorization assumption.
-    """
+    """Resolve a target using passive public scope metadata only."""
     host = normalize_target(target)
     if not host:
         return ScopeResult(target=target, normalized_target="", state="unknown", reason="target could not be normalized")
@@ -188,7 +180,11 @@ def resolve_scope(target: str, *, scope_url: str = "", timeout: float = 8.0) -> 
         if requests is None:
             return ScopeResult(target=target, normalized_target=host, state="unknown", source_url=configured_url, reason="HTTP client unavailable")
         try:
-            response = requests.get(configured_url, timeout=timeout, headers={"User-Agent": "X19-ScopeResolver/1.0"})
+            response = requests.get(
+                configured_url,
+                timeout=timeout,
+                headers={"User-Agent": "X19-ScopeResolver/1.0"},
+            )
             response.raise_for_status()
             patterns = _extract_patterns(response.text)
             matched = next((p for p in patterns if _matches(host, p)), "")
@@ -199,12 +195,27 @@ def resolve_scope(target: str, *, scope_url: str = "", timeout: float = 8.0) -> 
                 source_url=configured_url,
                 scope_patterns=patterns,
                 matched_pattern=matched,
-                reason=(f"matched declared scope {matched}" if matched else "source loaded, but target did not match any declared hostname"),
+                reason=(
+                    f"matched declared scope {matched}"
+                    if matched
+                    else "source loaded, but target did not match any declared hostname"
+                ),
             )
         except Exception as exc:
-            return ScopeResult(target=target, normalized_target=host, state="unknown", source_url=configured_url, reason=f"scope source unavailable: {type(exc).__name__}")
+            return ScopeResult(
+                target=target,
+                normalized_target=host,
+                state="unknown",
+                source_url=configured_url,
+                reason=f"scope source unavailable: {type(exc).__name__}",
+            )
 
     source = _source_for_target(host, TRUSTED_SOURCES)
     if source:
         return _verify_source(host, source)
-    return ScopeResult(target=target, normalized_target=host, state="unknown", reason="no trusted public program matched this target")
+    return ScopeResult(
+        target=target,
+        normalized_target=host,
+        state="unknown",
+        reason="no trusted public program matched this target",
+    )
