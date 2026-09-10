@@ -25,7 +25,7 @@ from tools import TOOLS, ToolExecutor
 install_builtin_tools(TOOLS, ToolExecutor)
 
 # Runtime compatibility fixes MUST be installed before cli imports agent.py.
-from runtime_bootstrap import install_runtime_fixes
+from runtime_bootstrap import install_runtime_fixes, install_agent_execution_policy
 install_runtime_fixes()
 
 from builtin_integration import install_phase_access
@@ -77,6 +77,9 @@ def main() -> int:
     # The existing CLI remains responsible for the security assessment command
     # graph. The cognitive runtime is already installed before this import.
     from cli import main as cli_main
+    # cli imports agent.py; only now can the compatibility layer bind the
+    # gateway to each X19 instance's explicit mission target.
+    install_agent_execution_policy()
 
     result = int(cli_main() or 0)
     _maybe_promote_learning(argv, result)
