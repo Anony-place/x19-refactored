@@ -72,3 +72,34 @@ def install_runtime_fixes() -> None:
     except Exception:
         # UI is optional on non-interactive CLI paths.
         pass
+
+
+def install_agent_execution_policy() -> None:
+    """Patch X19's existing gateway with the mission target after agent import.
+
+    The legacy agent constructs ``CommandGateway`` before its target has been
+    attached to a policy. Without this binding, the gateway's fail-closed empty
+    allowlist rejects every network-targeted command with ``scope_required``.
+    Keep the policy deterministic and target-bound instead of weakening the
+    gateway globally.
+    """
+    try:
+        from agent import X19
+        from execution import PolicyEngine, policy_from_config
+
+        if getattr(X19, "_x19_gateway_policy_installed", False):
+            return
+        original_init = X19.__init__
+
+        def wrapped_init(self, target: str = "", *args, **kwargs):
+            original_init(self, target, *args, **kwargs)
+            policy = policy_from_config(target)
+            self.command_gateway.policy_engine = PolicyEngine(policy)
+            if hasattr(self, "exec") and hasattr(self.exec, "gateway"):
+                self.exec.gateway = self.command_gateway
+
+        X19.__init__ = wrapped_init
+        X19._x19_gateway_policy_installed = True
+    except Exception:
+        # Agent may be unavailable for lightweight commands; keep setup/status usable.
+        pass
