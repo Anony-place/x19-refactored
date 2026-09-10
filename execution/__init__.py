@@ -1,13 +1,10 @@
-"""Typed execution boundary for X19 command execution.
-
-New planner/brain modules should depend on this package instead of invoking
-raw host subprocesses directly. The default gateway backend is sandboxed.
-"""
+"""Typed execution boundary for X19 command execution."""
 
 from execution.command_gateway import CommandGateway, GatewayExecutorAdapter
 from execution.command_request import CommandRequest, CommandResult, PolicyVerdict
 from execution.policy_engine import ExecutionPolicy, PolicyEngine, policy_from_config
 from execution.sandbox import SandboxExecutor, SandboxPolicy
+from execution.memory_kernel import MemoryKernel, MemorySnapshot, MemoryItem
 
 __all__ = [
     "CommandGateway",
@@ -20,4 +17,7 @@ __all__ = [
     "policy_from_config",
     "SandboxExecutor",
     "SandboxPolicy",
+    "MemoryKernel",
+    "MemorySnapshot",
+    "MemoryItem",
 ]
