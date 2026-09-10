@@ -9,7 +9,6 @@ existing verifier remain authoritative for execution and findings.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List
 
@@ -22,6 +21,28 @@ COGNITIVE CONTROL — follow this loop on every decision:
 4. ACTION: choose one highest-value available tool/action that can falsify or confirm it.
 5. EVIDENCE: define the exact output that would count as confirmation, rejection, or inconclusive.
 6. UPDATE: after the result, retire or promote the hypothesis; never silently carry a false assumption.
+
+OUTPUT CONTRACT — this is mandatory:
+- Return exactly ONE valid JSON object and nothing else.
+- `next_command` must be one concrete shell command or an empty string.
+- `hypothesis_id` must be a stable short identifier for the hypothesis, or an empty string when no action is needed.
+- `hypothesis` must state what the command is testing.
+- `expected_evidence` must state the exact observable output that would support or reject the hypothesis.
+- `evidence_required` must be true whenever `next_command` is non-empty or a finding is proposed.
+- `reasoning` must map the chosen tool/action to the hypothesis and expected evidence.
+- Never put imagined command output into `finding.evidence`; findings are emitted only from observed tool output already present in the context.
+
+Required shape:
+{
+  "hypothesis_id": "h1",
+  "hypothesis": "one testable statement",
+  "next_command": "one shell command or empty string",
+  "expected_evidence": "what exact output would confirm/reject it",
+  "evidence_required": true,
+  "reasoning": "tool:<name> | why:<reason> | evidence:<expected evidence>",
+  "finding": null,
+  "completed": false
+}
 
 PLANNING RULES:
 - Prefer information gain over repeating familiar scans.
@@ -72,8 +93,14 @@ class CognitiveRuntime:
     def __init__(self) -> None:
         self.state = CognitiveState()
 
-    def observe(self, phase: str | None = None, *, facts: Iterable[str] = (),
-                unknowns: Iterable[str] = (), evidence: str = "") -> Dict[str, Any]:
+    def observe(
+        self,
+        phase: str | None = None,
+        *,
+        facts: Iterable[str] = (),
+        unknowns: Iterable[str] = (),
+        evidence: str = "",
+    ) -> Dict[str, Any]:
         if phase in self.PHASES:
             self.state.phase = phase
         for fact in facts:
@@ -104,6 +131,7 @@ def self_check() -> Dict[str, Any]:
         "phases": list(CognitiveRuntime.PHASES),
         "contract_sections": ["state", "gap", "hypothesis", "action", "evidence", "update"],
         "execution_authority": "existing ScopeGuard/PolicyEngine/Verifier",
+        "output_contract": ["hypothesis_id", "hypothesis", "next_command", "expected_evidence", "evidence_required"],
     }
 
 
