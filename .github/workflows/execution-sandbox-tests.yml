@@ -1,0 +1,27 @@
+name: Execution sandbox tests
+
+on:
+  pull_request:
+    paths:
+      - 'execution/**'
+      - 'tests/test_sandbox.py'
+      - 'tests/test_command_gateway_sandbox.py'
+      - 'docker/Dockerfile.sandbox'
+      - '.github/workflows/execution-sandbox-tests.yml'
+  push:
+    branches:
+      - main
+      - feat/execution-sandbox
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run sandbox unit tests
+        run: python -m pytest -q tests/test_sandbox.py tests/test_command_gateway_sandbox.py
