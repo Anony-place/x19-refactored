@@ -1,13 +1,13 @@
-"""Typed execution compatibility layer.
+"""Typed execution boundary for X19 command execution.
 
-The execution package starts as a wrapper around the legacy ToolExecutor. New
-brain/planner modules should depend on these typed interfaces instead of raw
-shell strings.
+New planner/brain modules should depend on this package instead of invoking
+raw host subprocesses directly. The default gateway backend is sandboxed.
 """
 
 from execution.command_gateway import CommandGateway, GatewayExecutorAdapter
 from execution.command_request import CommandRequest, CommandResult, PolicyVerdict
 from execution.policy_engine import ExecutionPolicy, PolicyEngine, policy_from_config
+from execution.sandbox import SandboxExecutor, SandboxPolicy
 
 __all__ = [
     "CommandGateway",
@@ -18,4 +18,6 @@ __all__ = [
     "PolicyEngine",
     "PolicyVerdict",
     "policy_from_config",
+    "SandboxExecutor",
+    "SandboxPolicy",
 ]
