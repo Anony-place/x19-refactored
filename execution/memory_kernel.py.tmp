@@ -1,1 +1,0 @@
-This file is intentionally left as a compatibility placeholder for the existing MemoryKernel implementation. The enhanced implementation is `execution/security_memory_v2.py` and is exported by `execution/__init__.py` as `SecurityMemory`.
