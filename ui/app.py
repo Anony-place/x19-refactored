@@ -26,11 +26,14 @@ from ui.console import get_console, info, ok, rule, step, warn
 SYSTEM_PROMPT = (
     "You are X19, an expert offensive-security analyst running inside a terminal "
     "application. Answer precisely, prefer concrete commands and evidence, and "
-    "never invent output you did not observe. Keep user-facing responses concise."
+    "never invent output you did not observe. Keep user-facing responses concise. "
+    "Target authorization and public-program scope are resolved by deterministic "
+    "X19 policy code before active assessment; never invent authorization status."
 )
 
 COMMANDS: List[Dict[str, str]] = [
-    {"name": "/target <host>", "help": "start a quiet background assessment", "group": "assessment"},
+    {"name": "/target <host>", "help": "scope-check then start a quiet background assessment", "group": "assessment"},
+    {"name": "/scope <host>", "help": "passively check trusted public bounty scope", "group": "assessment"},
     {"name": "/dash <host>", "help": "live swarm mission control (full screen)", "group": "assessment"},
     {"name": "/status", "help": "current session, provider and task state", "group": "assessment"},
     {"name": "/findings", "help": "list recorded findings by severity", "group": "assessment"},
@@ -93,6 +96,7 @@ class ConsoleApp:
         sidebar.add_row("")
         sidebar.add_row("[bold]WORKSPACE[/]")
         sidebar.add_row("[grey70]/target[/]  assessment")
+        sidebar.add_row("[grey70]/scope[/]   bounty scope")
         sidebar.add_row("[grey70]/findings[/] findings")
         sidebar.add_row("[grey70]/report[/] report")
         sidebar.add_row("[grey70]/providers[/] providers")
@@ -121,7 +125,7 @@ class ConsoleApp:
         if not chat_parts:
             chat_parts.append(Panel(
                 "Ready. Give me a message or use /target <host> to start an assessment.\n\n"
-                "Long-running work, provider failover and tool output stay in the background.",
+                "X19 checks public program scope before active work. Long-running tool output stays in the background.",
                 title="X19",
                 border_style="bright_cyan",
                 padding=(1, 2),
@@ -180,7 +184,14 @@ class ConsoleApp:
         return 0
 
     def handle(self, line: str) -> None:
+        # Natural-language target requests are routed deterministically before
+        # the LLM. This prevents the model from issuing a blanket refusal or
+        # inventing authorization status before X19 has checked scope.
         if not line.startswith("/"):
+            target_request = self._parse_target_request(line)
+            if target_request:
+                self.cmd_target(target_request)
+                return
             self.chat(line)
             return
         parts = line[1:].split()
@@ -191,6 +202,25 @@ class ConsoleApp:
             warn(f"unknown command '/{command}' — try /help")
             return
         handler(*args)
+
+    @staticmethod
+    def _parse_target_request(message: str) -> Optional[str]:
+        """Recognize target/scan/pentest intent without asking the LLM."""
+        import re
+        parts = message.strip().split()
+        if not parts:
+            return None
+        first = parts[0].lower()
+        if first not in {"target", "scan", "pentest", "assess", "enumerate", "engage", "hack"}:
+            return None
+        host_re = re.compile(r"^(?:(?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9][a-zA-Z0-9.\-]*\.[a-zA-Z]{2,})(?::\d+)?$")
+        for token in parts[1:]:
+            token = token.strip().rstrip(".,")
+            if token.startswith("-"):
+                continue
+            if host_re.match(token):
+                return token
+        return None
 
     def cmd_help(self, *args: str) -> None:
         from ui.screens import help_screen
@@ -223,6 +253,41 @@ class ConsoleApp:
             warn("empty response — check provider configuration")
 
     # -- assessment ------------------------------------------------------
+    def _scope_result_text(self, result: Any) -> str:
+        state = getattr(result, "state", "unknown")
+        target = getattr(result, "normalized_target", "") or getattr(result, "target", "")
+        program = getattr(result, "program", "")
+        pattern = getattr(result, "matched_pattern", "")
+        source = getattr(result, "source_url", "")
+        reason = getattr(result, "reason", "")
+        lines = [f"**Scope check:** `{target}`", f"**Status:** `{state}`"]
+        if program:
+            lines.append(f"**Program:** {program}")
+        if pattern:
+            lines.append(f"**Matched:** `{pattern}`")
+        if source:
+            lines.append(f"**Source:** {source}")
+        if reason:
+            lines.append(f"**Why:** {reason}")
+        notes = list(getattr(result, "notes", []) or [])
+        if notes:
+            lines.append("\n**Program constraints:**\n" + "\n".join(f"- {n}" for n in notes[:6]))
+        return "\n".join(lines)
+
+    def _resolve_scope(self, target: str) -> Any:
+        from scope_guard import resolve_scope
+        return resolve_scope(target)
+
+    def cmd_scope(self, *args: str) -> None:
+        target = " ".join(args).strip() or getattr(self.agent, "target", "")
+        if not target:
+            warn("usage: /scope <host>")
+            return
+        result = self._resolve_scope(target)
+        self.history.append({"role": "user", "content": f"/scope {target}"})
+        self.history.append({"role": "assistant", "content": self._scope_result_text(result)})
+        self.console.print(Markdown(self._scope_result_text(result)))
+
     def cmd_target(self, *args: str) -> None:
         target = " ".join(args).strip() or Prompt.ask("target", console=self.console).strip()
         if not target:
@@ -234,6 +299,34 @@ class ConsoleApp:
         if self.background.active():
             warn("a background assessment is already running")
             return
+
+        # Scope is resolved before the LLM or autonomous loop gets control.
+        result = self._resolve_scope(target)
+        self.history.append({"role": "user", "content": f"target {target}"})
+        self.history.append({"role": "assistant", "content": self._scope_result_text(result)})
+        self.console.print(Markdown(self._scope_result_text(result)))
+
+        state = getattr(result, "state", "unknown")
+        if state == "verified_out_of_scope":
+            warn("assessment not started: the public program was found, but this exact target is outside its declared scope")
+            return
+        if state == "unknown":
+            warn("assessment not started: no trusted public program or explicit scope source was verified")
+            warn("for an authorized engagement, provide a scope URL via X19_SCOPE_URL or create an X19 engagement profile")
+            return
+
+        # Public-program discovery is evidence about scope, not a blanket grant
+        # to attack. Require an explicit confirmation of the program rules.
+        program = getattr(result, "program", "public program") or "public program"
+        confirm = Prompt.ask(
+            f"Proceed with active assessment under {program} rules? [y/N]",
+            console=self.console,
+            default="N",
+        ).strip().lower()
+        if confirm not in {"y", "yes"}:
+            info("assessment cancelled")
+            return
+
         try:
             task = self.background.start(
                 "Assessment",
@@ -244,7 +337,6 @@ class ConsoleApp:
                 self.agent.target = target
             except Exception:
                 pass
-            self.history.append({"role": "assistant", "content": f"Started background assessment for **{target}**. I’ll keep the terminal quiet and surface the final findings here."})
             ok(f"background assessment started · task {task.id}")
         except Exception as exc:
             warn(f"could not start background assessment: {exc}")
