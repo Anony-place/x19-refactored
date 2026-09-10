@@ -5,6 +5,7 @@ from execution.command_request import CommandRequest, CommandResult, PolicyVerdi
 from execution.policy_engine import ExecutionPolicy, PolicyEngine, policy_from_config
 from execution.sandbox import SandboxExecutor, SandboxPolicy
 from execution.memory_kernel import MemoryKernel, MemorySnapshot, MemoryItem
+from execution.security_memory_v2 import SecurityMemory, SecurityMemorySnapshot
 
 __all__ = [
     "CommandGateway",
@@ -20,4 +21,6 @@ __all__ = [
     "MemoryKernel",
     "MemorySnapshot",
     "MemoryItem",
+    "SecurityMemory",
+    "SecurityMemorySnapshot",
 ]
