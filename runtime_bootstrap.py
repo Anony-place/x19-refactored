@@ -45,3 +45,30 @@ def install_runtime_fixes() -> None:
         ProxyManager.proxy_url = proxy_url
     except Exception:
         pass
+
+    # The TUI's /model command must mutate the existing X19 runtime rather
+    # than merely changing a config value. This keeps target, session, memory,
+    # planner and mission identity intact while selecting a different model.
+    try:
+        from ui.app import ConsoleApp
+        from runtime.model_control import switch_model
+
+        def cmd_model(self, *args: str) -> None:
+            from ui.console import ok, warn
+            from rich.prompt import Prompt
+
+            name = " ".join(args).strip() or Prompt.ask("model", console=self.console).strip()
+            if not name:
+                warn("usage: /model <name>")
+                return
+            try:
+                active = switch_model(self.agent, name)
+            except Exception as exc:
+                warn(str(exc))
+                return
+            ok(f"X19 model switched live → {active}")
+
+        ConsoleApp.cmd_model = cmd_model
+    except Exception:
+        # UI is optional on non-interactive CLI paths.
+        pass
