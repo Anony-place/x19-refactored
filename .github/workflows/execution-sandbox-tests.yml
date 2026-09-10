@@ -24,4 +24,7 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run sandbox unit tests
-        run: python -m pytest -q tests/test_sandbox.py tests/test_command_gateway_sandbox.py
+        working-directory: tests
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -q test_sandbox.py test_command_gateway_sandbox.py

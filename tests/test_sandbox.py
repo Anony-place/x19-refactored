@@ -18,7 +18,8 @@ def test_sandbox_command_is_hardened(tmp_path: Path):
 
     command = sandbox._docker_command("printf 'ok'")
 
-    assert command[:3] == ["docker", "run", "--rm"]
+    assert Path(command[0]).name == "docker"
+    assert command[1:3] == ["run", "--rm"]
     assert "--network" in command and command[command.index("--network") + 1] == "none"
     assert "--read-only" in command
     assert command[command.index("--cap-drop") + 1] == "ALL"
