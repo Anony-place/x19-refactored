@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from config import CONFIG
 from execution.command_request import CommandRequest, CommandResult, utc_now
 from execution.policy_engine import ExecutionPolicy, PolicyEngine
 from execution.sandbox import SandboxExecutor
@@ -25,7 +26,8 @@ class CommandGateway:
     ):
         self.executor = executor
         self.policy_engine = policy_engine or PolicyEngine(ExecutionPolicy())
-        self.sandbox = sandbox or SandboxExecutor(executor.workspace)
+        workspace = getattr(executor, "workspace", None) or CONFIG.WORKSPACE
+        self.sandbox = sandbox or SandboxExecutor(workspace)
 
     def run(self, request: CommandRequest) -> CommandResult:
         verdict = self.policy_engine.evaluate(request)
@@ -41,8 +43,8 @@ class CommandGateway:
 
         backend = (request.backend or "auto").strip().lower()
         if backend == "host":
-            # Explicit operator-only escape hatch for compatibility/debugging.
-            # Autonomous paths should remain on the default sandbox backend.
+            # Explicit compatibility/debug escape hatch. Autonomous paths use
+            # the default sandbox backend and never select host execution.
             result = self.executor.run(request.command, timeout=request.timeout)
         else:
             result = self.sandbox.run(request.command, timeout=request.timeout)
