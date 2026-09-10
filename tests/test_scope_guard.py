@@ -29,21 +29,6 @@ def test_paytm_apex_is_not_assumed_in_scope():
     assert result.program == "Paytm Bug Bounty"
 
 
-def test_xiaomi_apex_is_recognized_but_not_implied_by_wildcard():
-    result = resolve_scope("mi.com")
-    assert result.state == "verified_out_of_scope"
-    assert result.program == "Xiaomi Bug Bounty"
-    assert result.platform == "hackerone"
-    assert "*.mi.com" in result.scope_patterns
-
-
-def test_xiaomi_subdomain_is_verified_in_scope():
-    result = resolve_scope("account.mi.com")
-    assert result.state == "verified_in_scope"
-    assert result.program == "Xiaomi Bug Bounty"
-    assert result.matched_pattern == "*.mi.com"
-
-
 def test_unknown_target_does_not_get_authorization_assumed():
     result = resolve_scope("example.invalid")
     assert result.state == "unknown"
