@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Optional
 
+from config import CONFIG
 from execution.command_request import CommandRequest, CommandResult, utc_now
 from execution.policy_engine import ExecutionPolicy, PolicyEngine
+from execution.sandbox import SandboxExecutor
 from logging_utils import log
 from tools import ToolExecutor, ToolResult
 
@@ -11,17 +13,21 @@ from tools import ToolExecutor, ToolResult
 class CommandGateway:
     """Mandatory execution entry point for new architecture modules.
 
-    The gateway currently delegates to the legacy ToolExecutor after policy
-    approval. That keeps behavior stable while giving planners a typed boundary.
+    Policy is evaluated first, then commands are executed in the hardened
+    sandbox by default. ``backend=host`` is intentionally explicit and is not
+    selected by the autonomous agent automatically.
     """
 
     def __init__(
         self,
         executor: ToolExecutor,
         policy_engine: Optional[PolicyEngine] = None,
+        sandbox: Optional[SandboxExecutor] = None,
     ):
         self.executor = executor
         self.policy_engine = policy_engine or PolicyEngine(ExecutionPolicy())
+        workspace = getattr(executor, "workspace", None) or CONFIG.WORKSPACE
+        self.sandbox = sandbox or SandboxExecutor(workspace)
 
     def run(self, request: CommandRequest) -> CommandResult:
         verdict = self.policy_engine.evaluate(request)
@@ -34,9 +40,20 @@ class CommandGateway:
             f"[GATEWAY_START] {request.request_id} tool={request.tool or '?'} "
             f"risk={request.risk} backend={request.backend} cmd={request.command[:160]}"
         )
-        result = self.executor.run(request.command, timeout=request.timeout)
+
+        backend = (request.backend or "auto").strip().lower()
+        if backend == "host":
+            # Explicit compatibility/debug escape hatch. Autonomous paths use
+            # the default sandbox backend and never select host execution.
+            result = self.executor.run(request.command, timeout=request.timeout)
+        else:
+            result = self.sandbox.run(request.command, timeout=request.timeout)
+
         finished = utc_now()
-        log(f"[GATEWAY_EXIT] {request.request_id} rc={getattr(result, 'returncode', -1)}")
+        log(
+            f"[GATEWAY_EXIT] {request.request_id} rc={getattr(result, 'returncode', -1)} "
+            f"sandbox={backend != 'host'}"
+        )
         return CommandResult.from_tool_result(
             request,
             result,
@@ -53,6 +70,7 @@ class CommandGateway:
         timeout: int = 120,
         reason: str = "",
         risk: str = "normal",
+        backend: str = "auto",
         hypothesis_id: str = "",
         hypothesis: str = "",
         expected_evidence: str = "",
@@ -64,6 +82,7 @@ class CommandGateway:
             timeout=timeout,
             reason=reason,
             risk=risk,
+            backend=backend,
             hypothesis_id=hypothesis_id,
             hypothesis=hypothesis,
             expected_evidence=expected_evidence,
@@ -75,8 +94,8 @@ class CommandGateway:
 class GatewayExecutorAdapter:
     """ToolExecutor-compatible adapter backed by CommandGateway.
 
-    This lets legacy code keep calling .run(command, timeout) and .resolve_tool()
-    while execution passes through typed policy/audit hooks.
+    Legacy callers keep the existing ``.run(command, timeout)`` interface while
+    the gateway transparently moves execution into the sandbox.
     """
 
     def __init__(self, legacy_executor: ToolExecutor, gateway: CommandGateway):
