@@ -1,0 +1,22 @@
+name: Security memory v2 tests
+
+on:
+  pull_request:
+    paths:
+      - 'execution/security_memory_v2.py'
+      - 'tests/test_security_memory_v2.py'
+      - '.github/workflows/security-memory-v2-tests.yml'
+  push:
+    branches:
+      - feat/security-memory-v2
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run focused memory tests
+        run: python -m unittest tests/test_security_memory_v2.py -v
