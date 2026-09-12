@@ -18,6 +18,15 @@ from learning.self_adaptation import SelfAdaptationEngine
 
 
 class ScopeGuardTests(unittest.TestCase):
+    def test_enforced_empty_scope_fails_closed(self):
+        """Legal-boundary mode cannot emit traffic until scope is explicit."""
+        guard = ScopeGuard(enforce=True)
+
+        self.assertFalse(guard.is_allowed_host("example.com"))
+        self.assertFalse(guard.is_allowed_url("https://example.com"))
+        with self.assertRaises(ScopeViolationError):
+            guard.assert_allowed("https://example.com")
+
     def test_scope_guard_enforces_domain_and_ip(self):
         guard = ScopeGuard(allowed_targets={"example.com", "192.168.1.10", "10.0.0.0/24"}, enforce=True)
         

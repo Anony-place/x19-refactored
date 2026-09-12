@@ -116,6 +116,8 @@ class SwarmCoordinator:
         self._pipeline_thread: Optional[threading.Thread] = None
 
     def set_target(self, target: str) -> None:
+        if not isinstance(target, str) or not target.strip():
+            raise ValueError("An explicit authorized target is required before starting a mission.")
         self.target = target
         self.scope_guard.add_target(target)
         self.scope_guard.enforce = True
@@ -154,6 +156,8 @@ class SwarmCoordinator:
         """Execute the coordinated multi-agent assessment pipeline asynchronously."""
         if target:
             self.set_target(target)
+        if not self.target:
+            raise ValueError("An explicit authorized target is required before starting a mission.")
         
         self.is_running = True
         self.start_time = time.time()
@@ -493,6 +497,8 @@ class SwarmCoordinator:
             self.apply_profile(profile)
         if target:
             self.set_target(target)
+        if not self.target:
+            raise ValueError("An explicit authorized target is required before starting a mission.")
 
         budget_cfg = getattr(profile, "budget", None)
         guard_cfg = getattr(profile, "guardrails", None)

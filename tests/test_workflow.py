@@ -841,6 +841,14 @@ def _with_stub_fleet(findings=None):
 
 
 class CoordinatorWorkflowTests(unittest.TestCase):
+    def test_workflow_requires_an_explicit_target(self):
+        from brain.coordinator import SwarmCoordinator
+
+        coordinator = SwarmCoordinator()
+
+        with self.assertRaisesRegex(ValueError, "explicit authorized target"):
+            coordinator.run_workflow(max_cycles=1)
+
     def _profile(self, **overrides):
         import engagement as eng
 
