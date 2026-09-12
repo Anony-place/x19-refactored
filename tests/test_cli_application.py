@@ -26,6 +26,7 @@ import version as version_module
 from ui import widgets
 from ui.console import init_console
 from ui.dashboard import MissionDashboard, severity_summary
+from ui.app import ConsoleApp
 from ui.screens import (
     config_screen,
     doctor_screen,
@@ -422,6 +423,28 @@ class DashboardTests(unittest.TestCase):
         dash.load(SUMMARY, GRAPH)
         dash.run(once=True, start=False)
         self.assertIn("swarm agents", stream.getvalue())
+
+    def test_small_terminal_uses_the_scrollable_dashboard(self):
+        stream = io.StringIO()
+        console = Console(file=stream, width=80, height=24, force_terminal=True, theme=X19_THEME)
+        dash = MissionDashboard(version="1.0.0", console=console)
+        dash.load(SUMMARY, GRAPH)
+        dash.run(start=False, headless=False, wait=False)
+        self.assertIn("swarm agents", stream.getvalue())
+        self.assertNotIn("RAW\n     FINDINGS", stream.getvalue())
+
+    def test_chat_workspace_hides_sidebar_in_a_narrow_terminal(self):
+        app = ConsoleApp(version="1.0.0")
+        app.console = Console(file=io.StringIO(), width=80, height=24, force_terminal=False, theme=X19_THEME)
+
+        text = render(app._workspace(), width=80)
+        self.assertIn("/help for commands", text)
+        self.assertNotIn("NEW CHAT", text)
+
+    def test_header_bar_truncates_an_overlong_target(self):
+        text = render(widgets.header_bar("1.0.0", target="very-long-target-name." + "example." * 12), width=80)
+        self.assertIn("very-long-target-name", text)
+        self.assertIn("…", text)
 
 
 class _FakeLive:

@@ -104,7 +104,10 @@ def header_bar(
     right = Text()
     if target:
         right.append("target ", style="grey50")
-        right.append(target, style="bold bright_white")
+        # Targets regularly include long generated preview domains.  Keeping
+        # them bounded preserves the mission status and elapsed time instead
+        # of allowing one value to collapse the entire top bar.
+        right.append(truncate(target, 28), style="bold bright_white")
         right.append("   ", style="grey37")
     if mode:
         right.append("mode ", style="grey50")

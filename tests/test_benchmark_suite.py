@@ -198,9 +198,8 @@ class BenchmarkSuiteTests(unittest.TestCase):
 
         res = vuln_engine.test_idor(url, baseline_token="token-user-a", target_user_id="102", headers=headers)
         self.assertIsNotNone(res)
-        if res:
-            self.assertIn("IDOR", res.title.upper())
-            self.assertIn("FLAG{IDOR_BOLA_VERIFIED_SUCCESS}", res.evidence)
+        self.assertIn("IDOR", res.title.upper())
+        self.assertIn("FLAG{IDOR_BOLA_VERIFIED_SUCCESS}", res.evidence)
 
     def test_sql_injection_differential_detection(self):
         """Verify SQL injection anomaly detection via response differential."""
@@ -209,9 +208,8 @@ class BenchmarkSuiteTests(unittest.TestCase):
 
         res = vuln_engine.test_sqli(target_url, param="q")
         self.assertIsNotNone(res)
-        if res:
-            self.assertIn("SQL", res.title.upper())
-            self.assertIn("Syntax error in SQL statement", res.evidence)
+        self.assertIn("SQL", res.title.upper())
+        self.assertIn("Syntax error in SQL statement", res.evidence)
 
 
 if __name__ == "__main__":

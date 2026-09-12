@@ -142,13 +142,27 @@ class ConsoleApp:
                 chat_parts.append(Panel(f"[red]✗[/] {last.label}: {last.error[:180]}", title="background", border_style="red"))
 
         main = Layout(name="main")
+        compact = self.console.width < 100
+        target_display = widgets.truncate(target, 22 if compact else 42)
+        provider_display = widgets.truncate(provider, 16 if compact else 30)
+        header = (
+            f"[bold bright_cyan]X19[/]   [bold]Target:[/] {target_display}   "
+            f"[bold]Provider:[/] {provider_display}   [bold]Tasks:[/] {len(active)}"
+        )
+        if compact:
+            header += "   [grey62]/help for commands[/]"
         main.split_column(
-            Layout(Panel(f"[bold bright_cyan]X19[/]   [bold]Target:[/] {target}   [bold]Provider:[/] {provider}   [bold]Tasks:[/] {len(active)}", border_style="grey37", padding=(0, 1)), name="header", size=3),
+            Layout(Panel(header, border_style="grey37", padding=(0, 1)), name="header", size=3),
             Layout(Panel(Group(*chat_parts), border_style="grey23", padding=(0, 1)), name="conversation", ratio=1),
             Layout(Panel("[bold magenta]you ›[/] _", border_style="grey37", height=3, padding=(0, 1)), name="composer", size=3),
         )
         root = Layout(name="root")
-        root.split_row(Layout(Panel(sidebar, border_style="grey23", padding=(1, 1)), name="sidebar", size=27), main)
+        if compact:
+            # Do not squeeze the conversation below a usable width.  The full
+            # command index remains available through /help.
+            root.split_column(main)
+        else:
+            root.split_row(Layout(Panel(sidebar, border_style="grey23", padding=(1, 1)), name="sidebar", size=27), main)
         return root
 
     def _draw(self) -> None:

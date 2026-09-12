@@ -44,6 +44,12 @@ KEY_BINDINGS = [
 #: How long the mission must look finished before the view lets go.
 SETTLE_SECONDS = 2.0
 
+# The full dashboard needs enough room for two panel columns, a log and a task
+# queue.  Below these dimensions Rich must crop meaningful state, so use the
+# scrollable renderer instead of presenting a visually broken TUI.
+MIN_LIVE_WIDTH = 100
+MIN_LIVE_HEIGHT = 30
+
 
 def severity_summary(counts: Dict[str, int]) -> str:
     """``critical:1 high:2`` — the compact finding roll-up in a panel corner."""
@@ -152,6 +158,26 @@ class MissionDashboard:
     def stats(self) -> Dict[str, int]:
         return dict(self._summary.get("stats") or {})
 
+    def _metrics(self, *, compact: bool = False) -> List[tuple[str, Any, str]]:
+        """Return the KPI set that fits the active dashboard layout."""
+        stats = self.stats()
+        counts = widgets.findings_by_severity(self.findings())
+        metrics = [
+            ("open ports", stats.get("open_ports", 0), "cyan"),
+            ("endpoints", stats.get("endpoints", 0), "magenta"),
+            ("verified", stats.get("verified_findings", 0), "bright_green"),
+            ("critical", counts.get("critical", 0), "bright_red"),
+        ]
+        if compact:
+            return metrics
+        return [
+            *metrics[:2],
+            ("raw findings", stats.get("raw_findings", 0), "yellow"),
+            *metrics[2:],
+            ("queued", stats.get("pending_tasks", 0), "grey74"),
+            ("elapsed", widgets.human_duration(self.elapsed()), "bright_white"),
+        ]
+
     def findings(self) -> List[Dict[str, Any]]:
         return list(self._summary.get("verified_findings") or [])
 
@@ -191,17 +217,7 @@ class MissionDashboard:
             mode=str(summary.get("mode") or ""),
         )
 
-        strip = widgets.metric_strip(
-            [
-                ("open ports", stats.get("open_ports", 0), "cyan"),
-                ("endpoints", stats.get("endpoints", 0), "magenta"),
-                ("raw findings", stats.get("raw_findings", 0), "yellow"),
-                ("verified", stats.get("verified_findings", 0), "bright_green"),
-                ("critical", counts.get("critical", 0), "bright_red"),
-                ("queued", stats.get("pending_tasks", 0), "grey74"),
-                ("elapsed", widgets.human_duration(self.elapsed()), "bright_white"),
-            ]
-        )
+        strip = widgets.metric_strip(self._metrics())
 
         agents = widgets.panel(
             "swarm agents",
@@ -300,19 +316,7 @@ class MissionDashboard:
                     mode=str(summary.get("mode") or ""),
                 )
             ),
-            chrome(
-                widgets.metric_strip(
-                    [
-                        ("open ports", stats.get("open_ports", 0), "cyan"),
-                        ("endpoints", stats.get("endpoints", 0), "magenta"),
-                        ("raw findings", stats.get("raw_findings", 0), "yellow"),
-                        ("verified", stats.get("verified_findings", 0), "bright_green"),
-                        ("critical", counts.get("critical", 0), "bright_red"),
-                        ("queued", stats.get("pending_tasks", 0), "grey74"),
-                        ("elapsed", widgets.human_duration(self.elapsed()), "bright_white"),
-                    ]
-                )
-            ),
+            chrome(widgets.metric_strip(self._metrics(compact=self.console.width < MIN_LIVE_WIDTH))),
             widgets.panel(
                 "swarm agents",
                 widgets.agents_table(summary.get("agents") or []),
@@ -390,11 +394,24 @@ class MissionDashboard:
             return self.refresh_state()
 
         interactive = key_capture_supported() if headless is None else not headless
-        if not interactive:
+        terminal_is_too_small = (
+            self.console.width < MIN_LIVE_WIDTH
+            or self.console.height < MIN_LIVE_HEIGHT
+        )
+        if not interactive or terminal_is_too_small:
             return self._run_polling(wait=wait, timeout=timeout)
         return self._run_live(timeout=timeout, wait=wait)
 
     def _run_live(self, *, timeout: Optional[float], wait: bool) -> Dict[str, Any]:
+        # A caller that asked not to wait needs a useful, durable snapshot.  Rich's
+        # alternate-screen live renderer is intentionally ephemeral, so it can
+        # produce no readable output when the process exits immediately (notably
+        # for programmatic callers and redirected terminal adapters).  Render the
+        # same complete dashboard used by the non-interactive path instead.
+        if not wait:
+            self.console.print(self.scrolling_frame())
+            return self.refresh_state()
+
         settled: Optional[float] = None
         with KeyListener() as keys:
             with Live(

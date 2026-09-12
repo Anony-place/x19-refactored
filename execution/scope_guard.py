@@ -83,8 +83,11 @@ class ScopeGuard:
         if not self.enforce:
             return True
         if not self.allowed_raw:
-            # If no scope configured, permissive by default unless enforced
-            return True
+            # An enforced guard without an explicitly authorized target must
+            # never create a network escape hatch.  Callers that deliberately
+            # need unrestricted local behaviour must opt out with
+            # ``enforce=False`` instead of inheriting a permissive default.
+            return False
 
         cleaned = self._clean_target(host)
         if not cleaned:
@@ -114,8 +117,10 @@ class ScopeGuard:
 
     def is_allowed_url(self, url: str) -> bool:
         """Check if a complete URL is inside the allowed scope."""
-        if not self.enforce or not self.allowed_raw:
+        if not self.enforce:
             return True
+        if not self.allowed_raw:
+            return False
         try:
             parsed = urllib.parse.urlparse(url if "://" in url else f"http://{url}")
             host = parsed.hostname
@@ -129,8 +134,12 @@ class ScopeGuard:
         """Validate whether a redirect destination remains in scope.
         Raises ScopeViolationError if the redirect escapes allowed scope.
         """
-        if not self.enforce or not self.allowed_raw:
+        if not self.enforce:
             return True
+        if not self.allowed_raw:
+            raise ScopeViolationError(
+                "Redirect blocked: no authorized scope configured."
+            )
         if not redirect_target:
             return True
 
