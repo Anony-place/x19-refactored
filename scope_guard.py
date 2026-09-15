@@ -67,6 +67,26 @@ TRUSTED_SOURCES = (
             "Automated scanner-generated reports are excluded.",
         ),
     ),
+    ProgramSource(
+        name="Xiaomi Bug Bounty",
+        platform="hackerone",
+        scope_url="https://hackerone.com/xiaomi",
+        program_url="https://hackerone.com/xiaomi",
+        patterns=(
+            "*.mi.com", "*.miui.com", "*.xiaomiyoupin.com", "*.miwifi.com",
+            "*.xiaomi.market", "*.xiaomi.com", "*.mi.cn", "*.mifile.cn",
+            "*.migames.com", "*.mipay.com", "*.mios.cn", "*.miot-spec.org",
+            "*.mijiayoupin.com", "*.duokan.com", "*.aleenote.com", "*.aleenote.cn",
+            "*.baoliyun.com", "*.airstar.com", "*.airstar-finance.com",
+            "*.airstarfinance.net", "*.miinsurtech.com", "*.miinsurtech.net",
+            "*.miinsurtech.cn", "*.mioffice.cn", "*.hongyuanib.com",
+        ),
+        notes=(
+            "Scope is based on Xiaomi's public HackerOne program metadata.",
+            "The wildcard *.mi.com covers subdomains; the mi.com apex is not implied by that wildcard.",
+            "Verify the live HackerOne program rules before active testing or submission.",
+        ),
+    ),
 )
 
 

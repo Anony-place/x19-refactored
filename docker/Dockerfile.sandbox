@@ -1,0 +1,25 @@
+FROM kalilinux/kali-rolling:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates \
+       curl \
+       dnsutils \
+       git \
+       gobuster \
+       ffuf \
+       nmap \
+       python3 \
+       python3-pip \
+       sqlmap \
+       wget \
+       whois \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# X19's runtime hardening is applied by docker run, not by this image.
+# Do not add docker.sock, host mounts, privileged mode, or host networking.
+CMD ["/bin/sh"]
