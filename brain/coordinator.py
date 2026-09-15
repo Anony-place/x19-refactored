@@ -2,6 +2,18 @@
 X19 Swarm Coordinator (Meta-Agent).
 Coordinates parallel specialized agents, synchronizes findings with the World Model
 and Attack Graph, streams live events, and manages prioritized task queue orchestration.
+
+P0 REMEDIATION:
+- WorldModel is the canonical source of truth (not TargetModel, GoalTree, etc.)
+- DecisionEngine is the single canonical next-action selector
+- Every coordination cycle runs: EvidenceRanking → Hypotheses → Strategist → Decision
+- Strategic goals generate candidate experiments
+- The selected experiment IS the action executed (not task queue override)
+- Every executed action carries hypothesis/evidence metadata
+- Every observation updates WorldModel
+- Every WorldModel update invalidates derived state
+- LoopGuard success detection uses explicit terminal states
+- CommandGateway initialized with policy_from_config
 """
 
 from __future__ import annotations
@@ -16,10 +28,18 @@ from brain.agents.web_agent import WebAgent
 from brain.agents.vuln_agent import VulnAgent
 from brain.agents.verifier_agent import VerifierAgent
 from brain.agents.critic_agent import CriticAgent
-from brain.attack_graph import AttackGraph, GraphNode, GraphEdge
+from brain.attack_graph import (
+    AttackGraph, GraphNode, GraphEdge,
+    EDGE_HOST_HAS_SERVICE, EDGE_SERVICE_SERVES_ENDPOINT,
+    EDGE_ENDPOINT_VULNERABLE_TO, NODE_STATE_OBSERVED, NODE_STATE_IDENTIFIED,
+    NODE_STATE_CONFIRMED, NODE_STATE_TESTABLE, NODE_STATE_VALIDATED,
+    NODE_STATE_UNKNOWN,
+)
 from brain.evidence_ranking import EvidenceRankingEngine, RankedEvidence
-from brain.hypothesis_engine import MultiHypothesisEngine
+from brain.hypothesis_engine import MultiHypothesisEngine, HYP_TESTING, HYP_CONFIRMED, HYP_REJECTED
 from brain.strategist_engine import StrategistEngine
+from brain.decision_engine import DecisionEngine, CandidateExperiment, DecisionRecord
+from brain.world_model import WorldModel, Observation, ServiceRecord, EndpointRecord, VulnerabilityRecord, EvidenceRecord
 from brain.workflow import (
     ACTION_EXPLOIT,
     ACTION_SWARM,
@@ -43,14 +63,18 @@ from execution.scope_guard import ScopeGuard, ScopeViolationError
 
 @dataclass
 class SwarmEvent:
-    event_type: str  # "log", "agent_status", "finding", "port", "endpoint", "task_update", "graph_update"
+    event_type: str
     sender: str
     data: Dict[str, Any]
     timestamp: float = field(default_factory=time.time)
 
 
 class SwarmCoordinator:
-    """Master orchestrator for the X19 parallel cognitive agent swarm."""
+    """Master orchestrator for the X19 parallel cognitive agent swarm.
+
+    P0: The coordinator maintains a single WorldModel as the canonical state,
+    and the DecisionEngine selects every next action.
+    """
 
     def __init__(self, target: str = "", scope_guard: Optional[ScopeGuard] = None):
         self.target = target
@@ -77,18 +101,17 @@ class SwarmCoordinator:
             self.critic_agent,
         ]
 
-        # Cognitive Engines & State
+        # P0: Canonical cognitive engines
+        self.world_model = WorldModel(target=target)
         self.attack_graph = AttackGraph()
         self.evidence_engine = EvidenceRankingEngine()
         self.strategist = StrategistEngine()
         self.strategy_library = StrategyLibrary()
         self.hypothesis_engine = MultiHypothesisEngine()
+        self.decision_engine = DecisionEngine()
 
-        # Workflow state. Initialised to usable defaults rather than None so a
-        # single stage can be driven on its own (and so a stage reached before
-        # run_workflow finished LEARN cannot crash on a missing attribute).
-        # run_workflow replaces each of these per mission.
-        self.profile = None  # EngagementProfile, set by apply_profile()
+        # Workflow state
+        self.profile = None
         self.workflow = WorkflowRun(target=target)
         self.plan = MissionPlan(target=target, objective="autonomous assessment")
         self.loop_guard = LoopGuard()
@@ -114,16 +137,19 @@ class SwarmCoordinator:
         self._lock = threading.Lock()
         self._worker_threads: List[threading.Thread] = []
         self._pipeline_thread: Optional[threading.Thread] = None
+        # Track last world model snapshot for evidence delta detection
+        self._last_wm_snapshot: Optional[Any] = None
 
     def set_target(self, target: str) -> None:
         if not isinstance(target, str) or not target.strip():
             raise ValueError("An explicit authorized target is required before starting a mission.")
         self.target = target
+        self.world_model.target = target
+        self.world_model.ensure_host(target)
         self.scope_guard.add_target(target)
         self.scope_guard.enforce = True
 
     def subscribe_events(self, callback: Callable[[Dict[str, Any]], None]) -> None:
-        """Register an event listener for live UI updates."""
         self.subscribers.append(callback)
 
     def publish_log(self, sender: str, message: str) -> None:
@@ -140,12 +166,7 @@ class SwarmCoordinator:
         event = SwarmEvent(event_type=event_type, sender=sender, data=data)
         with self._lock:
             self.events.append(event)
-        payload = {
-            "type": event_type,
-            "sender": sender,
-            "data": data,
-            "timestamp": event.timestamp
-        }
+        payload = {"type": event_type, "sender": sender, "data": data, "timestamp": event.timestamp}
         for sub in list(self.subscribers):
             try:
                 sub(payload)
@@ -153,104 +174,69 @@ class SwarmCoordinator:
                 pass
 
     def start_mission_pipeline(self, target: Optional[str] = None) -> threading.Thread:
-        """Execute the coordinated multi-agent assessment pipeline asynchronously."""
         if target:
             self.set_target(target)
         if not self.target:
             raise ValueError("An explicit authorized target is required before starting a mission.")
-        
         self.is_running = True
         self.start_time = time.time()
-        self.publish_log("Coordinator", f"🚀 Launching Prioritized Swarm Mission on target: {self.target}")
-        
-        # Initialize target node in attack graph
+        self.publish_log("Coordinator", f"Launching Prioritized Swarm Mission on target: {self.target}")
         self.target_node = self.attack_graph.add_node(
-            node_type="host",
-            label=f"Target: {self.target}",
-            value_score=1.0
+            node_type="host", label=f"Target: {self.target}", value_score=1.0
         )
-
-        # Seed initial tasks into queue
         self._seed_initial_tasks()
-
-        self._pipeline_thread = threading.Thread(
-            target=self._run_pipeline,
-            daemon=True,
-            name="Coordinator-Pipeline"
-        )
+        self._pipeline_thread = threading.Thread(target=self._run_pipeline, daemon=True, name="Coordinator-Pipeline")
         self._pipeline_thread.start()
         return self._pipeline_thread
 
     def _seed_initial_tasks(self) -> None:
-        """Seed high-priority recon and web tasks."""
-        # Task 1: Network & port scan
         recon_task = AgentTask(
-            priority=1,
-            task_id=f"task_recon_{int(time.time()*1000)}",
-            task_type="recon",
-            target=self.target,
-            params={"mode": "standard_ports"}
+            priority=1, task_id=f"task_recon_{int(time.time()*1000)}",
+            task_type="recon", target=self.target, params={"mode": "standard_ports"}
         )
         self.task_queue.push(recon_task)
-
-        # Task 2: Web surface discovery
         web_task = AgentTask(
-            priority=2,
-            task_id=f"task_web_{int(time.time()*1000)}",
-            task_type="web_fuzz",
-            target=self.target,
-            params={"wordlist": "default"}
+            priority=2, task_id=f"task_web_{int(time.time()*1000)}",
+            task_type="web_fuzz", target=self.target, params={"wordlist": "default"}
         )
         self.task_queue.push(web_task)
-
-        # Task 3: Metacognitive supervisor
         critic_task = AgentTask(
-            priority=5,
-            task_id=f"task_critic_{int(time.time()*1000)}",
-            task_type="reflect",
-            target=self.target,
-            params={}
+            priority=5, task_id=f"task_critic_{int(time.time()*1000)}",
+            task_type="reflect", target=self.target, params={}
         )
         self.task_queue.push(critic_task)
 
     def _run_pipeline(self) -> None:
-        """Main event-driven reactive swarm loop."""
         try:
-            # Stage 1: Execute initial parallel tasks
-            self.publish_log("Coordinator", "⚡ STAGE 1: Processing Initial Recon & Surface Mapping...")
+            self.publish_log("Coordinator", "STAGE 1: Processing Initial Recon & Surface Mapping...")
             t_recon = self.recon_agent.start_async(self.target)
             t_web = self.web_agent.start_async(self.target)
             self.critic_agent.start_async(self.target)
-
             t_recon.join(timeout=45)
             t_web.join(timeout=45)
+            self._sync_world_model_from_agents()
 
-            # Stage 2: Security & Vulnerability Audits
-            self.publish_log("Coordinator", "🔍 STAGE 2: Launching VulnAgent on discovered attack surface...")
+            self.publish_log("Coordinator", "STAGE 2: Launching VulnAgent on discovered attack surface...")
             t_vuln = self.vuln_agent.start_async(self.target)
             t_vuln.join(timeout=60)
+            self._sync_world_model_from_agents()
 
-            # Stage 3: Deterministic PoC Verification (Zero False-Positive Gate)
-            self.publish_log("Coordinator", "🛡️ STAGE 3: Launching VerifierAgent for PoC verification...")
+            self.publish_log("Coordinator", "STAGE 3: Launching VerifierAgent for PoC verification...")
             t_verif = self.verifier_agent.start_async(self.target, findings=self.raw_findings)
             t_verif.join(timeout=45)
+            self._sync_world_model_from_agents()
 
-            # Stage 4: Process any dynamically queued tasks
             self._process_dynamic_queue()
-
-            # Stage 5: Synthesis & Learning
             self._finalize_mission()
-
         except Exception as e:
-            self.publish_log("Coordinator", f"❌ Mission error: {str(e)}")
+            self.publish_log("Coordinator", f"Mission error: {str(e)}")
         finally:
             self.is_running = False
             self.end_time = time.time()
-            self.publish_log("Coordinator", f"🏁 Swarm mission finished in {self.end_time - self.start_time:.1f}s")
+            self.publish_log("Coordinator", f"Swarm mission finished in {self.end_time - self.start_time:.1f}s")
             self._emit("mission_completed", "Coordinator", self.get_summary())
 
     def _process_dynamic_queue(self) -> None:
-        """Process any remaining tasks in task queue."""
         while self.is_running and self.task_queue.pending_count() > 0:
             task = self.task_queue.pop()
             if not task:
@@ -264,17 +250,20 @@ class SwarmCoordinator:
                     self.task_queue.mark_completed(task.task_id, "audited")
                 else:
                     self.task_queue.mark_completed(task.task_id, "processed")
+                self._sync_world_model_from_agents()
             except Exception as ex:
                 self.task_queue.mark_failed(task.task_id, str(ex))
 
     def stop_mission(self) -> None:
-        """Emergency stop for all active agents in swarm."""
-        self.publish_log("Coordinator", "🛑 Emergency stop triggered! Halting all agents.")
+        self.publish_log("Coordinator", "Emergency stop triggered! Halting all agents.")
         self.task_queue.cancel_all()
         for agent in self.agents:
             agent.stop()
         self.is_running = False
 
+    # ==================================================================
+    # P0: WorldModel as canonical state — registrations update WorldModel
+    # ==================================================================
     def register_port(self, host: str, port: int, service: str, banner: str, tls_info: Dict[str, str]) -> None:
         with self._lock:
             port_data = {
@@ -282,34 +271,46 @@ class SwarmCoordinator:
                 "banner": banner, "tls_info": tls_info
             }
             self.discovered_ports.append(port_data)
-            
-            # Add to AttackGraph
+
+            # P0: Update WorldModel as canonical state
+            host_record = self.world_model.ensure_host(host)
+            svc_key = f"{port}/tcp"
+            if svc_key not in host_record.services:
+                host_record.services[svc_key] = ServiceRecord(
+                    port=port, proto="tcp", service=service, version=banner
+                )
+                host_record.services[svc_key].confidence = 0.7
+
+            # P0: Update attack graph with typed relationship
             target_node = getattr(self, "target_node", None)
             if not target_node:
                 target_node = self.attack_graph.add_node("host", f"Target: {host}", value_score=1.0)
                 self.target_node = target_node
-                
             port_node = self.attack_graph.add_node(
-                node_type="service",
-                label=f"{service}:{port}",
-                value_score=0.6
+                node_type="service", label=f"{service}:{port}",
+                value_score=0.6, state=NODE_STATE_OBSERVED,
+                properties={"port": port, "service": service, "banner": banner},
             )
-            self.attack_graph.add_edge(
-                source_node=target_node.id,
-                target_node=port_node.id,
-                edge_type="runs"
-            )
+            self.attack_graph.add_edge(target_node.id, port_node.id, EDGE_HOST_HAS_SERVICE, confidence=0.95)
 
-        # Dynamic Reactive Dispatch: If port is HTTP/HTTPS, queue targeted web fuzz task
+            # P0: Record observation in WorldModel
+            self.world_model.ingest(Observation(
+                kind="port", source="ReconAgent",
+                data=port_data, confidence=0.7,
+            ))
+
+            # P0: Add evidence to ranking engine
+            self.evidence_engine.add_evidence(RankedEvidence(
+                id=f"port-{port}-{service}", source="ReconAgent", kind="port",
+                data={"port": port, "service": service, "banner": banner, "proto": "tcp"},
+            ))
+
         if port in (80, 443, 8000, 8080, 8443, 8888, 5000, 3000):
             scheme = "https" if port in (443, 8443) else "http"
             url_target = f"{scheme}://{host}:{port}" if port not in (80, 443) else f"{scheme}://{host}"
             self.task_queue.push(AgentTask(
-                priority=2,
-                task_id=f"task_web_port_{port}_{int(time.time()*1000)}",
-                task_type="web_fuzz",
-                target=url_target,
-                params={"port": port}
+                priority=2, task_id=f"task_web_port_{port}_{int(time.time()*1000)}",
+                task_type="web_fuzz", target=url_target, params={"port": port}
             ))
 
         self._emit("port_discovered", "ReconAgent", port_data)
@@ -322,31 +323,44 @@ class SwarmCoordinator:
             }
             self.discovered_endpoints.append(ep_data)
 
-            # Add to AttackGraph
+            # P0: Update WorldModel
+            host_record = self.world_model.ensure_host(target)
+            method = "GET"
+            ep_key = f"{method} {path}"
+            if ep_key not in host_record.endpoints:
+                host_record.endpoints[ep_key] = EndpointRecord(
+                    url=path, method=method, status=status_code,
+                )
+
+            # P0: Update attack graph with typed relationship
             target_node = getattr(self, "target_node", None)
             if not target_node:
                 target_node = self.attack_graph.add_node("host", f"Target: {target}", value_score=1.0)
                 self.target_node = target_node
-
             ep_node = self.attack_graph.add_node(
-                node_type="endpoint",
-                label=f"{path} [{status_code}]",
-                value_score=0.85 if is_interesting else 0.4
+                node_type="endpoint", label=f"{path} [{status_code}]",
+                value_score=0.85 if is_interesting else 0.4,
+                state=NODE_STATE_OBSERVED,
+                properties={"url": path, "method": method, "status": status_code, "interesting": is_interesting},
             )
-            self.attack_graph.add_edge(
-                source_node=target_node.id,
-                target_node=ep_node.id,
-                edge_type="contains"
-            )
+            self.attack_graph.add_edge(target_node.id, ep_node.id, "contains", confidence=0.9)
 
-        # Dynamic Reactive Dispatch: Queue vuln audit for interesting endpoints
+            # P0: Record observation
+            self.world_model.ingest(Observation(
+                kind="endpoint", source="WebAgent",
+                data=ep_data, confidence=0.6,
+            ))
+
+            # P0: Add evidence to ranking engine
+            self.evidence_engine.add_evidence(RankedEvidence(
+                id=f"endpoint-{path}", source="WebAgent", kind="endpoint",
+                data={"url": path, "method": method, "status": status_code, "interesting": is_interesting},
+            ))
+
         if is_interesting:
             self.task_queue.push(AgentTask(
-                priority=2,
-                task_id=f"task_audit_ep_{hash(path)%100000}_{int(time.time()*1000)}",
-                task_type="vuln_audit",
-                target=target,
-                params={"path": path}
+                priority=2, task_id=f"task_audit_ep_{hash(path)%100000}_{int(time.time()*1000)}",
+                task_type="vuln_audit", target=target, params={"path": path}
             ))
 
         self._emit("endpoint_discovered", "WebAgent", ep_data)
@@ -354,40 +368,56 @@ class SwarmCoordinator:
     def register_finding(self, finding: VulnerabilityFinding) -> None:
         with self._lock:
             self.raw_findings.append(finding)
-        
-        # Dynamic Reactive Dispatch: Queue immediate PoC verification task
+
+            # P0: Update WorldModel
+            target = getattr(finding, "target", self.target)
+            host_record = self.world_model.ensure_host(target)
+            host_record.vulnerabilities.append(VulnerabilityRecord(
+                title=getattr(finding, "title", ""),
+                severity=getattr(finding, "severity", "info"),
+                description=getattr(finding, "description", ""),
+                evidence=[EvidenceRecord(source="VulnAgent", summary=getattr(finding, "evidence", "")[:500], confidence=0.5)],
+                confidence=0.4,
+            ))
+
+            # P0: Add evidence to ranking engine
+            self.evidence_engine.add_evidence(RankedEvidence(
+                id=f"vuln-{getattr(finding, 'title', '')[:32]}",
+                source="VulnAgent", kind="vulnerability",
+                data={"title": getattr(finding, "title", ""), "severity": getattr(finding, "severity", "info"),
+                      "endpoint": getattr(finding, "endpoint", "")},
+            ))
+
         self.task_queue.push(AgentTask(
-            priority=1,
-            task_id=f"task_verify_{hash(finding.title)%100000}_{int(time.time()*1000)}",
-            task_type="verify",
-            target=finding.target,
+            priority=1, task_id=f"task_verify_{hash(finding.title)%100000}_{int(time.time()*1000)}",
+            task_type="verify", target=finding.target,
             params={"finding_title": finding.title, "endpoint": finding.endpoint}
         ))
-
         self._emit("finding_detected", "VulnAgent", asdict(finding))
 
     def mark_finding_verified(self, finding: VulnerabilityFinding) -> None:
         with self._lock:
             if finding not in self.verified_findings:
                 self.verified_findings.append(finding)
-                
-                # Add to AttackGraph as vulnerability node
                 target_node = getattr(self, "target_node", None)
                 if not target_node:
                     target_node = self.attack_graph.add_node("host", f"Target: {finding.target}", value_score=1.0)
                     self.target_node = target_node
-
                 vuln_node = self.attack_graph.add_node(
                     node_type="vulnerability",
                     label=f"{finding.severity.upper()}: {finding.title}",
-                    value_score=finding.cvss_score / 10.0
+                    value_score=finding.cvss_score / 10.0,
+                    state=NODE_STATE_VALIDATED,
                 )
-                self.attack_graph.add_edge(
-                    source_node=target_node.id,
-                    target_node=vuln_node.id,
-                    edge_type="vulnerable_to"
-                )
+                self.attack_graph.add_edge(target_node.id, vuln_node.id, "vulnerable_to", confidence=0.9)
 
+                # P0: Update hypothesis confidence for related hypotheses
+                for hyp in self.hypothesis_engine.get_competing_hypotheses(limit=10, active_only=False):
+                    if finding.title.lower() in hyp.statement.lower() or finding.endpoint in hyp.statement:
+                        self.hypothesis_engine.confirm_hypothesis(
+                            hyp.id, evidence_ids=[f"verified-{finding.title}"],
+                            evidence_quality=finding.cvss_score / 10.0,
+                        )
         self._emit("finding_verified", "VerifierAgent", asdict(finding))
 
     def get_unverified_findings(self) -> List[VulnerabilityFinding]:
@@ -404,8 +434,19 @@ class SwarmCoordinator:
                 return a.to_dict()
         return {}
 
+    def _sync_world_model_from_agents(self) -> None:
+        """P0: Sync agent discoveries into the canonical WorldModel."""
+        for agent in self.agents:
+            if hasattr(agent, 'findings'):
+                for finding in getattr(agent, 'findings', []):
+                    if isinstance(finding, VulnerabilityFinding):
+                        if finding not in self.raw_findings:
+                            self.register_finding(finding)
+            if hasattr(agent, 'discovered_count'):
+                pass  # Already handled via register_port/register_endpoint callbacks
+
     def _finalize_mission(self) -> None:
-        self.publish_log("Coordinator", "🧠 Learning from session outcomes & updating Strategy Library...")
+        self.publish_log("Coordinator", "Learning from session outcomes & updating Strategy Library...")
         ports_list = [p["port"] for p in self.discovered_ports]
         services_list = [p["service"] for p in self.discovered_ports]
         sig = TargetSignature(
@@ -424,23 +465,16 @@ class SwarmCoordinator:
         )
 
     def get_attack_graph_d3(self) -> Dict[str, Any]:
-        """Convert AttackGraph to D3/Vis.js format for modern UI rendering."""
         with self._lock:
             nodes = []
             for n in self.attack_graph._nodes.values():
                 nodes.append({
-                    "id": n.id,
-                    "label": n.label,
-                    "type": n.node_type,
-                    "value_score": n.value_score
+                    "id": n.id, "label": n.label, "type": n.node_type,
+                    "state": n.state, "value_score": n.value_score,
                 })
             edges = []
             for e in self.attack_graph._edges.values():
-                edges.append({
-                    "from": e.source_node,
-                    "to": e.target_node,
-                    "label": e.edge_type
-                })
+                edges.append({"from": e.source_node, "to": e.target_node, "label": e.edge_type})
             return {"nodes": nodes, "edges": edges}
 
     def get_summary(self) -> Dict[str, Any]:
@@ -455,19 +489,24 @@ class SwarmCoordinator:
                     "endpoints": len(self.discovered_endpoints),
                     "raw_findings": len(self.raw_findings),
                     "verified_findings": len(self.verified_findings),
-                    "pending_tasks": self.task_queue.pending_count()
+                    "pending_tasks": self.task_queue.pending_count(),
+                    "hypotheses_active": len(self.hypothesis_engine.get_competing_hypotheses(limit=100)),
+                    "hypotheses_confirmed": len(self.hypothesis_engine.get_confirmed_hypotheses()),
+                    "decisions_made": self.decision_engine.get_decision_count(),
+                    "world_model_snapshot": self.world_model.snapshot().__dict__,
+                    "attack_graph_revision": self.attack_graph.revision,
                 },
                 "verified_findings": [asdict(f) for f in self.verified_findings],
                 "ports": self.discovered_ports,
                 "endpoints": self.discovered_endpoints,
-                "tasks": self.task_queue.get_all_tasks()
+                "tasks": self.task_queue.get_all_tasks(),
             }
 
     # ==================================================================
     # Hybrid workflow: XBOW loop + confidence gate + Hermes guardrails
+    # P0: All engines wired into every coordination cycle
     # ==================================================================
     def apply_profile(self, profile: Any) -> None:
-        """LEARN stage — turn an EngagementProfile into scope and guidance."""
         self.profile = profile
         if profile is None:
             return
@@ -487,11 +526,10 @@ class SwarmCoordinator:
     ) -> WorkflowRun:
         """Run the Learn → Map → Coordinate → Attack → Validate → Debrief loop.
 
-        Unlike the legacy fixed pipeline this loop is *driven by the task queue
-        and the cognitive engines*: the strategist picks the next goal, the
-        evidence ranker scores what was found, the confidence gate chooses the
-        behaviour, the loop guard refuses repeated failures, and the budget
-        ends the run. Attack agents are fresh per cycle and retired afterwards.
+        P0: Every cycle runs the full decision pipeline:
+          Evidence Ranking → Competing Hypotheses → Strategic Goal →
+          Candidate Experiments → Decision Engine (single selection) →
+          Execution Gateway → Observations → WorldModel update → verification
         """
         if profile is not None:
             self.apply_profile(profile)
@@ -518,9 +556,7 @@ class SwarmCoordinator:
             max_parallel=int(getattr(guard_cfg, "max_parallel_agents", 4) or 4),
         )
         self.plan = MissionPlan(target=self.target, objective="autonomous assessment")
-        self.workflow = WorkflowRun(
-            target=self.target, profile=getattr(profile, "name", "") or ""
-        )
+        self.workflow = WorkflowRun(target=self.target, profile=getattr(profile, "name", "") or "")
         self._consumed_checkpoints = set()
 
         self.is_running = True
@@ -545,6 +581,7 @@ class SwarmCoordinator:
                     except Exception:
                         pass
 
+                # P0: Every cycle runs the full decision pipeline
                 self._stage_coordinate(cycle)
                 self._stage_attack(cycle)
                 self._stage_validate(cycle)
@@ -626,10 +663,11 @@ class SwarmCoordinator:
                 pass
             self.agent_factory.retire(agent)
 
-        self._seed_evidence()
+        # P0: Sync discoveries into WorldModel after MAP stage
+        self._sync_world_model_from_agents()
+
         self.plan.mark(
-            WorkflowStage.MAP,
-            PHASE_DONE,
+            WorkflowStage.MAP, PHASE_DONE,
             f"{len(self.discovered_ports)} ports, {len(self.discovered_endpoints)} endpoints",
         )
         self.publish_log(
@@ -639,34 +677,87 @@ class SwarmCoordinator:
         )
 
     def _stage_coordinate(self, cycle: int) -> None:
+        """P0: Run the full decision pipeline.
+
+        Evidence Ranking → Competing Hypotheses → Strategic Goal →
+        Candidate Experiments → Decision Engine (single selection)
+        """
         self.plan.mark(WorkflowStage.COORDINATE, PHASE_ACTIVE)
-        confidence = 0.5
-        goal_text = "no goal synthesised"
-        try:
-            recommendation = self.strategist.analyze_attack_graph(
-                self.attack_graph, None, self.critic_agent.critic_engine
-            )
-            goal = recommendation.primary_goal
-            confidence = float(getattr(goal, "confidence", 0.5) or 0.5)
-            goal_text = f"{goal.goal_type}: {goal.description}"
-            self.plan.mark(WorkflowStage.COORDINATE, PHASE_ACTIVE, goal_text)
-        except Exception as exc:
-            self.publish_log("Coordinator", f"COORDINATE: strategist unavailable ({exc})")
 
-        self.last_confidence = confidence
-        decision = self.confidence_gate.decide(confidence)
-        self.workflow.decisions.append(
-            {"cycle": cycle, "goal": goal_text, **decision.to_dict()}
-        )
-        self.publish_log(
-            "Coordinator",
-            f"COORDINATE[{cycle}]: {goal_text} | confidence={confidence:.2f} → {decision.action}",
-        )
-        self._emit("workflow_decision", "Coordinator", {"cycle": cycle, "goal": goal_text, **decision.to_dict()})
+        # Step 1: Seed any new evidence from discoveries
+        self._seed_evidence()
 
-        # Plan checkpoint: re-read the plan at each budget checkpoint. Each one
-        # fires exactly once, and is matched with >= rather than a narrow band so
-        # a cycle that jumps from 18 % to 27 % still triggers the 20 % review.
+        # Step 2: Generate hypotheses from current state if none active
+        active_hyps = self.hypothesis_engine.get_competing_hypotheses(limit=5, active_only=True)
+        if not active_hyps and (self.discovered_ports or self.discovered_endpoints):
+            scenario = {
+                'ports': self.discovered_ports,
+                'endpoints': self.discovered_endpoints,
+                'tech_stack': {},
+            }
+            for host in self.world_model.hosts.values():
+                scenario['tech_stack'].update(host.technologies)
+            self.hypothesis_engine.generate_from_scenario(scenario)
+            active_hyps = self.hypothesis_engine.get_competing_hypotheses(limit=5, active_only=True)
+
+        # Step 3: Run the DecisionEngine — this is the SINGLE canonical selector
+        decision_record = self.decision_engine.decide(
+            hypothesis_engine=self.hypothesis_engine,
+            evidence_engine=self.evidence_engine,
+            strategist=self.strategist,
+            attack_graph=self.attack_graph,
+            world_model=self.world_model,
+            critic_engine=self.critic_agent.critic_engine,
+            target=self.target,
+        )
+
+        if decision_record:
+            exp = decision_record.selected_experiment
+            goal_text = decision_record.reasoning[:200]
+            confidence = exp.confidence
+            self._current_experiment = exp
+            self._current_decision_record = decision_record
+
+            self.workflow.decisions.append({
+                "cycle": cycle,
+                "goal": goal_text,
+                "experiment_id": exp.experiment_id,
+                "hypothesis_id": exp.hypothesis_id,
+                "hypothesis": exp.hypothesis,
+                "expected_evidence": exp.expected_evidence,
+                "reason": exp.reason,
+                "risk": exp.risk,
+                "confidence": confidence,
+                "decision_explanation": decision_record.explain(),
+            })
+
+            self.publish_log("Coordinator",
+                f"COORDINATE[{cycle}]: DecisionEngine selected experiment {exp.experiment_id} "
+                f"(hypothesis={exp.hypothesis_id}, risk={exp.risk}, conf={confidence:.2f})")
+        else:
+            # No viable experiment — use confidence gate fallback
+            try:
+                recommendation = self.strategist.analyze_attack_graph(
+                    self.attack_graph, self.world_model, self.critic_agent.critic_engine
+                )
+                confidence = recommendation.primary_goal.confidence
+                goal_text = recommendation.primary_goal.description
+            except Exception:
+                confidence = 0.5
+                goal_text = "no goal synthesised"
+
+            self.last_confidence = confidence
+            decision = self.confidence_gate.decide(confidence)
+            self.workflow.decisions.append({"cycle": cycle, "goal": goal_text, **decision.to_dict()})
+            self._current_experiment = None
+            self._current_decision_record = None
+            self.publish_log("Coordinator",
+                f"COORDINATE[{cycle}]: {goal_text} | confidence={confidence:.2f} → {decision.action}")
+
+        self.last_confidence = confidence if decision_record else self.last_confidence
+        self._emit("workflow_decision", "Coordinator", self.workflow.decisions[-1] if self.workflow.decisions else {})
+
+        # Plan checkpoint
         pct = self.budget_state.pct_used() if self.budget_state else 0.0
         budget = getattr(self.profile, "budget", None)
         if budget is not None:
@@ -675,40 +766,128 @@ class SwarmCoordinator:
                 self._consumed_checkpoints.add(point)
                 review = self.plan.checkpoint_review(pct)
                 self.publish_log("Coordinator", f"plan checkpoint {point}%:\n" + review)
-                self._emit(
-                    "workflow_checkpoint", "Coordinator",
-                    {"checkpoint": point, "pct_used": pct, "review": review},
-                )
+                self._emit("workflow_checkpoint", "Coordinator",
+                    {"checkpoint": point, "pct_used": pct, "review": review})
                 if self.loop_guard:
                     self.loop_guard.reset_cycle()
-        self._current_decision = decision
-        # Close the stage: leaving it active made the plan panel show the
-        # coordinator still working after the mission had already finished.
-        self.plan.mark(
-            WorkflowStage.COORDINATE, PHASE_DONE,
-            f"confidence {confidence:.2f} → {decision.action}",
-        )
+
+        self.plan.mark(WorkflowStage.COORDINATE, PHASE_DONE,
+            f"decision {self.decision_engine.get_decision_count()}, confidence {self.last_confidence:.2f}")
 
     def _stage_attack(self, cycle: int) -> None:
+        """P0: Execute the DecisionEngine's selected experiment.
+
+        The selected experiment IS the action actually executed.
+        Not a random task from the queue.
+        """
+        experiment = getattr(self, "_current_experiment", None)
+        decision_record = getattr(self, "_current_decision_record", None)
+        self.plan.mark(WorkflowStage.ATTACK, PHASE_ACTIVE, f"cycle {cycle}")
+
+        if experiment and experiment.command:
+            # P0: Execute the DecisionEngine's selection
+            self.publish_log("Coordinator",
+                f"ATTACK[{cycle}]: Executing DecisionEngine experiment {experiment.experiment_id}")
+            self.publish_log("Coordinator",
+                f"  hypothesis: {experiment.hypothesis[:120]}")
+            self.publish_log("Coordinator",
+                f"  expected_evidence: {experiment.expected_evidence[:120]}")
+
+            # Pre-flight loop guard check
+            verdict = self.loop_guard.would_allow(
+                experiment.tool or "unknown",
+                {"target": experiment.target, "command": experiment.command}
+            )
+            if not verdict.allowed:
+                self.publish_log("Coordinator", f"ATTACK blocked by guardrail: {verdict.reason}")
+                if experiment.hypothesis_id:
+                    self.hypothesis_engine.mark_stale(experiment.hypothesis_id, reason=verdict.reason)
+                self.plan.mark(WorkflowStage.ATTACK, PHASE_DONE, f"blocked by guardrail")
+                return
+
+            # Execute via agent
+            try:
+                agent_kind = "vuln" if experiment.tool in ("nmap", "sqlmap", "nuclei") else "web"
+                agent = self.agent_factory.spawn(agent_kind)
+            except Exception as exc:
+                self.publish_log("Coordinator", f"ATTACK: could not spawn agent ({exc})")
+                self.plan.mark(WorkflowStage.ATTACK, PHASE_SKIPPED, str(exc))
+                return
+
+            try:
+                # Mark hypothesis as testing
+                if experiment.hypothesis_id:
+                    self.hypothesis_engine.mark_testing(experiment.hypothesis_id)
+
+                agent.run(experiment.target)
+
+                # P0: Determine success from actual evidence delta, not agent.state
+                agent_findings = len(getattr(agent, "findings", []) or [])
+                agent_discovered = getattr(agent, "discovered_count", 0)
+                succeeded = agent_findings > 0 or agent_discovered > 0
+
+                # P0: Record observation
+                self._sync_world_model_from_agents()
+
+                # P0: Update hypothesis confidence from actual observation
+                if experiment.hypothesis_id:
+                    hyp = self.hypothesis_engine._hypotheses.get(experiment.hypothesis_id)
+                    if hyp:
+                        evidence_quality = min(1.0, agent_findings * 0.3 + agent_discovered * 0.2)
+                        hyp.update_confidence_from_observation(succeeded, evidence_quality)
+                        hyp.last_result = f"findings={agent_findings}, discovered={agent_discovered}"
+
+                # P0: Record in loop guard with proper success check
+                self.loop_guard.record(
+                    experiment.tool or "unknown",
+                    {"target": experiment.target, "command": experiment.command},
+                    succeeded=succeeded,
+                    result=agent_findings,
+                    progressed=agent_discovered > 0,
+                )
+                self.task_queue.mark_completed(f"experiment_{experiment.experiment_id}", f"executed")
+                self.budget_state.spend(commands=1)
+
+            except Exception as exc:
+                self.loop_guard.record(
+                    experiment.tool or "unknown",
+                    {"target": experiment.target, "command": experiment.command},
+                    succeeded=False, result=str(exc),
+                )
+                if experiment.hypothesis_id:
+                    hyp = self.hypothesis_engine._hypotheses.get(experiment.hypothesis_id)
+                    if hyp:
+                        hyp.update_confidence_from_observation(False, 0.3)
+                        hyp.last_result = f"error: {str(exc)[:200]}"
+            finally:
+                self.agent_factory.retire(agent)
+
+            self.plan.mark(WorkflowStage.ATTACK, PHASE_DONE,
+                f"experiment {experiment.experiment_id} executed")
+            self.publish_log("Coordinator",
+                f"ATTACK[{cycle}] complete — experiment {experiment.experiment_id}")
+        else:
+            # Fallback: process task queue (for compatibility)
+            self._stage_attack_legacy(cycle)
+
+    def _stage_attack_legacy(self, cycle: int) -> None:
+        """Legacy fallback when no experiment from DecisionEngine."""
+        # Preserve backward compatibility with tests that set _current_decision
         decision = getattr(self, "_current_decision", None)
-        action = getattr(decision, "action", ACTION_TEST)
-        self.plan.mark(WorkflowStage.ATTACK, PHASE_ACTIVE, f"cycle {cycle}: {action}")
+        if decision is None:
+            action = ACTION_TEST
+        else:
+            action = getattr(decision, "action", ACTION_TEST)
+        self.publish_log("Coordinator", f"ATTACK[{cycle}]: legacy fallback — {action}")
 
         if action == ACTION_SWARM:
-            self.publish_log("Coordinator", f"ATTACK[{cycle}]: confidence too low — deploying parallel mapping")
             self._stage_map()
             return
         if self.profile is not None and not self.profile.strategy.allow_destructive:
-            self.publish_log("Coordinator", f"ATTACK[{cycle}]: non-destructive only (profile forbids destructive tests)")
+            self.publish_log("Coordinator", f"ATTACK[{cycle}]: non-destructive only")
 
-        # At exploit confidence the coordinator stops discovering and goes after
-        # the exploitation tasks; below it, fuzzing stays in the drain set.
         if action == ACTION_EXPLOIT:
             allowed_types = {"vuln_audit", "attack"}
-            self.publish_log(
-                "Coordinator",
-                f"ATTACK[{cycle}]: confidence above exploit threshold — running exploitation tasks only",
-            )
         else:
             allowed_types = {"vuln_audit", "attack", "web_fuzz"}
 
@@ -717,10 +896,7 @@ class SwarmCoordinator:
             task = self.task_queue.pop(allowed_types=allowed_types)
             if task is None:
                 break
-            # Ask, do not record: the outcome is recorded after the agent runs.
-            verdict = self.loop_guard.would_allow(
-                task.task_type, {"target": task.target, "params": task.params}
-            )
+            verdict = self.loop_guard.would_allow(task.task_type, {"target": task.target, "params": task.params})
             if not verdict.allowed:
                 self.task_queue.mark_failed(task.task_id, verdict.reason)
                 self.publish_log("Coordinator", f"ATTACK blocked by guardrail: {verdict.reason}")
@@ -732,14 +908,18 @@ class SwarmCoordinator:
                 break
             try:
                 agent.run(task.target)
-                succeeded = getattr(agent, "state", None) is not None
+                # P0: Fix success detection — use evidence, not agent.state
+                agent_findings = len(getattr(agent, "findings", []) or [])
+                agent_discovered = getattr(agent, "discovered_count", 0)
+                succeeded = agent_findings > 0 or agent_discovered > 0
                 self.loop_guard.record(
                     task.task_type, {"target": task.target},
-                    succeeded=bool(succeeded), result=len(getattr(agent, "findings", []) or []),
-                    progressed=bool(getattr(agent, "discovered_count", 0)),
+                    succeeded=succeeded, result=agent_findings,
+                    progressed=agent_discovered > 0,
                 )
                 self.task_queue.mark_completed(task.task_id, f"executed by {agent.name}")
                 executed += 1
+                self._sync_world_model_from_agents()
             except Exception as exc:
                 self.loop_guard.record(task.task_type, {"target": task.target}, succeeded=False, result=str(exc))
                 self.task_queue.mark_failed(task.task_id, str(exc))
@@ -777,14 +957,9 @@ class SwarmCoordinator:
             WorkflowStage.VALIDATE, PHASE_DONE,
             f"{len(self.verified_findings)}/{len(self.raw_findings)} confirmed",
         )
-        self.publish_log(
-            "Coordinator",
-            f"VALIDATE[{cycle}] — {len(self.verified_findings)}/{len(self.raw_findings)} findings confirmed",
-        )
 
     def _stage_debrief(self) -> None:
         self.plan.mark(WorkflowStage.DEBRIEF, PHASE_ACTIVE)
-        # Feed the critic so failures become penalties instead of being ignored.
         try:
             self.critic_agent.critic_engine.advance_iteration()
             for finding in self.raw_findings:
@@ -800,6 +975,8 @@ class SwarmCoordinator:
                     strategy_chain=[getattr(finding, "severity", "info"), getattr(finding, "title", "")],
                     target_context=self.target,
                 )
+            # P0: Apply critic changes to WorldModel
+            self.critic_agent.critic_engine.apply_critique_to_world_model(self.world_model)
         except Exception as exc:
             self.publish_log("Coordinator", f"DEBRIEF: critic feedback failed ({exc})")
 
@@ -814,35 +991,29 @@ class SwarmCoordinator:
     def _seed_evidence(self) -> None:
         """Feed everything discovered so far into the evidence ranker."""
         for port in self.discovered_ports:
-            self.evidence_engine.add_evidence(
-                RankedEvidence(
-                    id=f"port-{port.get('port')}-{port.get('service')}",
-                    source="ReconAgent",
-                    kind="port",
+            eid = f"port-{port.get('port')}-{port.get('service')}"
+            if not self.evidence_engine.get_evidence_by_id(eid):
+                self.evidence_engine.add_evidence(RankedEvidence(
+                    id=eid, source="ReconAgent", kind="port",
                     data={"port": port.get("port"), "service": port.get("service"),
                           "banner": port.get("banner", ""), "proto": "tcp"},
-                )
-            )
+                ))
         for endpoint in self.discovered_endpoints:
-            self.evidence_engine.add_evidence(
-                RankedEvidence(
-                    id=f"endpoint-{endpoint.get('path')}",
-                    source="WebAgent",
-                    kind="endpoint",
+            eid = f"endpoint-{endpoint.get('path')}"
+            if not self.evidence_engine.get_evidence_by_id(eid):
+                self.evidence_engine.add_evidence(RankedEvidence(
+                    id=eid, source="WebAgent", kind="endpoint",
                     data={"url": endpoint.get("path"), "method": "GET",
                           "status": endpoint.get("status_code"), "interesting": endpoint.get("is_interesting")},
-                )
-            )
+                ))
         for finding in self.raw_findings:
-            self.evidence_engine.add_evidence(
-                RankedEvidence(
-                    id=f"vuln-{getattr(finding, 'title', '')[:32]}",
-                    source="VulnAgent",
-                    kind="vulnerability",
+            eid = f"vuln-{getattr(finding, 'title', '')[:32]}"
+            if not self.evidence_engine.get_evidence_by_id(eid):
+                self.evidence_engine.add_evidence(RankedEvidence(
+                    id=eid, source="VulnAgent", kind="vulnerability",
                     data={"title": getattr(finding, "title", ""), "severity": getattr(finding, "severity", "info"),
                           "endpoint": getattr(finding, "endpoint", "")},
-                )
-            )
+                ))
 
     def _progress_signature(self) -> str:
         return json.dumps(
@@ -852,19 +1023,21 @@ class SwarmCoordinator:
                 "raw": len(self.raw_findings),
                 "verified": len(self.verified_findings),
                 "queued": self.task_queue.pending_count(),
+                "hypotheses_active": len(self.hypothesis_engine.get_competing_hypotheses(limit=100)),
+                "graph_revision": self.attack_graph.revision,
+                "wm_snapshot": self.world_model.snapshot().__dict__,
             },
             sort_keys=True,
         )
 
     def _cycle_progressed(self, cycle: int) -> bool:
-        """Compare the discovery signature against the previous cycle."""
+        """P0: Progress means evidence delta, not just count changes."""
         signature = self._progress_signature()
         previous = getattr(self, "_last_progress_signature", None)
         self._last_progress_signature = signature
         return previous is None or previous != signature
 
     def get_workflow_summary(self) -> Dict[str, Any]:
-        """Dashboard-friendly view of workflow state."""
         return {
             "active": self.workflow is not None,
             "profile": getattr(self.profile, "name", "") if self.profile else "",
@@ -876,4 +1049,15 @@ class SwarmCoordinator:
             "guardrails": self.loop_guard.to_dict() if self.loop_guard else {},
             "agents": self.agent_factory.to_dict() if self.agent_factory else {},
             "run": self.workflow.to_dict() if self.workflow else {},
+            "decision_engine": {
+                "decisions_made": self.decision_engine.get_decision_count(),
+                "last_explanation": self.decision_engine.last_decision.explain() if self.decision_engine.last_decision else "none",
+            },
+            "hypothesis_engine": self.hypothesis_engine.get_learning_summary(),
+            "world_model": self.world_model.snapshot().__dict__,
+            "attack_graph": {
+                "nodes": self.attack_graph.node_count(),
+                "edges": self.attack_graph.edge_count(),
+                "revision": self.attack_graph.revision,
+            },
         }
