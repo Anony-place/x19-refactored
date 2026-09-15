@@ -91,16 +91,27 @@ keep typing.
  X19   X19 4.0.0 (3cde5d5)  ·  terminal workspace
   ai groq/llama-3.3-70b  ·  target —
 
- X19 · scanme.nmap.org · groq/llama-3.3-70b   ● assessment scanme.nmap.org 00:41 — iter 12 · 3 findings
+ X19 · scanme.nmap.org · groq/llama-3.3-70b   ● assessment scanme.nmap.org 00:41 · iter 12/50 · 3 findings
+  ⚙ nmap -sV --top-ports 500 scanme.nmap.org · rc 0 · 4.2s
 you › █
 ```
 
 * `/target <host>` — passive scope check, explicit confirmation, then a quiet
-  background assessment. The ribbon tracks iterations, findings and the
-  agent's latest activity; you keep chatting.
+  background assessment. Every command the agent runs appears **inline as a
+  live activity card** (`⚙ cmd · rc · time`) the moment it starts — the UI is
+  fed by structured agent events, never by scraping stdout.
+* **Streaming replies** — model output streams into the transcript with a live
+  tail preview (`✎ …`) for every backend that supports SSE/NDJSON, with
+  automatic provider/model failover on the stream path too.
+* `/stop` — asks the running agent to wrap up at the next decision point;
+  **Esc** does the same without leaving the prompt.
+* **Ctrl+C is safe**: with an assessment running the first press warns and the
+  second is required to quit — the agent is never killed silently.
+* `/resume [session-id]` — reload a previous session into the workspace (bare
+  `/resume` lists the last 10) and pick up where you left off.
+* The ribbon shows the iteration budget (`iter N/M`) live while work runs.
 * `/tasks` — background tasks with status and elapsed time; `/tasks log <id>`
   replays a task's captured output.
-* `/stop` — asks the running agent to wrap up at the next decision point.
 * Completion notifications (findings by severity, failure tails) appear in the
   transcript the moment work finishes.
 

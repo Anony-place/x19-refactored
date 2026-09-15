@@ -57,13 +57,21 @@ class LivePrompt:
         ribbon_fn: Optional[Callable[[], str]] = None,
         poll: float = 0.4,
         completer: Optional[Callable[[str], list]] = None,
+        on_tick: Optional[Callable[[], bool]] = None,
+        on_escape: Optional[Callable[[], bool]] = None,
     ):
         self.console = console
         self.ribbon_fn = ribbon_fn
         self.poll = max(0.1, float(poll))
         self.completer = completer
+        #: called on every idle poll; return True when it printed output
+        #: (the prompt area is cleared first and redrawn after)
+        self.on_tick = on_tick
+        #: called on a bare Esc press; return True when the press was consumed
+        self.on_escape = on_escape
         self._saved = None
         self._raw = False
+        self._last_ribbon = ""
 
     # ------------------------------------------------------------------
     # Terminal mode
@@ -118,6 +126,7 @@ class LivePrompt:
         self._write(seq + f"{prompt} {buffer}")
 
     def _clear_prompt_area(self, ribbon: str) -> None:
+        self._last_ribbon = ribbon
         seq = "\r\x1b[K"
         if ribbon:
             seq = "\r\x1b[K\x1b[1A\r\x1b[K" + seq
@@ -182,17 +191,30 @@ class LivePrompt:
 
         buffer = ""
         last_ribbon = ribbon
+        self._last_ribbon = ribbon
         self._redraw(prompt, buffer, ribbon)
         try:
             while True:
                 raw = self._read_char()
-                if raw is None:  # poll tick — maybe the ribbon changed
+                if raw is None:  # poll tick — ribbon refresh + agent activity
                     if ribbon_fn:
                         ribbon = str(ribbon_fn() or "")
-                    if ribbon != last_ribbon:
+                    printed = bool(self.on_tick and self.on_tick())
+                    if printed or ribbon != last_ribbon:
                         last_ribbon = ribbon
+                        self._last_ribbon = ribbon
                         self._redraw(prompt, buffer, ribbon)
                     continue
+                if raw == "\x1b":  # bare Esc — interrupt hook (arrows come as
+                    consumed = False  # multi-char sequences and fall through)
+                    if self.on_escape is not None:
+                        consumed = bool(self.on_escape())
+                    if consumed:
+                        last_ribbon = ""
+                        self._redraw(prompt, buffer, "")
+                    continue
+                if raw.startswith("\x1b"):
+                    continue  # arrow key / escape sequence — ignore
                 for char in raw:
                     if char in ("\r", "\n"):
                         self._clear_prompt_area(last_ribbon)

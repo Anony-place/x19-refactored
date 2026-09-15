@@ -51,6 +51,7 @@ COMMANDS: List[Dict[str, str]] = [
     {"name": "/config [K=V]", "help": "show configuration, or set a value", "group": "runtime"},
     {"name": "/sessions [id]", "help": "list stored sessions, or open one", "group": "runtime"},
     {"name": "/tasks [log <id>]", "help": "background tasks, or replay a task's output", "group": "runtime"},
+    {"name": "/resume [id]", "help": "load a stored session (findings + report) into this workspace", "group": "runtime"},
     {"name": "/tools", "help": "toolchain availability", "group": "runtime"},
     {"name": "/doctor", "help": "self diagnostics and health score", "group": "runtime"},
     {"name": "/test", "help": "round-trip the AI provider", "group": "runtime"},
@@ -83,7 +84,59 @@ class ConsoleApp:
             ribbon_fn=self._ribbon,
             poll=self._poll_interval(),
             completer=self._completions,
+            on_tick=self._drain_agent_events,
+            on_escape=self._handle_escape,
         )
+        self._ctrl_c_presses = 0
+
+    # ------------------------------------------------------------------
+    # Live agent observability — structured events, rendered inline
+    # ------------------------------------------------------------------
+    def _drain_agent_events(self) -> bool:
+        """Render new agent events as dim activity cards in the transcript.
+
+        Runs on every idle prompt poll (push-model UI): the agent publishes
+        facts to the event bus, the workspace drains and prints them without
+        ever scraping stdout. Returns True when something was printed.
+        """
+        task = self._assessment_task
+        if task is None:
+            return False
+        events = self.background.drain_events(task)
+        if not events:
+            return False
+        from events import summarize_event
+
+        self.prompt._clear_prompt_area(self.prompt._last_ribbon)
+        for event in events:
+            self.console.print(Text("  " + summarize_event(event), style="faint"))
+        return True
+
+    def _handle_escape(self) -> bool:
+        """Esc = interrupt the running assessment (Claude Code style)."""
+        if not (self._assessment_task and self._assessment_task.active):
+            return False
+        self.prompt._clear_prompt_area(self.prompt._last_ribbon)
+        self._request_stop(silent=False)
+        return True
+
+    def _request_stop(self, *, silent: bool = False) -> None:
+        task = self._assessment_task
+        if task is None or not task.active:
+            if not silent:
+                warn("no background assessment running")
+            return
+        try:
+            if getattr(self.agent, "running", False):
+                self.agent.stop = True
+                if not silent:
+                    info(f"stop requested for task {task.id} — the agent finishes its current step and wraps up")
+            else:
+                if not silent:
+                    warn("the agent is not reporting a running loop; waiting for the task to settle")
+        except Exception as exc:
+            if not silent:
+                warn(f"could not signal the agent: {exc}")
 
     def _completions(self, prefix: str) -> List[str]:
         """Tab completion candidates — derived from the command registry."""
@@ -153,9 +206,8 @@ class ConsoleApp:
         session = getattr(self.agent, "session", None)
         data = getattr(session, "data", {}) if session is not None else {}
         try:
-            iterations = int(data.get("iterations", 0) or 0)
-            if iterations:
-                bits.append(f"iter {iterations}")
+            # iterations live in the ribbon's budget chip (iter N/M); details
+            # carry only what the budget chip does not already say.
             findings = data.get("findings") or []
             if findings:
                 bits.append(f"{len(findings)} findings")
@@ -165,6 +217,19 @@ class ConsoleApp:
         if note:
             bits.append(note)
         return " · ".join(bits)
+
+    def _iteration_budget(self) -> str:
+        """``N/M`` iterations against the configured cap (data, not guesses)."""
+        try:
+            from config import CONFIG as _CONFIG
+
+            session = getattr(self.agent, "session", None)
+            data = getattr(session, "data", {}) if session is not None else {}
+            used = int(data.get("iterations", 0) or 0)
+            cap = int(_CONFIG.MAX_ITERATIONS)
+            return f"{used}/{cap}" if cap and used else ""
+        except Exception:
+            return ""
 
     def _ribbon(self) -> str:
         if not getattr(self.console, "is_terminal", False):
@@ -185,6 +250,10 @@ class ConsoleApp:
             elapsed = widgets.human_duration(active[0].elapsed())
             right.append("● ", style="ok")
             right.append(f"{active[0].label} {elapsed}", style="bold text")
+            # Budget transparency: iterations against the configured cap.
+            budget = self._iteration_budget()
+            if budget:
+                right.append(f" · iter {budget}", style="muted")
             if details:
                 right.append(f" — {widgets.truncate(details, max(10, width // 3))}", style="muted")
         else:
@@ -277,9 +346,26 @@ class ConsoleApp:
         while not self._exit:
             try:
                 line = self.prompt.ask(self.prompt_text()).strip()
-            except (EOFError, KeyboardInterrupt):
+            except EOFError:
                 self.console.print()
                 break
+            except KeyboardInterrupt:
+                # Never silently kill a running assessment: first Ctrl+C
+                # explains, a second consecutive press exits (Claude Code /
+                # Codex convention).
+                self._ctrl_c_presses += 1
+                self.console.print()
+                if self._assessment_task and self._assessment_task.active:
+                    if self._ctrl_c_presses >= 2:
+                        warn("exiting — the background assessment dies with this process")
+                        break
+                    warn("assessment still running — /stop (or Esc) to end it, Ctrl+C again to force quit")
+                    continue
+                if self._ctrl_c_presses >= 2:
+                    break
+                warn("press Ctrl+C again to quit")
+                continue
+            self._ctrl_c_presses = 0
             if not line:
                 self._drain_notifications()
                 continue
@@ -460,14 +546,26 @@ class ConsoleApp:
                 self.agent.target = target
             except Exception:
                 pass
+            # Structured observability: the agent's Session publishes every
+            # command/finding/status change to this bus; the prompt poll
+            # renders them live in the transcript.
+            from events import AgentEventBus
+
+            bus = AgentEventBus()
+            try:
+                self.agent.session.events = bus
+            except Exception:
+                bus = None
             task = self.background.start(
                 f"assessment {target}",
                 lambda: self.agent.autonomous_loop(target),
                 target=target,
             )
+            if bus is not None:
+                self.background.attach_events(task, bus)
             self._assessment_task = task
             ok(f"assessment running in the background · task {task.id}")
-            step("keep chatting — the ribbon above the prompt tracks progress; /stop wraps it up")
+            step("keep chatting — the agent's actions stream in live; /stop or Esc ends it")
         except Exception as exc:
             warn(f"could not start background assessment: {exc}")
 
@@ -475,21 +573,7 @@ class ConsoleApp:
     cmd_pentest = cmd_target
 
     def cmd_stop(self, *args: str) -> None:
-        task = self._assessment_task
-        if task is None or not task.active:
-            warn("no background assessment running")
-            return
-        stopped = False
-        try:
-            if getattr(self.agent, "running", False):
-                self.agent.stop = True
-                stopped = True
-        except Exception:
-            pass
-        if stopped:
-            info(f"stop requested for task {task.id} — the agent finishes its current step and wraps up")
-        else:
-            warn("the agent is not reporting a running loop; waiting for the task to settle")
+        self._request_stop()
 
     def cmd_tasks(self, *args: str) -> None:
         if args and args[0].lower() == "log":
@@ -645,6 +729,54 @@ class ConsoleApp:
             rows.append({"id": data.get("session_id", path.stem), "target": data.get("target", ""), "started": data.get("started", ""), "iterations": data.get("iterations", 0), "findings": len(data.get("findings") or []), "status": data.get("status", "")})
         self.console.print(sessions_screen(rows))
 
+    def cmd_resume(self, *args: str) -> None:
+        """Load a stored session so /findings and /report work over it."""
+        import json
+        from pathlib import Path
+
+        from config import CONFIG
+        from storage import Session
+
+        if not args:
+            from cli_support import list_sessions
+            rows = list_sessions(limit=10)
+            if not rows:
+                warn("no stored sessions — run an assessment first")
+                return
+            rows_to_show = [(r["id"], r["target"], r["status"], r["findings"]) for r in rows]
+            table = Table(expand=True, box=None)
+            for col, sty in (("session", "key"), ("target", "text"), ("status", "muted"), ("findings", "muted")):
+                table.add_column(col, style=sty or None)
+            for row in rows_to_show:
+                table.add_row(*[str(x) for x in row])
+            self.console.print(widgets.panel("resume a session", table, subtitle="/resume <session-id>"))
+            return
+
+        sid = args[0]
+        path = Path(CONFIG.SESSIONS_DIR) / f"{sid}.json"
+        if not path.exists():
+            warn(f"no such session: {sid}")
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            warn(f"could not read session: {exc}")
+            return
+        session = Session()
+        session.id = data.get("session_id", sid)
+        session.data = data
+        if self.agent is not None:
+            try:
+                self.agent.session = session
+                if data.get("target"):
+                    self.agent.target = data["target"]
+            except Exception:
+                pass
+        findings = len(data.get("findings") or [])
+        cmds = len(data.get("commands") or [])
+        ok(f"session {session.id} loaded · {findings} findings · {cmds} commands")
+        step("/findings to list them · /report for the full report")
+
     def cmd_tools(self, *args: str) -> None:
         from cli_support import toolchain_rows
         from ui.screens import tools_screen
@@ -663,22 +795,71 @@ class ConsoleApp:
         if self.ai is None:
             warn("no AI provider configured — run: x19 setup")
             return
+        reply = self._chat_reply(message)
+        if reply is None:
+            return
+        self.remember(ROLE_AGENT, reply)
+        self._echo_agent(reply)
+
+    def _chat_reply(self, message: str) -> Optional[str]:
+        """Get a reply, streaming when the backend supports it.
+
+        Streaming backends render a live tail preview while tokens arrive
+        (push-model UI); the final Markdown-rendered reply prints once the
+        stream completes. Non-streaming backends keep the spinner.
+        """
         from contextlib import nullcontext
 
         con = self.console
-        spinner = (
-            con.status("[info]X19 is thinking[/]", spinner="dots")
-            if con.is_terminal and not getattr(con, "no_color", False)
-            else nullcontext()
-        )
-        with spinner:
-            try:
-                reply = self.ai.chat(SYSTEM_PROMPT, message) or ""
-            except Exception as exc:
-                warn(f"provider request failed: {type(exc).__name__}")
-                return
-        self.remember(ROLE_AGENT, reply)
-        self._echo_agent(reply)
+        stream = getattr(self.ai, "chat_stream", None)
+        if stream is None:
+            spinner = (
+                con.status("[info]X19 is thinking[/]", spinner="dots")
+                if con.is_terminal and not getattr(con, "no_color", False)
+                else nullcontext()
+            )
+            with spinner:
+                try:
+                    return self.ai.chat(SYSTEM_PROMPT, message) or ""
+                except Exception as exc:
+                    warn(f"provider request failed: {type(exc).__name__}")
+                    return None
+
+        chunks: List[str] = []
+        live = None
+        if con.is_terminal and not getattr(con, "no_color", False):
+            from rich.live import Live
+            from rich.text import Text as _Text
+
+            live = Live(_Text("", style="muted"), console=con, transient=True,
+                        refresh_per_second=12, vertical_overflow="ellipsis")
+        try:
+            if live is not None:
+                live.__enter__()
+            for piece in stream(SYSTEM_PROMPT, message):
+                if not piece:
+                    continue
+                chunks.append(piece)
+                if live is not None:
+                    tail = "".join(chunks)[-400:]
+                    live.update(_Text(f"✎ {tail}", style="muted"))
+        except KeyboardInterrupt:
+            if live is not None:
+                live.__exit__(None, None, None)
+            warn("stream interrupted")
+            return ("".join(chunks) or None)
+        except Exception as exc:
+            if live is not None:
+                live.__exit__(None, None, None)
+            warn(f"provider request failed: {type(exc).__name__}")
+            return None
+        if live is not None:
+            live.__exit__(None, None, None)
+        reply = "".join(chunks)
+        if not reply.strip():
+            warn("empty response — check provider configuration")
+            return None
+        return reply
 
     def _session_findings(self) -> List[Dict[str, Any]]:
         if self.agent is None:

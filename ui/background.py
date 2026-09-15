@@ -264,6 +264,35 @@ class BackgroundTaskManager:
                     reported.append(task)
         return reported
 
+    # -- structured agent events ---------------------------------------------
+    def attach_events(self, task: "BackgroundTask", bus: Any) -> None:
+        """Pipe an :class:`~events.AgentEventBus` into ``task``.
+
+        The bus queues events; the UI drains them each prompt poll so agent
+        work (commands run, findings verified) appears live in the transcript
+        without anyone scraping stdout.
+        """
+        try:
+            token, q = bus.subscribe()
+        except Exception:
+            return
+        task._event_token = token
+        task._event_bus = bus
+        task._event_q = q
+
+    def drain_events(self, task: "BackgroundTask", limit: int = 20) -> List[Any]:
+        """Pop pending events for a task (oldest first, bounded per poll)."""
+        q = getattr(task, "_event_q", None)
+        if q is None:
+            return []
+        events: List[Any] = []
+        while len(events) < limit:
+            try:
+                events.append(q.get_nowait())
+            except Exception:
+                break
+        return events
+
     # -- ribbon ---------------------------------------------------------------
     def status_text(self, width: int = 80) -> str:
         """One compact line describing background work (for the live ribbon)."""

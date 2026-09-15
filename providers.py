@@ -44,8 +44,51 @@ def _post_with_retry(poster, url, *, _retries: int = 3, **kwargs):
 class AIBackend(ABC):
     @abstractmethod
     def chat(self, system: str, message: str) -> str: ...
+
     @abstractmethod
     def name(self) -> str: ...
+
+    def chat_stream(self, system: str, message: str):
+        """Yield reply chunks as they arrive.
+
+        Backends with a real streaming endpoint override this. The default
+        delegates to :meth:`chat` so older/custom backends keep working —
+        callers feature-detect via ``hasattr(ai, "chat_stream")`` but always
+        get a working generator either way. An empty reply yields nothing,
+        which callers treat as failure.
+        """
+        reply = self.chat(system, message)
+        if reply:
+            yield reply
+
+
+# ---------------------------------------------------------------------------
+# Streaming helpers (SSE / NDJSON)
+# ---------------------------------------------------------------------------
+def _iter_sse_data(response):
+    """Yield the payload of each ``data:`` frame of an SSE response body.
+
+    Handles multi-line ``data:`` frames per the SSE spec and stops cleanly on
+    ``[DONE]``. Used by the OpenAI-compatible and Anthropic streaming paths.
+    """
+    pending: List[str] = []
+    for raw in response.iter_lines(decode_unicode=True):
+        if raw is None:
+            continue
+        line = raw.strip()
+        if not line:
+            # Blank line = end of an SSE frame; emit what we collected.
+            if pending:
+                yield "\n".join(pending)
+                pending = []
+            continue
+        if line.startswith("data:"):
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            pending.append(data)
+    if pending:
+        yield "\n".join(pending)
 
 
 OPENROUTER_FALLBACKS = [
@@ -383,6 +426,87 @@ class OpenAICompatBackend(AIBackend):
             return ""
 
 
+
+    def _stream_model_candidates(self) -> List[str]:
+        """Ordered model list for streaming \u2014 same policy as _try_models."""
+        models = [self.model]
+        if self.provider == "nvidia":
+            fallbacks = NVIDIA_FALLBACKS
+        elif self.provider == "dashscope":
+            fallbacks = DASHSCOPE_FALLBACKS
+        else:
+            fallbacks = OPENROUTER_FALLBACKS
+        for m in fallbacks:
+            if m not in models:
+                models.append(m)
+        if not hasattr(self, "_exhausted_models"):
+            self._exhausted_models = set()
+        return [m for m in models if m not in self._exhausted_models]
+
+    def _stream_one_model(self, system: str, message: str, model: str):
+        """Stream one model. Yields text chunks; empty generator on failure
+        before the first token (callers fall through to the next model)."""
+        try:
+            r = self.session.post(
+                f"{self.base}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": message}],
+                    "max_tokens": ai_max_tokens(),
+                    "temperature": CONFIG.TEMPERATURE,
+                    "stream": True,
+                },
+                timeout=ai_request_timeout(),
+                stream=True,
+            )
+            if r.status_code in (404, 402, 429):
+                reason = {404: "404", 402: "quota", 429: "rate-limited"}.get(r.status_code, "rejected")
+                log(f"{self.label} stream model '{model}' {reason}")
+                self._exhausted_models.add(model)
+                return
+            r.raise_for_status()
+            produced = False
+            for payload in _iter_sse_data(r):
+                try:
+                    obj = json.loads(payload)
+                except Exception:
+                    continue
+                choices = obj.get("choices") or []
+                if not choices:
+                    continue
+                delta = (choices[0] or {}).get("delta") or {}
+                piece = delta.get("content") or ""
+                if piece:
+                    produced = True
+                    if model != self.model:
+                        self.model = model  # remember the working model
+                    yield piece
+            if not produced:
+                self._last_err = "empty stream"
+        except requests.exceptions.RequestException as e:
+            log(f"{self.label} stream failed: {e}")
+        except Exception as e:
+            log(f"{self.label} stream error: {type(e).__name__}: {e}")
+
+    def chat_stream(self, system: str, message: str):
+        """Stream the reply, walking the same model fallback order as chat()."""
+        if self.format != "openai":
+            yield from AIBackend.chat_stream(self, system, message)
+            return
+        for model in self._stream_model_candidates():
+            got_any = False
+            for piece in self._stream_one_model(system, message, model):
+                got_any = True
+                yield piece
+            if got_any:
+                return
+            # Nothing streamed \u2014 park this model for the session (same
+            # policy as chat()) and try the next one.
+            self._exhausted_models.add(model)
+        print(f"{C.R}[!] {self.label}: all models failed to stream{C.N}")
+
+
 class AnthropicBackend(AIBackend):
     def __init__(self, provider: str, api_key: str, model: str = ""):
         info = PROVIDERS[provider]
@@ -447,6 +571,7 @@ class AnthropicBackend(AIBackend):
             r.raise_for_status()
             content = r.json()["content"]
             return content[0]["text"] if isinstance(content, list) else content
+
         except requests.exceptions.HTTPError as e:
             detail = ""
             try: detail = f": {e.response.json()}"
@@ -463,7 +588,46 @@ class AnthropicBackend(AIBackend):
             print(f"{C.R}[!] {self.label} unexpected error: {e}{C.N}")
             return ""
 
-
+    def chat_stream(self, system: str, message: str):
+        """Stream an Anthropic reply (SSE content_block_delta frames)."""
+        try:
+            r = requests.post(
+                f"{self.base}/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "system": system,
+                    "messages": [{"role": "user", "content": message}],
+                    "max_tokens": ai_max_tokens(),
+                    "stream": True,
+                },
+                timeout=ai_request_timeout(),
+                stream=True,
+                proxies={"http": None, "https": None},
+            )
+            if r.status_code in (401, 402, 403, 404, 429):
+                log(f"{self.label}/{self.model} stream rejected ({r.status_code})")
+                return
+            r.raise_for_status()
+            for payload in _iter_sse_data(r):
+                try:
+                    obj = json.loads(payload)
+                except Exception:
+                    continue
+                if obj.get("type") != "content_block_delta":
+                    continue
+                delta = obj.get("delta") or {}
+                piece = delta.get("text") or ""
+                if piece:
+                    yield piece
+        except requests.exceptions.RequestException as e:
+            log(f"{self.label} stream failed: {e}")
+        except Exception as e:
+            log(f"{self.label} stream error: {type(e).__name__}: {e}")
 class GoogleBackend(AIBackend):
     def __init__(self, provider: str, api_key: str, model: str = ""):
         info = PROVIDERS[provider]
@@ -532,7 +696,6 @@ class GoogleBackend(AIBackend):
             print(f"{C.R}[!] {self.label} unexpected error: {e}{C.N}")
             return ""
 
-
 class OllamaBackend(AIBackend):
     def __init__(self, provider: str, model: str = ""):
         info = PROVIDERS[provider]
@@ -572,6 +735,43 @@ class OllamaBackend(AIBackend):
             log(f"{self.label}: {e}")
             print(f"{C.R}[!] {self.label} unexpected error: {e}{C.N}")
             return ""
+
+    def chat_stream(self, system: str, message: str):
+        """Stream from a local Ollama server (NDJSON lines with content parts)."""
+        try:
+            r = requests.post(
+                f"{self.base}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": message},
+                    ],
+                    "options": {"num_predict": ai_max_tokens(), "temperature": CONFIG.TEMPERATURE},
+                    "stream": True,
+                },
+                timeout=ai_request_timeout(),
+                stream=True,
+                proxies={"http": None, "https": None},
+            )
+            r.raise_for_status()
+            for line in r.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                piece = (obj.get("message") or {}).get("content") or ""
+                if piece:
+                    yield piece
+                if obj.get("done"):
+                    break
+        except requests.exceptions.RequestException as e:
+            log(f"{self.label} stream failed: {e}")
+            print(f"{C.Y}[*] {self.label} connection error: {e}{C.N}")
+        except Exception as e:
+            log(f"{self.label} stream error: {type(e).__name__}: {e}")
 
 
 class FailoverRouter(AIBackend):
@@ -731,6 +931,88 @@ class FailoverRouter(AIBackend):
 
         print(f"{C.R}[!] FailoverRouter: all providers & models exhausted.{C.N}", flush=True)
         return ""
+
+    def _ordered_chain(self) -> List[Tuple[str, str]]:
+        """The (provider, model) chain to walk, working combo first."""
+        ordered = list(self._chain)
+        if self._working:
+            wp, wm = self._working
+            if (wp, wm) in ordered:
+                ordered.remove((wp, wm))
+            ordered.insert(0, (wp, wm))
+        return ordered
+
+    def _backend_for(self, provider_id: str, model: str) -> Optional[AIBackend]:
+        """Build a one-shot backend for a chain entry (same rules as _try_one)."""
+        try:
+            info = PROVIDERS[provider_id]
+            if info.get("needs_key"):
+                key = _get_key_for(provider_id)
+                if not key:
+                    self._last_err_reasons[(provider_id, model)] = "no API key"
+                    return None
+            else:
+                key = ""
+            fmt = info["format"]
+            if fmt == "openai":
+                return OpenAICompatBackend(provider_id, key, model)
+            if fmt == "anthropic":
+                return AnthropicBackend(provider_id, key, model)
+            self._last_err_reasons[(provider_id, model)] = f"unsupported format {fmt}"
+        except Exception as e:
+            self._last_err_reasons[(provider_id, model)] = f"{type(e).__name__}: {e}"
+        return None
+
+    def chat_stream(self, system: str, message: str):
+        """Stream from the first chain entry that produces tokens.
+
+        Walks the same order as ``chat()``; a stream that fails before its
+        first chunk marks the combo exhausted and the router moves on, exactly
+        like a failed non-streaming request would.
+        """
+        if self._suppressed:
+            yield from self.primary.chat_stream(system, message)
+            return
+
+        for attempt in range(2):
+            tried_any = False
+            for pid, m in self._ordered_chain():
+                if (pid, m) in self._exhausted:
+                    continue
+                tried_any = True
+                backend = self._backend_for(pid, m)
+                if backend is None:
+                    continue
+                got_first = False
+                try:
+                    for piece in backend.chat_stream(system, message):
+                        if not got_first:
+                            got_first = True
+                            self._working = (pid, m)
+                            if hasattr(self.primary, "model"):
+                                self.primary.model = m
+                            if hasattr(self.primary, "provider"):
+                                try:
+                                    self.primary.provider = pid
+                                except Exception:
+                                    pass
+                            print(f"{C.D}[router] {PROVIDERS[pid]['name']}/{m}{C.N}", flush=True)
+                        yield piece
+                except Exception as e:
+                    log(f"FailoverRouter stream {pid}/{m}: {type(e).__name__}: {e}")
+                if got_first:
+                    return
+                self._exhausted.add((pid, m))
+                reason = self._last_err_reasons.get((pid, m), "")
+                suffix = f" ({reason})" if reason else ""
+                print(f"{C.Y}[router] {PROVIDERS[pid]['name']}/{m} failed{suffix} → next{C.N}", flush=True)
+            if not tried_any:
+                print(f"{C.Y}[router] All previously exhausted — retrying all providers/models...{C.N}", flush=True)
+                self._exhausted.clear()
+                self._working = None
+                continue
+            break
+        print(f"{C.R}[!] FailoverRouter: all providers & models exhausted.{C.N}", flush=True)
 
     def reset(self):
         """Re-enable previously exhausted models (e.g. after a sleep / new session)."""
