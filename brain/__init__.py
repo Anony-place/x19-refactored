@@ -7,6 +7,11 @@ Phase 2 (Self-Improving Autonomy) adds:
 - CriticEngine: Converts reflection into state changes
 - StrategistEngine: Dynamic goal synthesis from attack graph  
 - StrategyLibrary: Cross-session learning and adaptation
+
+Phase 3 (Architecture Remediation) adds:
+- DecisionEngine: Single canonical next-action selector
+- Typed attack graph relationships and node states
+- Evidence-driven hypothesis lifecycle
 """
 
 from brain.world_model import (
@@ -35,6 +40,7 @@ from brain.strategy_library import StrategyLibrary, StrategyPattern, TargetSigna
 from brain.evidence_ranking import EvidenceRankingEngine, EvidenceScore
 from brain.hypothesis_engine import MultiHypothesisEngine, CompetingHypothesis
 from brain.attack_graph import AttackGraph, GraphNode, GraphEdge
+from brain.decision_engine import DecisionEngine, CandidateExperiment, DecisionRecord
 
 __all__ = [
     # World Model
@@ -86,4 +92,9 @@ __all__ = [
     "AttackGraph",
     "GraphNode",
     "GraphEdge",
+
+    # Phase 3: Architecture Remediation
+    "DecisionEngine",
+    "CandidateExperiment",
+    "DecisionRecord",
 ]

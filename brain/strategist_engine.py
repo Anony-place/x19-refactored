@@ -3,14 +3,13 @@
 This engine replaces static goal selection with dynamic goal generation
 based on the current state of the Attack Graph and World Model.
 
-Instead of choosing from predefined goals like "recon_web" or "exploit_ad",
-the Strategist analyzes the attack graph to identify:
-- Highest value unexplored nodes
-- Optimal paths to critical objectives
-- Missing information that blocks progress
-- Alternative routes when primary paths are blocked
-
-True autonomy means goals emerge from evidence, not templates.
+Key fixes from P0 spec:
+  - Consumes actual WorldModel (not None)
+  - Reads correct field names from graph schema (label, not name/version/parameters)
+  - Creates typed node/evidence objects instead of arbitrary dict.get
+  - Critic context receives actual engagement/target context
+  - Strategic goals become candidate experiments
+  - Strategist produces actionable plans, not just human-readable reasoning
 """
 
 from __future__ import annotations
@@ -31,14 +30,20 @@ class StrategicGoal:
     goal_type: str              # "gather_intel", "validate_finding", "exploit_path", "pivot", "privesc"
     description: str
     target_node_id: str         # Attack graph node this goal targets
-    priority_score: float       # 0.0-1.0, calculated from node value + path feasibility
-    required_info: List[str]    # What information is missing to achieve this
-    expected_outcome: str       # What success looks like
-    alternative_goals: List[str]  # Fallback goal IDs if this fails
+    priority_score: float       # 0.0-1.0
+    required_info: List[str]
+    expected_outcome: str
+    alternative_goals: List[str]
     created_at: str = field(default_factory=utc_now)
     parent_goal_id: Optional[str] = None
     confidence: float = 0.5
-    
+    # P0: goals must produce candidate experiments
+    suggested_command: str = ""
+    suggested_hypothesis: str = ""
+    expected_evidence: str = ""
+    falsification_condition: str = ""
+    risk: str = "normal"
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "goal_id": self.goal_id,
@@ -51,6 +56,11 @@ class StrategicGoal:
             "alternative_goals": self.alternative_goals,
             "parent_goal_id": self.parent_goal_id,
             "confidence": self.confidence,
+            "suggested_command": self.suggested_command,
+            "suggested_hypothesis": self.suggested_hypothesis,
+            "expected_evidence": self.expected_evidence,
+            "falsification_condition": self.falsification_condition,
+            "risk": self.risk,
         }
 
 
@@ -58,12 +68,12 @@ class StrategicGoal:
 class InformationGap:
     """Represents a piece of missing information needed for decision-making."""
     gap_id: str
-    question: str             # What we need to know
-    why_it_matters: str       # How this affects attack strategy
-    related_nodes: List[str]  # Attack graph nodes affected
-    estimated_value: float    # Information gain score (0.0-1.0)
-    acquisition_methods: List[str]  # How to obtain this info
-    confidence_if_known: float = 0.0  # Expected confidence after obtaining
+    question: str
+    why_it_matters: str
+    related_nodes: List[str]
+    estimated_value: float
+    acquisition_methods: List[str]
+    confidence_if_known: float = 0.0
 
 
 @dataclass
@@ -72,11 +82,11 @@ class StrategyRecommendation:
     primary_goal: StrategicGoal
     reasoning: str
     information_gaps: List[InformationGap]
-    rejected_alternatives: List[Tuple[str, str]]  # (goal_id, rejection_reason)
-    attack_chain: List[str]   # Sequence of steps to achieve goal
-    risk_assessment: str      # low/medium/high + explanation
+    rejected_alternatives: List[Tuple[str, str]]
+    attack_chain: List[str]
+    risk_assessment: str
     estimated_iterations: int
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "primary_goal": self.primary_goal.to_dict(),
@@ -89,96 +99,138 @@ class StrategyRecommendation:
         }
 
 
+# ---------------------------------------------------------------------------
+# Typed wrappers for attack graph nodes
+# ---------------------------------------------------------------------------
+@dataclass
+class TypedNode:
+    """Typed wrapper over the dict-shaped attack graph node.
+
+    Reads only fields the schema actually provides; never invents
+    name/version/parameters.
+    """
+    id: str
+    node_type: str
+    label: str
+    state: str
+    value_score: float
+    difficulty_score: float
+    priority: float
+    properties: Dict[str, Any]
+
+    @classmethod
+    def from_dict(cls, node_id: str, data: Dict[str, Any]) -> "TypedNode":
+        return cls(
+            id=node_id,
+            node_type=str(data.get("type", "unknown")),
+            label=str(data.get("label", node_id)),
+            state=str(data.get("state", "unknown")),
+            value_score=float(data.get("value_score", 0.5)),
+            difficulty_score=float(data.get("difficulty_score", 0.5)),
+            priority=float(data.get("priority", 0.5)),
+            properties=dict(data.get("properties", {})),
+        )
+
+    @property
+    def service(self) -> str:
+        return str(self.properties.get("service", ""))
+
+    @property
+    def port(self) -> int:
+        v = self.properties.get("port", 0)
+        return int(v) if isinstance(v, (int, float, str)) and str(v).isdigit() else 0
+
+    @property
+    def version(self) -> str:
+        return str(self.properties.get("version", ""))
+
+    @property
+    def technique(self) -> str:
+        return str(self.properties.get("technique", ""))
+
+
 class StrategistEngine:
     """Dynamic goal synthesis engine.
-    
-    The Strategist Engine:
+
     1. Analyzes the Attack Graph to identify high-value targets
     2. Computes information gaps blocking progress
     3. Generates strategic goals dynamically (not from templates)
     4. Prioritizes goals based on mission impact + feasibility
-    5. Maintains goal hierarchy (parent/child relationships)
-    6. Adapts goals when paths are blocked
-    
-    This replaces the static GoalTree.select_active_node() approach.
+    5. Adapts goals when paths are blocked
+
+    Key fix: consumes actual WorldModel, reads correct graph fields.
     """
-    
+
     def __init__(self):
         self.active_goals: Dict[str, StrategicGoal] = {}
         self.completed_goals: Dict[str, StrategicGoal] = {}
         self.failed_goals: Dict[str, StrategicGoal] = {}
         self.information_gaps: Dict[str, InformationGap] = {}
         self._goal_counter = 0
-        
+
     def _generate_goal_id(self, goal_type: str) -> str:
         self._goal_counter += 1
         return f"{goal_type}_{self._goal_counter}"
-    
+
     def _generate_gap_id(self) -> str:
         return f"gap_{len(self.information_gaps) + 1}"
-    
-    def analyze_attack_graph(self, attack_graph: Any, world_model: Any, critic_engine: Any = None) -> StrategyRecommendation:
+
+    def analyze_attack_graph(
+        self,
+        attack_graph: Any,
+        world_model: Any,
+        critic_engine: Any = None,
+    ) -> StrategyRecommendation:
         """Analyze attack graph and generate optimal strategic goal.
-        
-        Args:
-            attack_graph: AttackGraph instance with nodes and edges
-            world_model: WorldModel instance for context
-            critic_engine: Optional CriticEngine for penalty-aware planning
-            
-        Returns:
-            StrategyRecommendation with primary goal and reasoning
+
+        P0 fix: world_model is now the actual WorldModel, not None.
+        P0 fix: reads correct field names from graph schema.
         """
-        # Step 1: Identify all candidate nodes (unexplored or partially explored)
+        # Step 1: Identify candidate nodes using typed wrappers
         candidate_nodes = self._identify_candidate_nodes(attack_graph)
-        
-        # Step 2: Score each node by value + accessibility
+
+        # Step 2: Score each node
         scored_nodes = []
         for node in candidate_nodes:
             value_score = self._calculate_node_value(node, world_model)
-            access_score = self._calculate_accessibility(node, attack_graph, critic_engine)
+            access_score = self._calculate_accessibility(node, attack_graph, critic_engine, world_model)
             combined_score = (value_score * 0.6) + (access_score * 0.4)
             scored_nodes.append((node, combined_score, value_score, access_score))
-        
-        # Sort by combined score descending
+
         scored_nodes.sort(key=lambda x: x[1], reverse=True)
-        
+
         # Step 3: Generate goals for top candidates
         goal_candidates = []
         rejected_alternatives = []
-        
-        for node, score, value_score, access_score in scored_nodes[:5]:  # Top 5
+
+        for node, score, value_score, access_score in scored_nodes[:5]:
             goal = self._create_goal_for_node(node, score, attack_graph, world_model)
-            
-            # Check if critic engine blocks this approach
+
             if critic_engine:
-                blocker = self._check_critic_blocks(goal, critic_engine, attack_graph)
+                blocker = self._check_critic_blocks(goal, critic_engine, attack_graph, world_model)
                 if blocker:
                     rejected_alternatives.append((goal.goal_id, blocker))
                     continue
-            
+
             goal_candidates.append(goal)
-        
+
         if not goal_candidates:
-            # Fallback: create generic intel-gathering goal
             goal_candidates.append(self._create_generic_intel_goal(world_model))
-        
-        # Select highest priority goal
+
         primary_goal = max(goal_candidates, key=lambda g: g.priority_score)
-        
-        # Step 4: Identify information gaps for this goal
+
+        # Step 4: Identify information gaps
         info_gaps = self._identify_information_gaps(primary_goal, attack_graph, world_model)
-        
+
         # Step 5: Build attack chain
         attack_chain = self._build_attack_chain(primary_goal, attack_graph)
-        
-        # Step 6: Generate reasoning text
-        reasoning = self._generate_reasoning(
-            primary_goal, scored_nodes, info_gaps, attack_chain, world_model
-        )
-        
+
+        # Step 6: Generate reasoning
+        reasoning = self._generate_reasoning(primary_goal, scored_nodes, info_gaps, attack_chain, world_model)
+
         # Step 7: Risk assessment
         risk = self._assess_risk(primary_goal, attack_graph, world_model)
-        
+
         return StrategyRecommendation(
             primary_goal=primary_goal,
             reasoning=reasoning,
@@ -186,341 +238,295 @@ class StrategistEngine:
             rejected_alternatives=rejected_alternatives,
             attack_chain=attack_chain,
             risk_assessment=risk,
-            estimated_iterations=self._estimate_iterations(attack_chain)
+            estimated_iterations=self._estimate_iterations(attack_chain),
         )
-    
-    def _identify_candidate_nodes(self, attack_graph: Any) -> List[Any]:
-        """Find nodes that are unexplored or have unexplored neighbors."""
+
+    def _identify_candidate_nodes(self, attack_graph: Any) -> List[TypedNode]:
+        """Find nodes that are unexplored or have unexplored neighbors.
+
+        P0 fix: uses TypedNode, reads state from the dict view.
+        """
         candidates = []
-        
-        for node_id, node in attack_graph.nodes.items():
-            node_state = node.get("state", "unknown")
-            
-            # Consider nodes that are:
-            # 1. Unknown/unconfirmed
-            # 2. Confirmed but not yet exploited
-            # 3. Have high-value unexplored neighbors
-            if node_state in ["unknown", "unconfirmed", "identified"]:
+        for node_id, node_data in attack_graph.nodes.items():
+            node = TypedNode.from_dict(node_id, node_data)
+
+            if node.state in ("unknown", "UNKNOWN", "observed", "OBSERVED", "identified", "IDENTIFIED"):
                 candidates.append(node)
-            elif node_state == "confirmed":
-                # Check if it has unexplored edges leading to valuable nodes
+            elif node.state in ("confirmed", "CONFIRMED"):
+                # Check if it has valuable unexplored neighbors
                 has_valuable_neighbor = False
                 for edge in attack_graph.edges.get(node_id, []):
                     neighbor_id = edge.get("target")
-                    neighbor = attack_graph.nodes.get(neighbor_id, {})
-                    if neighbor.get("value_score", 0) > 0.5 and neighbor.get("state") != "exploited":
+                    neighbor_data = attack_graph.nodes.get(neighbor_id, {})
+                    if neighbor_data.get("value_score", 0) > 0.5 and neighbor_data.get("state") not in ("exploited", "EXPLOITED"):
                         has_valuable_neighbor = True
                         break
                 if has_valuable_neighbor:
                     candidates.append(node)
-        
         return candidates
-    
-    def _calculate_node_value(self, node: Dict[str, Any], world_model: Any) -> float:
-        """Calculate strategic value of a node (0.0-1.0)."""
+
+    def _calculate_node_value(self, node: TypedNode, world_model: Any) -> float:
+        """Calculate strategic value of a node. P0 fix: reads correct fields."""
         base_value = 0.3
-        
-        # Node type bonuses
-        node_type = node.get("type", "")
-        if node_type in ["credential", "vulnerability"]:
-            base_value = 0.8
-        elif node_type in ["service", "endpoint"]:
-            base_value = 0.5
-        elif node_type in ["user", "host"]:
-            base_value = 0.6
-        elif node_type in ["technology"]:
-            base_value = 0.4
-        
-        # Value score from node itself
-        value_score = node.get("value_score", 0.0)
-        
-        # Critical service bonuses
-        service = node.get("service", "")
-        port = node.get("port", 0)
-        if port in [22, 80, 443, 3306, 445, 3389]:
-            base_value += 0.1
-        
-        # Evidence quality factor
-        confidence = node.get("confidence", 0.5)
-        
-        return min(1.0, (base_value * 0.5) + (value_score * 0.3) + (confidence * 0.2))
-    
+        type_bonuses = {
+            "credential": 0.8, "vulnerability": 0.8,
+            "service": 0.5, "endpoint": 0.5,
+            "user": 0.6, "host": 0.6,
+            "technology": 0.4,
+        }
+        base_value = type_bonuses.get(node.node_type, 0.3)
+        base_value += 0.1 if node.port in (22, 80, 443, 3306, 445, 3389) else 0
+        # P0: properties have real confidence, not hardcoded
+        confidence = float(node.properties.get("confidence", 0.5))
+        return min(1.0, (base_value * 0.5) + (node.value_score * 0.3) + (confidence * 0.2))
+
     def _calculate_accessibility(
-        self, 
-        node: Dict[str, Any], 
-        attack_graph: Any, 
-        critic_engine: Any = None
+        self,
+        node: TypedNode,
+        attack_graph: Any,
+        critic_engine: Any,
+        world_model: Any,
     ) -> float:
-        """Calculate how accessible this node is (0.0-1.0)."""
-        node_id = node.get("id", "")
-        
-        # Check direct paths from known nodes
-        paths_to_node = attack_graph.find_paths_to(node_id, max_depth=3)
-        
+        """Calculate how accessible this node is. P0 fix: uses actual target context."""
+        paths_to_node = attack_graph.find_paths_to(node.id, max_depth=3)
         if not paths_to_node:
-            return 0.2  # Hard to reach
-        
-        # Score paths by length and blocker presence
+            return 0.2
         best_path_score = 0.0
+        target = world_model.target if world_model and hasattr(world_model, 'target') else ""
         for path in paths_to_node:
             path_length = len(path)
             length_penalty = max(0.2, 1.0 - (path_length * 0.15))
-            
-            # Check if critic engine blocks any step in path
             blocked = False
             if critic_engine:
                 for step in path:
-                    step_node = attack_graph.nodes.get(step, {})
-                    technique = step_node.get("technique", "")
-                    if technique and critic_engine.should_block_technique(
-                        technique, step_node.get("category", ""), "current_target"
-                    ):
+                    step_data = attack_graph.nodes.get(step, {})
+                    technique = step_data.get("technique", "")
+                    category = step_data.get("category", step_data.get("type", ""))
+                    # P0: pass actual target context, not "current"
+                    if technique and critic_engine.should_block_technique(technique, category, target):
                         blocked = True
                         break
-            
             if not blocked:
-                path_score = length_penalty
-                best_path_score = max(best_path_score, path_score)
-        
+                best_path_score = max(best_path_score, length_penalty)
         return best_path_score
-    
+
     def _create_goal_for_node(
-        self, 
-        node: Dict[str, Any], 
+        self,
+        node: TypedNode,
         priority_score: float,
         attack_graph: Any,
-        world_model: Any
+        world_model: Any,
     ) -> StrategicGoal:
-        """Create a strategic goal targeting a specific node."""
-        node_id = node.get("id", "unknown")
-        node_type = node.get("type", "unknown")
-        
-        # Determine goal type based on node type and state
-        node_state = node.get("state", "unknown")
-        
-        if node_state in ["unknown", "unconfirmed"]:
+        """Create a strategic goal targeting a specific node.
+
+        P0 fix: reads correct fields, produces experiment-oriented goals.
+        """
+        goal_type = "gather_intel"
+        description = f"Investigate {node.node_type}: {node.label}"
+        expected_outcome = "Discover actionable intelligence"
+        suggested_hypothesis = f"The {node.node_type} '{node.label}' has exploitable properties"
+        expected_evidence = f"Confirmed properties and accessible surface for {node.label}"
+        falsification_condition = f"No exploitable properties found for {node.label}"
+        risk = "low"
+
+        if node.state in ("unknown", "UNKNOWN", "observed", "OBSERVED"):
             goal_type = "gather_intel"
-            description = f"Gather intelligence on {node_type}: {node.get('name', node_id)}"
-            expected_outcome = f"Confirm existence and properties of {node_type}"
-        elif node_state == "identified":
+            description = f"Gather intelligence on {node.node_type}: {node.label}"
+            expected_outcome = f"Confirm existence and properties of {node.node_type}"
+        elif node.state in ("identified", "IDENTIFIED"):
             goal_type = "validate_finding"
-            description = f"Validate and enumerate {node_type}: {node.get('name', node_id)}"
-            expected_outcome = f"Obtain confirmed evidence for exploitation"
-        elif node_state == "confirmed":
+            description = f"Validate and enumerate {node.node_type}: {node.label}"
+            expected_outcome = "Obtain confirmed evidence for exploitation"
+        elif node.state in ("confirmed", "CONFIRMED"):
             goal_type = "exploit_path"
-            description = f"Exploit {node_type} to gain access: {node.get('name', node_id)}"
-            expected_outcome = f"Achieve initial access or privilege escalation"
-        else:
-            goal_type = "gather_intel"
-            description = f"Investigate {node_type}: {node.get('name', node_id)}"
-            expected_outcome = f"Discover actionable intelligence"
-        
-        # Identify required information
+            description = f"Exploit {node.node_type} to gain access: {node.label}"
+            expected_outcome = "Achieve initial access or privilege escalation"
+            risk = "normal"
+        elif node.state in ("testable", "TESTABLE"):
+            goal_type = "validate_finding"
+            description = f"Test {node.node_type}: {node.label}"
+            expected_outcome = "Determine if exploitable"
+            suggested_hypothesis = f"{node.label} is exploitable via known techniques"
+
         required_info = []
-        if not node.get("confidence", 0) > 0.7:
-            required_info.append(f"Higher confidence evidence for {node_id}")
-        if node_type == "service" and not node.get("version"):
+        confidence = float(node.properties.get("confidence", 0.5))
+        if confidence < 0.7:
+            required_info.append(f"Higher confidence evidence for {node.id}")
+        if node.node_type == "service" and not node.version:
             required_info.append("Service version information")
-        if node_type == "endpoint" and not node.get("parameters"):
+        if node.node_type == "endpoint" and not node.properties.get("params"):
             required_info.append("Endpoint parameters and input vectors")
-        
-        # Generate alternatives (sibling nodes in graph)
-        alternative_ids = []
-        # Could find siblings here if needed
-        
+
         return StrategicGoal(
             goal_id=self._generate_goal_id(goal_type),
             goal_type=goal_type,
             description=description,
-            target_node_id=node_id,
+            target_node_id=node.id,
             priority_score=priority_score,
             required_info=required_info,
             expected_outcome=expected_outcome,
-            alternative_goals=alternative_ids,
-            confidence=node.get("confidence", 0.5)
+            alternative_goals=[],
+            confidence=confidence,
+            suggested_hypothesis=suggested_hypothesis,
+            expected_evidence=expected_evidence,
+            falsification_condition=falsification_condition,
+            risk=risk,
         )
-    
+
     def _create_generic_intel_goal(self, world_model: Any) -> StrategicGoal:
-        """Fallback goal when no specific targets identified."""
+        target = getattr(world_model, 'target', 'unknown') if world_model else "unknown"
         return StrategicGoal(
             goal_id=self._generate_goal_id("gather_intel"),
             goal_type="gather_intel",
-            description="Broad intelligence gathering to identify new attack vectors",
+            description=f"Broad intelligence gathering on {target}",
             target_node_id="surface_enumeration",
             priority_score=0.4,
             required_info=["Additional services", "Hidden endpoints", "Technology stack details"],
             expected_outcome="Discover at least one high-value target for focused attack",
             alternative_goals=[],
-            confidence=0.3
+            confidence=0.3,
+            suggested_hypothesis=f"Target {target} has undiscovered attack surface",
+            expected_evidence="New services, endpoints, or technologies discovered",
+            falsification_condition="Full port scan and directory enumeration produce no new findings",
         )
-    
+
     def _check_critic_blocks(
-        self, 
-        goal: StrategicGoal, 
-        critic_engine: Any, 
-        attack_graph: Any
+        self,
+        goal: StrategicGoal,
+        critic_engine: Any,
+        attack_graph: Any,
+        world_model: Any,
     ) -> Optional[str]:
-        """Check if critic engine blocks this goal's approach."""
-        # Get the path to this goal's target
-        target_node = attack_graph.nodes.get(goal.target_node_id, {})
-        
-        # Check if required techniques are blocked
-        technique = target_node.get("technique", "")
-        category = target_node.get("category", "")
-        
-        if technique and critic_engine.should_block_technique(technique, category, "current"):
-            return f"Technique '{technique}' is blocked by critic due to repeated failures"
-        
+        """Check if critic engine blocks this goal's approach.
+
+        P0 fix: passes actual target context to critic.
+        """
+        target_node_data = attack_graph.nodes.get(goal.target_node_id, {})
+        technique = target_node_data.get("technique", "")
+        category = target_node_data.get("category", target_node_data.get("type", ""))
+        target = getattr(world_model, 'target', '') if world_model else ''
+        # P0: pass actual target, not "current"
+        if technique and critic_engine.should_block_technique(technique, category, target):
+            return f"Technique '{technique}' is blocked by critic due to repeated failures against '{target}'"
         return None
-    
+
     def _identify_information_gaps(
-        self, 
-        goal: StrategicGoal, 
-        attack_graph: Any, 
-        world_model: Any
+        self,
+        goal: StrategicGoal,
+        attack_graph: Any,
+        world_model: Any,
     ) -> List[InformationGap]:
-        """Identify missing information needed to achieve the goal."""
         gaps = []
-        
-        # Gap 1: Target confirmation
-        target_node = attack_graph.nodes.get(goal.target_node_id, {})
-        if target_node.get("confidence", 0.5) < 0.7:
+        target_node_data = attack_graph.nodes.get(goal.target_node_id, {})
+        confidence = float(target_node_data.get("confidence", 0.5))
+        if confidence < 0.7:
+            label = target_node_data.get("label", goal.target_node_id)
             gaps.append(InformationGap(
                 gap_id=self._generate_gap_id(),
-                question=f"Is {target_node.get('name', goal.target_node_id)} actually present and accessible?",
+                question=f"Is {label} actually present and accessible?",
                 why_it_matters="Cannot plan exploitation without confirmed target",
                 related_nodes=[goal.target_node_id],
                 estimated_value=0.8,
-                acquisition_methods=["Active scanning", "Service probing", "Banner grabbing"]
+                acquisition_methods=["Active scanning", "Service probing", "Banner grabbing"],
             ))
-        
-        # Gap 2: Version/technology details
-        if target_node.get("type") == "service" and not target_node.get("version"):
+        node_type = target_node_data.get("type", "")
+        if node_type == "service" and not target_node_data.get("properties", {}).get("version"):
             gaps.append(InformationGap(
                 gap_id=self._generate_gap_id(),
                 question="What is the exact version of this service?",
                 why_it_matters="Version determines applicable CVEs and exploits",
                 related_nodes=[goal.target_node_id],
                 estimated_value=0.7,
-                acquisition_methods=["Banner grabbing", "Version detection scan"]
+                acquisition_methods=["Banner grabbing", "Version detection scan"],
             ))
-        
-        # Gap 3: Path accessibility
         paths = attack_graph.find_paths_to(goal.target_node_id, max_depth=2)
-        if not paths or len(paths) == 0:
+        if not paths:
             gaps.append(InformationGap(
                 gap_id=self._generate_gap_id(),
                 question="How do we reach this target from our current position?",
                 why_it_matters="No known attack path exists",
                 related_nodes=[goal.target_node_id],
                 estimated_value=0.9,
-                acquisition_methods=["Network mapping", "Pivot discovery", "Lateral movement analysis"]
+                acquisition_methods=["Network mapping", "Pivot discovery"],
             ))
-        
         return gaps
-    
+
     def _build_attack_chain(self, goal: StrategicGoal, attack_graph: Any) -> List[str]:
-        """Build sequence of steps to achieve the goal."""
-        # Find shortest path to target node
-        target_id = goal.target_node_id
-        paths = attack_graph.find_paths_to(target_id, max_depth=5)
-        
+        paths = attack_graph.find_paths_to(goal.target_node_id, max_depth=5)
         if paths:
-            # Return the shortest path as technique names
             shortest = min(paths, key=len)
             chain = []
             for node_id in shortest:
-                node = attack_graph.nodes.get(node_id, {})
-                technique = node.get("technique", "unknown")
-                if technique and technique != "unknown":
-                    chain.append(technique)
+                node_data = attack_graph.nodes.get(node_id, {})
+                # P0: reads label or technique, not name
+                technique = node_data.get("technique", "")
+                if not technique:
+                    technique = node_data.get("label", "unknown")
+                chain.append(technique)
             return chain if chain else ["reconnaissance"]
-        
         return ["reconnaissance", "enumeration"]
-    
+
     def _generate_reasoning(
         self,
         goal: StrategicGoal,
         scored_nodes: List[Tuple],
         info_gaps: List[InformationGap],
         attack_chain: List[str],
-        world_model: Any
+        world_model: Any,
     ) -> str:
-        """Generate human-readable reasoning for the selected goal."""
         parts = []
-        
         parts.append(f"Selected goal: {goal.description}")
         parts.append(f"Priority score: {goal.priority_score:.2f}")
-        
         if scored_nodes:
             top_node = scored_nodes[0][0]
-            parts.append(f"Target node type: {top_node.get('type', 'unknown')}")
-            parts.append(f"Target value: {scored_nodes[0][2]:.2f}, Accessibility: {scored_nodes[0][3]:.2f}")
-        
+            parts.append(f"Target: {top_node.node_type} '{top_node.label}' "
+                         f"(value={scored_nodes[0][2]:.2f}, access={scored_nodes[0][3]:.2f})")
         if info_gaps:
             parts.append(f"Critical information gaps: {len(info_gaps)}")
             for gap in info_gaps[:2]:
                 parts.append(f"  - {gap.question}")
-        
         parts.append(f"Attack chain: {' → '.join(attack_chain)}")
-        
         return " | ".join(parts)
-    
+
     def _assess_risk(self, goal: StrategicGoal, attack_graph: Any, world_model: Any) -> str:
-        """Assess risk level of pursuing this goal."""
-        target_node = attack_graph.nodes.get(goal.target_node_id, {})
-        
-        # Factors affecting risk
-        detection_risk = target_node.get("detection_risk", "medium")
-        stability_risk = target_node.get("stability_risk", "low")
-        
+        target_node_data = attack_graph.nodes.get(goal.target_node_id, {})
+        detection_risk = target_node_data.get("properties", {}).get("detection_risk", "medium")
+        stability_risk = target_node_data.get("properties", {}).get("stability_risk", "low")
         if detection_risk == "high" or stability_risk == "high":
             return "HIGH - Aggressive techniques may trigger IDS/IPS or cause service disruption"
         elif detection_risk == "medium" or stability_risk == "medium":
             return "MEDIUM - Standard offensive operations with moderate detection probability"
-        else:
-            return "LOW - Passive or low-profile techniques with minimal detection risk"
-    
+        return "LOW - Passive or low-profile techniques with minimal detection risk"
+
     def _estimate_iterations(self, attack_chain: List[str]) -> int:
-        """Estimate iterations needed to complete the attack chain."""
-        # Rough estimate: 1-2 iterations per technique
         return max(1, len(attack_chain) * 2)
-    
+
     def mark_goal_completed(self, goal_id: str, success: bool):
-        """Mark a goal as completed (success or failure)."""
         if goal_id in self.active_goals:
             goal = self.active_goals.pop(goal_id)
-            if success:
-                self.completed_goals[goal_id] = goal
-            else:
-                self.failed_goals[goal_id] = goal
-    
+            (self.completed_goals if success else self.failed_goals)[goal_id] = goal
+
     def get_active_goal(self) -> Optional[StrategicGoal]:
-        """Get the highest priority active goal."""
         if not self.active_goals:
             return None
         return max(self.active_goals.values(), key=lambda g: g.priority_score)
-    
+
     def add_goal(self, goal: StrategicGoal):
-        """Add a goal to the active pool."""
         self.active_goals[goal.goal_id] = goal
-    
+
     def clear_completed(self):
-        """Clear completed/failed goals to free memory."""
         self.completed_goals.clear()
         self.failed_goals.clear()
-    
+
     def export_state(self) -> Dict[str, Any]:
-        """Export strategist state for persistence."""
         return {
             "active_goals": [g.to_dict() for g in self.active_goals.values()],
             "completed_goals": list(self.completed_goals.keys()),
             "failed_goals": list(self.failed_goals.keys()),
             "information_gaps": [g.__dict__ for g in self.information_gaps.values()],
         }
-    
+
     def import_state(self, state: Dict[str, Any]):
-        """Import strategist state from persistence."""
         for goal_data in state.get("active_goals", []):
             goal = StrategicGoal(
                 goal_id=goal_data["goal_id"],
@@ -532,10 +538,14 @@ class StrategistEngine:
                 expected_outcome=goal_data["expected_outcome"],
                 alternative_goals=goal_data["alternative_goals"],
                 parent_goal_id=goal_data.get("parent_goal_id"),
-                confidence=goal_data.get("confidence", 0.5)
+                confidence=goal_data.get("confidence", 0.5),
+                suggested_command=goal_data.get("suggested_command", ""),
+                suggested_hypothesis=goal_data.get("suggested_hypothesis", ""),
+                expected_evidence=goal_data.get("expected_evidence", ""),
+                falsification_condition=goal_data.get("falsification_condition", ""),
+                risk=goal_data.get("risk", "normal"),
             )
             self.active_goals[goal.goal_id] = goal
-        
         for gap_data in state.get("information_gaps", []):
             gap = InformationGap(
                 gap_id=gap_data["gap_id"],
@@ -544,6 +554,6 @@ class StrategistEngine:
                 related_nodes=gap_data["related_nodes"],
                 estimated_value=gap_data["estimated_value"],
                 acquisition_methods=gap_data["acquisition_methods"],
-                confidence_if_known=gap_data.get("confidence_if_known", 0.0)
+                confidence_if_known=gap_data.get("confidence_if_known", 0.0),
             )
             self.information_gaps[gap.gap_id] = gap
