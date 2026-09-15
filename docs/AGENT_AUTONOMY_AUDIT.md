@@ -78,9 +78,49 @@ Verified by reading the loop (`agent.py` ~7,000 lines) and the `brain/` stack:
   checklist scanner. Discovery is now bounded by the model's reasoning, within
   deterministic policy/scope guardrails.
 
-## 5. Verification
+## 4b. Follow-up increment: chain hunting + variant analysis
+
+Immediately after the ledger shipped, two more big-agent patterns were wired
+in (still zero hardcoded behaviour — deterministic class-knowledge + soft
+advisories, the hunt stays the model's):
+
+5. **Chain opportunities in the loop (XBOW primitive chaining).**
+   `ExploitChainEngine.hunting_guidance()` consumes the same compliance
+   classifier the reports use and computes *near-miss* chains from the
+   agent's own confirmed findings: "your confirmed SSTI typically enables
+   remote_code_execution — confirming it lands a direct impact". Injected
+   into every decision context as `CHAIN OPPORTUNITIES`. This turns the
+   previously report-only chain engine into a live hunting compass.
+6. **Variant analysis (Big Sleep).** Every confirmed finding now queues a
+   soft advisory: enumerate sibling endpoints/parameters for the same bug
+   class before pivoting — variants of a confirmed class are the
+   highest-ROI probes. Delivered through the existing advisory queue
+   (injected into the next decision prompt), never a forced gate.
+
+## 5. Roadmap — what still separates X19 from big-agent caliber
+
+Prioritised by expected impact on real bug-hunting throughput:
+
+1. **Independent parallel trajectories** (Naptime's sampling strategy): run
+   the top-N competing hypotheses as separate short research threads and let
+   verification pick winners, instead of one sequential trajectory. Needs the
+   loop to become a dispatcher over per-hypothesis micro-sessions.
+2. **Frontier-model gating for hard steps**: `brain/frontier_gate.py` exists
+   but reasoning-budget escalation (bigger model / higher thinking budget on
+   confirmed-critical deep-dives) is not wired into the decision loop.
+3. **Fleet mode**: XBOW runs hundreds of targets concurrently; X19 is
+   single-process single-target. The background task manager is the natural
+   substrate for a multi-target supervisor.
+4. **Blind-vuln OOB correlation**: `attacks.get_oob/oob_inject` exist; wiring
+   OOB callback polling into hypothesis confirmation would close the blind
+   SSRF/SQLi evidence gap.
+
+## 6. Verification
 
 - 23 new tests (`tests/test_dynamic_reasoning.py`): ledger lifecycle
   (add/dedupe/confirm/reject/block-reopen), parser passthrough, tool-agnostic
   extraction, adversarial review (real/false-positive/outage/garbage), and
-  source-level wiring guards. Full suite: **628 passed, 20 subtests**.
+  source-level wiring guards.
+- 9 more (`tests/test_chain_hunting.py`): near-miss guidance (single-hop,
+  two-hop, already-complete, info-only, limit), classifier parity with
+  reports, and wiring guards. Full suite: **637 passed, 20 subtests**.

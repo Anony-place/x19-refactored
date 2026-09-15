@@ -44,6 +44,7 @@ from brain.planner import Planner
 import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
 from brain.hypothesis_engine import MultiHypothesisEngine
+from brain.exploit_chain import ExploitChainEngine
 from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
 
@@ -99,6 +100,9 @@ class X19:
         # decision JSON's "hypotheses" actions feed this; the rendered ledger
         # is injected into every decision context.
         self.hyp_engine = MultiHypothesisEngine()
+        # Chain awareness: deterministic class-ENABLES knowledge applied to
+        # confirmed findings so the loop can steer toward critical chains.
+        self.chain_engine = ExploitChainEngine()
         self.planner = Planner()
         self.critic_engine = CriticEngine()
         self.strategist_engine = StrategistEngine()
@@ -2093,6 +2097,14 @@ Analyze the output carefully. Return JSON ONLY:
                         )
                         self.model.add_finding(f)
                         self.session.add_finding(f.severity, f.title, f.description, f.evidence)
+                        # Variant analysis (Big Sleep pattern): a confirmed bug
+                        # class usually recurs in sibling endpoints/params.
+                        # Soft advisory — the model decides, never forced.
+                        self._advisories.append(
+                            f"VARIANT CHECK: '{f.title[:60]}' confirmed ({f.severity}). "
+                            "Before pivoting, enumerate sibling endpoints/parameters "
+                            "for this same bug class and test them — variants of a "
+                            "confirmed class are the highest-ROI probes.")
                         if f.evidence:
                             print(f"{C.G}[+] Evidence: {f.evidence[:120]}...{C.N}")
                             self.state_db.update_transition({"type": "finding", "title": f.title, "severity": f.severity})
@@ -6920,6 +6932,18 @@ WORKSPACE: {self._file_state(target)[:400]}
         hyp_ctx = self.hyp_engine.render_context()
         if hyp_ctx:
             ctx += "\n" + hyp_ctx + "\n"
+
+        # Chain opportunities (XBOW-style primitive chaining): which missing
+        # finding would turn the agent's own confirmed primitives into a
+        # critical chain. Knowledge is deterministic; the hunt is the model's.
+        try:
+            chain_lines = self.chain_engine.hunting_guidance(self.model.findings)
+        except Exception:
+            chain_lines = []
+        if chain_lines:
+            ctx += "\nCHAIN OPPORTUNITIES (your confirmed primitives → missing link):\n"
+            for line in chain_lines[:4]:
+                ctx += f"  - {line}\n"
 
         # Tool-awareness: show what's actually available vs what the planner keeps suggesting
         tool_ctx = self._installed_tools_context()
