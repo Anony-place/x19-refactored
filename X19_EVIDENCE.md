@@ -24,12 +24,14 @@ $$\text{PriorityScore} = 0.25 \cdot \text{Conf} + 0.35 \cdot \text{InfoGain} + 0
 python -m unittest discover -s tests -v
 ```
 **Output Summary:**
-- **Total Tests Executed:** 100
+- **Total Tests Executed:** 535
 - **Failures / Errors:** 0
-- **Execution Time:** ~1.8s
+- **Execution Time:** ~8s
 - **Pass Rate:** 100%
 
-All 100 unit, integration, and benchmark tests pass cleanly.
+Reproduce with `python -m unittest discover -s tests -t .`. Numbers in this file
+were stale before (README said 61, X19_BASELINE.md said 95, this file said 100
+while the suite held 542) — if you edit the suite, edit this line.
 
 ---
 
@@ -38,4 +40,4 @@ All 100 unit, integration, and benchmark tests pass cleanly.
 In `tests/test_benchmark_suite.py` and `tests/test_swarm_and_native_tools.py`, adversarial scope escapes were tested:
 - **In-Scope Target (`127.0.0.1`):** Allowed.
 - **Out-of-Scope Target (`evil-attacker.com`):** Blocked automatically.
-- **External Redirect (`http://evil-attacker.com/exfiltrate`):** Raises `ScopeViolationError` at the transport layer.
+- **External Redirect (`http://evil-attacker.com/exfiltrate`):** Raises `ScopeViolationError` at the transport layer — *inside* `ScopeGuard`, which the swarm coordinator uses. Commands the main agent runs through `ToolExecutor` are checked by `PolicyEngine`'s textual scan instead, which is a guardrail, not a boundary.

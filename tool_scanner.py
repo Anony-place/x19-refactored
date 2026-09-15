@@ -244,7 +244,7 @@ def build_tool_context(available: Dict[str, DiscoveredTool],
     lines = []
 
     if available:
-        lines.append("AVAILABLE TOOLS:")
+        lines.append("TOOL INVENTORY (preinstalled — not an allowlist):")
         for name, tool in sorted(available.items(), key=lambda x: x[1].category + x[0]):
             lines.append(f"  {name:<25} [{tool.category}] {tool.description}")
 

@@ -47,6 +47,44 @@ def decision_system_prompt() -> str:
     return base + _BROWSER_HINT
 
 
+# ---------------------------------------------------------------------------
+# Output verbosity
+# ---------------------------------------------------------------------------
+# A CLI a person runs hundreds of times should print one line per event and
+# nothing else. `X19_VERBOSITY=verbose` restores the full echo (tool stdout,
+# gain scores, per-iteration banners); `quiet` reduces to results only.
+_VERBOSITY = (os.getenv("X19_VERBOSITY", "normal") or "normal").strip().lower()
+_LEVELS = {"quiet": 0, "normal": 1, "verbose": 2}
+
+
+def set_verbosity(level: str) -> None:
+    global _VERBOSITY
+    _VERBOSITY = (level or "normal").strip().lower()
+
+
+def verbosity() -> str:
+    return _VERBOSITY
+
+
+def verbose_on() -> bool:
+    return _LEVELS.get(_VERBOSITY, 1) >= 2
+
+
+def quiet_on() -> bool:
+    return _LEVELS.get(_VERBOSITY, 1) <= 0
+
+
+def vprint(text: str, *, level: str = "normal") -> None:
+    """Print only when the active verbosity admits `level`."""
+    want = _LEVELS.get(level, 1)
+    if _LEVELS.get(_VERBOSITY, 1) >= want:
+        print(text, flush=True)
+
+
+def strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text or "")
+
+
 def live_type(text, delay=0.003):
     """Print a line of agent output instantly (no typing animation — standard CLI behavior).
     `delay` is accepted for backward compatibility with existing call sites."""

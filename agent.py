@@ -33,7 +33,6 @@ from mission import GoalNode, GoalTree, ConfidenceScorer, LoopDetector, Autonomy
 from loop import HypothesisState, StructuredHypothesis, GateResult, ValidationResult, AntiLoopState, AntiLoopEngine, get_antiloop, HYP_STATE_NEW, HYP_STATE_TESTING, HYP_STATE_CONFIRMED, HYP_STATE_REJECTED, HYP_STATE_DEAD, HYP_STATE_STALE, HYP_SCORE_REDUCE_THRESHOLD, HYP_DEAD_THRESHOLD
 from self_improve import SelfAwareness, PerformanceAnalyzer, CodeSurgeon, CodePatch, PatchResult, ImprovementSuggestion, Bottleneck, mid_session_self_improve
 from context_compressor import ContextCompressor, CompressionConfig
-from tool_distributions import get_tools_for_phase, sample_tools_from_distribution
 from telegram import TelegramBot
 from utils import live_type, fingerprint_output, signature_command, classify_progress, validate_target, _parse_ints, decision_system_prompt, _ver_lt, _ver_in_range
 from config import CONFIG, CONFIG_DIR, CONFIG_FILE, load_config, save_config, set_data, SCRIPTS_DIR, PAYLOADS_DIR, WORDLISTS_DIR
@@ -79,6 +78,14 @@ class X19:
         self._conn_fail_streak: int = 0
         self._plan_sigs: dict = {}
         self._last_commands: list = []
+        # ---- advisory queue (autonomy mode) -------------------------------
+        # Soft gates never refuse the agent's chosen command; they append a
+        # note here, which is injected into the *next* decision prompt as an
+        # observation. The agent keeps acting and self-corrects from evidence
+        # instead of having iterations stolen by policy blocks.
+        self._advisories: List[str] = []
+        self._recall_ids: List[str] = []
+        self._queued_pivot_probe: str = ""
         # Context compression
         self.context_compressor = ContextCompressor()
         # Dynamic tool scanning
@@ -1031,10 +1038,49 @@ Analyze the output carefully. Return JSON ONLY:
         return "authorized"  # safe default
 
     @staticmethod
+    @staticmethod
+    def _split_target(target: str) -> Tuple[str, int]:
+        """Return ``(host, port)`` for a raw target, preserving an explicit port.
+
+        Stripping the port used to send every ``host:8443``-style engagement's
+        bootstrap recon to port 80, so the agent then "discovered" the wrong
+        service — or nothing at all — and reasoned on that. A bare host with no
+        port yields ``port == 0`` and callers pick the scheme default.
+        """
+        t = str(target or "").strip()
+        t = re.sub(r"^[a-z]+://", "", t, flags=re.I)
+        t = t.split("/")[0].split("?")[0]
+        if not t:
+            return "", 0
+        # IPv6 literal: [::1]:8443
+        if t.startswith("["):
+            host, _, rest = t[1:].partition("]")
+            port = 0
+            if rest.startswith(":") and rest[1:].isdigit():
+                port = int(rest[1:])
+            return host, port
+        if t.count(":") == 1:
+            host, _, maybe = t.partition(":")
+            if maybe.isdigit():
+                return host, int(maybe)
+        return t, 0
+
+    @staticmethod
     def _normalize_domain(target: str) -> str:
-        t = target.strip()
-        t = re.sub(r"^https?://", "", t, flags=re.I)
-        return t.split("/")[0].split(":")[0]
+        """Bare hostname — for DNS/zone tools that must not carry a port."""
+        return X19._split_target(target)[0]
+
+    @staticmethod
+    def _target_origin(target: str) -> str:
+        """Scheme-correct origin for HTTP work, port preserved when given."""
+        host, port = X19._split_target(target)
+        if not host:
+            return ""
+        if port in (443, 8443, 9443):
+            return f"https://{host}:{port}" if port != 443 else f"https://{host}"
+        if port:
+            return f"http://{host}:{port}"
+        return f"http://{host}"
 
     def _configure_execution_scope(self, target: str):
         """Refresh command-gateway policy for this mission target."""
@@ -1072,10 +1118,12 @@ Analyze the output carefully. Return JSON ONLY:
 
     def _bug_bounty_bootstrap(self, target: str) -> str:
         """Hands-free recon burst before the AI loop (parallel, no human input)."""
-        domain = self._normalize_domain(target)
+        domain, port = self._split_target(target)
         if not domain:
             return ""
-        print(f"{C.BOLD}{C.M}[BB] Autonomous bootstrap on {domain} (parallel recon){C.N}")
+        origin = self._target_origin(target)
+        web = f"{origin}/"
+        print(f"{C.BOLD}{C.M}[BB] Autonomous bootstrap on {origin} (parallel recon){C.N}")
 
         jobs: List[Tuple[str, int]] = []
         if self._check_tool("subfinder"):
@@ -1083,39 +1131,41 @@ Analyze the output carefully. Return JSON ONLY:
         elif self._check_tool("amass"):
             jobs.append((f"amass enum -passive -d {domain} 2>/dev/null | head -80", 180))
         else:
-            jobs.append((f"dig +short {domain} A {domain} AAAA 2>/dev/null; dig +short www.{domain} A 2>/dev/null", 30))
+            jobs.append((f"dig +short {domain} A {domain} AAAA 2>/dev/null", 30))
 
         if self._check_tool("httpx"):
             jobs.append((
-                f"printf 'http://{domain}\\nhttps://{domain}\\nhttps://www.{domain}\\n' | "
+                f"printf '%s\\n' \"{web}\" | "
                 f"httpx -s -status-code -title -tech-detect -follow-redirects "
-                f"-ports 80,443,8080,8443 -json -o {self.workspace}/httpx.json 2>/dev/null; "
+                f"{'' if port else '-ports 80,443,8080,8443'} -json -o {self.workspace}/httpx.json 2>/dev/null; "
                 f"cat {self.workspace}/httpx.json 2>/dev/null | head -40",
                 90,
             ))
         else:
-            jobs.append((f"curl -sI -L --max-redirs 5 http://{domain} 2>/dev/null | head -30", 30))
+            jobs.append((f"curl -sI -L --max-redirs 5 {web} 2>/dev/null | head -30", 30))
 
         if self._check_tool("katana"):
-            jobs.append((f"katana -u https://{domain} -d 2 -silent 2>/dev/null | head -60", 120))
+            jobs.append((f"katana -u {web} -d 2 -silent 2>/dev/null | head -60", 120))
         elif self._check_tool("gau"):
             jobs.append((f"gau {domain} 2>/dev/null | head -60", 90))
 
         if self._check_tool("nuclei") and not is_fast_mode():
             jobs.append((
-                f"nuclei -u https://{domain} -t cves,misconfigurations,exposures,technologies "
+                f"nuclei -u {web} -t cves,misconfigurations,exposures,technologies "
                 f"-silent -rl 80 2>/dev/null | head -40",
                 180,
             ))
         elif is_fast_mode() and self._check_tool("nuclei"):
             jobs.append((
-                f"nuclei -u https://{domain} -t exposures,misconfigurations -silent -rl 120 2>/dev/null | head -25",
+                f"nuclei -u {web} -t exposures,misconfigurations -silent -rl 120 2>/dev/null | head -25",
                 90,
             ))
 
         summaries = []
         for cmd, result in self._run_commands_parallel(jobs):
-            print(f"{C.B}[BB] done ({result.returncode}): {cmd[:70]}...{C.N}")
+            from utils import verbose_on as _verbose
+            if _verbose():
+                print(f"{C.B}[BB] done ({result.returncode}): {cmd[:70]}...{C.N}")
             self._extract_to_model(cmd, result)
             self.session.add_cmd(cmd[:200], result.text[:500], "bootstrap", result.returncode)
             summaries.append(f"$ {cmd}\n{(result.text or result.stderr)[:1500]}")
@@ -1125,7 +1175,7 @@ Analyze the output carefully. Return JSON ONLY:
         cve_jobs: List[Tuple[str, int]] = []
         try:
             if self.model.tech_stack:
-                cve_plan = CveMapper().plan(dict(self.model.tech_stack), f"https://{domain}")
+                cve_plan = CveMapper().plan(dict(self.model.tech_stack), origin)
                 for entry in cve_plan[:3]:
                     if entry.get("command"):
                         cve_jobs.append((entry["command"], 60))
@@ -1140,10 +1190,11 @@ Analyze the output carefully. Return JSON ONLY:
                 self.session.add_cmd(cmd[:200], result.text[:500], "cve_exploit", result.returncode)
                 summaries.append(f"[CVE] $ {cmd}\n{(result.text or result.stderr)[:1500]}")
 
-        self.model.add_subdomain(domain)
-        self.model.add_subdomain(f"www.{domain}")
-        for p in (80, 443):
-            self.model.add_port(p, "tcp", "http" if p == 80 else "https", "")
+        # Nothing is recorded as discovered unless a command actually proved it.
+        # This block used to seed ports 80/443 as "open" and invent a www.
+        # subdomain with no scan behind them; that fabricated state flowed into
+        # the decision prompt and into phase/exploit logic, so the agent was
+        # reasoning about a target it had never looked at.
 
         summary = (
             f"[BOOTSTRAP COMPLETE — {len(jobs)} parallel jobs]\n"
@@ -1170,6 +1221,9 @@ Analyze the output carefully. Return JSON ONLY:
         self._no_progress_streak = 0
         self._iter_start_size = 0
         self._normalized_cmd_counts = {}
+        self._advisories = []
+        self._recall_ids = []
+        self._queued_pivot_probe = ""
         # Reset 404'd-URL set per-target
         self._false_claim_urls = set()
         self._stuck_warnings = []
@@ -1710,16 +1764,17 @@ Analyze the output carefully. Return JSON ONLY:
         # Scan system tools for capabilities context
         self._scan_system_tools()
         self._build_attack_chain()
-        print(f"{ICO.NODE} AI: {self.ai.name()}{C.N}")
-        print(f"{ICO.NODE} Target: {target}{C.N}")
-        print(f"{ICO.KEY} Session: {sid}{C.N}")
+        # One header line instead of five. The provider is already echoed by the
+        # CLI chain summary, and "background learner started" is an internal
+        # detail nobody needs on every run.
+        print(f"{ICO.NODE} target {target}  ·  session {sid}  ·  ai {self.ai.name()}{C.N}")
         if self.memory.ready:
             n_tech = self.memory.count("techniques")
             n_less = self.memory.count("lessons")
-            print(f"{ICO.INFO} Memory: {n_tech} techniques, {n_less} lessons{C.N}")
+            if n_tech or n_less:
+                print(f"{ICO.INFO} memory: {n_tech} techniques, {n_less} lessons{C.N}")
         if self.learner:
             self.learner.start()
-            print(f"{ICO.INFO} Background learner started{C.N}")
 
         if is_fast_mode():
             print(f"{ICO.BOLT} Fast mode — compact AI context, parallel plans, quick verify{C.N}")
@@ -1796,23 +1851,29 @@ Analyze the output carefully. Return JSON ONLY:
                 break
             iteration += 1
 
-            if not is_fast_mode():
-                print(f"\n{C.D}{'='*50}{C.N}")
-            print(f"{C.BOLD}Iteration {iteration}{C.N}")
-            if not is_fast_mode():
-                print(f"{C.D}{'='*50}{C.N}")
+            # One status line per iteration. The separator rules and the
+            # saturation readout used to occupy three lines each turn and told
+            # the operator nothing actionable; they are now one compact line in
+            # verbose mode and folded into the iteration marker otherwise.
+            from utils import vprint as _vp, verbose_on as _vb
+            self._iter_marker = f"[{iteration}/{CONFIG.MAX_ITERATIONS}]"
+            print(f"{C.BOLD}{self._iter_marker}{C.N}", flush=True)
+            if _vb():
+                print(f"{C.D}{'-' * 46}{C.N}")
 
             # Snapshot of model state at iter start (used by no-progress tracker)
             self._iter_start_size = self._model_size()
             # Auto-unban if the agent is soft-locked on a banned category with no progress
             self._maybe_auto_unban(iteration)
 
-            # Recon Saturation Detection — shown before every iteration (req 10)
+            # Recon saturation — surfaced only when it actually matters
             sat = self._recon_saturation()
-            print(f"{C.B}Pivot Score: {sat['pivot_score']:.0f}%  Duplicate Responses: {sat['duplicates']}  "
-                  f"Exhausted Endpoints: {sat['exhausted_endpoints']}  Recon Saturated: {sat['saturated']}{C.N}")
-            for c in self._active_constraints():  # req 7: show active constraints before generating a plan
-                print(f"{C.R}[CONSTRAINT] {c['conclusion']}{C.N}")
+            if _vb():
+                print(f"{C.B}    pivot={sat['pivot_score']:.0f}% dupes={sat['duplicates']} "
+                      f"exhausted={sat['exhausted_endpoints']} saturated={sat['saturated']}{C.N}")
+            for c in self._active_constraints():  # req 7: constraints still gate the planner
+                if _vb():
+                    print(f"{C.R}[CONSTRAINT] {c['conclusion']}{C.N}")
             if sat["saturated"] and not self._forced_exploit:
                 # WAF detected: do NOT enter FORCED EXPLOIT MODE. WAF = origin discovery
                 # required, not exploitation. Exploit mode against a 403-WAF is wasted effort.
@@ -1922,6 +1983,13 @@ Analyze the output carefully. Return JSON ONLY:
             thinking = decision.get("thinking", "")[:400]
             reasoning = decision.get("reasoning", "")[:300]
             command = (decision.get("next_command") or "").strip()
+            # Evidence recall: the model may ask to re-read a stored output in
+            # full. It is surfaced in the next context build, not executed.
+            _recall = decision.get("recall")
+            if isinstance(_recall, str) and _recall.strip():
+                self._recall_ids = [_recall.strip()]
+            elif isinstance(_recall, list):
+                self._recall_ids = [str(r).strip() for r in _recall if str(r).strip()][:3]
             # AI multi-command support: if AI returns a list of commands, run them in parallel
             parallel_commands = decision.get("commands", [])
             if isinstance(parallel_commands, list) and len(parallel_commands) > 1 and command:
@@ -1943,9 +2011,10 @@ Analyze the output carefully. Return JSON ONLY:
             log(f"[PLANNER_DECISION] iter={iteration} node={active_node} completed={completed} "
                 f"has_plan={isinstance(decision.get('plan'), dict)} finding={bool(finding)} cmd={command[:160]!r}")
 
-            live_type(f"{C.C}[X19] {thinking}{C.N}")
-            if reasoning:
-                live_type(f"{C.B}[Why] {reasoning}{C.N}")
+            _marker = getattr(self, "_iter_marker", "")
+            live_type(f"{C.C}{_marker} {thinking}{C.N}" if thinking else f"{C.D}{_marker}{C.N}")
+            if reasoning and _vb():
+                live_type(f"{C.B}    why: {reasoning}{C.N}")
 
             # Resolve evidence context — always check against the last REAL tool output,
             # so findings reported without a fresh command are still verified (not auto-accepted).
@@ -2104,20 +2173,7 @@ Analyze the output carefully. Return JSON ONLY:
                 plan_goal = (plan.get("goal") or reasoning or thinking or "").strip()
                 jpass, jreason = self._justification_gate(reasoning, thinking, plan_goal)
                 if not jpass:
-                    is_no_data = "no real session data" in jreason
-                    if is_no_data:
-                        print(f"{C.R}[!] PLAN JUSTIFICATION REJECTED — {jreason}. Plan blocked.{C.N}")
-                        self._stuck_warnings.append(f"Plan justification rejected (no session data): {plan_goal[:80]}")
-                        self._blocked_plan_signatures.add(plan_sig)
-                        previous_output = (f"[SYSTEM: Your plan justification does not reference REAL session data. "
-                            f"You must cite actual open ports, discovered services, found endpoints, credentials, "
-                            f"or subdomains from THIS session. Do not make generic claims. "
-                            f"Findings: {self.session.findings_summary()}]")
-                        self.session.add_cmd(f"[PLAN BLOCKED] {plan.get('goal','')[:80]}",
-                            f"[BLOCKED: justification needs real session data]", "blocked")
-                        continue
-                    print(f"{C.Y}[!] PLAN WEAK JUSTIFICATION — {jreason} (warning only, AI is in control){C.N}")
-                    self._stuck_warnings.append(f"Plan weak justification: {plan_goal[:80]}")
+                    self._advise(f"PLAN JUSTIFICATION: {jreason}")
 
                 file_read_cmds = ['head', 'cat', 'wc', 'tail', 'less', 'more', 'grep', 'awk', 'sed']
                 run_count = len(plan_commands)
@@ -2334,8 +2390,8 @@ Analyze the output carefully. Return JSON ONLY:
                             print(f"{C.Y}[!] Command failed (rc={fallback_result.returncode}), continuing...{C.N}")
                         last_rc = fallback_result.returncode if fallback_result else -1
                         self._last_reflection = self._self_reflect(command, previous_output, last_rc)
-                        if self._last_reflection:
-                            print(f"{C.B}[Reflect] {self._last_reflection[:200]}{C.N}")
+                        if self._last_reflection and _vb():
+                            print(f"{C.B}    reflect: {self._last_reflection[:200]}{C.N}")
                         # Give AI a chance to recover every 3 fallback iterations
                         if self._ai_empty_streak >= 5 and self._ai_empty_streak % 3 == 0:
                             self._ai_empty_streak = 0
@@ -2348,18 +2404,11 @@ Analyze the output carefully. Return JSON ONLY:
                 # Justification gate: warn-only (AI is the boss; we don't block its decisions)
                 jpass, jreason = self._justification_gate(reasoning, thinking, command)
                 if not jpass:
-                    is_no_data = "no real session data" in jreason
-                    if is_no_data:
-                        print(f"{C.R}[!] JUSTIFICATION REJECTED — {jreason}. Command blocked.{C.N}")
-                        self._stuck_warnings.append(f"Justification rejected (no session data): {command[:80]}")
-                        previous_output = (f"[SYSTEM: Your command justification does not reference REAL session data. "
-                            f"You must cite actual open ports, discovered services, found endpoints, "
-                            f"credentials, or subdomains from THIS session. "
-                            f"Findings: {self.session.findings_summary()}]")
-                        self.session.add_cmd(command, f"[BLOCKED: justification needs real session data]", "blocked", -1)
-                        continue
-                    print(f"{C.Y}[!] WEAK JUSTIFICATION — {jreason} (warning only, AI is in control){C.N}")
-                    self._stuck_warnings.append(f"Weak justification: {command[:80]}")
+                    # The comment here used to read "AI is the boss" while the code
+                    # blocked the command and skipped the turn. Make that true:
+                    # a vague justification is worth flagging, not worth vetoing —
+                    # the result of the command is what actually teaches the model.
+                    self._advise(f"WEAK JUSTIFICATION: {jreason}")
 
                 # Auth attack safety check (public real-world targets only)
                 if self.target_type == "public_real_world":
@@ -2393,42 +2442,30 @@ Analyze the output carefully. Return JSON ONLY:
                     )
                     continue
 
-                # Command validation
+                # ---- Command validation: advisory, not a veto -----------------
+                # A missing binary is not a reason to skip an iteration. Run it,
+                # let the shell return 127, and hand that real error to the model:
+                # it recovers from actual output far more reliably than from a
+                # policy refusal that burned the turn without learning anything.
                 is_valid, warning, fixes = self._validate_command(command)
-                if not is_valid:
-                    print(f"{C.Y}[!] COMMAND VALIDATION: {warning}{C.N}")
-                    if fixes:
-                        for fx in fixes[:2]:
-                            print(f"{C.B}    Fix suggestion: {fx}{C.N}")
-                    # Block obviously invalid commands
-                    if "not installed" in warning:
-                        base = command.strip().split()[0].split("/")[-1]
-                        print(f"{C.Y}[!] Auto-installing missing tool: {base}{C.N}")
-                        if self._auto_install(base):
-                            print(f"{C.G}[+] Tool installed, proceeding...{C.N}")
-                        else:
-                            print(f"{C.R}[!] Tool '{base}' unavailable — blocking (verify before execute).{C.N}")
-                            self._stuck_warnings.append(f"Unavailable tool blocked: {base}")
-                            previous_output = (
-                                f"[SYSTEM: Tool '{base}' is NOT installed and could not be auto-installed. "
-                                f"Do NOT use '{base}'. Use an installed tool (e.g. curl, httpx) or a different technique.]"
-                            )
-                            self.session.add_cmd(command, f"[BLOCKED: tool '{base}' unavailable]", "blocked", -1)
-                            continue
-                if warning:
-                    print(f"{C.Y}[!] Command warning: {warning[:200]}{C.N}")
+                if not is_valid and command:
+                    base = command.strip().split()[0].split("/")[-1]
+                    if "not installed" in warning and base:
+                        print(f"{C.Y}[!] '{base}' missing — attempting install, then running regardless{C.N}")
+                        self._auto_install(base)
+                    else:
+                        self._advise(warning)
+                elif warning:
+                    log(f"[cmd warning] {warning[:200]}")
 
-                # X19_INTELLIGENCE: self-critique gate — detect when the AI is
-                # template-filling (same think text, same generic reasoning,
-                # same tool family in a row). Catches the exact loop pattern
-                # observed in production runs (AI returning near-identical
-                # responses 5+ times in a row without learning).
+                # ---- Self-critique: report, never refuse ----------------------
+                # Detecting template-filling is useful signal. Acting on it by
+                # discarding the command is not: the loop then starves, because
+                # the model never sees what its idea produced.
                 critique_ok, critique_reason = self._self_critique_check(decision)
-                if not critique_ok:
-                    print(f"{C.BOLD}{C.M}[!] SELF-CRITIQUE FAILED — {critique_reason}{C.N}")
-                    self._stuck_warnings.append(f"Self-critique: {critique_reason[:80]}")
-                    previous_output = f"[SYSTEM: SELF-CRITIQUE FAILED — {critique_reason}]"
-                    self.session.add_cmd(command, f"[BLOCKED: self-critique failed]", "blocked", -1)
+                if not critique_ok and self._advise(f"SELF-CRITIQUE: {critique_reason}"):
+                    # X19_STRICT_GATES=1 only.
+                    self.session.add_cmd(command, "[BLOCKED: self-critique failed]", "blocked", -1)
                     self._consecutive_blocked_cmds += 1
                     if self._consecutive_blocked_cmds >= 3:
                         fb = self._force_next_planner_step()
@@ -2439,7 +2476,6 @@ Analyze the output carefully. Return JSON ONLY:
                             self.session.add_cmd(fb, result.text[:500], "probe", result.returncode)
                             previous_output = result.text[:3000]
                             self._consecutive_blocked_cmds = 0
-                            continue
                     continue
 
                 cmd_hash = hash(command)
@@ -2449,81 +2485,53 @@ Analyze the output carefully. Return JSON ONLY:
                 self._cmd_hashes.add(cmd_hash)
                 self._cmd_hashes_stripped.add(cmd_stripped_hash)
 
-                # Skip tool loop/tool-family checks in fallback mode (AI is broken,
-                # we're running deliberate phased pentest commands)
                 if self._ai_empty_streak < 2:
                     tool_base = command.strip().split()[0] if command.strip().split() else ""
                     same_tool_recent = sum(1 for c in self._last_commands if c.strip().startswith(tool_base))
                     if same_tool_recent >= 3 and not is_dup:
-                        print(f"{C.Y}[!] TOOL LOOP — '{tool_base}' used {same_tool_recent}/5 times. Pivot to a different tool.{C.N}")
-                        self._stuck_warnings.append(f"Tool loop: {tool_base} x{same_tool_recent}")
-                        previous_output = f"[SYSTEM: You keep using '{tool_base}'. Used {same_tool_recent} of the last 5 times. PICK A DIFFERENT TOOL.]"
-                        self.session.add_cmd(command, f"[BLOCKED: tool loop {tool_base}]", "blocked", -1)
-                        continue
+                        # Same tool with different arguments is normal tradecraft,
+                        # not a bug. Note it; do not veto it.
+                        self._advise(
+                            f"REPETITION: '{tool_base}' used {same_tool_recent}/5 times — "
+                            f"if it keeps returning nothing, change technique, not just flags"
+                        )
 
-                    # Tool family fixation check — force diversity across technique categories
                     fam_blocked, fam_msg = self._tool_fixation_check(command)
                     if fam_blocked:
-                        print(f"{C.R}[!] {fam_msg}{C.N}")
-                        self._stuck_warnings.append(f"Tool family fixation: {fam_msg[:80]}")
-                        previous_output = f"[SYSTEM: {fam_msg}]"
-                        self.session.add_cmd(command, f"[BLOCKED: tool family fixation]", "blocked", -1)
-                        continue
+                        self._advise(fam_msg)
 
-                    # ALREADY EXECUTED tool check — once a tool has been run successfully,
-                    # block any attempt to run it again. Prevents subfinder loops.
-                    tool_base = command.strip().split()[0] if command.strip().split() else ""
-                    if tool_base and self._executed_tool_names:
-                        # Match if command starts with any executed tool name
-                        already_run = False
-                        for et in sorted(self._executed_tool_names, key=len, reverse=True):
-                            if tool_base == et or tool_base.startswith(et + "/") or tool_base.startswith(et + "\\"):
-                                already_run = True
-                                break
-                            # Handle paths: /usr/bin/nmap or nmap
-                            base_name = os.path.basename(tool_base).split(".exe")[0].split(".py")[0]
-                            et_name = os.path.basename(et).split(".exe")[0].split(".py")[0]
-                            if base_name and base_name == et_name:
-                                already_run = True
-                                break
-                        if already_run:
-                            print(f"{C.R}[!] TOOL ALREADY EXECUTED — '{tool_base}' has been run already. Pivot to a different tool.{C.N}")
-                            self._stuck_warnings.append(f"Already executed: {tool_base}")
-                            previous_output = (
-                                f"[SYSTEM: '{tool_base}' was already executed earlier in this session. "
-                                f"Running it again produces no new information. "
-                                f"Executed tools: {sorted(self._executed_tool_names)}. "
-                                f"PICK A DIFFERENT TOOL YOU HAVEN'T USED YET.]"
-                            )
-                            self.session.add_cmd(command, f"[BLOCKED: already executed {tool_base}]", "blocked", -1)
-                            continue
-
-                # Phase enforcement: tool allowed in phase, max 2 tries per tool
+                # Phase enforcement: a hint about methodology depth, not a
+                # permission system. Skipping ahead is sometimes correct.
                 phase_allowed, phase_reason = self._phase_enforce(command)
-                if not phase_allowed:
-                    print(f"{C.R}[!] PHASE ENFORCEMENT: {phase_reason}{C.N}")
-                    self._stuck_warnings.append(f"Phase: {phase_reason[:80]}")
-                    previous_output = f"[SYSTEM: {phase_reason}. Current phase: {self._current_phase.upper()}. Choose a tool allowed in this phase.]"
-                    self.session.add_cmd(command, f"[BLOCKED: phase enforcement]", "blocked", -1)
+                if not phase_allowed and self._advise(
+                    f"PHASE: {phase_reason} (current phase {self._current_phase.upper()}); "
+                    f"running it anyway — adjust if it yields nothing"
+                ):
+                    self.session.add_cmd(command, "[BLOCKED: phase enforcement]", "blocked", -1)
                     continue
                 self._phase_attempt_record(command)
-                # Check stuck status and potentially ask for hint
+
                 if self._phase_is_stuck() and not self._asked_human_hint:
-                    print(f"{C.BOLD}{C.Y}[!] PHASE STUCK — 5+ iterations without advance in {self._current_phase.upper()}{C.N}")
-                    print(f"{C.Y}    Next phase requires: {self._phase_advance_needs_text()}{C.N}")
-                    previous_output = f"[SYSTEM: You appear stuck in {self._current_phase.upper()} phase. Try a fundamentally different approach or tool you haven't used yet.]"
+                    print(f"{C.Y}[!] stuck in {self._current_phase.upper()} — needs: {self._phase_advance_needs_text()}{C.N}")
+                    self._advise(
+                        f"PHASE STUCK: 5+ iterations without advancing {self._current_phase.upper()}. "
+                        f"To move on: {self._phase_advance_needs_text()}"
+                    )
                     self._asked_human_hint = True
 
                 # Information gain — scored for visibility but NOT blocked.
                 # Only exact duplicates and banned categories block commands now.
                 gain = self._info_gain_scorer(command)
+                self._last_gain = gain
                 if gain < 3:
-                    gain_note = " — ZERO-GAIN"
-                elif gain < 5:
-                    gain_note = " — LOW-GAIN"
-                else:
-                    gain_note = f" — GAIN={gain}"
-                print(f"{C.B}[Gain] {gain}/10{gain_note}{C.N}")
+                    self._advisories.append(
+                        f"LOW-YIELD PREDICTION: '{command[:70]}' is scored {gain}/10 by the "
+                        f"duplicate/heuristic check. Run it anyway if you disagree — just know "
+                        f"we have seen output like this already."
+                    )
+                if _vb():
+                    gain_note = " — ZERO-GAIN" if gain < 3 else (" — LOW-GAIN" if gain < 5 else f" — GAIN={gain}")
+                    print(f"{C.B}[Gain] {gain}/10{gain_note}{C.N}")
 
                 # Service category tracking
                 cat = self._cmd_category(command)
@@ -2545,21 +2553,30 @@ Analyze the output carefully. Return JSON ONLY:
                 if len(self._last_commands) > 5:
                     self._last_commands = self._last_commands[-5:]
 
-                if self._file_read_streak >= 2:
-                    print(f"{C.R}[!] FILE READ LOOP DETECTED — {self._file_read_streak} consecutive file reads. FORCING ACTIVE SCAN.{C.N}")
-                    self._stuck_warnings.append(f"File read loop: {self._file_read_streak} reads")
-                    previous_output = f"[SYSTEM: STOP READING FILES. You've read {self._file_read_streak} files in a row. START ACTIVE SCANNING NOW. Run httpx, nuclei, or ffuf on discovered subdomains. NO MORE head/cat/wc/tail/grep/awk/sed commands.]"
-                    self.session.add_cmd(command, "[BLOCKED: file read loop]", "blocked")
+                if self._file_read_streak >= 3:
+                    # Reading files is how secrets get found — it is not a crime.
+                    # Only nag about the streak; never discard the command.
+                    self._advise(
+                        f"FILE READ STREAK: {self._file_read_streak} consecutive reads. "
+                        f"If this one is empty too, go back to active probing"
+                    )
                     self._file_read_streak = 0
-                    continue
 
                 # Session memory check: block tool+flag combo that failed in last 3 iterations
                 _cmd_sig = self._tool_flag_signature(command)
                 if _cmd_sig and not is_dup:
                     _aloop = get_antiloop()
                     if _aloop.is_signature_blocked(_cmd_sig, max_recent=3):
-                        print(f"{C.R}[!] SESSION MEMORY — tool+flags '{_cmd_sig}' failed in last 3 iterations. BLOCKED.{C.N}")
-                        self._stuck_warnings.append(f"Session memory blocked: {_cmd_sig}")
+                        # Genuine dedupe, not a permission gate: this exact
+                        # tool+flag combination already failed 3x, so a 4th run
+                        # costs time and returns a known answer. Tell the model
+                        # *why* it is being skipped so it changes technique.
+                        print(f"{C.Y}[!] skipped — '{_cmd_sig}' already failed 3x{C.N}")
+                        self._advisories.append(
+                            f"SKIPPED DUPE: '{_cmd_sig}' failed 3 times already. "
+                            f"Change the tool or the technique, not just the flags."
+                        )
+                        self._stuck_warnings.append(f"Session memory skipped: {_cmd_sig}")
                         previous_output = (f"[SYSTEM: This exact tool+flag combination ('{_cmd_sig}') failed in the last 3 iterations. "
                             "It is temporarily blocked. Use a DIFFERENT tool, different flags, or a different approach. "
                             "Do NOT retry the same command with the same arguments.]")
@@ -2576,54 +2593,39 @@ Analyze the output carefully. Return JSON ONLY:
 
                 # Loop recovery: a category banned by a prior HARD LOOP must not run again.
                 if cat in self._banned_categories or cat in self._banned_plan_categories:
-                    print(f"{C.BOLD}{C.R}[!] BANNED CATEGORY '{cat}' — refusing, strategy change required.{C.N}")
-                    self._stuck_warnings.append(f"Banned-category blocked: {cat}")
+                    # "Banned" here means *our* saturation detector concluded the
+                    # category is dry. The model is allowed to disagree — it runs
+                    # its command and inherits the evidence. Only after a long,
+                    # unbroken streak do we additionally queue a pivot probe, and
+                    # even then we do not discard the model's action.
+                    self._advise(
+                        f"EXHAUSTED CATEGORY '{cat}': recon saturation flagged this as dry "
+                        f"({', '.join(sorted(set(self._banned_categories) | set(self._banned_plan_categories)))}). "
+                        f"Running yours anyway — if it adds nothing, pivot for real"
+                    )
+                    self._stuck_warnings.append(f"Banned-category advisory: {cat}")
                     banned_all = sorted(set(self._banned_categories) | set(self._banned_plan_categories))
-                    # BUGFIX: override with a non-banned command from local fallback instead of looping.
-                    # DEDUP: if pick_fallback returns the same override as last iteration, force-rotate
-                    # by trying up to 3 more candidates.
-                    # AI takeover: after 3 consecutive AI-driven banned-category attempts, skip the AI
-                    # for this iteration and use the local fallback directly (the model is stuck).
                     if not hasattr(self, "_banned_override_streak"):
                         self._banned_override_streak = 0
                     self._banned_override_streak += 1
-                    banned_set = set(self._banned_categories) | set(self._banned_plan_categories)
-                    override = ""
-                    if self._banned_override_streak >= 3:
-                        # Local takeover: rotate to next candidate without consulting AI again
-                        override = self.auto_replanner.pick_fallback(self)
-                        self._last_override_cmd = override
-                        print(f"{C.G}[+] AI TAKEOVER (x{self._banned_override_streak} banned) → {override!r} "
-                              f"(cat={self._cmd_category(override) if override else 'n/a'}){C.N}")
-                    else:
-                        for _attempt in range(4):
-                            override = self.auto_replanner.pick_fallback(self)
-                            if not override:
-                                break
-                            if override == self._last_override_cmd:
-                                self._last_override_idx = (self._last_override_idx + 1) % 100
-                                continue
-                            if self._cmd_category(override) in banned_set:
-                                continue
-                            break
-                    if override and self._cmd_category(override) not in banned_set:
-                        self._last_override_cmd = override
-                        if self._banned_override_streak < 3:
-                            print(f"{C.G}[+] Override → {override!r} (cat={self._cmd_category(override)}){C.N}")
-                        command = override
-                        cat = self._cmd_category(command)
-                        previous_output = (
-                            f"[SYSTEM: Your previous command was in BANNED category. "
-                            f"Overriding with: {command!r} (category: {cat}). "
-                            f"Banned: {banned_all}. Findings: {self.session.findings_summary()}]"
+                    # No command substitution and no skipped iteration. The model
+                    # sees the dry-category verdict as data and picks its own way
+                    # out; a stale category is only *additionally* probed by the
+                    # planner queue, never by hijacking this turn.
+                    if self._banned_override_streak >= 4:
+                        self._advisories.append(
+                            f"STILL DRY: you have chosen a saturated category "
+                            f"({', '.join(banned_all)}) {self._banned_override_streak} turns running. "
+                            f"An exhausted branch is a valid result — report what you "
+                            f"proved and move to a different attack surface."
                         )
-                    else:
-                        previous_output = (
-                            f"[SYSTEM: Category '{cat}' is BANNED. Banned: {banned_all}. "
-                            f"Pick a DIFFERENT category and a genuinely different command. Findings: {self.session.findings_summary()}]"
-                        )
-                        self.session.add_cmd(command, f"[BLOCKED: banned category {cat}]", "blocked", -1)
-                        continue
+                        try:
+                            extra = self.auto_replanner.pick_fallback(self)
+                            if extra and self._cmd_category(extra) not in set(banned_all):
+                                self._queued_pivot_probe = extra
+                        except Exception as exc:
+                            log(f"[banned-category] pivot probe skipped: {exc}")
+
 
                 # Hard category limit enforcement — force pivot after N in same category.
                 # Configurable via X19_CATEGORY_HARD_LIMIT (default 5 was too aggressive
@@ -2681,17 +2683,22 @@ Analyze the output carefully. Return JSON ONLY:
                         self.session.add_cmd(command, "[BLOCKED: dead endpoint]", "blocked", -1)
                         continue
                     if cat in self._dead_branches and not self._forced_exploit:
-                        print(f"{C.Y}[!] DEAD BRANCH '{cat}' — 3 unproductive runs. Pivot.{C.N}")
-                        self._stuck_warnings.append(f"Dead-branch blocked: {cat}")
-                        previous_output = (f"[SYSTEM: Category '{cat}' is a DEAD BRANCH (3 runs, no new assets/findings). "
-                            f"Switch to a different technique. Dead branches: {sorted(self._dead_branches)}.]")
-                        self.session.add_cmd(command, f"[BLOCKED: dead branch {cat}]", "blocked", -1)
-                        continue
+                        self._advise(
+                            f"DEAD BRANCH: '{cat}' produced nothing new on 3 runs "
+                            f"(dead: {sorted(self._dead_branches)}). Running yours anyway — "
+                            f"if this one is empty too, change technique rather than repeating it"
+                        )
 
                 if is_dup:
-                    print(f"{C.Y}[!] DUPLICATE COMMAND — blocked. Pivot.{C.N}")
-                    self._stuck_warnings.append(f"Duplicate command blocked: {command[:120]}")
-                    previous_output = f"[SYSTEM: Blocked duplicate command. You already ran this. Pivot to something fundamentally different.]"
+                    # Byte-identical to a command already run: skipped for cost,
+                    # not for control. The model is told plainly what happened.
+                    print(f"{C.Y}[!] skipped — identical command already ran{C.N}")
+                    self._advisories.append(
+                        f"SKIPPED IDENTICAL: `{command[:100]}` is byte-identical to a command "
+                        f"already run this session. It would return exactly what you already "
+                        f"have. Change the target path, the tool, or the technique."
+                    )
+                    self._stuck_warnings.append(f"Duplicate skipped: {command[:120]}")
                 elif not is_hard_blocked and len(parallel_commands) >= 2:
                     # === AI MULTI-COMMAND: execute ALL in parallel ===
                     model_size_before = self._model_size()
@@ -2771,6 +2778,22 @@ Analyze the output carefully. Return JSON ONLY:
                     self._consecutive_blocked_cmds = 0
                     previous_output = result.text[:3000]
 
+                    # A pivot probe queued by the exhausted-category path runs
+                    # *in addition to* the model's command, never instead of it.
+                    pivot = getattr(self, "_queued_pivot_probe", "")
+                    if pivot:
+                        self._queued_pivot_probe = ""
+                        try:
+                            pr = self.exec.run(pivot, timeout=self._estimate_timeout(pivot))
+                            self._extract_to_model(pivot, pr)
+                            self._register_probe(pivot, pr)
+                            self._record_tool_family(pivot)
+                            self.session.add_cmd(pivot, pr.text[:500], self._cmd_category(pivot), pr.returncode)
+                            previous_output = (previous_output + f"\n\n$ [pivot probe] {pivot}\n{(pr.text or '')[:1200]}")[:5000]
+                            print(f"{C.D}[pivot] {pivot[:100]} -> exit {pr.returncode}{C.N}")
+                        except Exception as pe:
+                            log(f"[pivot probe] {pe}")
+
                     # X19_INTELLIGENCE: semantic analysis of the output so the AI
                     # understands WHAT happened (not just hashes the bytes). The
                     # structured summary is injected into the next context build.
@@ -2813,8 +2836,8 @@ Analyze the output carefully. Return JSON ONLY:
                 # Self-reflection on last command
                 last_rc = result.returncode if not is_dup else 0
                 self._last_reflection = self._self_reflect(command, previous_output, last_rc)
-                if self._last_reflection:
-                    print(f"{C.B}[Reflect] {self._last_reflection[:200]}{C.N}")
+                if self._last_reflection and _vb():
+                    print(f"{C.B}    reflect: {self._last_reflection[:200]}{C.N}")
 
                 # Exploit-depth tracking: increment depth when exploitation commands run while focused
                 if self._current_focus_finding and not is_dup and not is_hard_blocked:
@@ -3895,6 +3918,20 @@ Analyze the output carefully. Return JSON ONLY:
         score = 0
         checks = []
 
+        # Nothing to cite yet. The gate used to demand that every justification
+        # reference real session data — open ports, services, endpoints — and on
+        # the first turns of a run there are none, because the whole point of
+        # those commands is to *create* that data. Combined with the removal of
+        # the fabricated 80/443 seed, that made the gate reject every opening
+        # move and burn the iteration. Bootstrap-stage actions are exempt.
+        _m = getattr(self, "model", None)
+        if _m is not None and not any((
+            getattr(_m, "ports", None), getattr(_m, "endpoints", None),
+            getattr(_m, "subdomains", None), getattr(_m, "tech_stack", None),
+            getattr(_m, "findings", None), getattr(_m, "credentials", None),
+        )):
+            return True, "no session data exists yet — nothing to cite"
+
         # 0. REAL SESSION DATA CHECK — must reference something that actually exists in this session
         model = getattr(self, "model", None)
         session_data_refs = []
@@ -4198,6 +4235,32 @@ Analyze the output carefully. Return JSON ONLY:
             if base.startswith(tool) or tool.startswith(base):
                 return family
         return "unknown"
+
+    def _advise(self, note: str, *, hard_block: bool = False) -> bool:
+        """Record a soft observation for the next decision prompt.
+
+        Returns True when the caller must skip the command (strict mode).
+        In autonomy mode this never blocks: the agent's action stands, and the
+        note becomes part of what it reads on the next turn. Only genuinely
+        destructive or out-of-scope commands are refused, and those go through
+        the gateway denylist rather than this path.
+        """
+        if not note:
+            return False
+        note = note.strip()
+        if note not in self._advisories:
+            self._advisories.append(note)
+        self._stuck_warnings.append(note[:120])
+        print(f"{C.Y}[!] {note}{C.N}")
+        return bool(hard_block or CONFIG.STRICT_GATES)
+
+    def _drain_advisories(self) -> str:
+        """Pop queued advisories as a block of text for the decision prompt."""
+        if not self._advisories:
+            return ""
+        lines = list(self._advisories)
+        self._advisories = []
+        return "\n".join(f"- {ln}" for ln in lines)
 
     def _tool_fixation_check(self, command: str) -> Tuple[bool, str]:
         """Check if the command's tool family has been overused recently.
@@ -4995,15 +5058,13 @@ Analyze the output carefully. Return JSON ONLY:
             pass
         has_web_port = bool(open_ports & {80, 443, 8080, 8443, 8000, 3000, 5000})
 
-        # Phase-aware tool distribution — sample tools based on current phase
         phase = self._cognitive_phase()
-        phase_tools = get_tools_for_phase(target_type=target_type, phase=phase)
+        # The suggestions below are derived deterministically from what has
+        # actually been discovered. This used to ALSO inject a "PHASE TOOLS"
+        # line sampled from tool_distributions.py, which picked which toolsets
+        # to mention with random.random() — so the same target produced a
+        # different prompt on every run, for no information. Dropped.
         phase_suggestions = ""
-        if phase_tools:
-            existing_tools = {t.split()[0] for t in phase_tools if t}
-            available_phase_tools = [t for t in existing_tools if self._check_tool(t)]
-            if available_phase_tools:
-                phase_suggestions = f"PHASE TOOLS [{phase}]: {' '.join(available_phase_tools[:10])}\n"
 
         suggestions = []
         # Methodology-driven suggestions (never suggest nmap if ports known)
@@ -6664,19 +6725,29 @@ WORKSPACE: {self._file_state(target)[:400]}
 
         # Recent full outputs available for analysis
         if model.command_outputs:
-            ctx += f"\nSTORED COMMAND OUTPUTS: {len(model.command_outputs)} available. Reference by cmd_id (e.g., cmd_0, cmd_1) in your commands."
-            # Show recent output IDs and first commands
             recent_ids = sorted(model.command_outputs.keys(), key=lambda k: model.command_outputs[k].get("timestamp", ""), reverse=True)[:5]
-            ctx += "\nRecent: " + ", ".join(f"{oid}: {model.command_outputs[oid]['command'][:60]}" for oid in recent_ids) + "\n"
-            # Show last full output in full (no truncation)
-            if recent_ids:
-                last = model.command_outputs[recent_ids[0]]
-                ctx += f"\n=== LAST OUTPUT: {last['command'][:100]} ===\n"
-                ctx += (last.get("stdout", "") + last.get("stderr", ""))[:out_limit]
-                ctx += "\n=== END ===\n"
+            ctx += f"\nSTORED COMMAND OUTPUTS: {len(model.command_outputs)} available ({', '.join(recent_ids[-4:])})."
+            ctx += " To re-read one in full, add \"recall\": \"cmd_3\" to your JSON.\n"
+            # Recall: the model asks for a stored output it truncated away.
+            pending = (getattr(self, "_recall_ids", None) or [])
+            for rid in pending:
+                got = model.get_output(rid)
+                if got:
+                    cmd = (model.command_outputs.get(rid) or {}).get("command", rid)
+                    ctx += f"\n=== RECALLED {rid}: {cmd[:100]} ===\n{got[:out_limit * 2]}\n=== END ===\n"
+            self._recall_ids = []
 
-        if last_output and not model.command_outputs:
-            ctx += f"\nLAST COMMAND OUTPUT:\n{last_output[:out_limit]}\n"
+        # The freshest real tool output always leads. This was previously only
+        # used when nothing was stored, so a run that recorded any earlier
+        # output kept showing the model a stale bootstrap result instead of
+        # what its own last command returned — which is how loops stalled.
+        if last_output:
+            ctx += f"\n=== LAST OUTPUT (freshest, this is what your last command returned) ===\n{last_output[:out_limit]}\n=== END ===\n"
+        elif model.command_outputs and recent_ids:
+            last = model.command_outputs[recent_ids[0]]
+            ctx += f"\n=== LAST OUTPUT: {last['command'][:100]} ===\n"
+            ctx += (last.get("stdout", "") + last.get("stderr", ""))[:out_limit]
+            ctx += "\n=== END ===\n"
 
         if self._last_reflection:
             ctx += f"\nSELF-REFLECTION ON LAST COMMAND:\n{self._last_reflection}\n"
@@ -6710,7 +6781,7 @@ WORKSPACE: {self._file_state(target)[:400]}
             # Strong hint: if same tool used 2+ times, don't repeat it
             repeated = [t for t, n in top_tried if n >= 2]
             if repeated:
-                ctx += f"!!! DO NOT REPEAT: {', '.join(repeated)} — switch to a different tool family.\n"
+                ctx += f"Already used a lot: {', '.join(repeated)} — a fresh angle is usually higher-yield, but you decide.\n"
 
         # FORBIDDEN section — aggregate all blocks into one prominent list
         forbidden = []
@@ -6735,8 +6806,11 @@ WORKSPACE: {self._file_state(target)[:400]}
         if hard_limited:
             forbidden.append(f"HARD-LIMITED categories (>=5 will be blocked): {hard_limited}")
         if forbidden:
-            ctx += "\n[!] FORBIDDEN (system WILL block these):\n" + "\n".join(f"  - {f}" for f in forbidden) + "\n"
+            ctx += "\n[LOW-YIELD HISTORY — not blocked, you may still proceed:]\n" + "\n".join(f"  - {f}" for f in forbidden) + "\n"
 
+        advisory_block = self._drain_advisories()
+        if advisory_block:
+            ctx += "\n[OBSERVATIONS ON YOUR LAST ACTION — nothing was blocked, these are notes:]\n" + advisory_block + "\n"
         if anti_loop:
             ctx += "\n[!] ANTI-LOOP WARNINGS (read carefully):\n" + "\n".join(anti_loop) + "\n"
 

@@ -270,26 +270,44 @@ def provider_chain_summary() -> Dict[str, Any]:
     }
 
 
+def _apply_gate_mode(args) -> None:
+    """`--strict-gates` flips the soft gates back into refusals."""
+    if getattr(args, "strict_gates", False):
+        from config import CONFIG
+        CONFIG.STRICT_GATES = True
+
+
+def _apply_verbosity(args) -> None:
+    """`-q` / `-v` map onto the agent's own verbosity, not just the console's."""
+    from config import CONFIG
+    from utils import set_verbosity
+
+    if getattr(args, "verbose", False):
+        set_verbosity("verbose")
+    elif getattr(args, "quiet", False):
+        set_verbosity("quiet")
+    elif os.getenv("X19_VERBOSITY", "").strip().lower() not in ("quiet", "normal", "verbose"):
+        set_verbosity("verbose" if not CONFIG.ui_is_clean else "normal")
+
+
 def _print_ai_chain_banner():
     """Print which providers X19 will try, in order. Helps user spot misconfig."""
     from ui.console import get_console, info, warn
 
     summary = provider_chain_summary()
-    console = get_console()
     if summary["chain"]:
-        chain_text = " [app.dim]→[/] ".join(f"[app.ok]{p}[/]" for p in summary["chain"][:5])
-        if len(summary["chain"]) > 5:
-            chain_text += f" [app.dim]→ …(+{len(summary['chain']) - 5})[/]"
-    else:
-        chain_text = "[app.err]no AI provider keys configured[/]"
-    info(f"AI chain: {chain_text}")
-    console.print(
-        f"  [app.dim]primary={summary['primary']}  model={summary['model'] or '(provider default)'}[/]"
-    )
-    if not (os.getenv("GROQ_API_KEY") or load_config().get("GROQ_API_KEY")):
-        warn("free Llama 3.3 70B (no card): https://console.groq.com/keys → x19 setup")
-    if not (os.getenv("HF_TOKEN") or load_config().get("HF_TOKEN")):
-        warn("free Hugging Face inference: https://huggingface.co/settings/tokens → export HF_TOKEN=hf_…")
+        # One line, and only when it says something. Two unsolicited "get a
+        # free key" warnings on every single run is nagging, not help.
+        chain = " > ".join(summary["chain"][:4])
+        if len(summary["chain"]) > 4:
+            chain += f" (+{len(summary['chain']) - 4})"
+        info(f"ai: {chain}  model={summary['model'] or '(default)'}")
+        return
+    warn("no AI provider keys configured")
+    console = get_console()
+    console.print("  [app.dim]free options:[/] groq → https://console.groq.com/keys"
+                  "  ·  hf → export HF_TOKEN=hf_…  ·  or point at a local endpoint:")
+    console.print("  [app.dim]export X19_AI_BASE_URL=http://127.0.0.1:11434/v1 X19_AI_MODEL=llama3[/]")
 
 
 # ===================================================================
@@ -411,6 +429,32 @@ def first_run_setup(*, force: bool = False) -> bool:
     return True
 
 
+#: argv that `main()` was actually invoked with, so the first-run gate can
+#: inspect the operator's own flags instead of assuming they configured nothing.
+_RUN_ARGV: List[str] = []
+
+
+def _first_run_bypass(argv: Optional[List[str]] = None) -> bool:
+    """True when the invocation itself supplies what setup would ask for.
+
+    The gate used to fire before argument parsing, so `x19 run -t host -p groq
+    -k gsk_…` was refused with "run x19 setup" even though the operator had
+    just passed the provider and key on the command line. Setup is a convenience
+    for people who have configured nothing, not a toll booth for people who have.
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    flags = {"-p", "--provider", "-k", "--api-key", "-m", "--model", "-d", "--set-data", "--setup-groq", "--setup-cerebras"}
+    if any(tok in flags for tok in argv):
+        return True
+    if os.getenv("X19_AI_BASE_URL", "").strip():
+        return True
+    from cli_support import usable_providers
+    try:
+        return bool(usable_providers())
+    except Exception:
+        return False
+
+
 def _enforce_first_run(command: str) -> Optional[int]:
     """Gate every real command behind the mandatory setup. Returns an exit code
     when the command must not proceed, or ``None`` to let it run."""
@@ -418,9 +462,14 @@ def _enforce_first_run(command: str) -> Optional[int]:
 
     if command in SETUP_EXEMPT or not first_run_pending():
         return None
+    if _first_run_bypass(_RUN_ARGV):
+        # Provider + key arrive with the command; let the handler wire them up.
+        return None
     if not _interactive_terminal():
         if not is_json_mode():
-            warn("X19 is not set up yet — run: x19 setup")
+            warn("no usable AI provider — export a key (GROQ_API_KEY / OPENROUTER_API_KEY / HF_TOKEN), "
+                 "pass -p <provider> -k <key>, or point at a local model with "
+                 "X19_AI_BASE_URL=http://host:11434/v1")
         return 1
     if not first_run_setup():
         return 1
@@ -564,6 +613,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -- run -------------------------------------------------------------
     p = sub.add_parser("run", parents=[common], help="run an autonomous assessment against a target")
+    p.add_argument("target_pos", nargs="?", default="", metavar="TARGET",
+                   help="target host, IP, URL or host:port — `x19 example.com` == `x19 run -t example.com`")
     p.add_argument("-t", "--target", type=str, default="", help="target host, IP, URL or CIDR")
     p.add_argument("--target-type", type=str, default="",
                    choices=["auto", "public_real_world", "authorized", "ctf", "lab"],
@@ -571,6 +622,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-b", "--bug-bounty", action="store_true", help="hands-free authorized bug bounty mode")
     p.add_argument("-c", "--ctf", action="store_true", help="CTF mode: aggressive, flag hunting")
     p.add_argument("-f", "--fast", action="store_true", help="fast decisions: smaller prompt/context")
+    p.add_argument("--strict-gates", action="store_true",
+                   help="let policy gates refuse the model's commands instead of only advising (X19_STRICT_GATES=1)")
     p.add_argument("-p", "--provider", type=str, default="", help="AI provider id")
     p.add_argument("-m", "--model", type=str, default="", help="AI model name")
     p.add_argument("-k", "--api-key", type=str, default="", help="API key for the provider")
@@ -775,16 +828,18 @@ def _apply_runtime_config(args: argparse.Namespace) -> None:
 
 
 def _make_agent():
+    """Build the agent. The four step/ok lines this used to print were startup
+    ceremony for work that takes milliseconds; the agent prints one header line
+    with the same facts (target · session · ai) right afterwards."""
     from agent import X19
     from providers import make_ai
-    from ui.console import ok, step
+    from utils import verbose_on
 
-    step("initialising AI provider")
+    if verbose_on():
+        from ui.console import step
+        step("initialising AI provider")
     ai = make_ai()
-    ok(f"AI: {ai.name()}")
-    step("loading agent")
     agent = X19(ai=ai)
-    ok("agent ready")
     return agent, ai
 
 
@@ -1548,11 +1603,15 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 0
 
     _apply_runtime_config(args)
+    _apply_gate_mode(args)
+    _apply_verbosity(args)
     _print_ai_chain_banner()
 
-    target = getattr(args, "target", "") or os.getenv("X19_TARGET", "")
-    if getattr(args, "target", ""):
-        set_data({"TARGET": args.target})
+    # `x19 example.com` and `x19 run example.com` both land here; -t still wins.
+    target = (getattr(args, "target", "") or getattr(args, "target_pos", "")
+              or os.getenv("X19_TARGET", ""))
+    if getattr(args, "target", "") or getattr(args, "target_pos", ""):
+        set_data({"TARGET": target})
 
     # swarm pipeline → the live dashboard owns the run
     if getattr(args, "swarm", False):
@@ -1631,9 +1690,8 @@ def _ensure_provider() -> bool:
     if not configured:
         warn("no AI provider configured — run: x19 setup")
         return False
-    resolved = resolve_provider()
-    if resolved:
-        info(f"AI provider: [bold]{resolved}[/]")
+    # The "ai: <chain>  model=<m>" line from _print_ai_chain_banner already
+    # names the resolved provider; printing it twice says nothing new.
     return True
 
 
@@ -1691,10 +1749,12 @@ def print_help(parser: argparse.ArgumentParser) -> None:
     get_console().print(
         "[app.dim]global flags:[/] --json  --no-color  --plain  -q/--quiet  -v/--verbose  "
         "-V/--version\n"
-        "[app.dim]examples:[/]   x19 run -t scanme.nmap.org --bug-bounty\n"
-        "           x19 dash -t 10.0.0.5\n"
+        "[app.dim]examples:[/]   x19 scanme.nmap.org\n"
+        "           x19 run 10.0.0.5 -t 10.0.0.5:8443 --target-type lab -v\n"
         "           x19 report --format html --out report.html\n"
         "           x19 doctor --json | jq .score\n"
+        "[app.dim]           [/]The agent runs any command it chooses and installs what it needs;\n"
+        "[app.dim]           [/]only out-of-scope traffic and host-destroying commands are refused.\n"
     )
 
 
@@ -1705,6 +1765,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     from ui.console import get_console, init_console
 
     argv = normalize_argv(list(sys.argv[1:] if argv is None else argv))
+    global _RUN_ARGV
+    _RUN_ARGV = list(argv)
     parser = build_parser()
     args = parser.parse_args(argv)
 

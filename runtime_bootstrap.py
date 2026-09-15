@@ -16,35 +16,13 @@ def install_runtime_fixes() -> None:
     except Exception:
         pass
 
-    # ProxyManager's mitmproxy detector references sys.executable but the
-    # network module did not import sys. Patch the detector at the boundary so
-    # venv/pip-installed mitmproxy binaries are still detected.
-    try:
-        from network import ProxyManager
-
-        def detect_mitmproxy(self) -> bool:
-            names = ("mitmdump", "mitmproxy", "mitmweb")
-            if any(shutil.which(name) for name in names):
-                return True
-            bindir = os.path.dirname(sys.executable)
-            exts = (".exe", ".cmd", "") if os.name == "nt" else ("",)
-            return any(
-                os.path.exists(os.path.join(bindir, name + ext))
-                for name in names for ext in exts
-            )
-
-        ProxyManager._detect_mitmproxy = detect_mitmproxy
-
-        # When Burp + mitmproxy are both running, X19's capture proxy is the
-        # mitmproxy listener (8081), not Burp's upstream listener (8080).
-        def proxy_url(self) -> str:
-            if self.mitm_proc is not None:
-                return "http://127.0.0.1:8081"
-            return "http://127.0.0.1:8080"
-
-        ProxyManager.proxy_url = proxy_url
-    except Exception:
-        pass
+    # ProxyManager used to be re-defined here for two reasons:
+    # `_detect_mitmproxy` raised NameError (network.py never imported `sys`) and
+    # `proxy_url` preferred Burp's listener over mitm's. Both are fixed in
+    # network.py itself now. Patching module behaviour in from here made the
+    # same install act differently depending on the entry point — `python -c
+    # "from agent import X19; X19()"` crashed while `python run.py run -t x`
+    # worked — so keep network.py out of this function permanently.
 
     # The TUI's /model command must mutate the existing X19 runtime rather
     # than merely changing a config value. This keeps target, session, memory,

@@ -47,7 +47,6 @@ class X19Upgrader:
         "mcp_client.py",
         "plugin_manager.py",
         "context_compressor.py",
-        "tool_distributions.py",
         "tool_scanner.py",
         "windows_bootstrap.py",
         "interactive.py",
