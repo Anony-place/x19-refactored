@@ -60,11 +60,6 @@ from self_improve import (
     SelfAwareness, PerformanceAnalyzer, CodeSurgeon,
     CodePatch, PatchResult, ImprovementSuggestion, Bottleneck,
 )
-from tool_distributions import (
-    TOOLSETS, PHASE_DISTRIBUTIONS,
-    get_distribution, list_distributions,
-    sample_tools_from_distribution, get_tools_for_phase,
-)
 from context_compressor import (
     ContextCompressor, CompressionConfig, CompressMetrics,
 )

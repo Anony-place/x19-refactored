@@ -525,7 +525,48 @@ class ToolExecutor:
         r'\bnc\s+[^|]+\s+-e\s+/(bin/bash|bin/sh)',
         # Privilege escalation direct
         r'\bsudo\s+su\b', r'\bsudo\s+-i\b', r'\bsu\s+-\s*root\b',
+        # Raw-device / block-device writes (anchored forms miss `echo x >/dev/sda`)
+        r'>\s*/dev/(sd|nvme|hd|vd|mmcblk)',
+        r'\bdd\b.*\bof=/dev/',
     ]
+
+    #: Shell separators that start a new statement. The denylist is anchored at
+    #: ``^``, so without splitting, `echo hi; rm -rf /` slipped past every rule.
+    _SHELL_SPLIT = re.compile(r"(?:\|\||&&|;|\||&|\bdo\b|`|\n)")
+
+    @classmethod
+    def _blocked_hit(cls, command: str) -> Optional[str]:
+        """True denylist match on the whole command **or any sub-statement**.
+
+        Also normalises leading ``VAR=value`` assignments, which were the second
+        trivial way to slip past the ``^`` anchors.
+        """
+        text = (command or "").strip()
+        if not text:
+            return None
+        candidates = [text]
+        for seg in cls._SHELL_SPLIT.split(text):
+            seg = (seg or "").strip()
+            if not seg:
+                continue
+            candidates.append(seg)
+            # `FOO=1 bar` / `FOO=1 FOO2=2 bar` -> the command is `bar`
+            while True:
+                m = re.match(r"^[A-Za-z_][A-Za-z0-9_]*=\S*\s+", seg)
+                if not m:
+                    break
+                seg = seg[m.end():].strip()
+                candidates.append(seg)
+        for cand in candidates:
+            for pat in cls.BLOCKED:
+                # Anchored rules match the start of a statement; unanchored ones
+                # (e.g. `>\s*/dev/sd`) are searched anywhere in that statement.
+                if pat.startswith("^"):
+                    if re.match(pat, cand):
+                        return pat
+                elif re.search(pat, cand):
+                    return pat
+        return None
 
     def __init__(self, workspace: str, mcp_client=None):
         self.workspace = Path(workspace)
@@ -533,12 +574,14 @@ class ToolExecutor:
         self.mcp_client = mcp_client
 
     def run(self, command: str, timeout: int = 120) -> ToolResult:
+        from utils import vprint, verbose_on
+
         if not command or not command.strip():
             return ToolResult("", "", 0)
-        for pat in self.BLOCKED:
-            if re.match(pat, command.strip()):
-                log(f"BLOCKED: {command}")
-                return ToolResult("", "Blocked: destructive command", -1, "blocked")
+        hit = self._blocked_hit(command)
+        if hit:
+            log(f"BLOCKED: {command} (rule={hit})")
+            return ToolResult("", "Blocked: destructive command", -1, "blocked")
 
         # Shell syntax validation (cross-platform basic parsing + bash -n on Unix).
         import shlex
@@ -575,17 +618,18 @@ class ToolExecutor:
                 if result.success:
                     texts = [c.get("text", "") for c in result.content if c.get("type") == "text"]
                     output = "\n".join(texts)
-                    print(f"{C.G}{output[:2500]}{C.N}")
-                    print(f"{C.B}[*] Exit: 0{C.N}")
+                    vprint(f"{C.BOLD}$ {command[:80]}{C.N}  -> exit 0, {len(output)}b")
+                    if verbose_on():
+                        print(f"{C.G}{output[:2500]}{C.N}")
                     return ToolResult(output, "", 0)
                 err_texts = [c.get("text", "") for c in result.content if c.get("type") == "text"]
                 err_out = "\n".join(err_texts) if err_texts else (result.error or "MCP error")
-                print(f"{C.R}{err_out[:1200]}{C.N}")
-                print(f"{C.B}[*] Exit: -1{C.N}")
+                vprint(f"{C.BOLD}$ {command[:80]}{C.N}  {C.R}-> error: {(err_out or '').strip()[:160]}{C.N}")
+                if verbose_on():
+                    print(f"{C.R}{err_out[:1200]}{C.N}")
                 return ToolResult("", err_out, -1, result.error)
 
         log(f"[TOOL_START] {command} (timeout={timeout}s cwd={self.workspace})")
-        print(f"{C.Y}[*] {command[:250]}{C.N}")
 
         try:
             kwargs = dict(
@@ -607,9 +651,21 @@ class ToolExecutor:
             log(f"[TOOL_EXIT] rc={r.returncode} cmd={command[:120]}")
             log(f"[TOOL_STDOUT] {len(so)}B: {so[:500]}")
             log(f"[TOOL_STDERR] {len(se)}B: {se[:500]}")
-            if so: print(f"{C.G}{so[:2500]}{C.N}")
-            if se: print(f"{C.R}{se[:1200]}{C.N}")
-            print(f"{C.B}[*] Exit: {r.returncode}{C.N}")
+            # One line per command. Raw tool output belongs in the model's
+            # context and the session log, not the operator's terminal — it was
+            # the biggest source of unreadable scrollback. A non-zero exit still
+            # surfaces a short tail, because "the tool is broken" is worth
+            # seeing and "404 404 404 404" is not.
+            tail = ""
+            if r.returncode != 0:
+                tail = (se or so or "").strip().replace("\n", " ")[:160]
+            status = f"{C.BOLD}$ {command[:80]}{C.N}  -> exit {r.returncode}, {len(so)}b"
+            if tail:
+                status += f"  {C.R}{tail}{C.N}"
+            vprint(status)
+            if verbose_on():
+                if so: print(f"{C.G}{so[:2500]}{C.N}")
+                if se: print(f"{C.R}{se[:1200]}{C.N}")
             return out
         except subprocess.TimeoutExpired:
             log(f"[TOOL_EXIT] TIMEOUT after {timeout}s: {command}")

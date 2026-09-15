@@ -73,6 +73,27 @@ class Config:
     ENFORCE_SCOPE: bool = os.getenv("X19_ENFORCE_SCOPE", "").strip().lower() in ("1", "true", "yes")
     SCOPE_ALLOWLIST: str = os.getenv("X19_SCOPE_ALLOWLIST", "")
 
+    # ---- Autonomy mode ----------------------------------------------------
+    # A real autonomous agent acts, then learns from what happened. The soft
+    # gates (tool-repeat / phase / self-critique / fixation) used to *refuse*
+    # the agent's chosen command and burn an iteration, which is how runs
+    # stalled at zero findings. They now report an advisory into the next
+    # observation and the command still executes. Only destructive-shell and
+    # out-of-scope network commands stay hard blocks.
+    # Set X19_STRICT_GATES=1 to restore the old blocking behaviour.
+    STRICT_GATES: bool = os.getenv("X19_STRICT_GATES", "").strip().lower() in ("1", "true", "yes")
+
+    # Terminal output style: "clean" (default, one line per event) or
+    # "rich" (legacy panels/tables/ASCII banner).
+    UI_MODE: str = os.getenv("X19_UI", "clean").strip().lower()
+    #: Print the ASCII X19 logo panel at startup. Off by default: a CLI that a
+    #: person runs hundreds of times a day does not get a splash screen.
+    UI_BANNER: bool = os.getenv("X19_UI_BANNER", "").strip().lower() in ("1", "true", "yes")
+
+    @property
+    def ui_is_clean(self) -> bool:
+        return self.UI_MODE != "rich"
+
 
 CONFIG: Config = Config()
 
@@ -157,11 +178,15 @@ def set_data(data: dict, save: bool = True):
         "INTERFACE": "X19_INTERFACE",
         "ENFORCE_SCOPE": "X19_ENFORCE_SCOPE",
         "SCOPE_ALLOWLIST": "X19_SCOPE_ALLOWLIST",
+        "STRICT_GATES": "X19_STRICT_GATES",
+        "UI_MODE": "X19_UI",
+        "UI_BANNER": "X19_UI_BANNER",
     }
 
     _bool_keys = {
         "BUG_BOUNTY_MODE", "CTF_MODE", "AUTO_BOOTSTRAP", "PARALLEL_PLAN", "FAST_MODE",
         "FAST_SKIP_PROXY", "ENFORCE_SCOPE", "AUTO_LEARN_SKILLS",
+        "STRICT_GATES", "UI_BANNER",
     }
     _int_keys = {
         "MIN_ITERATIONS", "AI_MAX_TOKENS", "AI_TIMEOUT", "SUBAGENT_MAX_CONCURRENT",

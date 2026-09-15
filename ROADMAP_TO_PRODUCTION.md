@@ -91,6 +91,32 @@ This document outlines the engineering blueprint to evolve **X19** from an advan
 
 ## Immediate Next Steps for Developers
 
-1. Wire `CriticEngine` and `StrategistEngine` directly into `agent.py`'s `_autonomous_loop_impl`.
-2. Migrate `ToolExecutor` inside `tools.py` to use `execution/command_gateway.py` exclusively.
-3. Replace hardcoded templates in `brain/planner.py` with LLM query calls passing `WorldModel` context.
+Updated after the autonomy pass (see `AUTONOMY_CHANGES.md`). Items 1-2 of the
+previous list are done or obsolete; the ordering below is now about containment
+rather than about wiring more reasoning into a loop that was refusing to act.
+
+1. **Containment before capability.** `ToolExecutor` executes arbitrary shell via
+   `subprocess.run(shell=True)` as the current user, guarded by a regex denylist.
+   Move execution behind a container / gVisor / network namespace so scope is
+   enforced by the OS. Install `execution/scope_guard.py`'s socket-level check on
+   that path — it currently only covers `brain/coordinator.py` and the native
+   modules, all of which construct it with `enforce=False`.
+2. **Retire the self-modifying upgrader or fence it.** `x19upgrader.py`
+   `import_to_main()` copies files over the live source tree; `self_improve.py`
+   patches source by string replacement behind a string-matching safety check.
+   Neither should be reachable from a box that holds engagement data.
+3. **`Planner` heuristics are still a second voice.** `brain/planner.py`
+   `METHODOLOGIES` and `constants.py` `SERVICE_ATTACKS` are static playbooks with
+   hardcoded shell strings and confidence numbers. Keep them as *proposals the
+   model can accept or reject*; today they take over during provider fallback.
+4. Remove `datasets/` from git history (49 MB of copyrighted books).
+5. `agent.py` is still ~6,900 lines. The soft gates were converted to advisories
+   in place; they belong in a `brain/guardrails.py` that can be tested without an
+   `X19`.
+
+Done in the autonomy pass, so nobody re-does it: fabricated bootstrap ports and
+`www.` subdomains removed; `host:port` targets no longer lose their port;
+`PolicyEngine` no longer mistakes a User-Agent version string for a destination
+(and now catches destinations inside query strings); the destructive denylist
+checks every statement instead of the first; soft gates inform instead of
+refusing; `tool_distributions.py` and `brain/decision_engine.py` deleted.

@@ -1,8 +1,10 @@
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime
@@ -121,7 +123,6 @@ class ProxyManager:
         self.flows_dir.mkdir(parents=True, exist_ok=True)
 
     def _detect_burp(self) -> Optional[str]:
-        import shutil
         for p in self.BURP_PATHS:
             if os.path.exists(p):
                 return p
@@ -132,7 +133,6 @@ class ProxyManager:
         return None
 
     def _detect_mitmproxy(self) -> bool:
-        import shutil
         names = ("mitmdump", "mitmproxy", "mitmweb")
         if any(shutil.which(n) for n in names):
             return True
@@ -227,8 +227,15 @@ class ProxyManager:
         return False
 
     def proxy_url(self) -> str:
-        """Return the proxy URL that tools should route through."""
-        if self.mitm_proc and not self.burp_proc:
+        """Return the proxy URL that tools should route through.
+
+        mitmproxy is X19's capture point, so when it is up, tools go to its
+        listener (8081) even when Burp also runs — Burp sits upstream of mitm,
+        not in front of it. This used to read `and not self.burp_proc`, and
+        `runtime_bootstrap` monkeypatched the corrected behaviour in, so the
+        same install routed traffic differently depending on the entry point.
+        """
+        if self.mitm_proc is not None:
             return "http://127.0.0.1:8081"
         return "http://127.0.0.1:8080"
 

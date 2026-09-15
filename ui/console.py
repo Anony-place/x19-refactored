@@ -229,8 +229,21 @@ class Banner:
 
 
 def banner(version: str, subtitle: str = "", meta: str = "") -> None:
-    """Print the application banner (suppressed in machine mode)."""
+    """Print the application banner.
+
+    Suppressed in machine mode, and in the default "clean" UI: a 6-row ASCII
+    logo on every invocation is decoration, and this is a tool people run
+    repeatedly. `x19 config set UI_BANNER true` (or X19_UI_BANNER=1) brings it
+    back, as does X19_UI=rich.
+    """
     if _json_mode:
+        return
+    try:
+        from config import CONFIG
+        show = bool(getattr(CONFIG, "UI_BANNER", False)) or not CONFIG.ui_is_clean
+    except Exception:
+        show = True
+    if not show:
         return
     get_console().print(Banner(version, subtitle, meta))
 

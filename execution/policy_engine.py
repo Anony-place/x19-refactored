@@ -157,16 +157,48 @@ class PolicyEngine:
             return False
         return ip in network
 
+    #: A dotted quad counts as a network destination only when it stands alone
+    #: as an argument. The lookbehind/lookahead matter: `_execute_and_store`
+    #: decorates every curl with a browser UA containing `Chrome/120.0.0.0`, the
+    #: old backslash-b anchored regex matched that version as an IP, and the scope check
+    #: then refused the command as out-of-scope — blocking the agent's single
+    #: most common action against its own assigned target.
+    #:
+    #: URLs are still scanned across the whole command (including flag values),
+    #: so hiding an endpoint inside `--header` or `--data` does not skip the check.
+    _BARE_IP = re.compile(r"(?<![\w.\-/])(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?(?![\w.\-])")
+
+    @staticmethod
+    def _plausible_address(candidate: str) -> bool:
+        """Reject version strings and bind-any addresses that are not targets."""
+        head = candidate.split("/")[0]
+        try:
+            octets = [int(part) for part in head.split(".")]
+        except ValueError:
+            return False
+        if len(octets) != 4 or any(octet > 255 for octet in octets):
+            return False
+        return head != "0.0.0.0"
+
+    #: Scheme prefixes are removed before the bare-IP scan so a destination
+    #: smuggled into a query string (`/r?to=http://91.99.0.1/x`) is still seen as
+    #: a host, while `Chrome/120.0.0.0` in a User-Agent keeps its disqualifying
+    #: `/` lookbehind.
+    _SCHEME = re.compile(r"https?://", re.I)
+
     @classmethod
     def _extract_refs(cls, command: str) -> Set[str]:
         refs: Set[str] = set()
-        for match in re.findall(r"https?://[^\s'\"<>]+", command or "", flags=re.I):
+        text = command or ""
+
+        for match in re.findall(r"https?://[^\s'\"<>]+", text, flags=re.I):
             refs.add(match)
 
-        for match in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?\b", command or ""):
-            refs.add(match)
+        for match in cls._BARE_IP.findall(cls._SCHEME.sub("", text)):
+            if cls._plausible_address(match):
+                refs.add(match)
 
-        for token in cls._shell_tokens(command):
+        for token in cls._shell_tokens(text):
             if cls._looks_like_host(token):
                 refs.add(token)
         return refs
