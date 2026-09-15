@@ -119,6 +119,23 @@ Concurrency and feel are configurable: `X19_BG_WORKERS` (or config
 `BG_WORKERS`) caps background tasks, `X19_UI_POLL` sets the ribbon refresh,
 `X19_UI_BANNER`/`UI_BANNER` brings back the ASCII splash screen.
 
+## Knowledge layer (live intel + your own corpus)
+
+The agent reasons over **real-time data, not hardcoded lists**: CISA KEV
+(actively-exploited vulnerabilities), NVD, FIRST EPSS and local searchsploit
+are correlated against what your target actually runs and injected into the
+decision context — version-matched, sorted by exploitation signal, tightly
+capped so the agent stays focused.
+
+Your own knowledge is a first-class layer: drop markdown/txt notes (program
+policy, target notes, house methodology) into `~/.x19/knowledge/` and they are
+embedded into the vector store and recalled semantically during decisions.
+
+Knobs: `X19_INTEL_DISABLE=1` turns feeds off, `X19_INTEL_SOURCES=kev,nvd`
+selects sources, `X19_KNOWLEDGE_DIR` moves the corpus dir, `NVD_API_KEY`
+raises NVD rate limits. Feed copies are cached in `~/.x19/cache/intel/` so a
+network outage degrades to slightly-stale intel instead of blindness.
+
 ## Look & feel
 
 The UI is a design system, not a pile of prints. Colours live in semantic

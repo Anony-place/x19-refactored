@@ -97,6 +97,37 @@ advisories, the hunt stays the model's):
    highest-ROI probes. Delivered through the existing advisory queue
    (injected into the next decision prompt), never a forced gate.
 
+## 4c. Increment: dynamic knowledge layer (real-time intel + custom corpus)
+
+The user's directive: agent ko **custom knowledge layer** chahiye — prompt dump
+nahi, **dynamic real-time data**, kuch bhi hardcoded nahi. Shipped as
+`knowledge.py`:
+
+- **Live sources** (runtime feeds, pluggable via `X19_INTEL_SOURCES`):
+  CISA KEV catalog (actively-exploited + ransomware flags), NVD API 2.0
+  keyword lookups (CVSS, description, public-PoC reference tags), FIRST EPSS
+  (exploitation probability), local searchsploit (PoC titles). Optional
+  `NVD_API_KEY` passthrough for rate limits.
+- **Focused injection, not prompt stuffing**: `render_context()` correlates
+  the world-model tech stack against the feeds — version-matched where the
+  CVE description names the exact version, sorted KEV > EPSS > CVSS, hard
+  caps (6 items / 2800 chars), and a FOCUS line telling the model to ignore
+  intel that does not apply to the target's version. This replaces the
+  decision loop's dependence on static knowledge; `CveMapper`'s legacy
+  offline DB remains only as an offline fallback.
+- **Real-time but resilient**: every source disk-caches under
+  `~/.x19/cache/intel/` with TTLs (KEV 12h, NVD 24h, EPSS 6h); network
+  failure falls back to stale cache (clearly labelled with its age); total
+  failure degrades to an empty block. Never raises, never blocks the loop.
+- **Custom layer (user's own brain)**: drop markdown/txt notes into
+  `~/.x19/knowledge/` (or `X19_KNOWLEDGE_DIR`) — program policy, target
+  notes, house playbooks. They are paragraph-chunked, hash-deduped and
+  embedded into the vector store's `intel` collection; `recall()` surfaces
+  them semantically in the decision context as CUSTOM KNOWLEDGE.
+- Verified: 21 unit tests (parsing, TTL expiry, stale-fallback, disable
+  switch, bounded rendering, corpus idempotency) + a live pipeline smoke
+  (HTTP KEV+NVD feed → cache → version-matched Apache 2.4.49 intel block).
+
 ## 5. Roadmap — what still separates X19 from big-agent caliber
 
 Prioritised by expected impact on real bug-hunting throughput:

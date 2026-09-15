@@ -45,6 +45,7 @@ import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
 from brain.hypothesis_engine import MultiHypothesisEngine
 from brain.exploit_chain import ExploitChainEngine
+from knowledge import KnowledgeLayer
 from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
 
@@ -103,6 +104,10 @@ class X19:
         # Chain awareness: deterministic class-ENABLES knowledge applied to
         # confirmed findings so the loop can steer toward critical chains.
         self.chain_engine = ExploitChainEngine()
+        # Dynamic knowledge layer: live threat feeds (CISA KEV / NVD / EPSS /
+        # searchsploit) + the user's custom corpus, retrieved by what this
+        # target actually runs — real-time focus, nothing hardcoded.
+        self.knowledge = KnowledgeLayer(memory=self.memory)
         self.planner = Planner()
         self.critic_engine = CriticEngine()
         self.strategist_engine = StrategistEngine()
@@ -6944,6 +6949,21 @@ WORKSPACE: {self._file_state(target)[:400]}
             ctx += "\nCHAIN OPPORTUNITIES (your confirmed primitives → missing link):\n"
             for line in chain_lines[:4]:
                 ctx += f"  - {line}\n"
+
+        # Dynamic knowledge layer (live feeds + custom corpus): focused,
+        # version-matched intel about what this target runs — never a static
+        # dump. Kept near the top-level state blocks so the model reasons
+        # with current exploitation data, not stale training memory.
+        try:
+            intel_block = self.knowledge.render_context(
+                dict(getattr(self.model, "tech_stack", {}) or {}),
+                query=f"{target} {' '.join(list(getattr(self.model, 'tech_stack', {}) or {})[:3])}",
+            )
+        except Exception as e:
+            log(f"[INTEL] context render failed: {e}")
+            intel_block = ""
+        if intel_block:
+            ctx += "\n" + intel_block + "\n"
 
         # Tool-awareness: show what's actually available vs what the planner keeps suggesting
         tool_ctx = self._installed_tools_context()
