@@ -190,4 +190,4 @@ HexStrike AI (MCP, 150+ tools), D-CIPHER (44% HTB multi-agent), Anthropic
 | Hierarchical sub-agents | ⬜ roadmap (HPTSA pattern) |
 | Episodic memory layer | ⬜ roadmap (PentAGI pattern) |
 | Fleet (multi-target) | ⬜ roadmap (XBOW scale pattern) |
-| OOB callback = blind-vuln oracle | ⬜ roadmap (Big Sleep "perfect verification" for SSRF/SQLi) |
+| OOB callback = blind-vuln oracle | ✅ shipped (`_poll_oob_oracle`: durable evidence + hypothesis correlation + gate integration) |

@@ -128,6 +128,33 @@ nahi, **dynamic real-time data**, kuch bhi hardcoded nahi. Shipped as
   switch, bounded rendering, corpus idempotency) + a live pipeline smoke
   (HTTP KEV+NVD feed → cache → version-matched Apache 2.4.49 intel block).
 
+## 4d. Increment: OOB oracle — binary verification for blind vulnerability classes
+
+Roadmap se sabse zyada value ka gap close kiya: X19 ka verification system
+output-based tha, to **blind SSRF/XXE/blind-SQLi/OOB-RCE** ke true positives
+bhi reject ho jaate the (response mein proof nahi hota). Ab interactsh
+callbacks = binary oracle:
+
+- **Redesigned poll path** (`_poll_oob_oracle`): callback ab durable evidence
+  (`_oob_evidence` ring, 8) + live UI event (`◉ oob callback`) + honest
+  **info-severity lead** hai — pehle wala bina-verification direct HIGH
+  finding (false-positive machine) hata diya. Model real finding normal
+  verified path se file karta hai, callback line ko evidence ke roop mein
+  quote karte hue.
+- **Deterministic correlation**: jis TESTING hypothesis ke probe mein exact
+  canary tha, wo callback se auto-CONFIRM ho jata hai (ledger + oracle wired).
+- **Gate integration**: `[OOB INTERACTION]` line ab exploit-indicator hai aur
+  binary oracle ke roop mein critical-claim ke extra-context requirement se
+  exempt — evidence_context mein OOB lines hamesha streams ke saath jaate
+  hain.
+- **Model ko canary ab dikhta hai**: `OOB ORACLE ACTIVE — canary host: …`
+  block decision context mein — custom blind probes (curl/python3/XXE DTD)
+  kar sakta hai, sirf nuclei/sqlmap auto-inject nahi. No-interactsh
+  environment mein honest "callbacks NOT monitored" block (koi jhootha
+  promise nahi).
+- Prompts (LEAN + fast) document the oracle workflow; 11 new tests
+  (`tests/test_oob_oracle.py`).
+
 ## 5. Roadmap — what still separates X19 from big-agent caliber
 
 Prioritised by expected impact on real bug-hunting throughput:
@@ -154,4 +181,6 @@ Prioritised by expected impact on real bug-hunting throughput:
   source-level wiring guards.
 - 9 more (`tests/test_chain_hunting.py`): near-miss guidance (single-hop,
   two-hop, already-complete, info-only, limit), classifier parity with
-  reports, and wiring guards. Full suite: **637 passed, 20 subtests**.
+  reports, and wiring guards.
+- Knowledge layer: 21 (`tests/test_knowledge_layer.py`); OOB oracle: 11
+  (`tests/test_oob_oracle.py`). Full suite: **669 passed, 20 subtests**.
