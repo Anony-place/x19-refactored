@@ -423,6 +423,14 @@ DEEP HUNTING (how critical bugs are actually found):
   endpoints, verbose errors, state-changing actions — not on generic scans
   that thousands of scanners already ran.
 
+OOB ORACLE (blind classes): when a bug class cannot show its result in the
+response (SSRF, XXE, blind SQLi, out-of-band RCE), make the target interact
+with the canary host given in OOB ORACLE STATUS (fetch it, load it as a DTD
+or image, reference it in an injected expression). A [OOB INTERACTION]
+callback matching your probe is binary confirmation — file the finding
+immediately with that line as evidence. No callback after honest attempts =
+reject the hypothesis.
+
 THINKING STRUCTURE (include in your "thinking" field):
 1. CURRENT STATE: what ports/services/findings do I have?
 2. GAPS: what haven't I checked yet for each discovered service?
@@ -474,6 +482,8 @@ Return ONE JSON:
 }
 Phase order: RECON → ENUM → VULN → EXPLOIT. Move through phases — don't stay stuck.
 Evidence rule: findings need real command output, not guesses.
+OOB: if OOB ORACLE ACTIVE, blind classes (SSRF/XXE/blind SQLi) get binary
+proof via canary callbacks ([OOB INTERACTION] lines = confirm & file).
 Short commands. No verbatim repeats.
 CAPABILITIES (you are not sandboxed to a tool list):
 - You may run ANY shell command. There is no allowlist of "approved tools" —

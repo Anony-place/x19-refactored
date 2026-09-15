@@ -101,6 +101,9 @@ class X19:
         # decision JSON's "hypotheses" actions feed this; the rendered ledger
         # is injected into every decision context.
         self.hyp_engine = MultiHypothesisEngine()
+        # OOB oracle evidence: durable [OOB INTERACTION] lines (blind-vuln
+        # binary proof) — surfaced in context and used as finding evidence.
+        self._oob_evidence: List[str] = []
         # Chain awareness: deterministic class-ENABLES knowledge applied to
         # confirmed findings so the loop can steer toward critical chains.
         self.chain_engine = ExploitChainEngine()
@@ -1319,6 +1322,7 @@ Analyze the output carefully. Return JSON ONLY:
         self._terminated_vectors = set()
         self._hypotheses = {}
         self.hyp_engine = MultiHypothesisEngine()
+        self._oob_evidence = []
         self._banned_plan_categories = set()
         self._recon_no_progress_count = 0
         self._recon_total = 0
@@ -2040,6 +2044,12 @@ Analyze the output carefully. Return JSON ONLY:
             # Resolve evidence context — always check against the last REAL tool output,
             # so findings reported without a fresh command are still verified (not auto-accepted).
             evidence_context = previous_output or ""
+            # OOB oracle lines are durable evidence for blind-vuln findings —
+            # make them visible to the verification gates regardless of what
+            # the latest command printed.
+            _oob_tail = [l for l in self._oob_evidence[-3:] if l not in evidence_context]
+            if _oob_tail:
+                evidence_context = (evidence_context + "\n" + "\n".join(_oob_tail)).strip()
 
             # Record finding — 4-gate validation engine (fast mode: skip LLM pass)
             if finding and finding.get("title"):
@@ -3238,28 +3248,12 @@ Analyze the output carefully. Return JSON ONLY:
                 self._last_reflection = ""
                 time.sleep(1)
 
-            # OOB/Interactsh polling: check for blind interactions (SSRF, RCE callbacks, DNS out-of-band)
-            try:
-                from attacks import get_oob
-                oob = get_oob()
-                if oob and oob._available:
-                    oob_hits = oob.poll()
-                    if oob_hits:
-                        for hit in oob_hits[-5:]:
-                            msg = f"[OOB INTERACTION] {hit['protocol']}: {hit['full-id']} from {hit.get('raw',{}).get('remote-address','?')}"
-                            print(f"{C.BOLD}{C.G}{msg}{C.N}")
-                            self.model.add_finding(Finding(
-                                severity="high",
-                                title=f"OOB Interaction: {hit['protocol']} callback",
-                                description=msg,
-                                evidence=str(hit['raw'])[:500],
-                            ))
-                        previous_output = (f"[SYSTEM: {len(oob_hits)} OOB interaction(s) detected! "
-                            "This confirms a blind SSRF, RCE, or template injection. "
-                            f"Last: {oob_hits[-1]['protocol']} from {oob_hits[-1].get('raw',{}).get('remote-address','?')}. "
-                            "Escalate this finding immediately.")[:3000]
-            except Exception as _oob_err:
-                pass
+            # OOB oracle: interactsh callbacks = binary proof for blind
+            # SSRF/XXE/SQLi/RCE. Durable evidence + live event + hypothesis
+            # correlation (see _poll_oob_oracle).
+            _oob_note = self._poll_oob_oracle(previous_output)
+            if _oob_note:
+                previous_output = _oob_note
 
             # No-progress tracker: did this iter add a finding/endpoint/port?
             try:
@@ -5694,6 +5688,86 @@ Analyze the output carefully. Return JSON ONLY:
 
     # ===================== FINDING VALIDATION ENGINE =====================
 
+    def _poll_oob_oracle(self, previous_output: str) -> str:
+        """Poll the interactsh client and turn callbacks into oracle evidence.
+
+        A callback is *binary* proof that the target contacted our canary —
+        exactly the "perfect verification" signal blind SSRF/XXE/SQLi/RCE
+        need. The raw callback does NOT name the vulnerability, so it is
+        never auto-filed as a high finding: it becomes durable evidence
+        (``self._oob_evidence``), a live UI event, an honest info-severity
+        lead, and — when a TESTING hypothesis used the exact canary in its
+        probe — a confirmed hypothesis. The model files the real finding
+        through the normal verified path, quoting the callback line.
+        """
+        try:
+            from attacks import get_oob as _get_oob
+            oob = _get_oob()
+        except Exception:
+            return previous_output
+        try:
+            if oob is None or not getattr(oob, "available", False):
+                return previous_output
+            hits = oob.poll() or []
+            if not hits:
+                return previous_output
+            canary = ""
+            try:
+                canary = oob.canary
+            except Exception:
+                canary = ""
+            confirmed_notes: List[str] = []
+            for hit in hits[-5:]:
+                proto = str(hit.get("protocol", "?"))
+                full_id = str(hit.get("full-id") or canary)
+                remote = str((hit.get("raw") or {}).get("remote-address", "?"))
+                msg = f"[OOB INTERACTION] {proto}: {full_id} from {remote}"
+                self._oob_evidence.append(msg)
+                print(f"{C.BOLD}{C.G}{msg}{C.N}")
+                try:
+                    self.session.emit_event("oob", f"{proto} callback from {remote}",
+                                            protocol=proto)
+                except Exception:
+                    pass
+                # Deterministic correlation: a TESTING hypothesis whose probe
+                # referenced this exact canary is confirmed by the oracle.
+                try:
+                    for hyp in self.hyp_engine.get_competing_hypotheses(limit=12, active_only=True):
+                        if hyp.command and (full_id in hyp.command
+                                            or (canary and canary in hyp.command)):
+                            self.hyp_engine.apply_actions([{
+                                "action": "confirm", "id": hyp.id,
+                                "evidence": [msg],
+                                "reason": "OOB callback on this hypothesis' canary",
+                            }])
+                            confirmed_notes.append(str(hyp.title)[:60])
+                            break
+                except Exception:
+                    pass
+                # Honest lead record (info, deduped) — the verified finding
+                # must still come from the model via the normal gates.
+                try:
+                    lead_title = f"OOB lead: {proto} callback (correlate & file)"
+                    if not any(getattr(f, "title", "") == lead_title
+                               for f in self.model.findings):
+                        self.model.add_finding(Finding(
+                            severity="info", title=lead_title,
+                            description=msg, evidence=str(hit.get("raw"))[:500],
+                        ))
+                except Exception:
+                    pass
+            del self._oob_evidence[:-8]
+            note = (f"[SYSTEM: {len(hits)} OOB interaction(s) received — binary out-of-band "
+                    "proof that the target contacted your canary. "
+                    + (f"Confirmed hypothesis: {confirmed_notes[0]}. " if confirmed_notes else "")
+                    + "If one of YOUR probes used this canary, file the matching finding NOW "
+                    "(severity per impact class) with the [OOB INTERACTION] line as evidence; "
+                    "otherwise correlate which probe triggered it before escalating.]")
+            return note[:3000]
+        except Exception as e:
+            log(f"[OOB] oracle poll failed: {e}")
+            return previous_output
+
     def _validate_finding(self, finding: dict, command: str,
                            output: str) -> ValidationResult:
         """Production-grade 4-gate finding validation engine.
@@ -5779,6 +5853,7 @@ Analyze the output carefully. Return JSON ONLY:
         is_critical_claim = any(kw in (title + " " + detail) for kw in _CRITICAL_CLAIM_KEYWORDS)
 
         exploit_indicators = [
+            r'\[OOB INTERACTION\]',  # out-of-band callback = binary blind-vuln proof
             r'uid=\d+|root:x?:0:0:', r'flag\{', r'CTF\{',
             r'\[extracted\]|\[dumped\]', r'credentials? found',
             r'successfully executed', r'administrator:\d+:\d+:',
@@ -5792,11 +5867,17 @@ Analyze the output carefully. Return JSON ONLY:
         ]
         has_exploit = any(re.search(p, output, re.I) for p in exploit_indicators)
 
-        # For critical claims, require BOTH exploit indicator AND contextual evidence
+        # For critical claims, require BOTH exploit indicator AND contextual evidence.
+        # Exception: an out-of-band callback is a binary oracle — the target
+        # physically contacted our canary — so it needs no corroboration.
+        oob_confirmed = bool(re.search(r"\[OOB INTERACTION\]", output or ""))
         if is_critical_claim:
             if not has_exploit:
                 return GateResult("security_impact", False,
                                   "Critical claim requires exploit indicators in output — none found")
+            if oob_confirmed:
+                return GateResult("security_impact", True,
+                                  "OOB callback (binary oracle) confirms the claim")
             # Require at least 3 lines of context for critical findings
             evidence = finding.get("evidence", "")
             evidence_lines = [l for l in output.split("\n") if evidence in l] if evidence else []
@@ -6964,6 +7045,31 @@ WORKSPACE: {self._file_state(target)[:400]}
             intel_block = ""
         if intel_block:
             ctx += "\n" + intel_block + "\n"
+
+        # OOB oracle status: give the model the live canary so it can craft
+        # blind probes (SSRF/XXE/SQLi/RCE) and know that callbacks arrive as
+        # [OOB INTERACTION] evidence lines. Fallback (no interactsh binary)
+        # says so honestly instead of promising callbacks.
+        try:
+            _oob = get_oob()
+            if _oob is not None and getattr(_oob, "available", False):
+                if getattr(_oob, "_mode", "") == "binary":
+                    _canary_host = _oob.oast_url("http").replace("http://", "")
+                    ctx += ("\nOOB ORACLE ACTIVE — canary host: " + _canary_host + "\n"
+                            "  For blind classes (SSRF, XXE, blind SQLi, out-of-band RCE), make the\n"
+                            "  target fetch/connect to this host (or embed it in payloads). Callbacks\n"
+                            "  are polled automatically and appear as [OOB INTERACTION] lines — a\n"
+                            "  callback matching your probe is binary confirmation: file the finding\n"
+                            "  with that line as evidence.\n")
+                else:
+                    ctx += ("\nOOB ORACLE: out-of-band callbacks are NOT monitored in this\n"
+                            "  environment (no interactsh client) — do not report blind-vuln\n"
+                            "  findings based on expected callbacks.\n")
+            if self._oob_evidence:
+                ctx += ("RECENT OOB EVIDENCE:\n"
+                        + "\n".join(f"  {l}" for l in self._oob_evidence[-3:]) + "\n")
+        except Exception:
+            pass
 
         # Tool-awareness: show what's actually available vs what the planner keeps suggesting
         tool_ctx = self._installed_tools_context()

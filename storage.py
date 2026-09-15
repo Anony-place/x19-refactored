@@ -523,6 +523,10 @@ class Session:
         except Exception:
             pass  # observability must never break the mission
 
+    def emit_event(self, kind: str, text: str = "", **detail) -> None:
+        """Publish a live observability event (mutates no session data)."""
+        self._emit(kind, text, **detail)
+
     def mark_command_started(self) -> None:
         """Note when the agent begins running a command (for durations)."""
         self._cmd_started = time.monotonic()

@@ -121,4 +121,7 @@ def summarize_event(event: AgentEvent) -> str:
         return f"+ os fingerprint: {event.text}"
     if kind == "status":
         return f"■ status: {event.text}"
+    if kind == "oob":
+        proto = str(detail.get("protocol", "?"))
+        return f"◉ oob callback [{proto}] {event.text}"
     return f"· {event.text or kind}"
