@@ -41,6 +41,17 @@ HYP_TRANSITIONS: Dict[str, Set[str]] = {
 }
 
 
+def _clamp01(value: Any) -> float:
+    """Coerce arbitrary model-supplied numbers into a safe [0, 1] float."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return 0.5
+    if f != f:  # NaN
+        return 0.5
+    return max(0.0, min(1.0, f))
+
+
 @dataclass
 class CompetingHypothesis:
     """A testable hypothesis with multi-dimensional scoring."""
@@ -404,6 +415,149 @@ class MultiHypothesisEngine:
 
     def get_rejected_hypotheses(self) -> List[CompetingHypothesis]:
         return [h for h in self._hypotheses.values() if h.state == HYP_REJECTED]
+
+    def find_hypothesis(self, text: Any) -> Optional[CompetingHypothesis]:
+        """Resolve a hypothesis by id, exact title/statement, or substring.
+
+        The model only ever sees short ids and titles in its context, so the
+        resolver must be forgiving: any of id → title → statement → substring
+        match is accepted.
+        """
+        t = str(text or "").strip()
+        if not t:
+            return None
+        if t in self._hypotheses:
+            return self._hypotheses[t]
+        tl = t.lower()
+        for h in self._hypotheses.values():
+            if h.title.lower() == tl or h.statement.lower() == tl:
+                return h
+        for h in self._hypotheses.values():
+            if tl in h.statement.lower() or tl in (h.title or "").lower():
+                return h
+        return None
+
+    def apply_actions(self, actions: Any) -> List[str]:
+        """Apply hypothesis actions proposed by the model in a decision.
+
+        This is the model-owned research ledger (Naptime-style): the agent —
+        not hardcoded heuristics — decides which hypotheses exist, which are
+        being tested, and which are confirmed or rejected.
+
+        Each action is a dict:
+          {"action": "add|test|confirm|reject|abandon",
+           "statement": "...", "command": "...", "expected_evidence": [...],
+           "falsification": "...", "confidence": 0.0-1.0, "impact": 0.0-1.0,
+           "evidence": [...], "reason": "..."}
+
+        Returns human-readable one-liners describing what happened (for the
+        transcript); malformed entries are skipped, never raised.
+        """
+        notes: List[str] = []
+        if isinstance(actions, dict):
+            actions = [actions]
+        if not isinstance(actions, list):
+            return notes
+        for a in actions:
+            if not isinstance(a, dict):
+                continue
+            act = str(a.get("action") or a.get("op") or "add").strip().lower()
+            stmt = str(a.get("statement") or a.get("title") or "").strip()
+            if act == "add":
+                if not stmt:
+                    continue
+                # Skip if a live/confirmed hypothesis already says this — the
+                # ledger must stay a short list of distinct research threads.
+                existing = self.find_hypothesis(stmt)
+                new_cmd = str(a.get("command") or "").strip()
+                if existing is not None:
+                    if existing.state in (HYP_NEW, HYP_TESTING, HYP_CONFIRMED):
+                        notes.append(f"duplicate ignored: {stmt[:70]}")
+                        continue
+                    # Rejected/dead threads reopen only with a genuinely
+                    # different probe — otherwise the model would re-run the
+                    # exact experiment that already falsified the idea.
+                    if not new_cmd or new_cmd == existing.command:
+                        notes.append(f"blocked (was REJECTED, same probe): {stmt[:60]}")
+                        continue
+                    notes.append(f"reopening after rejection with new probe: {stmt[:60]}")
+                if self.is_duplicate_or_rejected(stmt, new_cmd):
+                    notes.append(f"duplicate ignored: {stmt[:70]}")
+                    continue
+                ev = a.get("expected_evidence")
+                ev_list = [str(e) for e in ev if str(e).strip()] if isinstance(ev, list) else []
+                hyp = self.add_hypothesis(
+                    statement=stmt,
+                    command=str(a.get("command") or ""),
+                    expected_evidence=ev_list,
+                    falsification_condition=str(a.get("falsification") or ""),
+                    confidence=_clamp01(a.get("confidence", 0.5)),
+                    impact=_clamp01(a.get("impact", 0.5)),
+                    generation_reason=str(a.get("reason") or "model decision"),
+                )
+                if hyp:
+                    notes.append(f"new {hyp.id}: {stmt[:70]}")
+                continue
+            if act not in ("test", "confirm", "reject", "abandon", "stale", "drop"):
+                notes.append(f"unknown action '{act}'")
+                continue
+            hyp = self.find_hypothesis(a.get("id") or stmt)
+            if not hyp:
+                notes.append(f"unknown hypothesis: {str(a.get('id') or stmt)[:60]}")
+                continue
+            reason = str(a.get("reason") or "")
+            if act == "test":
+                self.mark_testing(hyp.id)
+                notes.append(f"testing {hyp.id}: {hyp.title[:60]}")
+            elif act == "confirm":
+                ev = a.get("evidence")
+                ev_ids = [str(e) for e in ev if str(e).strip()][:4] if isinstance(ev, list) else []
+                # State machine requires NEW -> TESTING -> CONFIRMED; a fresh
+                # hypothesis confirmed on first evidence passes through testing.
+                if hyp.state == HYP_NEW:
+                    self.mark_testing(hyp.id)
+                self.confirm_hypothesis(hyp.id, ev_ids)
+                if hyp.state == HYP_CONFIRMED:
+                    notes.append(f"CONFIRMED {hyp.id}: {hyp.title[:60]}")
+                else:
+                    notes.append(f"confirm rejected by state machine for {hyp.id} ({hyp.state})")
+            elif act == "reject":
+                self.reject_hypothesis(hyp.id, reason or "model rejected")
+                notes.append(f"REJECTED {hyp.id}: {hyp.title[:60]}")
+            elif act in ("abandon", "stale", "drop"):
+                self.mark_stale(hyp.id, reason or "abandoned")
+                notes.append(f"abandoned {hyp.id}: {hyp.title[:60]}")
+            else:
+                notes.append(f"unknown action '{act}'")
+        return notes
+
+    def render_context(self, limit: int = 6) -> str:
+        """Render the research ledger for the decision prompt.
+
+        Shows open threads (with their next probe and expected evidence) plus
+        recent confirmed/rejected items so the model keeps a coherent line of
+        reasoning across iterations instead of re-deriving state each turn.
+        """
+        active = self.get_competing_hypotheses(limit=max(1, limit), active_only=True)
+        if not active and not self.get_confirmed_hypotheses():
+            return ""
+        lines = ["RESEARCH LEDGER (your hypotheses — test or close them):"]
+        for h in active:
+            lines.append(f"  [{h.state}] #{h.id} {h.title}")
+            if h.command:
+                lines.append(f"      next probe: {h.command[:120]}")
+            if h.expected_evidence:
+                lines.append(f"      expect: {str(h.expected_evidence[0])[:100]}")
+        confirmed = self.get_confirmed_hypotheses()
+        if confirmed:
+            lines.append("CONFIRMED (file the finding with real evidence, or move on):")
+            for h in confirmed[-3:]:
+                lines.append(f"  + {h.title[:90]}")
+        rejected = self.get_rejected_hypotheses()
+        if rejected:
+            names = ", ".join((h.title or h.id)[:40] for h in rejected[-4:])
+            lines.append(f"REJECTED (do not revisit): {names}")
+        return "\n".join(lines)
 
     def get_learning_summary(self) -> Dict[str, Any]:
         confirmed = self.get_confirmed_hypotheses()

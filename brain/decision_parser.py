@@ -113,13 +113,36 @@ def _extract_prose_command(raw: str) -> str:
                 s = line.strip()
                 if s and not s.startswith("#"):
                     return s
-    # Inline backtick
+    # Inline backtick — any plausible shell line, not a fixed tool allowlist.
+    # A dynamic agent invents custom probes (python3 one-liners, fresh
+    # binaries it installed); the policy engine gates execution, not the parser.
     bticks = re.findall(r'`([^`\n]{8,400})`', raw)
     for cand in bticks:
         s = cand.strip().strip("$").strip()
-        if re.match(r'^(nmap|curl|wget|httpx|sqlmap|nuclei|ffuf|gobuster|feroxbuster|whatweb|masscan|rustscan|hydra|nc|cat|ls|cd|bash|sh|python|python3)\s', s, re.IGNORECASE):
+        if _looks_like_shell_command(s):
             return s
     return ""
+
+
+def _looks_like_shell_command(s: str) -> bool:
+    """Heuristic: does this string look like a shell command rather than prose?
+
+    Deliberately tool-agnostic: first token must be a plausible binary/path
+    token, the line must not end with sentence punctuation, and it should
+    carry at least one argument. Actual executability is the policy engine's
+    job, not the parser's.
+    """
+    if not s or len(s) > 400 or "\n" in s:
+        return False
+    tokens = s.split()
+    if len(tokens) < 2:
+        return False
+    first = tokens[0]
+    if not re.match(r'^[A-Za-z0-9_./@+-]+$', first):
+        return False
+    if re.search(r'[.;!?]$', s):
+        return False
+    return True
 
 
 def _normalize_decision(d: Any) -> Optional[Dict[str, Any]]:
@@ -135,4 +158,10 @@ def _normalize_decision(d: Any) -> Optional[Dict[str, Any]]:
     for k in ("thinking", "think", "reasoning", "strategy", "pivot_reason"):
         v = d.get(k)
         d[k] = v if isinstance(v, str) else ("" if v is None else str(v))
+    # Model-owned research ledger (Naptime-style): a dict is accepted as a
+    # single action; anything else non-list becomes None so the loop can skip.
+    hyp = d.get("hypotheses")
+    if isinstance(hyp, dict):
+        hyp = [hyp]
+    d["hypotheses"] = hyp if isinstance(hyp, list) else None
     return d

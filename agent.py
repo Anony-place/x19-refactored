@@ -43,6 +43,8 @@ from tool_scanner import scan_available_tools, scan_missing_critical, build_tool
 from brain.planner import Planner
 import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
+from brain.hypothesis_engine import MultiHypothesisEngine
+from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
 
 class X19:
@@ -93,6 +95,10 @@ class X19:
         self._missing_tools = {}
         self._tools_scanned = False
         # Attack planner and cognitive engines
+        # Model-owned research ledger (Naptime-style hypothesis loop). The
+        # decision JSON's "hypotheses" actions feed this; the rendered ledger
+        # is injected into every decision context.
+        self.hyp_engine = MultiHypothesisEngine()
         self.planner = Planner()
         self.critic_engine = CriticEngine()
         self.strategist_engine = StrategistEngine()
@@ -1303,6 +1309,7 @@ Analyze the output carefully. Return JSON ONLY:
         self._vector_codes = {}
         self._terminated_vectors = set()
         self._hypotheses = {}
+        self.hyp_engine = MultiHypothesisEngine()
         self._banned_plan_categories = set()
         self._recon_no_progress_count = 0
         self._recon_total = 0
@@ -1974,6 +1981,11 @@ Analyze the output carefully. Return JSON ONLY:
                 else:
                     self._ai_empty_streak = 0
                     consec_fail = 0
+                    # Model-owned research ledger: add/test/confirm/reject
+                    # hypotheses proposed in the decision JSON.
+                    hyp_notes = self.hyp_engine.apply_actions(decision.get("hypotheses"))
+                    for note in hyp_notes:
+                        print(f"{C.D}[HYP] {note}{C.N}")
 
             if not decision:
                 self.session.data["status"] = "failed"; self.session.save()
@@ -2051,6 +2063,21 @@ Analyze the output carefully. Return JSON ONLY:
                                 # Preserve original independent verification (HTTP cross-check)
                                 if verified and not self._manual_verify(verified):
                                     verified = None
+                    # Adversarial second reviewer (XBOW-style debate): critical
+                    # and high claims get one independent hostile review before
+                    # they can be reported. Disagreement demotes the finding —
+                    # the loop keeps hunting instead of filing a likely false
+                    # positive. Reviewer outage fails open ("unsure").
+                    if (verified
+                            and not is_fast_mode()
+                            and str(verified.get("severity", "")).lower() in ("critical", "high")):
+                        review = _adversarial_review(self.ai, verified, evidence_context)
+                        if review.get("verdict") == "false_positive":
+                            print(f"{C.Y}[!] '{verified.get('title', '?')}' demoted by adversarial review — "
+                                  f"{review.get('reason', '')[:100]}{C.N}")
+                            verified = None
+                        elif review.get("verdict") == "real":
+                            print(f"{C.G}[+] Adversarial review passed — {review.get('reason', '')[:90]}{C.N}")
                     if verified:
                         self._tick_hypothesis(
                             self._get_or_create_hypothesis(finding),
@@ -6887,6 +6914,13 @@ WORKSPACE: {self._file_state(target)[:400]}
         # Phase enforcement: show current phase, tool limits, and stuck status
         ctx += f"\nPHASE STATE: {self._phase_context()}\n"
 
+        # Model-owned research ledger — the agent's own open hypotheses with
+        # their next probe and expected evidence, so reasoning persists across
+        # iterations instead of being re-derived from scratch every turn.
+        hyp_ctx = self.hyp_engine.render_context()
+        if hyp_ctx:
+            ctx += "\n" + hyp_ctx + "\n"
+
         # Tool-awareness: show what's actually available vs what the planner keeps suggesting
         tool_ctx = self._installed_tools_context()
         if tool_ctx:
@@ -6977,32 +7011,13 @@ WORKSPACE: {self._file_state(target)[:400]}
 
     def _extract_prose_command(self, raw: str) -> str:
         """Last-resort: pull a single shell command out of free-form AI prose.
-        Looks for EXEC: directives, fenced code blocks, and the first plausible
-        nmap/curl/etc. invocation in the response."""
-        if not raw:
-            return ""
-        # 1) EXEC: directive (line-based)
-        for line in raw.splitlines():
-            s = line.strip()
-            if s.upper().startswith("EXEC:"):
-                cmd = s.split(":", 1)[1].strip()
-                if cmd:
-                    return cmd
-        # 2) Fenced bash/sh code block — take the first non-empty line
-        for fence in ("```bash", "```sh", "```shell", "```"):
-            m = re.search(re.escape(fence) + r"\s*\n(.*?)```", raw, re.DOTALL | re.IGNORECASE)
-            if m:
-                for line in m.group(1).splitlines():
-                    s = line.strip()
-                    if s and not s.startswith("#"):
-                        return s
-        # 3) Inline backticked command
-        bticks = re.findall(r'`([^`\n]{8,400})`', raw)
-        for cand in bticks:
-            s = cand.strip().strip("$").strip()
-            if re.match(r'^(nmap|curl|wget|httpx|sqlmap|nuclei|ffuf|gobuster|feroxbuster|whatweb|masscan|rustscan|hydra|nc|cat|ls|cd|bash|sh|python|python3)\s', s, re.IGNORECASE):
-                return s
-        return ""
+
+        Delegates to the shared parser so EXEC: directives, fenced code blocks
+        and inline backticks are handled by one tool-agnostic implementation
+        (any plausible command line is accepted; the policy engine decides what
+        may actually run)."""
+        from brain.decision_parser import _extract_prose_command as _epc
+        return _epc(raw or "")
 
     def _normalize_decision(self, d) -> Optional[Dict]:
         """Validate planner output shape; coerce/reject so malformed JSON can't crash the loop."""
@@ -7018,6 +7033,10 @@ WORKSPACE: {self._file_state(target)[:400]}
         for k in ("thinking", "think", "reasoning", "strategy", "pivot_reason"):
             v = d.get(k)
             d[k] = v if isinstance(v, str) else ("" if v is None else str(v))
+        hyp = d.get("hypotheses")
+        if isinstance(hyp, dict):
+            hyp = [hyp]
+        d["hypotheses"] = hyp if isinstance(hyp, list) else None
         # Track strategy changes — if AI keeps the same strategy for 3+ turns, it's looping.
         if d.get("strategy"):
             if not hasattr(self, "_strategy_history"):

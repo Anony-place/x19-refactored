@@ -330,6 +330,7 @@ Analyze the context and return ONE JSON object:
   "next_command": "single shell command to execute or empty string",
   "reasoning": "tool:<name> | why: <this check> | evidence: <expected output>",
   "finding": null or {"title": "...", "severity": "critical/high/medium/low/info", "detail": "...", "evidence": "..."},
+  "hypotheses": null or [{"action": "add|test|confirm|reject", "statement": "specific falsifiable claim", "command": "probe to run", "expected_evidence": ["output that proves it"], "reason": "why"}],
   "completed": false
 }
 
@@ -402,8 +403,25 @@ Respond with exactly one JSON object:
   "next_command": "one shell command or empty",
   "reasoning": "tool:<name> | why: <why this check> | evidence: <exact expected output>",
   "finding": null or {"title": "...", "severity": "critical/high/medium/low/info", "detail": "...", "evidence": "..."},
+  "hypotheses": null or [{"action": "add|test|confirm|reject", "statement": "specific falsifiable claim", "command": "probe to run", "expected_evidence": ["output that proves it"], "reason": "why"}],
   "completed": false
 }
+
+DEEP HUNTING (how critical bugs are actually found):
+- Use "hypotheses" as your live research ledger. Every suspicious observation
+  (an odd reflection, a version banner, a verbose error, an inconsistent auth
+  response) becomes ONE specific, falsifiable hypothesis with the smallest
+  command that could prove it wrong.
+- STATE the falsifier: if you cannot say what output would DISPROVE the idea,
+  it is a guess, not a hypothesis.
+- confirm only with real output in hand (then immediately file the finding
+  with the exact evidence); reject with a reason and never re-run the same
+  probe on it — re-entry needs a genuinely different technique.
+- Chain primitives: a leaked path, token or version feeds the next test.
+  Two or three confirmed primitives chained = a critical finding candidate.
+- Spend depth on the target's unusual surface: custom parameters, obscure
+  endpoints, verbose errors, state-changing actions — not on generic scans
+  that thousands of scanners already ran.
 
 THINKING STRUCTURE (include in your "thinking" field):
 1. CURRENT STATE: what ports/services/findings do I have?
@@ -451,6 +469,7 @@ Return ONE JSON:
   "next_command": "shell command or ''",
   "reasoning": "tool:<name>, why:<reason>",
   "finding": null or finding object,
+  "hypotheses": null or [{"action": "add|test|confirm|reject", "statement": "...", "command": "...", "reason": "..."}],
   "completed": false
 }
 Phase order: RECON → ENUM → VULN → EXPLOIT. Move through phases — don't stay stuck.
