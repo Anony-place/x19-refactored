@@ -18,7 +18,7 @@ from typing import Any, Dict, Iterable, NoReturn, Optional
 
 from rich.console import Console, ConsoleOptions, RenderResult
 
-from ui.theme import X19_THEME
+from ui.theme import build_theme, theme_name
 
 _console: Optional[Console] = None
 _json_mode = False
@@ -46,7 +46,7 @@ def init_console(
         width = max(60, min(detected, int(os.getenv("X19_MAX_WIDTH", "160"))))
 
     _console = Console(
-        theme=X19_THEME,
+        theme=build_theme(theme_name()),
         no_color=bool(no_color) or os.getenv("NO_COLOR", "") != "",
         highlight=False,
         soft_wrap=False,
@@ -104,45 +104,52 @@ def emit_jsonl(records: Iterable[Dict[str, Any]]) -> None:
 def ok(message: str = "") -> None:
     if _json_mode:
         return
-    get_console().print(f"[app.ok]✔[/] {message}" if message else "[app.ok]✔[/]")
+    get_console().print(f"[ok]✔[/] {message}" if message else "[ok]✔[/]")
 
 
 def fail(message: str = "") -> None:
     if _json_mode:
         return
-    get_console().print(f"[app.err]✖[/] {message}" if message else "[app.err]✖[/]")
+    get_console().print(f"[err]✖[/] {message}" if message else "[err]✖[/]")
 
 
 def warn(message: str = "") -> None:
     if _json_mode:
         return
-    get_console().print(f"[app.warn]![/] {message}" if message else "[app.warn]![/]")
+    get_console().print(f"[warn]![/] {message}" if message else "[warn]![/]")
 
 
 def err(message: str = "") -> None:
     if _json_mode:
         return
-    get_console().print(f"[app.err]✖[/] {message}" if message else "[app.err]✖[/]")
+    get_console().print(f"[err]✖[/] {message}" if message else "[err]✖[/]")
 
 
 def info(message: str = "") -> None:
     if _json_mode:
         return
-    get_console().print(f"[app.info]•[/] {message}" if message else "[app.info]•[/]")
+    get_console().print(f"[info]•[/] {message}" if message else "[info]•[/]")
+
+
+def hint(message: str = "") -> None:
+    """Quiet, dimmed pointer text that never competes with results."""
+    if _json_mode:
+        return
+    get_console().print(f"[faint]{message}[/]" if message else "")
 
 
 def step(message: str = "") -> None:
     """Secondary/progress line, dimmed so it never competes with results."""
     if _json_mode:
         return
-    get_console().print(f"[app.dim]»[/] [app.dim]{message}[/]")
+    get_console().print(f"[faint]›[/] [muted]{message}[/]")
 
 
 def raw(message: str = "") -> None:
     get_console().print(message)
 
 
-def rule(title: str = "", style: str = "panel.border") -> None:
+def rule(title: str = "", style: str = "border") -> None:
     if _json_mode:
         return
     get_console().rule(title, style=style)
@@ -150,7 +157,7 @@ def rule(title: str = "", style: str = "panel.border") -> None:
 
 def die(message: str, code: int = 1) -> NoReturn:
     """Print an error and exit with ``code``."""
-    get_console().print(f"[app.err]✖ {message}[/]")
+    get_console().print(f"[err]✖ {message}[/]")
     raise SystemExit(code)
 
 
@@ -195,22 +202,22 @@ class Banner:
 
         if console.width < 64:
             line = _Text()
-            line.append("X19", style="bold bright_cyan")
-            line.append(f"  {self.version}", style="grey62")
+            line.append("X19", style="brand")
+            line.append(f"  {self.version}", style="muted")
             if self.subtitle:
-                line.append(f"  ·  {self.subtitle}", style="grey50")
+                line.append(f"  ·  {self.subtitle}", style="faint")
             yield line
             return
 
-        logo = _Text(logo_src, style="bold cyan")
+        logo = _Text(logo_src, style="brand")
         right = _Text()
-        right.append("AUTONOMOUS AI SECURITY ASSESSMENT", style="bold bright_white")
+        right.append("AUTONOMOUS AI SECURITY ASSESSMENT", style="bold text")
         right.append("\n")
-        right.append(self.subtitle or "recon → enumeration → exploitation → verified evidence", style="grey62")
+        right.append(self.subtitle or "recon → enumeration → exploitation → verified evidence", style="muted")
         right.append("\n\n")
-        right.append(f"version {self.version}", style="bold cyan")
+        right.append(f"version {self.version}", style="brand")
         if self.meta:
-            right.append(f"\n{self.meta}", style="grey50")
+            right.append(f"\n{self.meta}", style="faint")
 
         grid = Table.grid(padding=(0, 2))
         grid.add_column(justify="left", no_wrap=True)
@@ -219,13 +226,29 @@ class Banner:
 
         yield Panel(
             grid,
-            border_style="cyan",
+            border_style="border",
             padding=(0, 1),
             title="[panel.title] X19 [/]",
             title_align="left",
-            subtitle="[app.dim]cli · no web ui[/]",
+            subtitle="[faint]terminal application[/]",
             subtitle_align="right",
         )
+
+
+def _banner_wanted() -> bool:
+    """Banner policy, resolved from config/env — never hardcoded here."""
+    import os as _os
+
+    if _os.getenv("X19_UI_BANNER", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    try:
+        from config import CONFIG
+
+        if bool(getattr(CONFIG, "UI_BANNER", False)):
+            return True
+        return not CONFIG.ui_is_clean
+    except Exception:
+        return False
 
 
 def banner(version: str, subtitle: str = "", meta: str = "") -> None:
@@ -238,12 +261,7 @@ def banner(version: str, subtitle: str = "", meta: str = "") -> None:
     """
     if _json_mode:
         return
-    try:
-        from config import CONFIG
-        show = bool(getattr(CONFIG, "UI_BANNER", False)) or not CONFIG.ui_is_clean
-    except Exception:
-        show = True
-    if not show:
+    if not _banner_wanted():
         return
     get_console().print(Banner(version, subtitle, meta))
 
@@ -258,5 +276,5 @@ def working(message: str, transient: bool = True):
     if _json_mode or _plain_mode or not con.is_terminal:
         yield
         return
-    with con.status(f"[app.info]{message}[/]", spinner="dots"):
+    with con.status(f"[info]{message}[/]", spinner="dots"):
         yield

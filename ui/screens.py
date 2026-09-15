@@ -727,8 +727,8 @@ def workspace_screen(
     ))
     blocks.append(widgets.panel("next actions", next_actions_panel(next_actions)))
     blocks.append(widgets.key_hint_bar([
-        ("x19 dash -t <target> --engagement <name>", "start an assessment"),
-        ("x19 chat", "interactive console"),
+        ("x19 dash -t <target>", "assessment"),
+        ("x19 chat", "assistant"),
         ("x19 -h", "all options"),
     ]))
     return Group(*blocks)

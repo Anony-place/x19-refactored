@@ -80,6 +80,50 @@ Global flags: `--json`, `--no-color`, `--plain`, `-q/--quiet`, `-v/--verbose`,
 `-V/--version`. Legacy flag-first invocations still work: `x19 -t host` is
 routed to `x19 run -t host`.
 
+## The terminal workspace (`x19 chat`)
+
+`x19 chat` is a rolling-transcript console — every message renders once, so
+nothing flickers — with a **live status ribbon** above the prompt. Long work
+never blocks the conversation: assessments run on background threads while you
+keep typing.
+
+```
+ X19   X19 4.0.0 (3cde5d5)  ·  terminal workspace
+  ai groq/llama-3.3-70b  ·  target —
+
+ X19 · scanme.nmap.org · groq/llama-3.3-70b   ● assessment scanme.nmap.org 00:41 — iter 12 · 3 findings
+you › █
+```
+
+* `/target <host>` — passive scope check, explicit confirmation, then a quiet
+  background assessment. The ribbon tracks iterations, findings and the
+  agent's latest activity; you keep chatting.
+* `/tasks` — background tasks with status and elapsed time; `/tasks log <id>`
+  replays a task's captured output.
+* `/stop` — asks the running agent to wrap up at the next decision point.
+* Completion notifications (findings by severity, failure tails) appear in the
+  transcript the moment work finishes.
+
+Concurrency and feel are configurable: `X19_BG_WORKERS` (or config
+`BG_WORKERS`) caps background tasks, `X19_UI_POLL` sets the ribbon refresh,
+`X19_UI_BANNER`/`UI_BANNER` brings back the ASCII splash screen.
+
+## Look & feel
+
+The UI is a design system, not a pile of prints. Colours live in semantic
+palettes — pick one with `x19 config set UI_THEME <name>` or
+`X19_UI_THEME=<name>`:
+
+| palette | vibe |
+| --- | --- |
+| `midnight` (default) | cool teal-on-slate |
+| `matrix` | classic terminal green |
+| `ember` | warm amber |
+| `mono` | colour-blind-safe greyscale |
+
+`--no-color` / `NO_COLOR` disable styling, `--plain` disables live TUIs, and
+`X19_ASCII=1` swaps unicode glyphs for ASCII fallbacks.
+
 ## Live mission control
 
 `x19 dash` is the terminal equivalent of the retired web dashboard. It renders
@@ -114,10 +158,12 @@ cli.py            subcommand parser + command handlers
 cli_support.py    provider resolution, sessions, diagnostics (no rendering)
 ui/               the terminal application
   console.py        global rich Console, ok/warn/err, --json contract
-  theme.py          palette, severity and state styling
+  theme.py          palettes, severity and state styling (UI_THEME selects)
   widgets.py        panels, tables, trees, progress, key hints
+  prompt.py         live prompt that redraws the status ribbon while you type
+  background.py     quiet background task runner (captured output, callbacks)
   dashboard.py      MissionDashboard — live mission control
-  app.py            ConsoleApp — interactive REPL with slash commands
+  app.py            ConsoleApp — rolling-transcript chat with slash commands
   screens.py        providers / config / sessions / findings / doctor views
   keys.py           non-blocking keyboard capture (POSIX + Windows)
 version.py          single source of truth for the version
@@ -126,7 +172,7 @@ execution/          command gateway, policy engine, native scan/fuzz/vuln
 parsers/            structured output parsers (nmap, httpx, gobuster, ffuf)
 learning/           self-adaptation and failure lessons
 reporting/          markdown / html / json report generation
-tests/              180 unit tests
+tests/              unit + regression tests
 ```
 
 ## Tests

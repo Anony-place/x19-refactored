@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shutil
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -433,13 +436,67 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("swarm agents", stream.getvalue())
         self.assertNotIn("RAW\n     FINDINGS", stream.getvalue())
 
-    def test_chat_workspace_hides_sidebar_in_a_narrow_terminal(self):
+    def test_chat_welcome_renders_brand_and_commands(self):
+        """The rolling chat workspace: welcome shows brand + real state."""
         app = ConsoleApp(version="1.0.0")
         app.console = Console(file=io.StringIO(), width=80, height=24, force_terminal=False, theme=X19_THEME)
 
-        text = render(app._workspace(), width=80)
-        self.assertIn("/help for commands", text)
+        stream = io.StringIO()
+        app.console = Console(file=stream, width=80, height=24, force_terminal=True, theme=X19_THEME, record=True)
+        app._welcome()
+        text = app.console.export_text(clear=True, styles=False)
+        self.assertIn("X19", text)
+        self.assertIn("terminal workspace", text)
+        self.assertIn("/target", text)
+        # no full-screen sidebar chrome in the redesigned workspace
         self.assertNotIn("NEW CHAT", text)
+
+    def test_ribbon_reports_background_state(self):
+        """The live ribbon names the running task; idle state stays quiet."""
+        app = ConsoleApp(version="1.0.0")
+        app.console = Console(file=io.StringIO(), width=100, height=24, force_terminal=True, theme=X19_THEME)
+
+        idle = app._ribbon()
+        self.assertIn("idle", idle)
+
+        release = threading.Event()
+        started = app.background.start("assessment demo.example.com", release.wait)
+        try:
+            ribbon = app._ribbon()
+            self.assertIn("assessment demo.example.com", ribbon)
+        finally:
+            release.set()
+            started.join(timeout=2)
+
+    def test_background_manager_captures_worker_output(self):
+        """Worker stdout/stderr is captured per task instead of flooding the terminal."""
+        app = ConsoleApp(version="1.0.0")
+        app.console = Console(file=io.StringIO(), width=100, height=24, force_terminal=False, theme=X19_THEME)
+
+        def noisy():
+            print("[RECON] enumerating subdomains")
+            print("[SCAN] 443 open")
+            return "result"
+
+        task = app.background.start("test task", noisy)
+        task.join(timeout=2)
+        self.assertEqual(task.status, "completed")
+        self.assertIn("[RECON] enumerating subdomains", "\n".join(task.tail(10)))
+        self.assertEqual(app.background.drain_notifications()[0].id, task.id)
+        # a second drain reports nothing new
+        self.assertEqual(app.background.drain_notifications(), [])
+
+    def test_background_worker_limit_is_configurable(self):
+        """Concurrency comes from config/env, with a documented fallback."""
+        from ui.background import _configured_workers, BackgroundTaskManager
+
+        os.environ["X19_BG_WORKERS"] = "5"
+        try:
+            self.assertEqual(_configured_workers(), 5)
+            self.assertEqual(BackgroundTaskManager().max_workers, 5)
+        finally:
+            os.environ.pop("X19_BG_WORKERS", None)
+        self.assertGreaterEqual(_configured_workers(), 1)
 
     def test_header_bar_truncates_an_overlong_target(self):
         text = render(widgets.header_bar("1.0.0", target="very-long-target-name." + "example." * 12), width=80)

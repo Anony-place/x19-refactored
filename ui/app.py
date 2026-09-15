@@ -1,8 +1,14 @@
 """Terminal-native X19 chat workspace.
 
-The terminal is a UI, not an execution log. Long-running assessments are sent
-to quiet background workers; the conversation shows only concise state and
-final results. Provider failover/tool chatter stays out of the main screen.
+The terminal is a UI, not an execution log. The conversation is a rolling
+transcript — every message is rendered exactly once, so nothing flickers —
+while long-running assessments execute on quiet background threads. A live
+status ribbon above the input line keeps the operator informed (task, elapsed
+time, latest agent activity) and finished work is reported as it completes.
+
+Nothing in this file is hardcoded to a particular provider, target, model or
+terminal size: state comes from the attached agent / task manager, layout
+adapts to the console width, and tunables live in the environment / config.
 """
 from __future__ import annotations
 
@@ -17,11 +23,11 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
-from rich.layout import Layout
 
 from ui import widgets
-from ui.background import BackgroundTaskManager
-from ui.console import get_console, info, ok, rule, step, warn
+from ui.background import BackgroundTask, BackgroundTaskManager
+from ui.console import get_console, info, ok, step, warn
+from ui.prompt import LivePrompt
 
 SYSTEM_PROMPT = (
     "You are X19, an expert offensive-security analyst running inside a terminal "
@@ -35,6 +41,7 @@ COMMANDS: List[Dict[str, str]] = [
     {"name": "/target <host>", "help": "scope-check then start a quiet background assessment", "group": "assessment"},
     {"name": "/scope <host>", "help": "passively check trusted public bounty scope", "group": "assessment"},
     {"name": "/dash <host>", "help": "live swarm mission control (full screen)", "group": "assessment"},
+    {"name": "/stop", "help": "ask the running assessment to wrap up", "group": "assessment"},
     {"name": "/status", "help": "current session, provider and task state", "group": "assessment"},
     {"name": "/findings", "help": "list recorded findings by severity", "group": "assessment"},
     {"name": "/report", "help": "render the assessment report", "group": "assessment"},
@@ -43,7 +50,7 @@ COMMANDS: List[Dict[str, str]] = [
     {"name": "/model <name>", "help": "switch the active model", "group": "runtime"},
     {"name": "/config [K=V]", "help": "show configuration, or set a value", "group": "runtime"},
     {"name": "/sessions [id]", "help": "list stored sessions, or open one", "group": "runtime"},
-    {"name": "/tasks", "help": "show quiet background tasks", "group": "runtime"},
+    {"name": "/tasks [log <id>]", "help": "background tasks, or replay a task's output", "group": "runtime"},
     {"name": "/tools", "help": "toolchain availability", "group": "runtime"},
     {"name": "/doctor", "help": "self diagnostics and health score", "group": "runtime"},
     {"name": "/test", "help": "round-trip the AI provider", "group": "runtime"},
@@ -53,9 +60,13 @@ COMMANDS: List[Dict[str, str]] = [
     {"name": "/exit", "help": "quit", "group": "session"},
 ]
 
+#: Roles the transcript understands (everything else renders as plain text).
+ROLE_USER = "user"
+ROLE_AGENT = "assistant"
+
 
 class ConsoleApp:
-    """ChatGPT-style workspace rendered entirely inside the terminal."""
+    """A rolling-transcript workspace with the agent working in the background."""
 
     def __init__(self, agent: Any = None, *, version: str = "", ai: Any = None):
         self.agent = agent
@@ -64,8 +75,36 @@ class ConsoleApp:
         self.history: List[Dict[str, str]] = []
         self._ai = ai
         self._exit = False
-        self.background = BackgroundTaskManager(max_workers=2)
-        self._workspace_notice = ""
+        self.background = BackgroundTaskManager()
+        #: the task currently driving the attached agent, if any
+        self._assessment_task: Optional[BackgroundTask] = None
+        self.prompt = LivePrompt(
+            self.console,
+            ribbon_fn=self._ribbon,
+            poll=self._poll_interval(),
+            completer=self._completions,
+        )
+
+    def _completions(self, prefix: str) -> List[str]:
+        """Tab completion candidates — derived from the command registry."""
+        if not prefix.startswith("/"):
+            return []
+        names = []
+        for entry in COMMANDS:
+            name = str(entry.get("name", "")).split()[0]
+            if name not in names:
+                names.append(name)
+        return [n for n in names if n.startswith(prefix)]
+
+    # ------------------------------------------------------------------
+    # Tunables — resolved from the environment/config, never hardcoded here
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _poll_interval() -> float:
+        try:
+            return max(0.1, float(os.getenv("X19_UI_POLL", "0.4")))
+        except ValueError:
+            return 0.4
 
     @property
     def ai(self) -> Any:
@@ -73,119 +112,179 @@ class ConsoleApp:
             self._ai = getattr(self.agent, "ai", None)
         return self._ai
 
+    # ------------------------------------------------------------------
+    # Transcript rendering — each message is printed exactly once
+    # ------------------------------------------------------------------
+    def _echo_user(self, text: str) -> None:
+        line = Text()
+        line.append("you ", style="accent2")
+        line.append("❯ ", style="border.dim")
+        line.append(text, style="bold text")
+        self.console.print(line)
+
+    def _echo_agent(self, markdown: str, title: str = "X19") -> None:
+        head = Text()
+        head.append(f"{title} ", style="brand")
+        head.append("─", style="border.dim")
+        self.console.print(head)
+        self.console.print(Markdown(markdown))
+        self.console.print()
+
+    def _echo_system(self, text: str, *, style: str = "muted") -> None:
+        self.console.print(Text(text, style=style))
+
+    def remember(self, role: str, content: str) -> None:
+        self.history.append({"role": role, "content": content})
+
+    # ------------------------------------------------------------------
+    # Status ribbon — one live line above the prompt
+    # ------------------------------------------------------------------
+    def _provider_name(self) -> str:
+        try:
+            return self.ai.name() if self.ai else "—"
+        except Exception:
+            return "—"
+
+    def _assessment_details(self) -> str:
+        """Live facts about the running assessment, straight from the agent."""
+        if self._assessment_task is None or not self._assessment_task.active:
+            return ""
+        bits: List[str] = []
+        session = getattr(self.agent, "session", None)
+        data = getattr(session, "data", {}) if session is not None else {}
+        try:
+            iterations = int(data.get("iterations", 0) or 0)
+            if iterations:
+                bits.append(f"iter {iterations}")
+            findings = data.get("findings") or []
+            if findings:
+                bits.append(f"{len(findings)} findings")
+        except Exception:
+            pass
+        note = (self._assessment_task.note or "").strip()
+        if note:
+            bits.append(note)
+        return " · ".join(bits)
+
+    def _ribbon(self) -> str:
+        if not getattr(self.console, "is_terminal", False):
+            return ""
+        width = max(40, int(self.console.width))
+        left = Text()
+        left.append("X19", style="brand")
+        left.append(" · ", style="border.dim")
+        target = getattr(self.agent, "target", "") or "no target"
+        left.append(widgets.truncate(target, max(10, width // 4)), style="bold text")
+        left.append(" · ", style="border.dim")
+        left.append(widgets.truncate(self._provider_name(), max(8, width // 5)), style="info")
+
+        right = Text()
+        active = self.background.active()
+        if active:
+            details = self._assessment_details()
+            elapsed = widgets.human_duration(active[0].elapsed())
+            right.append("● ", style="ok")
+            right.append(f"{active[0].label} {elapsed}", style="bold text")
+            if details:
+                right.append(f" — {widgets.truncate(details, max(10, width // 3))}", style="muted")
+        else:
+            right.append("○ idle", style="faint")
+            right.append("   /help commands", style="faint")
+
+        # Manually padded single line — LivePrompt repaints it in place.
+        pad = max(2, width - 2 - left.cell_len - right.cell_len)
+        line = Text(" ")
+        line.append(left)
+        line.append(" " * pad)
+        line.append(right)
+        if getattr(self.console, "no_color", False):
+            return line.plain
+        return _render_ansi(line, width, self.console)
+
+    # ------------------------------------------------------------------
+    # Welcome / notifications
+    # ------------------------------------------------------------------
+    def _welcome(self) -> None:
+        from version import version_line
+
+        self.console.print()
+        head = Text()
+        head.append(" X19 ", style="bold black on brand")
+        head.append(f"  {version_line()}", style="brand")
+        head.append("  ·  terminal workspace", style="muted")
+        self.console.print(head)
+        meta = Text()
+        meta.append(f"  ai {self._provider_name()}", style="info")
+        target = getattr(self.agent, "target", "")
+        if target:
+            meta.append(f"  ·  target {target}", style="bold text")
+        self.console.print(meta)
+        hints = Text("  ")
+        quick = [c["name"] for c in COMMANDS if c["group"] == "assessment"][:3]
+        hints.append("start here: ", style="faint")
+        hints.append("  ".join(quick), style="key")
+        self.console.print(hints)
+        self.console.print()
+
+    def _drain_notifications(self) -> None:
+        """Report background tasks that finished since the last look."""
+        for task in self.background.drain_notifications():
+            duration = widgets.human_duration(task.elapsed())
+            if task.status == "completed":
+                body = Text()
+                body.append("✔ ", style="ok")
+                body.append(f"{task.label} completed in {duration}", style="bold text")
+                counts = self._finding_counts()
+                if counts:
+                    body.append(f" — {counts}", style="warn")
+                self.console.print(Panel(body, title="background", border_style="border", padding=(0, 1)))
+                hint_text = Text("  ")
+                hint_text.append("/report", style="key")
+                hint_text.append(" render the assessment · ", style="muted")
+                hint_text.append("/findings", style="key")
+                hint_text.append(" list what was verified", style="muted")
+                self.console.print(hint_text)
+            elif task.status == "cancelled":
+                self._echo_system(f"■ {task.label} interrupted after {duration}", style="warn")
+            else:
+                self._echo_system(f"✖ {task.label} failed after {duration}: {task.error}", style="err")
+                tail_hint = Text("  ")
+                tail_hint.append(f"/tasks log {task.id}", style="key")
+                tail_hint.append(" replay what happened", style="muted")
+                self.console.print(tail_hint)
+
+    def _finding_counts(self) -> str:
+        session = getattr(self.agent, "session", None)
+        data = getattr(session, "data", {}) if session is not None else {}
+        findings = data.get("findings") or []
+        if not findings:
+            return ""
+        counts: Dict[str, int] = {}
+        for finding in findings:
+            severity = str(finding.get("severity", "info") or "info").lower()
+            counts[severity] = counts.get(severity, 0) + 1
+        order = ("critical", "high", "medium", "low", "info")
+        return " ".join(f"{n} {sev}" for sev in order if (n := counts.get(sev, 0)))
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
     def prompt_text(self) -> str:
         return "you ›"
 
-    def _workspace(self) -> Layout:
-        target = getattr(self.agent, "target", "") or "—"
-        provider = "—"
-        try:
-            provider = self.ai.name() if self.ai else "—"
-        except Exception:
-            pass
-        active = self.background.active()
-        tasks = self.background.recent(6)
-
-        sidebar = Table.grid(padding=(0, 1))
-        sidebar.add_column(style="bold bright_cyan", width=20)
-        sidebar.add_row("X19")
-        sidebar.add_row("")
-        sidebar.add_row("[bold bright_white]NEW CHAT[/]")
-        sidebar.add_row("[grey50]Current session[/]")
-        sidebar.add_row(f"[grey70]Target: {target[:24]}[/]")
-        sidebar.add_row("")
-        sidebar.add_row("[bold]WORKSPACE[/]")
-        sidebar.add_row("[grey70]/target[/]  assessment")
-        sidebar.add_row("[grey70]/scope[/]   bounty scope")
-        sidebar.add_row("[grey70]/findings[/] findings")
-        sidebar.add_row("[grey70]/report[/] report")
-        sidebar.add_row("[grey70]/providers[/] providers")
-        sidebar.add_row("[grey70]/sessions[/] history")
-        sidebar.add_row("")
-        sidebar.add_row("[bold]BACKGROUND[/]")
-        if active:
-            for task in active:
-                sidebar.add_row(f"[yellow]●[/] {task.label[:25]}")
-        else:
-            sidebar.add_row("[grey50]idle[/]")
-        sidebar.add_row("")
-        sidebar.add_row(f"[grey50]{provider[:26]}[/]")
-
-        chat_parts: List[Any] = []
-        for item in self.history[-30:]:
-            role = item.get("role")
-            content = item.get("content", "").strip()
-            if not content:
-                continue
-            if role == "user":
-                chat_parts.append(Panel(content, title="you", title_align="left", border_style="magenta", padding=(0, 1)))
-            else:
-                chat_parts.append(Panel(Markdown(content), title="X19", title_align="left", border_style="bright_cyan", padding=(0, 1)))
-
-        if not chat_parts:
-            chat_parts.append(Panel(
-                "Ready. Give me a message or use /target <host> to start an assessment.\n\n"
-                "X19 checks public program scope before active work. Long-running tool output stays in the background.",
-                title="X19",
-                border_style="bright_cyan",
-                padding=(1, 2),
-            ))
-
-        if active:
-            task_lines = [f"[yellow]●[/] {t.label} — [grey70]{t.status}[/]" for t in active]
-            chat_parts.append(Panel("\n".join(task_lines), title="background", border_style="yellow", padding=(0, 1)))
-        elif tasks and tasks[-1].status in {"completed", "failed"}:
-            last = tasks[-1]
-            if last.status == "completed":
-                chat_parts.append(Panel(f"[green]✓[/] {last.label} completed", title="background", border_style="green"))
-            else:
-                chat_parts.append(Panel(f"[red]✗[/] {last.label}: {last.error[:180]}", title="background", border_style="red"))
-
-        main = Layout(name="main")
-        compact = self.console.width < 100
-        target_display = widgets.truncate(target, 22 if compact else 42)
-        provider_display = widgets.truncate(provider, 16 if compact else 30)
-        header = (
-            f"[bold bright_cyan]X19[/]   [bold]Target:[/] {target_display}   "
-            f"[bold]Provider:[/] {provider_display}   [bold]Tasks:[/] {len(active)}"
-        )
-        if compact:
-            header += "   [grey62]/help for commands[/]"
-        main.split_column(
-            Layout(Panel(header, border_style="grey37", padding=(0, 1)), name="header", size=3),
-            Layout(Panel(Group(*chat_parts), border_style="grey23", padding=(0, 1)), name="conversation", ratio=1),
-            Layout(Panel("[bold magenta]you ›[/] _", border_style="grey37", height=3, padding=(0, 1)), name="composer", size=3),
-        )
-        root = Layout(name="root")
-        if compact:
-            # Do not squeeze the conversation below a usable width.  The full
-            # command index remains available through /help.
-            root.split_column(main)
-        else:
-            root.split_row(Layout(Panel(sidebar, border_style="grey23", padding=(1, 1)), name="sidebar", size=27), main)
-        return root
-
-    def _draw(self) -> None:
-        if self.console.is_terminal:
-            self.console.clear()
-        self.console.print(self._workspace())
-
     def run(self) -> int:
-        from version import version_line
-        self.console.print()
-        rule(f"[panel.title]{version_line()}[/]  ·  terminal workspace")
-        info("[grey70]Background-first mode: tools, scans and provider failover stay quiet.[/]")
-        self.console.print()
-
+        self._welcome()
         while not self._exit:
             try:
-                self._draw()
-                line = Prompt.ask(self.prompt_text(), console=self.console, default="", show_default=False).strip()
+                line = self.prompt.ask(self.prompt_text()).strip()
             except (EOFError, KeyboardInterrupt):
                 self.console.print()
                 break
             if not line:
+                self._drain_notifications()
                 continue
+            self._echo_user(line)
+            self.remember(ROLE_USER, line)
             try:
                 self.handle(line)
             except KeyboardInterrupt:
@@ -193,7 +292,8 @@ class ConsoleApp:
             except SystemExit:
                 raise
             except Exception as exc:
-                self.console.print(f"[app.err]✖ {type(exc).__name__}: {exc}[/]")
+                self.console.print(f"[err]✖ {type(exc).__name__}: {exc}[/]")
+            self._drain_notifications()
         ok("bye")
         return 0
 
@@ -236,17 +336,29 @@ class ConsoleApp:
                 return token
         return None
 
+    # ------------------------------------------------------------------
+    # Session commands
+    # ------------------------------------------------------------------
     def cmd_help(self, *args: str) -> None:
         from ui.screens import help_screen
         self.console.print(help_screen(COMMANDS, version=self.version))
 
     def cmd_exit(self, *args: str) -> None:
+        if self._assessment_task and self._assessment_task.active:
+            self._echo_system(
+                "note: a background assessment is still running — it is a daemon "
+                "thread and ends with this process",
+                style="warn",
+            )
         self._exit = True
 
     cmd_quit = cmd_exit
 
     def cmd_clear(self, *args: str) -> None:
         self.history.clear()
+        if self.console.is_terminal:
+            self.console.clear()
+        self._welcome()
         ok("conversation cleared")
 
     def cmd_shell(self, *args: str) -> None:
@@ -266,7 +378,9 @@ class ConsoleApp:
         else:
             warn("empty response — check provider configuration")
 
-    # -- assessment ------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Assessment
+    # ------------------------------------------------------------------
     def _scope_result_text(self, result: Any) -> str:
         state = getattr(result, "state", "unknown")
         target = getattr(result, "normalized_target", "") or getattr(result, "target", "")
@@ -298,9 +412,9 @@ class ConsoleApp:
             warn("usage: /scope <host>")
             return
         result = self._resolve_scope(target)
-        self.history.append({"role": "user", "content": f"/scope {target}"})
-        self.history.append({"role": "assistant", "content": self._scope_result_text(result)})
-        self.console.print(Markdown(self._scope_result_text(result)))
+        text = self._scope_result_text(result)
+        self.remember(ROLE_AGENT, text)
+        self._echo_agent(text, title="scope")
 
     def cmd_target(self, *args: str) -> None:
         target = " ".join(args).strip() or Prompt.ask("target", console=self.console).strip()
@@ -310,15 +424,15 @@ class ConsoleApp:
         if self.agent is None:
             warn("no agent attached — run: x19 run -t " + target)
             return
-        if self.background.active():
-            warn("a background assessment is already running")
+        if self._assessment_task and self._assessment_task.active:
+            warn("a background assessment is already running — /stop it first or /tasks for status")
             return
 
         # Scope is resolved before the LLM or autonomous loop gets control.
         result = self._resolve_scope(target)
-        self.history.append({"role": "user", "content": f"target {target}"})
-        self.history.append({"role": "assistant", "content": self._scope_result_text(result)})
-        self.console.print(Markdown(self._scope_result_text(result)))
+        text = self._scope_result_text(result)
+        self.remember(ROLE_AGENT, text)
+        self._echo_agent(text, title="scope")
 
         state = getattr(result, "state", "unknown")
         if state == "verified_out_of_scope":
@@ -342,33 +456,69 @@ class ConsoleApp:
             return
 
         try:
-            task = self.background.start(
-                "Assessment",
-                lambda: self.agent.autonomous_loop(target),
-                target=target,
-            )
             try:
                 self.agent.target = target
             except Exception:
                 pass
-            ok(f"background assessment started · task {task.id}")
+            task = self.background.start(
+                f"assessment {target}",
+                lambda: self.agent.autonomous_loop(target),
+                target=target,
+            )
+            self._assessment_task = task
+            ok(f"assessment running in the background · task {task.id}")
+            step("keep chatting — the ribbon above the prompt tracks progress; /stop wraps it up")
         except Exception as exc:
             warn(f"could not start background assessment: {exc}")
 
     cmd_scan = cmd_target
     cmd_pentest = cmd_target
 
-    def cmd_tasks(self, *args: str) -> None:
-        rows = [(t.id, t.label, t.target or "—", t.status) for t in self.background.recent(20)]
-        if not rows:
-            self.console.print(Panel("No background tasks.", title="tasks", border_style="grey37"))
+    def cmd_stop(self, *args: str) -> None:
+        task = self._assessment_task
+        if task is None or not task.active:
+            warn("no background assessment running")
             return
-        table = Table(title="quiet background tasks")
-        for col in ("id", "task", "target", "status"):
-            table.add_column(col)
+        stopped = False
+        try:
+            if getattr(self.agent, "running", False):
+                self.agent.stop = True
+                stopped = True
+        except Exception:
+            pass
+        if stopped:
+            info(f"stop requested for task {task.id} — the agent finishes its current step and wraps up")
+        else:
+            warn("the agent is not reporting a running loop; waiting for the task to settle")
+
+    def cmd_tasks(self, *args: str) -> None:
+        if args and args[0].lower() == "log":
+            if len(args) < 2:
+                warn("usage: /tasks log <task-id>")
+                return
+            task = self.background.get(args[1])
+            if task is None:
+                warn(f"no such task: {args[1]}")
+                return
+            self.console.print(widgets.panel(
+                f"task {task.id} · {task.label}",
+                Group(*(Text(line, style="evidence") for line in task.tail(30))) if task.tail(30)
+                else Text("no captured output", style="muted"),
+                subtitle=f"{task.status} · {len(task.output)} lines captured",
+            ))
+            return
+        rows = [(t.id, t.label, t.target or "—", t.status, widgets.human_duration(t.elapsed()), t.note or "—")
+                for t in self.background.recent(20)]
+        if not rows:
+            self.console.print(Panel("No background tasks yet — /target <host> starts one.",
+                                     title="tasks", border_style="border"))
+            return
+        table = Table(title=None, expand=True, box=None)
+        for col, style in (("id", "key"), ("task", "text.strong"), ("target", "info"), ("status", ""), ("elapsed", "muted"), ("latest", "muted")):
+            table.add_column(col, style=style or None)
         for row in rows:
             table.add_row(*row)
-        self.console.print(table)
+        self.console.print(widgets.panel("background tasks", table, subtitle="use /tasks log <id> to replay output"))
 
     def cmd_dash(self, *args: str) -> None:
         from ui.dashboard import MissionDashboard
@@ -394,7 +544,8 @@ class ConsoleApp:
             rows.append(("ai", self.ai.name() if self.ai else "—"))
         except Exception:
             rows.append(("ai", "—"))
-        rows.append(("background", str(len(self.background.active()))))
+        active = self.background.active()
+        rows.append(("background", f"{len(active)} running" if active else "idle"))
         self.console.print(widgets.panel("status", widgets.kv_table(rows)))
 
     def cmd_findings(self, *args: str) -> None:
@@ -483,7 +634,10 @@ class ConsoleApp:
             self.console.print(session_detail_screen(data, args[0]))
             return
         rows = []
-        for path in sorted(directory.glob("*.json"), reverse=True)[:50]:
+        # Most recent first, by actual modification time — file names are not
+        # guaranteed to sort chronologically.
+        paths = sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:50]
+        for path in paths:
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except Exception:
@@ -502,18 +656,29 @@ class ConsoleApp:
         result = run_diagnostics()
         self.console.print(doctor_screen(result["checks"], score=result["score"], detail=result.get("detail", "")))
 
+    # ------------------------------------------------------------------
+    # LLM chat
+    # ------------------------------------------------------------------
     def chat(self, message: str) -> None:
         if self.ai is None:
             warn("no AI provider configured — run: x19 setup")
             return
-        self.history.append({"role": "user", "content": message})
-        with get_console().status("[app.info]thinking[/]", spinner="dots") if get_console().is_terminal else _noop():
+        from contextlib import nullcontext
+
+        con = self.console
+        spinner = (
+            con.status("[info]X19 is thinking[/]", spinner="dots")
+            if con.is_terminal and not getattr(con, "no_color", False)
+            else nullcontext()
+        )
+        with spinner:
             try:
                 reply = self.ai.chat(SYSTEM_PROMPT, message) or ""
             except Exception as exc:
                 warn(f"provider request failed: {type(exc).__name__}")
                 return
-        self.history.append({"role": "assistant", "content": reply})
+        self.remember(ROLE_AGENT, reply)
+        self._echo_agent(reply)
 
     def _session_findings(self) -> List[Dict[str, Any]]:
         if self.agent is None:
@@ -524,9 +689,29 @@ class ConsoleApp:
             return []
 
 
-class _noop:
-    def __enter__(self) -> "_noop":
-        return self
+def _render_ansi(renderable: Any, width: int, source_console: Any) -> str:
+    """Render one line of markup to a raw ANSI string for in-place repaints.
 
-    def __exit__(self, *exc: Any) -> None:
-        return None
+    Uses the same theme as the active console so the ribbon matches the rest
+    of the UI. Falls back to plain text when rendering is not possible.
+    """
+    import io
+
+    from rich.console import Console
+
+    try:
+        buf = Console(
+            file=io.StringIO(),
+            width=width,
+            force_terminal=True,
+            color_system=getattr(source_console, "_color_system", None) or "truecolor",
+            theme=source_console.theme,
+        )
+        buf.print(renderable)
+        text = buf.file.getvalue()
+        return text.rstrip("\n")
+    except Exception:
+        try:
+            return renderable.plain
+        except Exception:
+            return str(renderable)

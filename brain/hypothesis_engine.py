@@ -11,9 +11,8 @@ Confidence is updated using actual observations, never trusted from LLM.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 from datetime import datetime, timezone
-import math
 import hashlib
 
 
@@ -105,6 +104,33 @@ class CompetingHypothesis:
     def is_active(self) -> bool:
         return self.state in (HYP_NEW, HYP_TESTING)
 
+    # -- legacy aliases ----------------------------------------------------
+    # Early consumers (and the benchmark suite) used the ``estimated_*`` names;
+    # keep them as live aliases so both spellings stay valid.
+    @property
+    def estimated_information_gain(self) -> float:
+        return self.expected_information_gain
+
+    @property
+    def estimated_execution_cost(self) -> float:
+        return self.execution_cost
+
+    @property
+    def estimated_risk(self) -> float:
+        return self.risk
+
+    @estimated_information_gain.setter
+    def estimated_information_gain(self, value: float) -> None:
+        self.expected_information_gain = max(0.0, min(1.0, float(value)))
+
+    @estimated_execution_cost.setter
+    def estimated_execution_cost(self, value: float) -> None:
+        self.execution_cost = max(0.0, min(1.0, float(value)))
+
+    @estimated_risk.setter
+    def estimated_risk(self, value: float) -> None:
+        self.risk = max(0.0, min(1.0, float(value)))
+
     def transition(self, new_state: str, reason: str = "", result: str = "") -> bool:
         allowed = HYP_TRANSITIONS.get(self.state, set())
         if new_state not in allowed:
@@ -189,13 +215,29 @@ class MultiHypothesisEngine:
         content = f"{statement}:{command}:{','.join(sorted(assumptions))}"
         return hashlib.sha256(content.encode()).hexdigest()
 
-    def is_duplicate_or_rejected(self, statement: str, command: str = "", assumptions: Optional[List[str]] = None) -> bool:
-        h = self._hash_hypothesis(statement, command or "", assumptions or [])
-        return h in self._rejected_hashes
+    def _identity_hashes(self, hyp: "CompetingHypothesis") -> List[str]:
+        """Every hash a hypothesis must be findable/duplicated by.
+
+        Callers may identify a hypothesis by its full statement, its title or
+        its description (older API surface did exactly that), so all three
+        spellings hash to the same identity.
+        """
+        identities = {hyp.statement, hyp.title or "", hyp.description or ""}
+        identities.discard("")
+        return [self._hash_hypothesis(s, hyp.command, hyp.assumptions) for s in sorted(identities)]
+
+    def is_duplicate_or_rejected(self, statement: str = "", command: str = "", assumptions: Optional[List[str]] = None, *, title: str = "", description: str = "") -> bool:
+        identities = {str(statement or "").strip(), str(title or "").strip(), str(description or "").strip()}
+        identities.discard("")
+        for s in identities:
+            h = self._hash_hypothesis(s, command or "", assumptions or [])
+            if h in self._rejected_hashes:
+                return True
+        return False
 
     def add_hypothesis(
         self,
-        statement: str,
+        statement: str = "",
         title: str = "",
         description: str = "",
         command: str = "",
@@ -215,7 +257,16 @@ class MultiHypothesisEngine:
         command_alternatives: Optional[List[str]] = None,
     ) -> Optional[CompetingHypothesis]:
         assumptions = assumptions or []
-        if self.is_duplicate_or_rejected(statement, command, assumptions):
+        # ``statement`` is the canonical identity, but callers may only have a
+        # title/description/command — derive one instead of raising, so keyword
+        # calls like add_hypothesis(title=…, command=…) keep working.
+        statement = str(statement or "").strip()
+        if not statement:
+            statement = str(title or "").strip() or str(description or "").strip() \
+                or str(command or "").strip()
+        if not statement:
+            return None
+        if self.is_duplicate_or_rejected(statement, command, assumptions, title=title, description=description):
             return None
         hyp_id = self.generate_hypothesis_id(statement, command, assumptions)
         if hyp_id in self._hypotheses:
@@ -290,8 +341,9 @@ class MultiHypothesisEngine:
         hyp.transition(HYP_REJECTED, reason=reason)
         if evidence_ids:
             hyp.contradicting_evidence_ids.extend(evidence_ids)
-        h = self._hash_hypothesis(hyp.statement, hyp.command, hyp.assumptions)
-        self._rejected_hashes.add(h)
+        # Every identity spelling of this hypothesis becomes rejected, so a
+        # later add_hypothesis(title=…) cannot resurrect it either.
+        self._rejected_hashes.update(self._identity_hashes(hyp))
         for contra_id in hyp.contradicts:
             if contra_id in self._hypotheses:
                 self._hypotheses[contra_id].confidence = min(1.0, self._hypotheses[contra_id].confidence + 0.15)
@@ -384,6 +436,7 @@ class MultiHypothesisEngine:
             h1 = self.add_hypothesis(
                 statement="Web directory brute-forcing will discover hidden/sensitive paths",
                 title="Directory Enumeration Discovery",
+                description="Brute-force common web paths to surface hidden admin, backup and config endpoints",
                 command="gobuster dir -u http://target -w /usr/share/wordlists/dirb/common.txt",
                 assumptions=["Web server is responding", "Standard wordlist covers common paths"],
                 expected_evidence=["HTTP 200/301 responses for discovered paths", "Interesting directories like /admin, /backup"],
@@ -402,7 +455,8 @@ class MultiHypothesisEngine:
                     h2 = self.add_hypothesis(
                         statement=f"The {tech_name} installation has vulnerable plugins/themes",
                         title=f"{tech_name} Plugin Vulnerability",
-                        command=f"wpscan --url http://target --enumerate vp,vt,u" if tech_name.lower() == 'wordpress' else f"nuclei -t /nuclei-templates/{tech_name.lower()}/",
+                        description=f"Enumerate {tech_name} plugins/themes and match versions against known public CVEs",
+                        command=("wpscan --url http://target --enumerate vp,vt,u" if tech_name.lower() == "wordpress" else f"nuclei -t /nuclei-templates/{tech_name.lower()}/"),
                         assumptions=[f"{tech_name} is installed and detectable", "Public CVEs exist for plugins/themes"],
                         expected_evidence=["CVE matches", "Version disclosure", "Plugin listings"],
                         falsification_condition="No vulnerable plugins/themes found after full enumeration",
@@ -417,6 +471,7 @@ class MultiHypothesisEngine:
             h3 = self.add_hypothesis(
                 statement=".git directory is publicly accessible and may contain sensitive history",
                 title="Git Repository Exposure",
+                description="The exposed .git directory may leak source code, history and credentials",
                 command="curl -sik http://target/.git/config",
                 assumptions=[".git directory exists", "Web server allows access to .git"],
                 expected_evidence=["Git config file content", "Repository structure disclosure"],
@@ -433,6 +488,7 @@ class MultiHypothesisEngine:
             h4 = self.add_hypothesis(
                 statement="Git commit history contains hardcoded credentials or secrets",
                 title="Credentials in Git History",
+                description="Commit logs and history often contain hardcoded secrets, keys and developer emails",
                 command="curl -sik http://target/.git/logs/HEAD",
                 assumptions=[".git is accessible", "Commits contain sensitive data"],
                 expected_evidence=["Commit messages", "Potential credential strings", "Developer emails"],
@@ -452,6 +508,7 @@ class MultiHypothesisEngine:
             h5 = self.add_hypothesis(
                 statement="SSH service accepts weak/default credentials or has misconfigurations",
                 title="SSH Weak Authentication",
+                description="Probe SSH auth methods and credential strength for weak or default configurations",
                 command="nmap -p 22 --script ssh-auth-methods,ssh-brute target",
                 assumptions=["SSH service is OpenSSH or compatible", "Default credentials may exist"],
                 expected_evidence=["Authentication method disclosure", "Valid credentials if brute succeeds"],

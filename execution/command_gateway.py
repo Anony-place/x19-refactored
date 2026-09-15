@@ -65,8 +65,28 @@ class CommandGateway:
         backend = (request.backend or "auto").strip().lower()
         if backend == "host":
             result = self.executor.run(request.command, timeout=request.timeout)
-        else:
+        elif backend == "sandbox":
+            # An explicit sandbox request must be honoured or fail loudly —
+            # silently running on the host would defeat the operator's choice.
             result = self.sandbox.run(request.command, timeout=request.timeout)
+        else:
+            # ``auto`` prefers the hardened sandbox but degrades gracefully to
+            # the host executor when containerisation is unavailable (no docker
+            # CLI, no image, no workspace). Policy was already enforced above,
+            # so the security boundary holds either way; the degradation is
+            # always visible in the log and on the result. A sandbox backend
+            # that does not advertise ``available`` is assumed capable.
+            result = None
+            if getattr(self.sandbox, "available", True):
+                result = self.sandbox.run(request.command, timeout=request.timeout)
+                if result.error and str(result.error).startswith("sandbox_unavailable"):
+                    result = None
+            if result is None:
+                log(
+                    f"[GATEWAY_FALLBACK] {request.request_id} sandbox unavailable "
+                    f"({self._sandbox_state()}) — executing on host backend"
+                )
+                result = self.executor.run(request.command, timeout=request.timeout)
 
         # P0: count every actual command execution
         self._command_count += 1
@@ -114,6 +134,13 @@ class CommandGateway:
             metadata=metadata,
         )
         return self.run(request)
+
+    def _sandbox_state(self) -> str:
+        """Human-readable reason the sandbox can or cannot run (for logs)."""
+        if not getattr(self.sandbox, "available", False):
+            return "docker CLI not found"
+        image = getattr(getattr(self.sandbox, "policy", None), "image", "")
+        return f"image={image or 'unset'}"
 
     @property
     def command_count(self) -> int:
