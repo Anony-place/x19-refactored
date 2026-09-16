@@ -84,6 +84,12 @@ def team_disabled() -> bool:
     return (os.getenv("X19_TEAM_DISABLE", "") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def trajectories_per_iter() -> int:
+    """Pre-registered hypothesis probes auto-dispatched per iteration
+    (Naptime-style parallel trajectories). 0 disables the feature."""
+    return _env_int("X19_TEAM_TRAJECTORIES", 2, 0, 6)
+
+
 @dataclass
 class ProbeSpec:
     """One unit of work a manager hands to a worker."""
@@ -294,6 +300,10 @@ class MissionDirector:
         self._iter_probes = 0
 
     # -- harvest + review --------------------------------------------------
+    def pending_reports(self) -> List[WorkerReport]:
+        """Peek at staged reports without draining them (render_context drains)."""
+        return list(self._pending)
+
     def harvest_all(self) -> int:
         """Drain every lane's reports into the staged pending buffer."""
         n = 0

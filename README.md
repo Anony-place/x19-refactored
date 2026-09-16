@@ -119,6 +119,26 @@ Concurrency and feel are configurable: `X19_BG_WORKERS` (or config
 `BG_WORKERS`) caps background tasks, `X19_UI_POLL` sets the ribbon refresh,
 `X19_UI_BANNER`/`UI_BANNER` brings back the ASCII splash screen.
 
+## Bug-hunting team (boss → managers → workers)
+
+X19 is not a single agent. A **MissionDirector** (boss) decomposes the target
+into dynamic workstream lanes from what the target actually exposes, each lane
+run by a **manager** with its own **worker** pool. Workers execute probes
+through the same policy-gated command gateway as the main loop and return raw
+evidence — never findings; verification stays with the deterministic gates.
+The boss reviews verified findings each iteration (severity rollup +
+exploit-chain summary) and hands breadth work to the team.
+
+**Parallel research trajectories**: hypotheses in the agent's research ledger
+that pre-register a probe command *and* the output that would prove it are
+auto-dispatched to workers every iteration — Naptime-style sampling. A match
+against the pre-registered evidence auto-confirms the hypothesis (the model
+defined the falsifier itself); the finding still goes through normal
+verification before it is reported.
+
+Knobs: `X19_TEAM_DISABLE=1`, `X19_TEAM_MAX_LANES` (3), `X19_TEAM_WORKERS` (2
+per lane), `X19_TEAM_PROBES_PER_ITER` (6), `X19_TEAM_TRAJECTORIES` (2).
+
 ## Knowledge layer (live intel + your own corpus)
 
 The agent reasons over **real-time data, not hardcoded lists**: CISA KEV

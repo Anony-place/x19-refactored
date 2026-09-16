@@ -183,6 +183,24 @@ best-approach se kaam kare, sab boss ko report kare. Shipped as
 - 17 tests (`tests/test_team.py`); workers live smoke via real
   CommandGateway.
 
+## 4f. Increment: parallel research trajectories (Naptime sampling on the ledger)
+
+Roadmap ka top item close: ledger ki pre-registered hypotheses ab **parallel
+chalti hain**, sirf sequential nahi —
+
+- Dispatch: har iteration, TESTING/NEW hypotheses jinhone **probe command +
+  expected evidence** pre-register kiya hai, team workers pe auto-dispatch
+  hote hain (`X19_TEAM_TRAJECTORIES`, default 2; shared probe budget).
+  Main loop ka next_command judgment ke liye bachta hai; breadth team pe.
+- Evaluation: worker report vs hypothesis ka **apna pre-registered success
+  criterion** — match → auto-confirm (model ne khud falsifier define kiya
+  tha — pre-registration contract). Miss → boss model ko note (refine ya
+  reject kare). Short evidence tokens sirf word-boundary match pe confirm
+  karte hain (`49` ≠ `1492`).
+- Findings ka verification path unchanged — confirm hypothesis ≠ reported
+  finding; gates + adversarial review phir bhi zaroori.
+- 13 tests (`tests/test_trajectories.py`).
+
 ## 5. Roadmap — what still separates X19 from big-agent caliber
 
 Prioritised by expected impact on real bug-hunting throughput:
@@ -211,5 +229,6 @@ Prioritised by expected impact on real bug-hunting throughput:
   two-hop, already-complete, info-only, limit), classifier parity with
   reports, and wiring guards.
 - Knowledge layer: 21 (`tests/test_knowledge_layer.py`); OOB oracle: 11
-  (`tests/test_oob_oracle.py`); team org: 17 (`tests/test_team.py`).
-  Full suite: **686 passed, 20 subtests**.
+  (`tests/test_oob_oracle.py`); team org: 17 (`tests/test_team.py`);
+  trajectories: 13 (`tests/test_trajectories.py`).
+  Full suite: **699 passed, 20 subtests**.

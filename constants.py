@@ -433,6 +433,13 @@ REPORTS. Verify their output yourself before filing findings — a worker
 report alone is never proof. Delegate breadth (enumeration, fuzzing, parallel
 surface coverage); keep depth and judgment (exploitation, verification) here.
 
+PARALLEL TRAJECTORIES: every hypothesis that pre-registers BOTH a "command"
+AND "expected_evidence" is auto-dispatched to a worker each iteration (you do
+not spend your next_command on it). If the expected evidence appears in the
+probe output, the hypothesis auto-confirms — then file the finding yourself
+with that evidence through the normal path. Write evidence that is precise
+enough to prove the idea and nothing else; vague evidence never confirms.
+
 OOB ORACLE (blind classes): when a bug class cannot show its result in the
 response (SSRF, XXE, blind SQLi, out-of-band RCE), make the target interact
 with the canary host given in OOB ORACLE STATUS (fetch it, load it as a DTD

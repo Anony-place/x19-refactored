@@ -185,7 +185,7 @@ HexStrike AI (MCP, 150+ tools), D-CIPHER (44% HTB multi-agent), Anthropic
 | Adversarial finding review | ✅ shipped (critical/high) |
 | Chain hunting + variant analysis | ✅ shipped |
 | Deterministic verification gates | ✅ 4-gate + stale-evidence + HTTP cross-check |
-| Parallel hypothesis trajectories | ⬜ roadmap (Atlantis N-version pattern) |
+| Parallel hypothesis trajectories | ✅ shipped (pre-registered hypotheses auto-dispatch to team workers; evidence auto-confirm) |
 | PoV oracle for chains | ⬜ roadmap (exploit → re-run → binary proof) |
 | Hierarchical sub-agents | ✅ shipped (`brain/team.py`: MissionDirector → WorkstreamManager → ProbeWorker, policy-gated) |
 | Episodic memory layer | ⬜ roadmap (PentAGI pattern) |

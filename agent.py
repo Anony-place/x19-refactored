@@ -43,9 +43,9 @@ from tool_scanner import scan_available_tools, scan_missing_critical, build_tool
 from brain.planner import Planner
 import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
-from brain.hypothesis_engine import MultiHypothesisEngine
+from brain.hypothesis_engine import MultiHypothesisEngine, HYP_NEW, HYP_TESTING
 from brain.exploit_chain import ExploitChainEngine
-from brain.team import MissionDirector, TEAM_SYSTEM_PROMPT, team_disabled
+from brain.team import MissionDirector, TEAM_SYSTEM_PROMPT, team_disabled, trajectories_per_iter
 from knowledge import KnowledgeLayer
 from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
@@ -114,6 +114,10 @@ class X19:
         self.team = MissionDirector(executor=self._team_executor,
                                     ai=self.ai, chain_engine=self.chain_engine)
         self._team_planned = False
+        # Parallel research trajectories: pre-registered hypotheses with a
+        # probe command are auto-dispatched to team workers (Naptime sampling).
+        self._trajectory_dispatched: set = set()   # md5(cmd) already sent
+        self._trajectory_map: dict = {}            # md5(cmd) -> hypothesis id
         # Dynamic knowledge layer: live threat feeds (CISA KEV / NVD / EPSS /
         # searchsploit) + the user's custom corpus, retrieved by what this
         # target actually runs — real-time focus, nothing hardcoded.
@@ -1338,6 +1342,8 @@ Analyze the output carefully. Return JSON ONLY:
                                     ai=self.ai, chain_engine=self.chain_engine)
         self._team_planned = False
         self._banned_plan_categories = set()
+        self._trajectory_dispatched = set()
+        self._trajectory_map = {}
         self._recon_no_progress_count = 0
         self._recon_total = 0
         self._forced_exploit = False
@@ -5729,6 +5735,108 @@ Analyze the output carefully. Return JSON ONLY:
             pass
         return result
 
+    def _trajectory_lane(self) -> str:
+        """Lane for auto-dispatched hypothesis trajectories: a dedicated lane
+        if one exists/can be spawned, else any existing lane (report→hypothesis
+        mapping is by command hash, so sharing a lane is safe)."""
+        if "trajectories" in self.team.lanes:
+            return "trajectories"
+        if not self.team.lanes:
+            if self.team.spawn(
+                    "trajectories",
+                    "pre-registered hypothesis probes (parallel research trajectories)",
+                    self.team.workers_per_lane).startswith("spawned"):
+                return "trajectories"
+            return ""
+        return next(iter(self.team.lanes))
+
+    def _dispatch_parallel_trajectories(self) -> None:
+        """Naptime's sampling strategy on X19's ledger: every TESTING/NEW
+        hypothesis that pre-registers a probe command + expected evidence is
+        executed by a team worker as its own parallel trajectory. The main
+        loop keeps its next_command for judgment work; breadth runs on the
+        team. Deduped per session and bounded by the shared probe budget."""
+        if team_disabled():
+            return
+        cap = trajectories_per_iter()
+        if cap <= 0:
+            return
+        lane = self._trajectory_lane()
+        if not lane:
+            return
+        dispatched = 0
+        for hyp in self.hyp_engine.get_competing_hypotheses(limit=8, active_only=True):
+            if dispatched >= cap:
+                break
+            if hyp.state not in (HYP_NEW, HYP_TESTING):
+                continue
+            if not hyp.command or not hyp.expected_evidence:
+                continue  # pre-registration (probe + expected evidence) required
+            h = hashlib.md5(hyp.command.encode()).hexdigest()[:12]
+            if h in self._trajectory_dispatched:
+                continue
+            note = self.team.assign(lane, hyp.command,
+                                    why=f"trajectory for {hyp.id}")
+            if not note.startswith("→"):
+                break  # budget exhausted / lane gone — try again next iteration
+            self._trajectory_dispatched.add(h)
+            self._trajectory_map[h] = hyp.id
+            if len(self._trajectory_map) > 128:
+                for k in list(self._trajectory_map)[:-64]:
+                    self._trajectory_map.pop(k, None)
+            self.hyp_engine.mark_testing(hyp.id)
+            dispatched += 1
+        if dispatched:
+            try:
+                self.session.emit_event(
+                    "team", f"{dispatched} hypothesis trajectory(ies) dispatched → {lane}")
+            except Exception:
+                pass
+
+    def _evaluate_trajectories(self, reports) -> None:
+        """Check finished trajectory reports against the hypothesis's own
+        pre-registered success criterion. A match auto-confirms (the model
+        defined the falsifier itself — pre-registration contract); a miss is
+        surfaced to the boss model, which may refine or reject the idea.
+        Findings still require the normal verified path."""
+        import re as _re
+        for rep in reports:
+            h = hashlib.md5(rep.cmd.encode()).hexdigest()[:12]
+            hyp_id = self._trajectory_map.get(h)
+            if not hyp_id:
+                continue
+            hyp = self.hyp_engine.find_hypothesis(hyp_id)
+            if hyp is None or hyp.state != HYP_TESTING:
+                continue
+            excerpt = rep.excerpt or ""
+            hit = ""
+            for ev in hyp.expected_evidence:
+                ev = str(ev or "").strip()
+                if not ev:
+                    continue
+                if len(ev) >= 4:
+                    if ev in excerpt:
+                        hit = ev
+                        break
+                elif _re.search(r"(?<![\w])" + _re.escape(ev) + r"(?![\w])", excerpt):
+                    hit = ev  # short evidence needs a word-boundary match
+                    break
+            if hit:
+                self.hyp_engine.apply_actions([{
+                    "action": "confirm", "id": hyp.id, "evidence": [hit],
+                    "reason": "pre-registered expected evidence observed in parallel trajectory",
+                }])
+                msg = f"trajectory CONFIRMED '{hyp.title[:60]}' — expected evidence matched"
+                print(f"{C.G}[TRAJ] {msg}{C.N}")
+                try:
+                    self.session.emit_event("team", msg)
+                except Exception:
+                    pass
+            else:
+                self.team.notes.append(
+                    f"trajectory for '{hyp.title[:40]}': probe ran "
+                    f"(rc {rep.rc}), expected evidence not observed yet")
+
     def _team_tick(self) -> None:
         """Per-iteration team maintenance: budget reset, lazy boss planning
         (once the target's surface is known), harvest, and review."""
@@ -5753,7 +5861,9 @@ Analyze the output carefully. Return JSON ONLY:
                             self.session.emit_event("team", note)
                         except Exception:
                             pass
+            self._dispatch_parallel_trajectories()
             self.team.harvest_all()
+            self._evaluate_trajectories(self.team.pending_reports())
             self.team.review(self.model.findings)
         except Exception as e:
             log(f"[TEAM] tick failed: {e}")
