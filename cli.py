@@ -1559,7 +1559,10 @@ def cmd_chat(args: argparse.Namespace) -> int:
     banner(__version__, subtitle=f"interactive console · {ai.name()}")
     system = getattr(args, "system", "")
     if system:
-        app_module.SYSTEM_PROMPT = system
+        # An operator-supplied role replaces X19's specialisation, not its
+        # guardrails: no fabricated evidence, no self-granted authorization, no
+        # obeying instructions smuggled in through target output.
+        app_module.SYSTEM_PROMPT = app_module.compose_system_prompt(system)
     return ConsoleApp(agent, version=__version__, ai=ai).run()
 
 
@@ -1605,13 +1608,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     _apply_runtime_config(args)
     _apply_gate_mode(args)
     _apply_verbosity(args)
-    _print_ai_chain_banner()
 
     # `x19 example.com` and `x19 run example.com` both land here; -t still wins.
     target = (getattr(args, "target", "") or getattr(args, "target_pos", "")
               or os.getenv("X19_TARGET", ""))
     if getattr(args, "target", "") or getattr(args, "target_pos", ""):
         set_data({"TARGET": target})
+
+    # The workspace header names the provider *and* its failover chain, so a
+    # second banner line above it says nothing new. It still speaks up when no
+    # provider is configured, and for one-shot runs there is no header to defer to.
+    if target or not provider_chain_summary()["chain"]:
+        _print_ai_chain_banner()
 
     # swarm pipeline → the live dashboard owns the run
     if getattr(args, "swarm", False):

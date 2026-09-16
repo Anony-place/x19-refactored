@@ -30,6 +30,26 @@ DEFAULT_LOG_LINES = 400
 ACTIVE_STATES = ("queued", "running")
 FINISHED_STATES = ("completed", "failed", "cancelled")
 
+#: The manager whose thread-local capture state decides whether a write from
+#: the calling thread reaches the terminal. Set on construction; the prompt's
+#: output guard asks this before repainting itself around a foreign write.
+_current_manager: Optional["BackgroundTaskManager"] = None
+
+
+def output_is_captured() -> bool:
+    """True when the *calling thread's* stdout/stderr writes are captured.
+
+    Background worker output goes into the task ring buffer instead of the
+    terminal, so the terminal UI must not redraw anything for it.
+    """
+    manager = _current_manager
+    if manager is None:
+        return False
+    try:
+        return getattr(manager._local, "task", None) is not None
+    except Exception:
+        return False
+
 
 def _env_int(name: str, fallback: int) -> int:
     try:
@@ -163,6 +183,7 @@ class BackgroundTaskManager:
     """Runs agent work on daemon threads, with live, inspectable state."""
 
     def __init__(self, max_workers: Optional[int] = None):
+        global _current_manager
         self.max_workers = int(max_workers) if max_workers else _configured_workers()
         self._lock = threading.RLock()
         self._tasks: Dict[str, BackgroundTask] = {}
@@ -173,6 +194,7 @@ class BackgroundTaskManager:
             sys.stdout = _QuietStream(sys.stdout, self._local)
         if not isinstance(sys.stderr, _QuietStream):
             sys.stderr = _QuietStream(sys.stderr, self._local)
+        _current_manager = self
 
     # -- lifecycle -----------------------------------------------------------
     def start(

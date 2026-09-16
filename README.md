@@ -89,20 +89,41 @@ keep typing.
 
 ```
  X19   X19 4.0.0 (3cde5d5)  ·  terminal workspace
-  ai groq/llama-3.3-70b  ·  target —
+  ai groq/llama-3.3-70b  ·  failover groq > openrouter  ·  target —
 
  X19 · scanme.nmap.org · groq/llama-3.3-70b   ● assessment scanme.nmap.org 00:41 · iter 12/50 · 3 findings
   ⚙ nmap -sV --top-ports 500 scanme.nmap.org · rc 0 · 4.2s
-you › █
+you ❯ █
 ```
 
-* `/target <host>` — passive scope check, explicit confirmation, then a quiet
-  background assessment. Every command the agent runs appears **inline as a
-  live activity card** (`⚙ cmd · rc · time`) the moment it starts — the UI is
-  fed by structured agent events, never by scraping stdout.
+* **Type a target, get a decision — not a lecture.** A bare `scanme.nmap.org`
+  (or `scan scanme.nmap.org`, or a URL) is resolved by deterministic scope code
+  before any model is asked anything, then X19 offers the next step:
+  `p` read-only observation now, `a` active assessment (only when scope is
+  verified), `s` verify a claimed program against its public scope URL, `c`
+  cancel. Prose still goes to the chat model; `run.py` in the working directory
+  is a file, not a host.
+* `/passive <host>` — read-only public observation with no authorization gate:
+  DNS, a TLS handshake and **one** HTTP GET, reported as facts (`resolves to …`,
+  `TLSv1.3`, `absent security headers: …`). No scanning, no exploitation, and
+  the result is added to the conversation so you can ask about it.
+* `/target <host>` — scope check, explicit confirmation, then a quiet background
+  assessment. Every command the agent runs appears **inline as a live activity
+  card** (`⚙ cmd · rc · time`) the moment it starts — the UI is fed by
+  structured agent events, never by scraping stdout.
+* **The prompt owns the bottom two rows.** Anything else that writes to the
+  terminal — the provider router, a tool warning, a background thread — is
+  lifted above the prompt and the prompt is repainted underneath, so output can
+  never shred the ribbon or leave ghost prompt rows behind. A resize is picked
+  up on the next repaint instead of wrapping the ribbon.
+* **Chat keeps context**: the last few turns travel with each request (bounded
+  by `X19_CHAT_HISTORY_TURNS` / `X19_CHAT_HISTORY_CHARS`) and are framed as
+  untrusted data, so quoted target output cannot steer the model.
 * **Streaming replies** — model output streams into the transcript with a live
   tail preview (`✎ …`) for every backend that supports SSE/NDJSON, with
-  automatic provider/model failover on the stream path too.
+  automatic provider/model failover on the stream path too. Streams are decoded
+  as UTF-8 regardless of what the response headers claim, so emoji and non-Latin
+  text arrive intact instead of as `ð`-mojibake.
 * `/stop` — asks the running agent to wrap up at the next decision point;
   **Esc** does the same without leaving the prompt.
 * **Ctrl+C is safe**: with an assessment running the first press warns and the
@@ -113,7 +134,8 @@ you › █
 * `/tasks` — background tasks with status and elapsed time; `/tasks log <id>`
   replays a task's captured output.
 * Completion notifications (findings by severity, failure tails) appear in the
-  transcript the moment work finishes.
+  transcript the moment work finishes — once per task: a passive recon reports
+  through its own card and is not announced twice.
 
 Concurrency and feel are configurable: `X19_BG_WORKERS` (or config
 `BG_WORKERS`) caps background tasks, `X19_UI_POLL` sets the ribbon refresh,
