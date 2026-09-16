@@ -231,3 +231,33 @@ class WiringTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QueuedStopTests(unittest.TestCase):
+    def test_stop_queued_unit_before_start(self):
+        gate = threading.Event()
+
+        class SlowAgent(FakeAgent):
+            def autonomous_loop(self, target):
+                while not gate.is_set() and not self.stop:
+                    time.sleep(0.05)
+
+        sup = FleetSupervisor(unit_factory=lambda t: SlowAgent(t), max_concurrency=1)
+        sup.submit(["running-one", "queued-one"])
+        sup.run(wait=False)
+        time.sleep(0.3)
+        # queued-one has no agent yet — stop() must cancel it, not fail
+        self.assertTrue(sup.stop("queued-one"))
+        rows = {r["target"]: r for r in sup.status_rows()}
+        self.assertEqual(rows["queued-one"]["status"], "stopped")
+        gate.set()
+        self.assertTrue(sup.wait(timeout=10))
+        # the worker skipped it: no session, still marked stopped
+        unit = sup.units["queued-one"]
+        self.assertEqual(unit.status, "stopped")
+        self.assertIsNone(unit.agent)
+
+    def test_stop_unknown_still_false(self):
+        sup = _fleet(["a.com"])
+        self.assertFalse(sup.stop("never-submitted.com"))
+        sup.shutdown if hasattr(sup, "shutdown") else None

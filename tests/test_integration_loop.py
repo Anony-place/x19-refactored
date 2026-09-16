@@ -136,3 +136,15 @@ class FullLoopIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CorpusIngestionWiringTests(unittest.TestCase):
+    """The custom corpus must be ingested when a loop starts (README promise)."""
+
+    def test_loop_start_calls_ingest_custom(self):
+        with open("agent.py") as fh:
+            src = fh.read()
+        self.assertIn("self.knowledge.ingest_custom()", src)
+        self.assertIn("Knowledge corpus: ingested", src)
+        self.assertLess(src.index("self.knowledge.ingest_custom()"),
+                        src.index("while self.running and iteration < CONFIG.MAX_ITERATIONS"))

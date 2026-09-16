@@ -1779,6 +1779,14 @@ Analyze the output carefully. Return JSON ONLY:
         self.plugins.call_hook("on_start", self)
         # MCP: connect all servers
         self.mcp.connect_all()
+        # Custom knowledge corpus: hash-state makes this idempotent and cheap;
+        # edits to ~/.x19/knowledge between runs are picked up here.
+        try:
+            _added = self.knowledge.ingest_custom()
+            if _added:
+                print(f"{C.G}[+] Knowledge corpus: ingested {_added} new chunk(s){C.N}")
+        except Exception as _ing_err:
+            log(f"[INTEL] corpus ingestion at loop start failed: {_ing_err}")
         
         # AUTONOMY: No bootstrap recon - AI generates initial commands through reasoning
         # The World Model is seeded with target info, then the LLM decides what to run.

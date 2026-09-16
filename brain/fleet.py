@@ -144,6 +144,8 @@ class FleetSupervisor:
                     break
                 target = self._queue.pop(0)
                 unit = self.units[target]
+                if unit.status != "queued":
+                    continue   # stopped/cancelled before start — skip it
                 unit.status = "running"
                 unit.started = time.time()
             self._emit(f"start {target}", target=target)
@@ -194,7 +196,17 @@ class FleetSupervisor:
     # -- control ---------------------------------------------------------------
     def stop(self, target: str) -> bool:
         unit = self.units.get(str(target or "").strip())
-        if unit is None or unit.agent is None:
+        if unit is None:
+            return False
+        if unit.agent is None:
+            # Not started yet: a queued unit is stopped by flipping its state;
+            # the worker will pop it, see the terminal status, and move on.
+            with self._lock:
+                if unit.status == "queued":
+                    unit.status = "stopped"
+                    unit.finished = time.time()
+                    self._queue.remove(unit.target)
+                    return True
             return False
         try:
             unit.agent.stop = True
