@@ -45,6 +45,7 @@ import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
 from brain.hypothesis_engine import MultiHypothesisEngine
 from brain.exploit_chain import ExploitChainEngine
+from brain.team import MissionDirector, TEAM_SYSTEM_PROMPT, team_disabled
 from knowledge import KnowledgeLayer
 from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
@@ -107,6 +108,12 @@ class X19:
         # Chain awareness: deterministic class-ENABLES knowledge applied to
         # confirmed findings so the loop can steer toward critical chains.
         self.chain_engine = ExploitChainEngine()
+        # Hierarchical bug-hunting team (boss → managers → workers). Workers
+        # execute through the same policy-gated path; the boss reviews
+        # verified findings and decomposes the target into dynamic lanes.
+        self.team = MissionDirector(executor=self._team_executor,
+                                    ai=self.ai, chain_engine=self.chain_engine)
+        self._team_planned = False
         # Dynamic knowledge layer: live threat feeds (CISA KEV / NVD / EPSS /
         # searchsploit) + the user's custom corpus, retrieved by what this
         # target actually runs — real-time focus, nothing hardcoded.
@@ -1323,6 +1330,13 @@ Analyze the output carefully. Return JSON ONLY:
         self._hypotheses = {}
         self.hyp_engine = MultiHypothesisEngine()
         self._oob_evidence = []
+        try:
+            self.team.shutdown()
+        except Exception:
+            pass
+        self.team = MissionDirector(executor=self._team_executor,
+                                    ai=self.ai, chain_engine=self.chain_engine)
+        self._team_planned = False
         self._banned_plan_categories = set()
         self._recon_no_progress_count = 0
         self._recon_total = 0
@@ -1886,6 +1900,10 @@ Analyze the output carefully. Return JSON ONLY:
             # Auto-unban if the agent is soft-locked on a banned category with no progress
             self._maybe_auto_unban(iteration)
 
+            # Team org: reset probe budget, plan lanes lazily once surface is
+            # known, harvest worker reports, refresh the boss review.
+            self._team_tick()
+
             # Recon saturation — surfaced only when it actually matters
             sat = self._recon_saturation()
             if _vb():
@@ -1999,6 +2017,10 @@ Analyze the output carefully. Return JSON ONLY:
                     hyp_notes = self.hyp_engine.apply_actions(decision.get("hypotheses"))
                     for note in hyp_notes:
                         print(f"{C.D}[HYP] {note}{C.N}")
+                    # Team org: spawn/assign/retire actions from the boss model.
+                    team_notes = self.team.apply_decision(decision.get("team"))
+                    for note in team_notes:
+                        print(f"{C.D}[TEAM] {note}{C.N}")
 
             if not decision:
                 self.session.data["status"] = "failed"; self.session.save()
@@ -3269,6 +3291,10 @@ Analyze the output carefully. Return JSON ONLY:
                 self._save_model_state()
 
         self._save_model_state()
+        try:
+            self.team.shutdown()
+        except Exception:
+            pass
         self.session.data["status"] = "completed" if not self.stop else "interrupted"
         self.session.save()
         self.running = False
@@ -5688,6 +5714,50 @@ Analyze the output carefully. Return JSON ONLY:
 
     # ===================== FINDING VALIDATION ENGINE =====================
 
+    def _team_executor(self, cmd: str, timeout: int):
+        """Policy-gated executor the team workers must use (never raw subprocess).
+
+        Thread-safe by design: it only touches the execution gateway (the same
+        concurrency pattern as tools.TaskManager) and the event bus — worker
+        threads never mutate session data structures."""
+        result = self.exec.run(cmd, timeout=timeout)
+        try:
+            self.session.emit_event(
+                "team", f"{str(cmd)[:70]} rc {int(getattr(result, 'returncode', 0) or 0)}",
+                lane="", probe=str(cmd)[:120])
+        except Exception:
+            pass
+        return result
+
+    def _team_tick(self) -> None:
+        """Per-iteration team maintenance: budget reset, lazy boss planning
+        (once the target's surface is known), harvest, and review."""
+        try:
+            self.team.new_iteration()
+            if not self._team_planned and not team_disabled():
+                has_surface = bool(self.model.ports or self.model.endpoints
+                                   or self.model.tech_stack)
+                if has_surface:
+                    self._team_planned = True
+                    world = (f"target: {self.target}\n"
+                             f"ports: {[(p.get('port'), p.get('service')) for p in self.model.ports[:10]]}\n"
+                             f"endpoints: {[getattr(e, 'path', e) if not isinstance(e, str) else e for e in list(self.model.endpoints)[:12]]}\n"
+                             f"tech: {dict(list(self.model.tech_stack.items())[:8])}\n"
+                             f"findings so far: {[getattr(f, 'title', '') for f in self.model.findings]}")
+                    notes = self.team.plan_with_ai(world, TEAM_SYSTEM_PROMPT)
+                    if not notes:
+                        notes = self.team.plan_from_surface(self.model)
+                    for note in notes:
+                        print(f"{C.B}[TEAM] {note}{C.N}")
+                        try:
+                            self.session.emit_event("team", note)
+                        except Exception:
+                            pass
+            self.team.harvest_all()
+            self.team.review(self.model.findings)
+        except Exception as e:
+            log(f"[TEAM] tick failed: {e}")
+
     def _poll_oob_oracle(self, previous_output: str) -> str:
         """Poll the interactsh client and turn callbacks into oracle evidence.
 
@@ -7071,6 +7141,15 @@ WORKSPACE: {self._file_state(target)[:400]}
         except Exception:
             pass
 
+        # Team org status: lanes, boss review of verified findings, and raw
+        # worker evidence for the boss model to reason over.
+        try:
+            team_block = self.team.render_context()
+            if team_block:
+                ctx += "\n" + team_block + "\n"
+        except Exception:
+            pass
+
         # Tool-awareness: show what's actually available vs what the planner keeps suggesting
         tool_ctx = self._installed_tools_context()
         if tool_ctx:
@@ -7187,6 +7266,10 @@ WORKSPACE: {self._file_state(target)[:400]}
         if isinstance(hyp, dict):
             hyp = [hyp]
         d["hypotheses"] = hyp if isinstance(hyp, list) else None
+        team = d.get("team")
+        if isinstance(team, dict):
+            team = [team]
+        d["team"] = team if isinstance(team, list) else None
         # Track strategy changes — if AI keeps the same strategy for 3+ turns, it's looping.
         if d.get("strategy"):
             if not hasattr(self, "_strategy_history"):

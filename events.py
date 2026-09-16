@@ -124,4 +124,6 @@ def summarize_event(event: AgentEvent) -> str:
     if kind == "oob":
         proto = str(detail.get("protocol", "?"))
         return f"◉ oob callback [{proto}] {event.text}"
+    if kind == "team":
+        return f"♛ {event.text}"
     return f"· {event.text or kind}"

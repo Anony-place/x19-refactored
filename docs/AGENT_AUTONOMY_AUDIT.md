@@ -155,6 +155,34 @@ callbacks = binary oracle:
 - Prompts (LEAN + fast) document the oracle workflow; 11 new tests
   (`tests/test_oob_oracle.py`).
 
+## 4e. Increment: hierarchical bug-hunting team (boss → managers → workers)
+
+User ka directive: X19 ek single agent nahi — poora team ho jo fast aur
+best-approach se kaam kare, sab boss ko report kare. Shipped as
+`brain/team.py` (HPTSA/PentAGI organisational pattern):
+
+- **MissionDirector (boss)**: dynamic lane decomposition (boss-model LLM
+  planning from the live world state, deterministic surface-derived
+  fallback), probe budget, aur verified findings ka review — severity
+  rollup + exploit-chain summary. Boss reviews; boss never bends
+  verification.
+- **WorkstreamManager + ProbeWorker (managers/employees)**: per-lane probe
+  queues + worker pools. Workers sirf injected executor (X19 ka policy-gated
+  gateway) chalate hain — raw subprocess kabhi nahi; scope, rate limits,
+  command gateway sab inherit. Workers raw evidence laute hain (rc +
+  excerpt + duration), findings nahi — "worker report alone is never
+  proof" (prompt-documented rule).
+- **Loop integration**: decision JSON ka `team` field (spawn/assign/retire),
+  `_team_tick()` har iteration (budget reset, lazy planning once surface
+  known, harvest, review), TEAM STATUS / BOSS REVIEW / LANE REPORTS context
+  blocks, `♛ team` live UI events, per-target reset + loop-end shutdown.
+- **Dynamic, not hardcoded**: lane naam/mission/workers boss model se aate
+  hain — target ke exposed surface se; fallback bhi world-model-derived.
+  Knobs: `X19_TEAM_DISABLE`, `X19_TEAM_MAX_LANES` (3), `X19_TEAM_WORKERS`
+  (2/lane), `X19_TEAM_PROBES_PER_ITER` (6).
+- 17 tests (`tests/test_team.py`); workers live smoke via real
+  CommandGateway.
+
 ## 5. Roadmap — what still separates X19 from big-agent caliber
 
 Prioritised by expected impact on real bug-hunting throughput:
@@ -183,4 +211,5 @@ Prioritised by expected impact on real bug-hunting throughput:
   two-hop, already-complete, info-only, limit), classifier parity with
   reports, and wiring guards.
 - Knowledge layer: 21 (`tests/test_knowledge_layer.py`); OOB oracle: 11
-  (`tests/test_oob_oracle.py`). Full suite: **669 passed, 20 subtests**.
+  (`tests/test_oob_oracle.py`); team org: 17 (`tests/test_team.py`).
+  Full suite: **686 passed, 20 subtests**.

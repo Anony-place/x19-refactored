@@ -164,4 +164,8 @@ def _normalize_decision(d: Any) -> Optional[Dict[str, Any]]:
     if isinstance(hyp, dict):
         hyp = [hyp]
     d["hypotheses"] = hyp if isinstance(hyp, list) else None
+    team = d.get("team")
+    if isinstance(team, dict):
+        team = [team]
+    d["team"] = team if isinstance(team, list) else None
     return d
