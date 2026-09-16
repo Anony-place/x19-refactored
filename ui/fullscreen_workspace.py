@@ -1,10 +1,9 @@
-"""Production terminal workspace for X19.
+"""Minimal full-screen terminal workspace for X19.
 
-The workspace is deliberately data-driven. It does not manufacture tool names,
-workflow stages, findings, progress values, or agent messages. The center of the
-screen is the actual X19 conversation; assessment activity is sourced from the
-agent event bus and session state, while the existing ConsoleApp remains the
-source of truth for command handling and execution.
+The UI is a presentation layer over the existing ConsoleApp. Conversation,
+provider responses, assessment events and session state all come from the real
+runtime; this module does not synthesize progress, findings, tools or agent
+messages.
 """
 from __future__ import annotations
 
@@ -12,7 +11,7 @@ import os
 import select
 import sys
 import termios
-import time
+import threading
 import tty
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -23,14 +22,13 @@ from rich.layout import Layout
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.table import Table
 from rich.text import Text
 
-from ui.console import get_console, info, warn
+from ui.console import get_console, warn
 
 
 class FullscreenWorkspace:
-    """A restrained, production terminal workspace backed by live X19 state."""
+    """A restrained, chat-first terminal workspace backed by live X19 state."""
 
     def __init__(self, app: Any):
         self.app = app
@@ -39,10 +37,14 @@ class FullscreenWorkspace:
         self.buffer = ""
         self.running = True
         self._events: deque[Any] = deque(maxlen=80)
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="x19-ui")
+        self._state_lock = threading.RLock()
+        self._chat_busy = False
+        self._streaming_reply = ""
+        self._chat_error = ""
+        self._live: Optional[Live] = None
         self._saved_termios = None
         self._raw = False
-        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="x19-ui")
-        self._chat_busy = False
 
     # ------------------------------------------------------------------
     # Terminal input
@@ -71,7 +73,7 @@ class FullscreenWorkspace:
         self._raw = False
         self._saved_termios = None
 
-    def _read_key(self, timeout: float = 0.15) -> Optional[str]:
+    def _read_key(self, timeout: float = 0.12) -> Optional[str]:
         if os.name == "nt":
             return None
         try:
@@ -81,12 +83,12 @@ class FullscreenWorkspace:
         if not ready:
             return None
         try:
-            return os.read(sys.stdin.fileno(), 16).decode("utf-8", "replace")
+            return os.read(sys.stdin.fileno(), 32).decode("utf-8", "replace")
         except Exception:
             return None
 
     # ------------------------------------------------------------------
-    # Live state — no synthetic values
+    # Runtime state
     # ------------------------------------------------------------------
     def _session_data(self) -> dict:
         session = getattr(self.agent, "session", None)
@@ -103,8 +105,7 @@ class FullscreenWorkspace:
         return str(getattr(self.agent, "target", "") or "—")
 
     def _task(self) -> Any:
-        task = getattr(self.app, "_assessment_task", None)
-        return task if task is not None and getattr(task, "active", False) else None
+        return getattr(self.app, "_assessment_task", None)
 
     def _drain_events(self) -> None:
         task = self._task()
@@ -114,254 +115,164 @@ class FullscreenWorkspace:
             events = self.app.background.drain_events(task)
         except Exception:
             events = []
-        for event in events or []:
-            self._events.append(event)
+        self._events.extend(events or [])
 
     def _history(self) -> list[dict]:
-        history = getattr(self.app, "history", []) or []
+        with self._state_lock:
+            history = list(getattr(self.app, "history", []) or [])
         return [h for h in history if isinstance(h, dict) and h.get("content") is not None]
-
-    def _findings(self) -> list[dict]:
-        return list(self._session_data().get("findings") or [])
-
-    def _counts(self) -> dict[str, int]:
-        counts = {k: 0 for k in ("critical", "high", "medium", "low", "info")}
-        for finding in self._findings():
-            sev = str(finding.get("severity", "info")).lower()
-            if sev in counts:
-                counts[sev] += 1
-        return counts
-
-    def _stats(self) -> dict:
-        value = self._session_data().get("stats") or {}
-        return value if isinstance(value, dict) else {}
-
-    def _iteration(self) -> str:
-        data = self._session_data()
-        used = data.get("iterations")
-        if used is None:
-            return "—"
-        try:
-            from config import CONFIG
-            cap = int(getattr(CONFIG, "MAX_ITERATIONS", 0) or 0)
-            return f"{int(used)}/{cap}" if cap else str(int(used))
-        except Exception:
-            return str(used)
 
     def _status(self) -> tuple[str, str]:
         task = self._task()
-        if task is not None:
+        if task is not None and getattr(task, "active", False):
             try:
                 return "RUNNING", f"{task.elapsed():.0f}s"
             except Exception:
                 return "RUNNING", ""
-        if self._chat_busy or getattr(self.agent, "running", False):
+        with self._state_lock:
+            busy = self._chat_busy
+        if busy or getattr(self.agent, "running", False):
             return "WORKING", ""
+        if task is not None and getattr(task, "status", ""):
+            return str(task.status).upper(), ""
         return "READY", ""
 
     # ------------------------------------------------------------------
-    # Conversation
+    # Chat rendering
     # ------------------------------------------------------------------
     def _conversation(self) -> RenderableType:
         history = self._history()
-        visible = history[-16:]
         rows: list[RenderableType] = []
-        for item in visible:
+        for item in history[-18:]:
             role = str(item.get("role", "assistant"))
             content = str(item.get("content", ""))
             if role == "user":
-                head = Text()
-                head.append("you", style="bold cyan")
-                rows.append(Group(head, Text(content, style="white")))
+                rows.append(Group(Text("you", style="bold cyan"), Text(content)))
             else:
-                head = Text()
-                head.append("X19", style="bold")
-                rows.append(Group(head, Markdown(content)))
-        if self._chat_busy:
-            rows.append(Text("X19 is responding…", style="dim"))
-        elif not rows:
+                rows.append(Group(Text("X19", style="bold"), Markdown(content)))
+
+        with self._state_lock:
+            streaming = self._streaming_reply
+            busy = self._chat_busy
+            error = self._chat_error
+
+        if busy and streaming:
+            rows.append(Group(Text("X19", style="bold"), Text(streaming)))
+        elif busy:
+            rows.append(Text("X19 · responding…", style="dim"))
+        elif error:
+            rows.append(Text(f"X19 · {error}", style="red"))
+        if not rows:
             rows.append(Text("No conversation yet. Type a message below.", style="dim"))
-        return Panel(Group(*rows), title="Conversation", border_style="bright_blue", padding=(1, 2))
+        return Panel(Group(*rows), title="X19", border_style="bright_blue", padding=(1, 2))
 
     def _activity(self) -> RenderableType:
         from events import summarize_event
         lines: list[Text] = []
-        for event in list(self._events)[-12:]:
+        for event in list(self._events)[-4:]:
             try:
                 text = summarize_event(event)
             except Exception:
                 text = str(event)
             if text:
                 lines.append(Text(text, style="dim"))
-        if not lines:
-            return Panel(Text("No agent activity yet.", style="dim"), title="Activity", border_style="border")
-        return Panel(Group(*lines), title="Activity", border_style="border", padding=(0, 1))
-
-    # ------------------------------------------------------------------
-    # Context panels — only facts exposed by X19
-    # ------------------------------------------------------------------
-    def _context(self) -> RenderableType:
-        data = self._session_data()
-        stats = self._stats()
-        counts = self._counts()
-        table = Table.grid(padding=(0, 1))
-        table.add_column(style="dim", width=11)
-        table.add_column(style="white")
-        table.add_row("target", self._target())
-        table.add_row("provider", self._provider())
-        session = getattr(getattr(self.agent, "session", None), "id", "")
-        if session:
-            table.add_row("session", str(session))
-        table.add_row("state", self._status()[0].lower())
-        table.add_row("iterations", self._iteration())
-        if "open_ports" in stats:
-            table.add_row("ports", str(stats["open_ports"]))
-        if "endpoints" in stats:
-            table.add_row("endpoints", str(stats["endpoints"]))
-        table.add_row("findings", str(len(self._findings())))
-        for sev in ("critical", "high", "medium"):
-            if counts[sev]:
-                table.add_row(sev, str(counts[sev]))
-        mode = data.get("mode")
-        if mode:
-            table.add_row("mode", str(mode))
-        return Panel(table, title="Session", border_style="border")
-
-    def _tools(self) -> RenderableType:
-        tools = getattr(self.agent, "_available_tools", None)
-        if isinstance(tools, dict) and tools:
-            names = list(tools.keys())
-            source = "runtime"
-        else:
-            try:
-                from tools import TOOLS
-                names = list(TOOLS.keys())
-                source = "registry"
-            except Exception:
-                names = []
-                source = "none"
-        table = Table.grid(padding=(0, 1))
-        table.add_column(style="dim", width=7)
-        table.add_column(style="white")
-        for name in names[:16]:
-            table.add_row("tool", str(name))
-        if not names:
-            table.add_row("tool", "none discovered")
-        return Panel(table, title=f"Tools · {source}", border_style="border")
-
-    def _current_work(self) -> RenderableType:
         task = self._task()
-        current_plan = getattr(self.agent, "_current_plan", None)
-        plan_index = getattr(self.agent, "_plan_step_index", None)
-        table = Table.grid(padding=(0, 1))
-        table.add_column(style="dim", width=10)
-        table.add_column(style="white")
-        if task is not None:
-            table.add_row("task", str(getattr(task, "label", "assessment")))
-            note = str(getattr(task, "note", "") or "")
-            if note:
-                table.add_row("activity", note)
-        if isinstance(current_plan, dict):
-            title = current_plan.get("title") or current_plan.get("goal")
-            if title:
-                table.add_row("plan", str(title))
-            steps = current_plan.get("steps")
-            if isinstance(steps, list):
-                table.add_row("steps", str(len(steps)))
-                if plan_index is not None:
-                    table.add_row("step", f"{plan_index + 1}/{len(steps)}")
-        if not task and not isinstance(current_plan, dict):
-            table.add_row("state", "idle")
-        return Panel(table, title="Current Work", border_style="border")
-
-    def _footer(self) -> RenderableType:
-        status, elapsed = self._status()
-        line = Text()
-        line.append(" ", style="dim")
-        line.append(status.lower(), style="cyan" if status != "READY" else "dim")
-        if elapsed:
-            line.append(f"  {elapsed}", style="dim")
-        line.append("      ", style="dim")
-        line.append("Enter", style="bold")
-        line.append(" send   ", style="dim")
-        line.append("Ctrl+C", style="bold")
-        line.append(" stop/exit   ", style="dim")
-        line.append("/help", style="bold")
-        line.append(" commands", style="dim")
-        return Panel(line, border_style="border", padding=(0, 1))
+        if task is not None and not getattr(task, "active", False):
+            status = str(getattr(task, "status", "")).lower()
+            if status:
+                lines.append(Text(f"assessment · {status}", style="dim"))
+        if not lines:
+            return Text("", style="dim")
+        return Group(*lines)
 
     def _input(self) -> RenderableType:
         line = Text()
         line.append("› ", style="bold cyan")
-        line.append(self.buffer, style="white")
+        line.append(self.buffer)
         if not self.buffer:
-            line.append("Type a message or /command", style="dim")
-        return Panel(line, title="Input", border_style="bright_blue", padding=(0, 1))
+            line.append("message or /command", style="dim")
+        return Panel(line, border_style="bright_blue", padding=(0, 1))
+
+    def _header(self) -> RenderableType:
+        status, elapsed = self._status()
+        text = Text()
+        text.append("X19", style="bold")
+        text.append("  ", style="dim")
+        text.append(self._target(), style="bold white")
+        text.append("  ·  ", style="dim")
+        text.append(self._provider(), style="cyan")
+        text.append("  ·  ", style="dim")
+        text.append(status, style="bold cyan" if status in {"RUNNING", "WORKING"} else "dim")
+        if elapsed:
+            text.append(f" {elapsed}", style="dim")
+        return Panel(text, border_style="border", padding=(0, 1))
+
+    def _footer(self) -> RenderableType:
+        return Text(" Enter send   Ctrl+C stop/exit   Ctrl+U clear input   /help commands", style="dim")
 
     def render(self) -> RenderableType:
         self._drain_events()
         root = Layout(name="root")
         root.split_column(
             Layout(self._header(), name="header", size=3),
-            Layout(name="body"),
+            Layout(name="conversation", ratio=1),
+            Layout(self._activity(), name="activity", size=5),
             Layout(self._input(), name="input", size=3),
-            Layout(self._footer(), name="footer", size=3),
+            Layout(self._footer(), name="footer", size=1),
         )
-        body = root["body"]
-        body.split_row(Layout(name="main", ratio=7), Layout(name="side", ratio=3))
-        main = body["main"]
-        main.split_column(Layout(self._conversation(), name="conversation", ratio=7), Layout(self._activity(), name="activity", ratio=3))
-        side = body["side"]
-        side.split_column(Layout(self._context(), name="context", ratio=4), Layout(self._current_work(), name="work", ratio=3), Layout(self._tools(), name="tools", ratio=5))
         return root
 
-    def _header(self) -> RenderableType:
-        status, _ = self._status()
-        text = Text()
-        text.append(" X19 ", style="bold black on cyan")
-        text.append("  ", style="dim")
-        text.append(self._target(), style="bold white")
-        text.append("   ·   ", style="dim")
-        text.append(self._provider(), style="cyan")
-        text.append("   ·   ", style="dim")
-        text.append(status, style="bold cyan" if status != "READY" else "dim")
-        return Panel(text, border_style="bright_blue", padding=(0, 1))
+    # ------------------------------------------------------------------
+    # Real provider execution
+    # ------------------------------------------------------------------
+    def _on_chunk(self, piece: str) -> None:
+        with self._state_lock:
+            self._streaming_reply += piece
 
-    # ------------------------------------------------------------------
-    # Input dispatch
-    # ------------------------------------------------------------------
     def _run_chat(self, message: str) -> None:
-        self._chat_busy = True
         try:
-            self.app.remember("user", message)
-            # The fullscreen workspace already owns the Rich Live renderer;
-            # disable ConsoleApp's nested spinner/stream Live and only consume
-            # the real provider result into the shared transcript.
-            reply = self.app._chat_reply(message, render=False)
-            if reply:
-                self.app.remember("assistant", reply)
+            reply = self.app._chat_reply(message, render=False, on_chunk=self._on_chunk)
+            with self._state_lock:
+                if reply:
+                    self.app.remember("assistant", reply)
+                elif not self._streaming_reply:
+                    self._chat_error = "provider request failed or returned no response"
+        except Exception as exc:
+            with self._state_lock:
+                self._chat_error = f"provider error: {type(exc).__name__}"
         finally:
-            self._chat_busy = False
+            with self._state_lock:
+                self._chat_busy = False
 
     def _submit_chat(self, message: str) -> None:
-        if self._chat_busy:
-            warn("X19 is still responding — wait for the current reply")
-            return
+        with self._state_lock:
+            if self._chat_busy:
+                warn("X19 is still responding — wait for the current reply")
+                return
+            self._chat_busy = True
+            self._streaming_reply = ""
+            self._chat_error = ""
+            self.app.remember("user", message)
         self._executor.submit(self._run_chat, message)
 
+    # ------------------------------------------------------------------
+    # Commands
+    # ------------------------------------------------------------------
     def _submit_command(self, line: str) -> None:
-        """Reuse ConsoleApp's real command handlers; this UI owns no fake logic."""
+        """Run the existing command implementation outside the raw-input mode."""
         self._exit_raw()
+        live = self._live
+        if live is not None:
+            live.stop()
         try:
-            self.app._echo_user(line)
-            self.app.remember("user", line)
             self.app.handle(line)
         except KeyboardInterrupt:
             pass
         except Exception as exc:
             self.console.print(f"[err]✖ {type(exc).__name__}: {exc}[/]")
         finally:
-            if self.running:
+            if self.running and live is not None:
+                live.start(refresh=True)
                 self._enter_raw()
 
     def _submit(self) -> None:
@@ -382,7 +293,9 @@ class FullscreenWorkspace:
             return self.app._legacy_run()
         self._enter_raw()
         try:
-            with Live(self.render(), console=self.console, screen=True, transient=False, refresh_per_second=8) as live:
+            live = Live(self.render(), console=self.console, screen=True, transient=False, refresh_per_second=10)
+            self._live = live
+            with live:
                 while self.running:
                     live.update(self.render(), refresh=True)
                     raw = self._read_key()
@@ -393,7 +306,7 @@ class FullscreenWorkspace:
                         continue
                     if raw == "\x03":
                         task = self._task()
-                        if task:
+                        if task is not None and getattr(task, "active", False):
                             try:
                                 self.app._request_stop(silent=False)
                             except Exception:
@@ -419,6 +332,7 @@ class FullscreenWorkspace:
                             self.buffer += char
         finally:
             self._exit_raw()
+            self._live = None
             self._executor.shutdown(wait=False, cancel_futures=False)
             self.console.clear()
         return 0
