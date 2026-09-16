@@ -1,14 +1,9 @@
 """Terminal-native X19 chat workspace.
 
 The terminal is a UI, not an execution log. The conversation is a rolling
-transcript — every message is rendered exactly once, so nothing flickers —
-while long-running assessments execute on quiet background threads. A live
-status ribbon above the input line keeps the operator informed (task, elapsed
-time, latest agent activity) and finished work is reported as it completes.
-
-Nothing in this file is hardcoded to a particular provider, target, model or
-terminal size: state comes from the attached agent / task manager, layout
-adapts to the console width, and tunables live in the environment / config.
+transcript — every message is rendered exactly once, while long-running
+assessments execute on quiet background threads. A live status ribbon above the
+input line keeps the operator informed.
 """
 from __future__ import annotations
 
@@ -62,7 +57,6 @@ COMMANDS: List[Dict[str, str]] = [
     {"name": "/exit", "help": "quit", "group": "session"},
 ]
 
-#: Roles the transcript understands (everything else renders as plain text).
 ROLE_USER = "user"
 ROLE_AGENT = "assistant"
 
@@ -78,7 +72,6 @@ class ConsoleApp:
         self._ai = ai
         self._exit = False
         self.background = BackgroundTaskManager()
-        #: the task currently driving the attached agent, if any
         self._assessment_task: Optional[BackgroundTask] = None
         self.prompt = LivePrompt(
             self.console,
@@ -90,16 +83,7 @@ class ConsoleApp:
         )
         self._ctrl_c_presses = 0
 
-    # ------------------------------------------------------------------
-    # Live agent observability — structured events, rendered inline
-    # ------------------------------------------------------------------
     def _drain_agent_events(self) -> bool:
-        """Render new agent events as dim activity cards in the transcript.
-
-        Runs on every idle prompt poll (push-model UI): the agent publishes
-        facts to the event bus, the workspace drains and prints them without
-        ever scraping stdout. Returns True when something was printed.
-        """
         task = self._assessment_task
         if task is None:
             return False
@@ -107,14 +91,12 @@ class ConsoleApp:
         if not events:
             return False
         from events import summarize_event
-
         self.prompt._clear_prompt_area(self.prompt._last_ribbon)
         for event in events:
             self.console.print(Text("  " + summarize_event(event), style="faint"))
         return True
 
     def _handle_escape(self) -> bool:
-        """Esc = interrupt the running assessment (Claude Code style)."""
         if not (self._assessment_task and self._assessment_task.active):
             return False
         self.prompt._clear_prompt_area(self.prompt._last_ribbon)
@@ -132,15 +114,13 @@ class ConsoleApp:
                 self.agent.stop = True
                 if not silent:
                     info(f"stop requested for task {task.id} — the agent finishes its current step and wraps up")
-            else:
-                if not silent:
-                    warn("the agent is not reporting a running loop; waiting for the task to settle")
+            elif not silent:
+                warn("the agent is not reporting a running loop; waiting for the task to settle")
         except Exception as exc:
             if not silent:
                 warn(f"could not signal the agent: {exc}")
 
     def _completions(self, prefix: str) -> List[str]:
-        """Tab completion candidates — derived from the command registry."""
         if not prefix.startswith("/"):
             return []
         names = []
@@ -150,9 +130,6 @@ class ConsoleApp:
                 names.append(name)
         return [n for n in names if n.startswith(prefix)]
 
-    # ------------------------------------------------------------------
-    # Tunables — resolved from the environment/config, never hardcoded here
-    # ------------------------------------------------------------------
     @staticmethod
     def _poll_interval() -> float:
         try:
@@ -166,9 +143,6 @@ class ConsoleApp:
             self._ai = getattr(self.agent, "ai", None)
         return self._ai
 
-    # ------------------------------------------------------------------
-    # Transcript rendering — each message is printed exactly once
-    # ------------------------------------------------------------------
     def _echo_user(self, text: str) -> None:
         line = Text()
         line.append("you ", style="accent2")
@@ -190,9 +164,6 @@ class ConsoleApp:
     def remember(self, role: str, content: str) -> None:
         self.history.append({"role": role, "content": content})
 
-    # ------------------------------------------------------------------
-    # Status ribbon — one live line above the prompt
-    # ------------------------------------------------------------------
     def _provider_name(self) -> str:
         try:
             return self.ai.name() if self.ai else "—"
@@ -200,27 +171,19 @@ class ConsoleApp:
             return "—"
 
     def _assessment_details(self) -> str:
-        """Live facts about the running assessment, straight from the agent."""
         if self._assessment_task is None or not self._assessment_task.active:
             return ""
         bits: List[str] = []
         session = getattr(self.agent, "session", None)
         data = getattr(session, "data", {}) if session is not None else {}
         try:
-            # iterations live in the ribbon's budget chip (iter N/M); details
-            # carry only what the budget chip does not already say.
             findings = data.get("findings") or []
             if findings:
                 bits.append(f"{len(findings)} findings")
-            # Usage accounting (ARTEMIS-style cost transparency): model calls
-            # and rough token estimate every decision, plus an optional $/run
-            # estimate when the operator supplies their blended rate via
-            # X19_PRICE_PER_MTOK (dollars per million tokens).
             usage = data.get("usage") or {}
             calls = int(usage.get("calls") or 0)
             if calls:
-                toks = (int(usage.get("chars_in") or 0)
-                        + int(usage.get("chars_out") or 0)) // 4
+                toks = (int(usage.get("chars_in") or 0) + int(usage.get("chars_out") or 0)) // 4
                 bits.append(f"{calls} calls ~{toks // 1000}k tok")
                 try:
                     rate = float(os.getenv("X19_PRICE_PER_MTOK", "") or 0)
@@ -239,10 +202,8 @@ class ConsoleApp:
         return " · ".join(bits)
 
     def _iteration_budget(self) -> str:
-        """``N/M`` iterations against the configured cap (data, not guesses)."""
         try:
             from config import CONFIG as _CONFIG
-
             session = getattr(self.agent, "session", None)
             data = getattr(session, "data", {}) if session is not None else {}
             used = int(data.get("iterations", 0) or 0)
@@ -262,7 +223,6 @@ class ConsoleApp:
         left.append(widgets.truncate(target, max(10, width // 4)), style="bold text")
         left.append(" · ", style="border.dim")
         left.append(widgets.truncate(self._provider_name(), max(8, width // 5)), style="info")
-
         right = Text()
         active = self.background.active()
         if active:
@@ -270,7 +230,6 @@ class ConsoleApp:
             elapsed = widgets.human_duration(active[0].elapsed())
             right.append("● ", style="ok")
             right.append(f"{active[0].label} {elapsed}", style="bold text")
-            # Budget transparency: iterations against the configured cap.
             budget = self._iteration_budget()
             if budget:
                 right.append(f" · iter {budget}", style="muted")
@@ -279,8 +238,6 @@ class ConsoleApp:
         else:
             right.append("○ idle", style="faint")
             right.append("   /help commands", style="faint")
-
-        # Manually padded single line — LivePrompt repaints it in place.
         pad = max(2, width - 2 - left.cell_len - right.cell_len)
         line = Text(" ")
         line.append(left)
@@ -290,12 +247,8 @@ class ConsoleApp:
             return line.plain
         return _render_ansi(line, width, self.console)
 
-    # ------------------------------------------------------------------
-    # Welcome / notifications
-    # ------------------------------------------------------------------
     def _welcome(self) -> None:
         from version import version_line
-
         self.console.print()
         head = Text()
         head.append(" X19 ", style="bold black on brand")
@@ -316,7 +269,6 @@ class ConsoleApp:
         self.console.print()
 
     def _drain_notifications(self) -> None:
-        """Report background tasks that finished since the last look."""
         for task in self.background.drain_notifications():
             duration = widgets.human_duration(task.elapsed())
             if task.status == "completed":
@@ -337,10 +289,6 @@ class ConsoleApp:
                 self._echo_system(f"■ {task.label} interrupted after {duration}", style="warn")
             else:
                 self._echo_system(f"✖ {task.label} failed after {duration}: {task.error}", style="err")
-                tail_hint = Text("  ")
-                tail_hint.append(f"/tasks log {task.id}", style="key")
-                tail_hint.append(" replay what happened", style="muted")
-                self.console.print(tail_hint)
 
     def _finding_counts(self) -> str:
         session = getattr(self.agent, "session", None)
@@ -355,9 +303,6 @@ class ConsoleApp:
         order = ("critical", "high", "medium", "low", "info")
         return " ".join(f"{n} {sev}" for sev in order if (n := counts.get(sev, 0)))
 
-    # ------------------------------------------------------------------
-    # Main loop
-    # ------------------------------------------------------------------
     def prompt_text(self) -> str:
         return "you ›"
 
@@ -370,9 +315,6 @@ class ConsoleApp:
                 self.console.print()
                 break
             except KeyboardInterrupt:
-                # Never silently kill a running assessment: first Ctrl+C
-                # explains, a second consecutive press exits (Claude Code /
-                # Codex convention).
                 self._ctrl_c_presses += 1
                 self.console.print()
                 if self._assessment_task and self._assessment_task.active:
@@ -404,9 +346,6 @@ class ConsoleApp:
         return 0
 
     def handle(self, line: str) -> None:
-        # Natural-language target requests are routed deterministically before
-        # the LLM. This prevents the model from issuing a blanket refusal or
-        # inventing authorization status before X19 has checked scope.
         if not line.startswith("/"):
             target_request = self._parse_target_request(line)
             if target_request:
@@ -425,7 +364,6 @@ class ConsoleApp:
 
     @staticmethod
     def _parse_target_request(message: str) -> Optional[str]:
-        """Recognize target/scan/pentest intent without asking the LLM."""
         import re
         parts = message.strip().split()
         if not parts:
@@ -442,20 +380,13 @@ class ConsoleApp:
                 return token
         return None
 
-    # ------------------------------------------------------------------
-    # Session commands
-    # ------------------------------------------------------------------
     def cmd_help(self, *args: str) -> None:
         from ui.screens import help_screen
         self.console.print(help_screen(COMMANDS, version=self.version))
 
     def cmd_exit(self, *args: str) -> None:
         if self._assessment_task and self._assessment_task.active:
-            self._echo_system(
-                "note: a background assessment is still running — it is a daemon "
-                "thread and ends with this process",
-                style="warn",
-            )
+            self._echo_system("note: a background assessment is still running — it is a daemon thread and ends with this process", style="warn")
         self._exit = True
 
     cmd_quit = cmd_exit
@@ -484,9 +415,6 @@ class ConsoleApp:
         else:
             warn("empty response — check provider configuration")
 
-    # ------------------------------------------------------------------
-    # Assessment
-    # ------------------------------------------------------------------
     def _scope_result_text(self, result: Any) -> str:
         state = getattr(result, "state", "unknown")
         target = getattr(result, "normalized_target", "") or getattr(result, "target", "")
@@ -533,13 +461,10 @@ class ConsoleApp:
         if self._assessment_task and self._assessment_task.active:
             warn("a background assessment is already running — /stop it first or /tasks for status")
             return
-
-        # Scope is resolved before the LLM or autonomous loop gets control.
         result = self._resolve_scope(target)
         text = self._scope_result_text(result)
         self.remember(ROLE_AGENT, text)
         self._echo_agent(text, title="scope")
-
         state = getattr(result, "state", "unknown")
         if state == "verified_out_of_scope":
             warn("assessment not started: the public program was found, but this exact target is outside its declared scope")
@@ -548,41 +473,18 @@ class ConsoleApp:
             warn("assessment not started: no trusted public program or explicit scope source was verified")
             warn("for an authorized engagement, provide a scope URL via X19_SCOPE_URL or create an X19 engagement profile")
             return
-
-        # Public-program discovery is evidence about scope, not a blanket grant
-        # to attack. Require an explicit confirmation of the program rules.
         program = getattr(result, "program", "public program") or "public program"
-        confirm = Prompt.ask(
-            f"Proceed with active assessment under {program} rules? [y/N]",
-            console=self.console,
-            default="N",
-        ).strip().lower()
+        confirm = Prompt.ask(f"Proceed with active assessment under {program} rules? [y/N]", console=self.console, default="N").strip().lower()
         if confirm not in {"y", "yes"}:
             info("assessment cancelled")
             return
-
         try:
-            try:
-                self.agent.target = target
-            except Exception:
-                pass
-            # Structured observability: the agent's Session publishes every
-            # command/finding/status change to this bus; the prompt poll
-            # renders them live in the transcript.
+            self.agent.target = target
             from events import AgentEventBus
-
             bus = AgentEventBus()
-            try:
-                self.agent.session.events = bus
-            except Exception:
-                bus = None
-            task = self.background.start(
-                f"assessment {target}",
-                lambda: self.agent.autonomous_loop(target),
-                target=target,
-            )
-            if bus is not None:
-                self.background.attach_events(task, bus)
+            self.agent.session.events = bus
+            task = self.background.start(f"assessment {target}", lambda: self.agent.autonomous_loop(target), target=target)
+            self.background.attach_events(task, bus)
             self._assessment_task = task
             ok(f"assessment running in the background · task {task.id}")
             step("keep chatting — the agent's actions stream in live; /stop or Esc ends it")
@@ -596,17 +498,9 @@ class ConsoleApp:
         self._request_stop()
 
     def cmd_fleet(self, *args: str) -> None:
-        """XBOW-style fleet: run several targets concurrently.
-
-        /fleet a.com, b.com  — confirm, then run (bounded by X19_FLEET_CONCURRENCY)
-        /fleet status        — per-target table + fleet rollup
-        /fleet stop          — cooperative stop of every unit
-        """
         from rich.table import Table as _Table
-
         arg = " ".join(args).strip()
         fleet = getattr(self, "_fleet", None)
-
         if not arg or arg.lower() == "status":
             if fleet is None or not fleet.units:
                 info("no fleet yet — start one with /fleet target1, target2, …")
@@ -615,16 +509,12 @@ class ConsoleApp:
             for col in ("target", "status", "secs", "findings", "crit+high", "error"):
                 table.add_column(col)
             for row in fleet.status_rows():
-                table.add_row(str(row["target"]), row["status"], str(row["secs"]),
-                              str(row["findings"]), str(row["crit_high"]),
-                              str(row["error"] or "—"))
+                table.add_row(str(row["target"]), row["status"], str(row["secs"]), str(row["findings"]), str(row["crit_high"]), str(row["error"] or "—"))
             self.console.print(table)
             s = fleet.summary()
             if s["shared_stacks"]:
-                info("shared stacks (intel + confirmed hypotheses transfer): "
-                     + "; ".join(f"{t} on {', '.join(h)}" for t, h in s["shared_stacks"].items()))
+                info("shared stacks (intel + confirmed hypotheses transfer): " + "; ".join(f"{t} on {', '.join(h)}" for t, h in s["shared_stacks"].items()))
             return
-
         if arg.lower() == "stop":
             if fleet is None or not fleet.units:
                 warn("no fleet running")
@@ -632,8 +522,6 @@ class ConsoleApp:
             n = fleet.stop_all()
             ok(f"stop requested for {n} running unit(s); queued units cancelled")
             return
-
-        # start a new fleet
         if fleet is not None and fleet.active_count():
             warn("a fleet is already running — /fleet stop first")
             return
@@ -641,20 +529,14 @@ class ConsoleApp:
         if len(targets) < 2:
             warn("fleet needs at least two targets (use /target for a single assessment)")
             return
-        confirm = Prompt.ask(
-            f"Run {len(targets)} independent assessments (each unit passes its own scope gate)? [y/N]",
-            console=self.console, default="N",
-        ).strip().lower()
+        confirm = Prompt.ask(f"Run {len(targets)} independent assessments (each unit passes its own scope gate)? [y/N]", console=self.console, default="N").strip().lower()
         if confirm not in {"y", "yes"}:
             info("fleet cancelled")
             return
-
         from brain.fleet import FleetSupervisor, fleet_concurrency
-
         sup = FleetSupervisor(bus=None, max_concurrency=fleet_concurrency())
         sup.submit(targets)
         self._fleet = sup
-
         def _run_fleet() -> str:
             sup.run(wait=True, on_status=lambda t: None)
             s = sup.summary()
@@ -665,20 +547,13 @@ class ConsoleApp:
             if sev:
                 parts.append("severity " + ", ".join(f"{k}:{v}" for k, v in sorted(sev.items())))
             return "fleet finished — " + " · ".join(parts) + " (/fleet for the table)"
-
         try:
-            task = self.background.start(
-                f"fleet of {len(targets)} targets",
-                _run_fleet,
-                target=f"{len(targets)} targets",
-            )
+            task = self.background.start(f"fleet of {len(targets)} targets", _run_fleet, target=f"{len(targets)} targets")
             self._fleet_task = task
-            ok(f"fleet running in the background · {len(targets)} targets, "
-               f"max {sup.max_concurrency} concurrent · task {task.id}")
+            ok(f"fleet running in the background · {len(targets)} targets, max {sup.max_concurrency} concurrent · task {task.id}")
             step("per-unit scope checks still apply; /fleet status · /fleet stop")
         except Exception as exc:
             warn(f"could not start fleet: {exc}")
-
 
     def cmd_tasks(self, *args: str) -> None:
         if args and args[0].lower() == "log":
@@ -689,18 +564,11 @@ class ConsoleApp:
             if task is None:
                 warn(f"no such task: {args[1]}")
                 return
-            self.console.print(widgets.panel(
-                f"task {task.id} · {task.label}",
-                Group(*(Text(line, style="evidence") for line in task.tail(30))) if task.tail(30)
-                else Text("no captured output", style="muted"),
-                subtitle=f"{task.status} · {len(task.output)} lines captured",
-            ))
+            self.console.print(widgets.panel(f"task {task.id} · {task.label}", Group(*(Text(line, style="evidence") for line in task.tail(30))) if task.tail(30) else Text("no captured output", style="muted"), subtitle=f"{task.status} · {len(task.output)} lines captured"))
             return
-        rows = [(t.id, t.label, t.target or "—", t.status, widgets.human_duration(t.elapsed()), t.note or "—")
-                for t in self.background.recent(20)]
+        rows = [(t.id, t.label, t.target or "—", t.status, widgets.human_duration(t.elapsed()), t.note or "—") for t in self.background.recent(20)]
         if not rows:
-            self.console.print(Panel("No background tasks yet — /target <host> starts one.",
-                                     title="tasks", border_style="border"))
+            self.console.print(Panel("No background tasks yet — /target <host> starts one.", title="tasks", border_style="border"))
             return
         table = Table(title=None, expand=True, box=None)
         for col, style in (("id", "key"), ("task", "text.strong"), ("target", "info"), ("status", ""), ("elapsed", "muted"), ("latest", "muted")):
@@ -747,7 +615,6 @@ class ConsoleApp:
             return
         self.console.print(Markdown("```\n" + self.agent.session.report() + "\n```"))
 
-    # -- providers -------------------------------------------------------
     def cmd_providers(self, *args: str) -> None:
         from constants import PROVIDERS, PROVIDER_PRIORITY
         from config import load_config
@@ -823,8 +690,6 @@ class ConsoleApp:
             self.console.print(session_detail_screen(data, args[0]))
             return
         rows = []
-        # Most recent first, by actual modification time — file names are not
-        # guaranteed to sort chronologically.
         paths = sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:50]
         for path in paths:
             try:
@@ -835,28 +700,23 @@ class ConsoleApp:
         self.console.print(sessions_screen(rows))
 
     def cmd_resume(self, *args: str) -> None:
-        """Load a stored session so /findings and /report work over it."""
         import json
         from pathlib import Path
-
         from config import CONFIG
         from storage import Session
-
         if not args:
             from cli_support import list_sessions
             rows = list_sessions(limit=10)
             if not rows:
                 warn("no stored sessions — run an assessment first")
                 return
-            rows_to_show = [(r["id"], r["target"], r["status"], r["findings"]) for r in rows]
             table = Table(expand=True, box=None)
             for col, sty in (("session", "key"), ("target", "text"), ("status", "muted"), ("findings", "muted")):
                 table.add_column(col, style=sty or None)
-            for row in rows_to_show:
-                table.add_row(*[str(x) for x in row])
+            for r in rows:
+                table.add_row(str(r["id"]), str(r["target"]), str(r["status"]), str(r["findings"]))
             self.console.print(widgets.panel("resume a session", table, subtitle="/resume <session-id>"))
             return
-
         sid = args[0]
         path = Path(CONFIG.SESSIONS_DIR) / f"{sid}.json"
         if not path.exists():
@@ -893,9 +753,6 @@ class ConsoleApp:
         result = run_diagnostics()
         self.console.print(doctor_screen(result["checks"], score=result["score"], detail=result.get("detail", "")))
 
-    # ------------------------------------------------------------------
-    # LLM chat
-    # ------------------------------------------------------------------
     def chat(self, message: str) -> None:
         if self.ai is None:
             warn("no AI provider configured — run: x19 setup")
@@ -906,21 +763,21 @@ class ConsoleApp:
         self.remember(ROLE_AGENT, reply)
         self._echo_agent(reply)
 
-    def _chat_reply(self, message: str) -> Optional[str]:
-        """Get a reply, streaming when the backend supports it.
+    def _chat_reply(self, message: str, *, render: bool = True) -> Optional[str]:
+        """Get a reply; ``render=False`` is used by embedded full-screen UIs.
 
-        Streaming backends render a live tail preview while tokens arrive
-        (push-model UI); the final Markdown-rendered reply prints once the
-        stream completes. Non-streaming backends keep the spinner.
+        The embedded workspace already owns a Rich ``Live`` renderer. Starting
+        another Live/spinner from inside it corrupts cursor state and makes the
+        UI look like a mock or a broken dashboard, so the data path can be used
+        independently of presentation.
         """
         from contextlib import nullcontext
-
         con = self.console
         stream = getattr(self.ai, "chat_stream", None)
         if stream is None:
             spinner = (
                 con.status("[info]X19 is thinking[/]", spinner="dots")
-                if con.is_terminal and not getattr(con, "no_color", False)
+                if render and con.is_terminal and not getattr(con, "no_color", False)
                 else nullcontext()
             )
             with spinner:
@@ -932,12 +789,10 @@ class ConsoleApp:
 
         chunks: List[str] = []
         live = None
-        if con.is_terminal and not getattr(con, "no_color", False):
+        if render and con.is_terminal and not getattr(con, "no_color", False):
             from rich.live import Live
             from rich.text import Text as _Text
-
-            live = Live(_Text("", style="muted"), console=con, transient=True,
-                        refresh_per_second=12, vertical_overflow="ellipsis")
+            live = Live(_Text("", style="muted"), console=con, transient=True, refresh_per_second=12, vertical_overflow="ellipsis")
         try:
             if live is not None:
                 live.__enter__()
@@ -976,23 +831,10 @@ class ConsoleApp:
 
 
 def _render_ansi(renderable: Any, width: int, source_console: Any) -> str:
-    """Render one line of markup to a raw ANSI string for in-place repaints.
-
-    Uses the same theme as the active console so the ribbon matches the rest
-    of the UI. Falls back to plain text when rendering is not possible.
-    """
     import io
-
     from rich.console import Console
-
     try:
-        buf = Console(
-            file=io.StringIO(),
-            width=width,
-            force_terminal=True,
-            color_system=getattr(source_console, "_color_system", None) or "truecolor",
-            theme=source_console.theme,
-        )
+        buf = Console(file=io.StringIO(), width=width, force_terminal=True, color_system=getattr(source_console, "_color_system", None) or "truecolor", theme=source_console.theme)
         buf.print(renderable)
         text = buf.file.getvalue()
         return text.rstrip("\n")
