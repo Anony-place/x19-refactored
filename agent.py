@@ -46,6 +46,7 @@ from brain import CriticEngine, StrategistEngine, StrategyLibrary
 from brain.hypothesis_engine import MultiHypothesisEngine, HYP_NEW, HYP_TESTING
 from brain.exploit_chain import ExploitChainEngine
 from brain.team import MissionDirector, TEAM_SYSTEM_PROMPT, team_disabled, trajectories_per_iter
+from brain.escalation import Escalator
 from knowledge import KnowledgeLayer
 from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
@@ -118,6 +119,10 @@ class X19:
         # probe command are auto-dispatched to team workers (Naptime sampling).
         self._trajectory_dispatched: set = set()   # md5(cmd) already sent
         self._trajectory_map: dict = {}            # md5(cmd) -> hypothesis id
+        # Frontier escalation: hard steps (critical deep-dives, flail/stuck
+        # streaks, high-impact hypotheses) may run on a stronger model from
+        # X19_ESCALATE — gate-respecting, cooldown-bounded, accounted.
+        self._escalator = Escalator()
         # Dynamic knowledge layer: live threat feeds (CISA KEV / NVD / EPSS /
         # searchsploit) + the user's custom corpus, retrieved by what this
         # target actually runs — real-time focus, nothing hardcoded.
@@ -1344,6 +1349,7 @@ Analyze the output carefully. Return JSON ONLY:
         self._banned_plan_categories = set()
         self._trajectory_dispatched = set()
         self._trajectory_map = {}
+        self._escalator = Escalator()
         self._recon_no_progress_count = 0
         self._recon_total = 0
         self._forced_exploit = False
@@ -1979,7 +1985,7 @@ Analyze the output carefully. Return JSON ONLY:
             t0 = time.time()
             try:
                 ctx = self._build_context(target, previous_output)
-                response = self.ai.chat(decision_system_prompt(), ctx)
+                response = self._decision_chat(ctx)
             except Exception as e:
                 log(f"[Loop] AI decision error at iter {iteration}: {e}")
                 response = ""
@@ -5734,6 +5740,41 @@ Analyze the output carefully. Return JSON ONLY:
         except Exception:
             pass
         return result
+
+    def _usage_tick(self, chars_in: int, chars_out: int, secs: float,
+                    escalated: bool = False) -> None:
+        """Account one decision call into session usage (ribbon shows it)."""
+        try:
+            usage = self.session.data.setdefault("usage", {})
+            usage["calls"] = int(usage.get("calls", 0)) + 1
+            usage["chars_in"] = int(usage.get("chars_in", 0)) + int(chars_in)
+            usage["chars_out"] = int(usage.get("chars_out", 0)) + int(chars_out)
+            usage["secs"] = float(usage.get("secs", 0.0)) + float(secs)
+            if escalated:
+                usage["escalations"] = int(usage.get("escalations", 0)) + 1
+        except Exception:
+            pass
+
+    def _decision_chat(self, ctx: str) -> str:
+        """One decision call: escalate to a stronger model on hard steps
+        (gate-respecting, cooldown-bounded) and account usage."""
+        prompt = decision_system_prompt()
+        t0 = time.time()
+        ai, reason = self._escalator.pick(self)
+        if reason and ai is not None:
+            print(f"{C.M}[FRONTIER] escalated decision → {ai.name()} ({reason[:80]}){C.N}")
+            try:
+                self.session.emit_event("escalation", f"hard step → {ai.name()}: {reason[:60]}")
+            except Exception:
+                pass
+        if ai is None:
+            ai = self.ai
+        try:
+            response = ai.chat(prompt, ctx)
+        finally:
+            self._usage_tick(len(prompt) + len(ctx), len(response or ""),
+                             time.time() - t0, escalated=bool(reason))
+        return response
 
     def _trajectory_lane(self) -> str:
         """Lane for auto-dispatched hypothesis trajectories: a dedicated lane

@@ -774,6 +774,31 @@ class OllamaBackend(AIBackend):
             log(f"{self.label} stream error: {type(e).__name__}: {e}")
 
 
+def build_backend(provider_id: str, model: str, errors: Optional[Dict] = None) -> Optional[AIBackend]:
+    """One-shot backend for (provider, model) with the same rules as the
+    failover chain: needs_key -> _get_key_for, format dispatch. Returns None
+    (recording the reason in `errors` when given) instead of raising."""
+    errors = errors if errors is not None else {}
+    try:
+        info = PROVIDERS[provider_id]
+        if info.get("needs_key"):
+            key = _get_key_for(provider_id)
+            if not key:
+                errors[(provider_id, model)] = "no API key"
+                return None
+        else:
+            key = ""
+        fmt = info["format"]
+        if fmt == "openai":
+            return OpenAICompatBackend(provider_id, key, model)
+        if fmt == "anthropic":
+            return AnthropicBackend(provider_id, key, model)
+        errors[(provider_id, model)] = f"unsupported format {fmt}"
+    except Exception as e:
+        errors[(provider_id, model)] = f"{type(e).__name__}: {e}"
+    return None
+
+
 class FailoverRouter(AIBackend):
     """Cross-provider auto-failover wrapper.
     Tries the primary backend's model first, then walks PROVIDER_FREE_MODELS across all
@@ -944,24 +969,7 @@ class FailoverRouter(AIBackend):
 
     def _backend_for(self, provider_id: str, model: str) -> Optional[AIBackend]:
         """Build a one-shot backend for a chain entry (same rules as _try_one)."""
-        try:
-            info = PROVIDERS[provider_id]
-            if info.get("needs_key"):
-                key = _get_key_for(provider_id)
-                if not key:
-                    self._last_err_reasons[(provider_id, model)] = "no API key"
-                    return None
-            else:
-                key = ""
-            fmt = info["format"]
-            if fmt == "openai":
-                return OpenAICompatBackend(provider_id, key, model)
-            if fmt == "anthropic":
-                return AnthropicBackend(provider_id, key, model)
-            self._last_err_reasons[(provider_id, model)] = f"unsupported format {fmt}"
-        except Exception as e:
-            self._last_err_reasons[(provider_id, model)] = f"{type(e).__name__}: {e}"
-        return None
+        return build_backend(provider_id, model, errors=self._last_err_reasons)
 
     def chat_stream(self, system: str, message: str):
         """Stream from the first chain entry that produces tokens.

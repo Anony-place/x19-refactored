@@ -211,6 +211,25 @@ class ConsoleApp:
             findings = data.get("findings") or []
             if findings:
                 bits.append(f"{len(findings)} findings")
+            # Usage accounting (ARTEMIS-style cost transparency): model calls
+            # and rough token estimate every decision, plus an optional $/run
+            # estimate when the operator supplies their blended rate via
+            # X19_PRICE_PER_MTOK (dollars per million tokens).
+            usage = data.get("usage") or {}
+            calls = int(usage.get("calls") or 0)
+            if calls:
+                toks = (int(usage.get("chars_in") or 0)
+                        + int(usage.get("chars_out") or 0)) // 4
+                bits.append(f"{calls} calls ~{toks // 1000}k tok")
+                try:
+                    rate = float(os.getenv("X19_PRICE_PER_MTOK", "") or 0)
+                except ValueError:
+                    rate = 0.0
+                if rate > 0:
+                    bits.append(f"~${(toks / 1_000_000) * rate:.2f}")
+            esc = int(usage.get("escalations") or 0)
+            if esc:
+                bits.append(f"{esc} escalated")
         except Exception:
             pass
         note = (self._assessment_task.note or "").strip()

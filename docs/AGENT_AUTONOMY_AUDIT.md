@@ -201,6 +201,26 @@ chalti hain**, sirf sequential nahi —
   finding; gates + adversarial review phir bhi zaroori.
 - 13 tests (`tests/test_trajectories.py`).
 
+## 4g. Increment: frontier escalation + usage accounting
+
+Roadmap items 2 (frontier gating) aur 9 (cost transparency) close:
+
+- **Escalation chain** (`brain/escalation.py`): `X19_ESCALATE="provider/model"`
+  — hard steps (critical/high focus-finding deep-dive ≥ depth 2, high-impact
+  open hypothesis ≥ 0.8, flail streak ≥ 3, no-progress streak ≥ 3) decision
+  call ko stronger model pe bhejte hain. Default off (accounts/keys
+  user-specific — kuch hardcoded nahi).
+- **Gate-respecting**: critical-tier model pe escalation exploitation phase
+  mein `brain.frontier_gate` verdict se guzarti hai — unauthorised engagement
+  pe fail-closed. Standard-tier models ungated.
+- **Cooldown** (`X19_ESCALATE_EVERY`, default 4 decisions) + one-shot backend
+  via naya `providers.build_backend` (FailoverRouter._backend_for ab isi pe
+  delegate karta hai).
+- **Usage accounting**: har decision call session usage mein account hota hai
+  (calls/chars/secs/escalations); ribbon dikhata hai `N calls ~Tk tok`, aur
+  `~$X` jab operator apni blended rate `X19_PRICE_PER_MTOK` se de.
+- 17 tests (`tests/test_escalation.py`).
+
 ## 5. Roadmap — what still separates X19 from big-agent caliber
 
 Prioritised by expected impact on real bug-hunting throughput:
@@ -209,9 +229,8 @@ Prioritised by expected impact on real bug-hunting throughput:
    the top-N competing hypotheses as separate short research threads and let
    verification pick winners, instead of one sequential trajectory. Needs the
    loop to become a dispatcher over per-hypothesis micro-sessions.
-2. **Frontier-model gating for hard steps**: `brain/frontier_gate.py` exists
-   but reasoning-budget escalation (bigger model / higher thinking budget on
-   confirmed-critical deep-dives) is not wired into the decision loop.
+2. ~~**Frontier-model gating for hard steps**~~ → ✅ shipped (§4g:
+   `X19_ESCALATE` chain, gate-respecting, cooldown-bounded).
 3. **Fleet mode**: XBOW runs hundreds of targets concurrently; X19 is
    single-process single-target. The background task manager is the natural
    substrate for a multi-target supervisor.
@@ -230,5 +249,5 @@ Prioritised by expected impact on real bug-hunting throughput:
   reports, and wiring guards.
 - Knowledge layer: 21 (`tests/test_knowledge_layer.py`); OOB oracle: 11
   (`tests/test_oob_oracle.py`); team org: 17 (`tests/test_team.py`);
-  trajectories: 13 (`tests/test_trajectories.py`).
-  Full suite: **699 passed, 20 subtests**.
+  trajectories: 13 (`tests/test_trajectories.py`); escalation+usage: 17
+  (`tests/test_escalation.py`). Full suite: **716 passed, 20 subtests**.

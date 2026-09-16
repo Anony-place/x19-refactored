@@ -173,8 +173,9 @@ HexStrike AI (MCP, 150+ tools), D-CIPHER (44% HTB multi-agent), Anthropic
 8. **Domain-tuned mid-scale models** (xOffense 79% > GPT-4; Atlantis fine-tuned
    7B): provider-failover ke saath X19 ka "koi bhi backend" design is direction
    mein already flexible hai.
-9. **Cost transparency** (ARTEMIS $59/hr): per-run cost tracking roadmap-worthy
-   (budget ribbon already iterations dikhata hai; $/run add karo).
+9. **Cost transparency** (ARTEMIS $59/hr): ✅ shipped — ribbon shows
+   `N calls ~Tk tok` per run + `~$X` with operator-supplied
+   `X19_PRICE_PER_MTOK`; escalations counted separately.
 
 ## 5. X19 mapping — kya already hai, kya baaki
 

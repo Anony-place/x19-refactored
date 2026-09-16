@@ -139,6 +139,14 @@ verification before it is reported.
 Knobs: `X19_TEAM_DISABLE=1`, `X19_TEAM_MAX_LANES` (3), `X19_TEAM_WORKERS` (2
 per lane), `X19_TEAM_PROBES_PER_ITER` (6), `X19_TEAM_TRAJECTORIES` (2).
 
+**Frontier escalation**: set `X19_ESCALATE="provider/model,..."` and hard
+steps (critical deep-dives, flail/stuck streaks, high-impact hypotheses)
+automatically run on the stronger model — gate-respecting (critical-tier
+models stay blocked on unauthorised exploitation), cooldown-bounded
+(`X19_ESCALATE_EVERY`, default 4 decisions), and fully accounted: the
+ribbon shows `N calls ~Tk tok` per run, and `~$X` too when you set your
+blended rate via `X19_PRICE_PER_MTOK`.
+
 ## Knowledge layer (live intel + your own corpus)
 
 The agent reasons over **real-time data, not hardcoded lists**: CISA KEV
