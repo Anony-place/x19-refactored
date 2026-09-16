@@ -191,11 +191,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(fleet_mod.cli(["-h"]), 0)
 
     def test_cli_runs_with_overridden_factory(self):
-        FakeAgent.crash_on = ("bad.com",)
+        # Lab hosts: the CLI's authorization gate must let the fleet through
+        # without evidence, so these tests stay about supervisor mechanics.
+        FakeAgent.crash_on = ("10.0.0.9",)
         try:
             with mock.patch.object(fleet_mod.FleetSupervisor, "_default_factory",
                                    staticmethod(lambda t: FakeAgent(t))):
-                rc = fleet_mod.cli(["-t", "a.com,bad.com", "--max", "2"])
+                rc = fleet_mod.cli(["-t", "10.0.0.5,10.0.0.9", "--max", "2"])
         finally:
             FakeAgent.crash_on = ()
         self.assertEqual(rc, 1)          # one unit failed -> nonzero exit
@@ -203,7 +205,7 @@ class CliTests(unittest.TestCase):
     def test_cli_zero_exit_when_all_done(self):
         with mock.patch.object(fleet_mod.FleetSupervisor, "_default_factory",
                                staticmethod(lambda t: FakeAgent(t))):
-            rc = fleet_mod.cli(["--targets=a.com"])
+            rc = fleet_mod.cli(["--targets=10.0.0.5"])
         self.assertEqual(rc, 0)
 
 

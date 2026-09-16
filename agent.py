@@ -1037,41 +1037,18 @@ Analyze the output carefully. Return JSON ONLY:
 
     @staticmethod
     def _resolve_target_type(target: str, configured: str) -> str:
-        """Auto-detect target type if configured as 'auto'."""
+        """Auto-detect target type if configured as 'auto'.
+
+        The classification itself lives in :mod:`scope_guard` so the agent loop
+        and the CLI's authorization gate cannot drift apart: one heuristic, one
+        answer, tested in one place.
+        """
         if configured != "auto":
             return configured
-        target = target.strip().lower()
-        # Local artifacts (mobile apps, binaries) -> local analysis, full testing allowed
-        if re.search(r'\.(apk|ipa|aab|dex|jar|so|elf|exe|bin|war)$', target):
-            return "authorized"
-        # Private/local -> assume authorized
-        private_patterns = [
-            r'^10\.', r'^172\.(1[6-9]|2\d|3[01])\.', r'^192\.168\.',
-            r'^127\.', r'^localhost$', r'^0\.',
-            r'^::1$', r'^fe80:', r'^fc00:', r'^fd00:',
-            r'\.local$', r'\.internal$', r'\.lan$',
-        ]
-        for pat in private_patterns:
-            if re.match(pat, target):
-                return "authorized"
-        # CTF/lab/challenge domains — allow full attack chain
-        ctf_hints = ["ctf", "hackme", "hack.me", "capturetheflag", "challenge", "vulnhub", "hackthebox", "tryhackme"]
-        if any(h in target for h in ctf_hints):
-            return "ctf"
-        # Has domain-like pattern (contains dots, not IP) -> public
-        if re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,}', target) and not re.match(r'^\d+\.\d+\.\d+\.\d+$', target):
-            return "public_real_world"
-        # Public IP range (not private)
-        try:
-            ip = ipaddress.ip_address(target)
-            if ip.is_private or ip.is_loopback or ip.is_link_local:
-                return "authorized"
-            return "public_real_world"
-        except ValueError:
-            pass
-        return "authorized"  # safe default
+        from scope_guard import classify_target
 
-    @staticmethod
+        return classify_target(target)
+
     @staticmethod
     def _split_target(target: str) -> Tuple[str, int]:
         """Return ``(host, port)`` for a raw target, preserving an explicit port.
@@ -1802,9 +1779,24 @@ Analyze the output carefully. Return JSON ONLY:
             CONFIG.PARALLEL_PLAN = True
             print(f"{C.BOLD}{C.M}[CTF] CTF Mode active — aggressive flag hunting, full testing authorized{C.N}")
         elif is_bug_bounty_mode():
-            if resolved == "public_real_world":
-                print(f"{C.G}[BB] Bug bounty mode: using authorized scope (full testing){C.N}")
-            self.target_type = "authorized"
+            # A flag used to be enough to escalate any host to full testing —
+            # including the very host the terminal workspace refuses without a
+            # verified program. Evidence decides now: an explicit configured
+            # posture (verified by the CLI gate, or written into an engagement
+            # profile) is honored; a bare claim on an "auto" posture is checked
+            # against the program's own scope metadata before it may widen.
+            if self.target_type and self.target_type != "auto":
+                print(f"{C.G}[BB] Bug bounty mode: {self.target_type} scope (configured){C.N}")
+            else:
+                from scope_guard import decide_active_run
+
+                decision = decide_active_run(target, claimed=True)
+                self.target_type = decision.target_type or "public_real_world"
+                if decision.verified:
+                    print(f"{C.G}[BB] Bug bounty mode: {decision.reason} — full testing{C.N}")
+                else:
+                    print(f"{C.Y}[BB] {decision.reason} — recon/enumeration only, "
+                          f"auth attacks blocked.{C.N}")
             CONFIG.PARALLEL_PLAN = True
         elif resolved != self.target_type:
             print(f"{C.Y}[!] Auto-detected target type: {resolved}{C.N}")

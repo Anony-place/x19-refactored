@@ -54,12 +54,42 @@ x19 findings                                # what it found, by severity
 x19 report --format html --out report.html  # exportable report
 ```
 
+## Authorization is evidence, not a flag
+
+One policy covers the workspace, `run`, `dash` and `fleet`: a target's posture
+comes from what can be *shown*, and a claim only buys you a chance to show it.
+
+| You run | What X19 does |
+| --- | --- |
+| `-t 10.0.0.5`, `-t app.local`, `-t app.apk` | your network, your artifact — full testing |
+| `-t machine.hackthebox.eu` | practice platform — full testing |
+| `-t www.paytm.com` | the program's own scope metadata declares it — full testing |
+| `-t scanme.nmap.org` | no claim: recon/enumeration only, auth attacks blocked |
+| `-t scanme.nmap.org --bug-bounty` | **refused** until you prove or assert it |
+| `-t paytm.com --bug-bounty` | **refused** — Paytm's scope declares `*.paytm.com`, not the apex |
+
+Proof and assertions, in the order you'd reach for them:
+
+```bash
+x19 run -t host --bug-bounty --scope-url https://program/scope   # verify against the program
+x19 engagement new acme -t host --target-type authorized         # written authorization, recorded
+X19_ALLOW_UNVERIFIED=1 x19 run -t host --bug-bounty              # you assert it, on the record
+x19 run -t host                                                  # no claim: recon/enumeration run
+```
+
+At a terminal a refusal asks once and takes three answers: paste a scope URL
+(verified before it counts), re-type the target (recorded as *your* assertion),
+or press enter for the narrower recon-only run. Non-interactively it exits
+non-zero and names every way out. Verdicts are per run — nothing is written to
+`~/.x19/config.json`, because a persisted `TARGET_TYPE=authorized` would
+authorize every target you ever ran afterwards.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `workspace` | X19 home — status, state, every function and next actions. **The default** |
-| `run` | Autonomous assessment (`-t`, `--bug-bounty`, `--ctf`, `--fast`, `--swarm`) |
+| `run` | Autonomous assessment (`-t`, `--bug-bounty`, `--scope-url`, `--ctf`, `--fast`, `--swarm`) |
 | `dash` | Full-screen live swarm mission control (`--once`, `--no-tui`, `--timeout`, `--engagement`) |
 | `chat` | Interactive AI assistant console |
 | `findings` | Findings by severity (`--severity`, `--session`) |

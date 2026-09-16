@@ -130,3 +130,99 @@ target-intake routing, `passive_recon` facts-only guarantees (a patched
 across chunk boundaries, and four **live pty** scenarios asserting on the
 reconstructed screen. The pty tests were confirmed to have teeth: disabling
 `_install_guard()` fails them. Full suite: 788 passed.
+
+---
+
+# Round 3 — 2026-09-16: the one-shot path and the workspace disagreed about authorization
+
+Trigger: after Round 2 made the workspace resolve scope before it acts, the
+one-shot path was audited and found to do the opposite. `scope_guard.resolve_scope`
+had exactly one caller in the whole repository — `ui/app.py`. Everything else
+that could attack a host took its posture from a flag:
+
+```
+$ x19 run -t scanme.nmap.org --bug-bounty      # before
+[BB] Bug bounty mode: using authorized scope (full testing)
+```
+
+No program was looked up, nothing was verified, and `_apply_runtime_config`
+wrote `TARGET_TYPE=authorized` into `~/.x19/config.json` — where the agent
+trusts it for **every later run**, against any target. The same host typed into
+the workspace was refused. Two doors, two policies; the unlocked one was the
+one that runs unattended.
+
+## 7. Root causes
+
+| # | Defect | Cause | Fix |
+|---|--------|-------|-----|
+| A1 | `--bug-bounty` alone granted full testing on any public host | `_apply_runtime_config` translated the flag into `TARGET_TYPE=authorized` before anything looked at the target | The flag now records *intent* (hands-off, bootstrapped, parallel) only; `_authorize_active_run()` decides the posture from evidence |
+| A2 | One run's verdict authorized every later run | The verdict was persisted to the config file, and `agent._resolve_target_type` returns a configured posture without asking again | Authorization state is per run (`set_data(..., save=False)`); a `TARGET_TYPE=authorized` found in the config file is treated as a **claim** that must be re-earned per host |
+| A3 | Two posture heuristics could drift | The classification lived inline in `agent._resolve_target_type`; the workspace had its own resolver | `scope_guard.classify_target()` is the single heuristic, the agent delegates to it, and a parity test pins it to the code it replaced (39 samples, zero drift). One deliberate difference: an empty target now fails closed instead of classifying as `authorized` |
+| A4 | `x19 dash -t host` had no gate at all | The dashboard launches the same offensive work as `run` but went straight to `SwarmCoordinator` | Same gate, same message, before the coordinator is built |
+| A5 | A fleet inherited whichever target was verified first | `fleet.cli()` submitted every target it was given | Per-target decision: authorized targets run, the rest are reported as `skipped — <reason>` with the evidence that would unlock them; nothing authorized → exit 2 |
+| A6 | The agent loop re-widened a narrowed run | `elif is_bug_bounty_mode(): self.target_type = "authorized"` ran regardless of evidence | The branch asks `decide_active_run()`; an explicitly configured posture is honored, a bare claim on `auto` is not. The recon-only fallback also clears `BUG_BOUNTY_MODE`, which is what that branch keys on |
+| A7 | No way to present evidence on a command line | Scope URLs were env-only, and an engagement name was accepted as proof | `--scope-url` on `run` and `dash` (same value as `X19_SCOPE_URL`); an engagement counts only when a **recorded** profile states the posture — `ad_hoc_profile` synthesised from `-t` is not evidence, as its own docstring says |
+| A8 | A refusal was a dead end | The workspace had intake options; the CLI had nothing | At a terminal: one prompt, three honest answers — paste a scope URL (verified before it counts), re-type the target (recorded as your assertion), enter (recon-only run). Non-interactively: exit 1 with all four exits named |
+| A9 | A refused run still started things | `cmd_run` built the agent, created its session and started the telegram poller *before* the gate ran | The gate moved ahead of all three: a run that will not happen starts nothing |
+| A10 | Drive-by: `X19._split_target` was decorated `@staticmethod` twice | Duplicate decorator line | Removed — harmless on 3.10+, a `TypeError` on older interpreters |
+
+## 8. The decision, stated once
+
+`scope_guard.decide_active_run(target, claimed=…, scope_url=…, engagement=…)`
+returns one `ActiveRunDecision` (`allowed`, `state`, `target_type`, `reason`,
+`needs_input`) that every entry point obeys:
+
+| Evidence | Decision |
+| --- | --- |
+| Program found, target declared (`www.paytm.com` → `*.paytm.com`) | run, `authorized` |
+| Program found, target **not** declared (`paytm.com` apex) | refuse, naming the declared scope — nothing to confirm, wrong evidence |
+| Private range, loopback, `.local`/`.internal`/`.lan`, local artifact | run, `authorized` — no public program needed |
+| Practice platform (`hackthebox`, `tryhackme`, `ctf`, `vulnhub`, …) | run, `ctf` |
+| Recorded engagement profile with an explicit posture | run, `authorized` |
+| `X19_ALLOW_UNVERIFIED=1` | run, `authorized`, with the assertion printed as the reason |
+| Public host, no claim | run, recon/enumeration posture only |
+| Public host **with** a claim and nothing to back it | refuse, `needs_input` — one prompt at a terminal, exit 1 otherwise |
+
+Permissive where permission is obvious, fail-closed where it is not, and the
+reason printed is the reason that was used.
+
+## 9. Verification
+
+`tests/test_active_run_authorization.py` (44 tests): heuristic parity with the
+code it replaced, the decision matrix above, the CLI gate in all four of its
+outcomes (refuse / verify / assert / narrow) with `Prompt.ask` and `isatty`
+driven explicitly, the interrupt path, per-run persistence asserted through a
+recording `set_data` (a persisted verdict is a regression, not a feature), a
+config-file `TARGET_TYPE=authorized` treated as a claim, `cmd_run` and
+`cmd_dash` returning 1 *before* the agent loop or the coordinator, source-order
+assertions that the gate precedes both, and per-target fleet filtering.
+Existing fleet CLI tests were retargeted to lab hosts so they keep testing
+supervisor mechanics rather than accidentally depending on an unauthorized
+public target. Full suite: 832 passed, 20 subtests.
+
+Known pre-existing flake, unrelated to this round: `tests/test_knowledge_layer.py`
+KEV cache tests fail roughly one full-suite run in five, on either
+`test_fetch_parse_and_cache` or `test_ttl_expiry_refetches`, and always pass in
+isolation. It reproduces with this round's changes stashed, so it was not
+introduced here — it is left alone rather than half-diagnosed.
+
+Real CLI transcripts (non-interactive, no provider needed to reach the gate):
+
+```
+$ X19_BUG_BOUNTY_MODE=1 x19 dash -t scanme.nmap.org --once --no-start
+! active run not started — active testing was requested, but no public program or
+  scope source verifies scanme.nmap.org
+› prove it:  x19 run -t scanme.nmap.org --bug-bounty --scope-url <program scope url>
+›            x19 engagement new <name> -t scanme.nmap.org --target-type authorized
+› assert it: X19_ALLOW_UNVERIFIED=1 x19 run -t scanme.nmap.org --bug-bounty
+› narrow it: drop --bug-bounty for a recon/enumeration run          # exit 1
+
+$ x19 dash -t paytm.com --once --no-start
+! active run not started — Paytm Bug Bounty was found, but paytm.com is outside its
+  declared scope (*.paytm.com, *.paytm.in, *.mypaytm.com, paytmfoundation.org, …)
+› program: Paytm Bug Bounty · https://bugbounty.paytm.com/scope/
+› in-scope hosts run normally; observation needs no authorization: x19 chat → /passive paytm.com
+
+$ x19 dash -t www.paytm.com --once --no-start
+• scope: verified — Paytm Bug Bounty declares *.paytm.com                # mission control renders
+```
