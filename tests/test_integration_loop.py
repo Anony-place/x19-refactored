@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -65,9 +66,6 @@ class FakeAI:
             "hypotheses": [],
             "completed": False,
         })
-
-
-import time  # after the class body uses it at runtime only
 
 
 def _run_loop():

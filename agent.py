@@ -5769,6 +5769,8 @@ Analyze the output carefully. Return JSON ONLY:
                 pass
         if ai is None:
             ai = self.ai
+        response = ""   # bound before try: a raising chat() must keep its
+                        # original error, not die on a NameError in finally
         try:
             response = ai.chat(prompt, ctx)
         finally:
@@ -5823,8 +5825,12 @@ Analyze the output carefully. Return JSON ONLY:
             self._trajectory_dispatched.add(h)
             self._trajectory_map[h] = hyp.id
             if len(self._trajectory_map) > 128:
-                for k in list(self._trajectory_map)[:-64]:
-                    self._trajectory_map.pop(k, None)
+                # Evict only CLOSED hypotheses' entries — dropping an active
+                # one would orphan its future worker reports forever.
+                for k, hid in list(self._trajectory_map.items())[:-64]:
+                    h2 = self.hyp_engine.find_hypothesis(hid)
+                    if h2 is None or h2.state not in (HYP_NEW, HYP_TESTING):
+                        self._trajectory_map.pop(k, None)
             self.hyp_engine.mark_testing(hyp.id)
             dispatched += 1
         if dispatched:

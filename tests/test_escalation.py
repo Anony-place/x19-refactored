@@ -176,3 +176,30 @@ class UsageAndWiringTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DecisionChatFailureTests(unittest.TestCase):
+    """A raising provider must keep its real error and still get accounted."""
+
+    def test_chat_exception_preserved_and_counted(self):
+        from agent import X19
+
+        class BoomAI:
+            def name(self):
+                return "fake/boom"
+
+            def chat(self, prompt, ctx):
+                raise RuntimeError("provider exploded")
+
+        agent = X19.__new__(X19)
+        agent.ai = BoomAI()
+        agent.session = SimpleNamespace(data={})
+        agent._escalator = Escalator()   # no chain -> falls back to agent.ai
+        agent._escalator.chain = []
+        with self.assertRaises(RuntimeError) as ctx:
+            agent._decision_chat("ctx")
+        self.assertEqual(str(ctx.exception), "provider exploded",
+                         "the real provider error must not be masked")
+        usage = agent.session.data["usage"]
+        self.assertEqual(usage["calls"], 1, "failed calls count as attempts")
+        self.assertEqual(usage["chars_out"], 0)

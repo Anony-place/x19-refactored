@@ -25,7 +25,7 @@ Design:
 from __future__ import annotations
 
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 from logging_utils import log
 

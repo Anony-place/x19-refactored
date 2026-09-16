@@ -11,9 +11,6 @@ from __future__ import annotations
 
 import time
 import unittest
-from unittest import mock
-
-import brain.team as team_mod
 from agent import X19
 from brain.hypothesis_engine import HYP_CONFIRMED, HYP_NEW, HYP_TESTING
 from brain.team import MissionDirector

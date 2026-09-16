@@ -172,6 +172,9 @@ class WorkstreamManager:
         self.jobs: "queue.Queue" = queue.Queue()
         self.reports: deque = deque(maxlen=64)
         self.rlock = threading.Lock()
+        # NOTE: `idle` is a best-effort hint for single-worker lanes — with
+        # several workers any idling one can set it while another still runs.
+        # Do not use it for correctness; only queues and reports are exact.
         self.idle = threading.Event()
         self.idle.set()
         self.probes_submitted = 0

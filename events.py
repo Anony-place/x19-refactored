@@ -20,7 +20,7 @@ import queue
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -126,4 +126,6 @@ def summarize_event(event: AgentEvent) -> str:
         return f"◉ oob callback [{proto}] {event.text}"
     if kind == "team":
         return f"♛ {event.text}"
+    if kind == "escalation":
+        return f"⤴ {event.text}"
     return f"· {event.text or kind}"
