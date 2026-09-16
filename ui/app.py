@@ -73,14 +73,7 @@ class ConsoleApp:
         self._exit = False
         self.background = BackgroundTaskManager()
         self._assessment_task: Optional[BackgroundTask] = None
-        self.prompt = LivePrompt(
-            self.console,
-            ribbon_fn=self._ribbon,
-            poll=self._poll_interval(),
-            completer=self._completions,
-            on_tick=self._drain_agent_events,
-            on_escape=self._handle_escape,
-        )
+        self.prompt = LivePrompt(self.console, ribbon_fn=self._ribbon, poll=self._poll_interval(), completer=self._completions, on_tick=self._drain_agent_events, on_escape=self._handle_escape)
         self._ctrl_c_presses = 0
 
     def _drain_agent_events(self) -> bool:
@@ -763,29 +756,28 @@ class ConsoleApp:
         self.remember(ROLE_AGENT, reply)
         self._echo_agent(reply)
 
-    def _chat_reply(self, message: str, *, render: bool = True) -> Optional[str]:
-        """Get a reply; ``render=False`` is used by embedded full-screen UIs.
+    def _chat_reply(self, message: str, *, render: bool = True, on_chunk: Optional[Callable[[str], None]] = None) -> Optional[str]:
+        """Get a provider reply.
 
-        The embedded workspace already owns a Rich ``Live`` renderer. Starting
-        another Live/spinner from inside it corrupts cursor state and makes the
-        UI look like a mock or a broken dashboard, so the data path can be used
-        independently of presentation.
+        ``render=False`` lets an embedded workspace own presentation. In that
+        mode ``on_chunk`` receives real provider chunks so the host can render
+        the response without starting a nested Rich Live instance.
         """
         from contextlib import nullcontext
         con = self.console
         stream = getattr(self.ai, "chat_stream", None)
         if stream is None:
-            spinner = (
-                con.status("[info]X19 is thinking[/]", spinner="dots")
-                if render and con.is_terminal and not getattr(con, "no_color", False)
-                else nullcontext()
-            )
+            spinner = con.status("[info]X19 is thinking[/]", spinner="dots") if render and con.is_terminal and not getattr(con, "no_color", False) else nullcontext()
             with spinner:
                 try:
-                    return self.ai.chat(SYSTEM_PROMPT, message) or ""
+                    reply = self.ai.chat(SYSTEM_PROMPT, message) or ""
                 except Exception as exc:
-                    warn(f"provider request failed: {type(exc).__name__}")
+                    if render:
+                        warn(f"provider request failed: {type(exc).__name__}")
                     return None
+            if reply and on_chunk is not None:
+                on_chunk(reply)
+            return reply
 
         chunks: List[str] = []
         live = None
@@ -800,24 +792,29 @@ class ConsoleApp:
                 if not piece:
                     continue
                 chunks.append(piece)
+                if on_chunk is not None:
+                    on_chunk(piece)
                 if live is not None:
                     tail = "".join(chunks)[-400:]
                     live.update(_Text(f"✎ {tail}", style="muted"))
         except KeyboardInterrupt:
             if live is not None:
                 live.__exit__(None, None, None)
-            warn("stream interrupted")
+            if render:
+                warn("stream interrupted")
             return ("".join(chunks) or None)
         except Exception as exc:
             if live is not None:
                 live.__exit__(None, None, None)
-            warn(f"provider request failed: {type(exc).__name__}")
+            if render:
+                warn(f"provider request failed: {type(exc).__name__}")
             return None
         if live is not None:
             live.__exit__(None, None, None)
         reply = "".join(chunks)
         if not reply.strip():
-            warn("empty response — check provider configuration")
+            if render:
+                warn("empty response — check provider configuration")
             return None
         return reply
 
