@@ -80,6 +80,117 @@ Global flags: `--json`, `--no-color`, `--plain`, `-q/--quiet`, `-v/--verbose`,
 `-V/--version`. Legacy flag-first invocations still work: `x19 -t host` is
 routed to `x19 run -t host`.
 
+## The terminal workspace (`x19 chat`)
+
+`x19 chat` is a rolling-transcript console — every message renders once, so
+nothing flickers — with a **live status ribbon** above the prompt. Long work
+never blocks the conversation: assessments run on background threads while you
+keep typing.
+
+```
+ X19   X19 4.0.0 (3cde5d5)  ·  terminal workspace
+  ai groq/llama-3.3-70b  ·  target —
+
+ X19 · scanme.nmap.org · groq/llama-3.3-70b   ● assessment scanme.nmap.org 00:41 · iter 12/50 · 3 findings
+  ⚙ nmap -sV --top-ports 500 scanme.nmap.org · rc 0 · 4.2s
+you › █
+```
+
+* `/target <host>` — passive scope check, explicit confirmation, then a quiet
+  background assessment. Every command the agent runs appears **inline as a
+  live activity card** (`⚙ cmd · rc · time`) the moment it starts — the UI is
+  fed by structured agent events, never by scraping stdout.
+* **Streaming replies** — model output streams into the transcript with a live
+  tail preview (`✎ …`) for every backend that supports SSE/NDJSON, with
+  automatic provider/model failover on the stream path too.
+* `/stop` — asks the running agent to wrap up at the next decision point;
+  **Esc** does the same without leaving the prompt.
+* **Ctrl+C is safe**: with an assessment running the first press warns and the
+  second is required to quit — the agent is never killed silently.
+* `/resume [session-id]` — reload a previous session into the workspace (bare
+  `/resume` lists the last 10) and pick up where you left off.
+* The ribbon shows the iteration budget (`iter N/M`) live while work runs.
+* `/tasks` — background tasks with status and elapsed time; `/tasks log <id>`
+  replays a task's captured output.
+* Completion notifications (findings by severity, failure tails) appear in the
+  transcript the moment work finishes.
+
+Concurrency and feel are configurable: `X19_BG_WORKERS` (or config
+`BG_WORKERS`) caps background tasks, `X19_UI_POLL` sets the ribbon refresh,
+`X19_UI_BANNER`/`UI_BANNER` brings back the ASCII splash screen.
+
+## Bug-hunting team (boss → managers → workers)
+
+X19 is not a single agent. A **MissionDirector** (boss) decomposes the target
+into dynamic workstream lanes from what the target actually exposes, each lane
+run by a **manager** with its own **worker** pool. Workers execute probes
+through the same policy-gated command gateway as the main loop and return raw
+evidence — never findings; verification stays with the deterministic gates.
+The boss reviews verified findings each iteration (severity rollup +
+exploit-chain summary) and hands breadth work to the team.
+
+**Parallel research trajectories**: hypotheses in the agent's research ledger
+that pre-register a probe command *and* the output that would prove it are
+auto-dispatched to workers every iteration — Naptime-style sampling. A match
+against the pre-registered evidence auto-confirms the hypothesis (the model
+defined the falsifier itself); the finding still goes through normal
+verification before it is reported.
+
+Knobs: `X19_TEAM_DISABLE=1`, `X19_TEAM_MAX_LANES` (3), `X19_TEAM_WORKERS` (2
+per lane), `X19_TEAM_PROBES_PER_ITER` (6), `X19_TEAM_TRAJECTORIES` (2).
+
+**Frontier escalation**: set `X19_ESCALATE="provider/model,..."` and hard
+steps (critical deep-dives, flail/stuck streaks, high-impact hypotheses)
+automatically run on the stronger model — gate-respecting (critical-tier
+models stay blocked on unauthorised exploitation), cooldown-bounded
+(`X19_ESCALATE_EVERY`, default 4 decisions), and fully accounted: the
+ribbon shows `N calls ~Tk tok` per run, and `~$X` too when you set your
+blended rate via `X19_PRICE_PER_MTOK`.
+
+## Fleet mode — many targets, one supervisor
+
+`x19 fleet -t target1,target2,target3 --max 3` runs independent assessments
+concurrently (XBOW-scale pattern): each unit is a full X19 agent with its own
+session, so the scope gate, policy engine, verification gates and team org
+are inherited per unit. Failure isolation, cooperative `/fleet stop`-style
+control, severity rollup across targets, and shared-tech-stack correlation
+(intel and confirmed hypotheses transfer between targets running the same
+stack). In the workspace: `/fleet t1, t2, t3` to launch, `/fleet status`,
+`/fleet stop`. Concurrency: `X19_FLEET_CONCURRENCY` (default 2, max 8).
+
+## Knowledge layer (live intel + your own corpus)
+
+The agent reasons over **real-time data, not hardcoded lists**: CISA KEV
+(actively-exploited vulnerabilities), NVD, FIRST EPSS and local searchsploit
+are correlated against what your target actually runs and injected into the
+decision context — version-matched, sorted by exploitation signal, tightly
+capped so the agent stays focused.
+
+Your own knowledge is a first-class layer: drop markdown/txt notes (program
+policy, target notes, house methodology) into `~/.x19/knowledge/` and they are
+embedded into the vector store and recalled semantically during decisions.
+
+Knobs: `X19_INTEL_DISABLE=1` turns feeds off, `X19_INTEL_SOURCES=kev,nvd`
+selects sources, `X19_KNOWLEDGE_DIR` moves the corpus dir, `NVD_API_KEY`
+raises NVD rate limits. Feed copies are cached in `~/.x19/cache/intel/` so a
+network outage degrades to slightly-stale intel instead of blindness.
+
+## Look & feel
+
+The UI is a design system, not a pile of prints. Colours live in semantic
+palettes — pick one with `x19 config set UI_THEME <name>` or
+`X19_UI_THEME=<name>`:
+
+| palette | vibe |
+| --- | --- |
+| `midnight` (default) | cool teal-on-slate |
+| `matrix` | classic terminal green |
+| `ember` | warm amber |
+| `mono` | colour-blind-safe greyscale |
+
+`--no-color` / `NO_COLOR` disable styling, `--plain` disables live TUIs, and
+`X19_ASCII=1` swaps unicode glyphs for ASCII fallbacks.
+
 ## Live mission control
 
 `x19 dash` is the terminal equivalent of the retired web dashboard. It renders
@@ -114,10 +225,12 @@ cli.py            subcommand parser + command handlers
 cli_support.py    provider resolution, sessions, diagnostics (no rendering)
 ui/               the terminal application
   console.py        global rich Console, ok/warn/err, --json contract
-  theme.py          palette, severity and state styling
+  theme.py          palettes, severity and state styling (UI_THEME selects)
   widgets.py        panels, tables, trees, progress, key hints
+  prompt.py         live prompt that redraws the status ribbon while you type
+  background.py     quiet background task runner (captured output, callbacks)
   dashboard.py      MissionDashboard — live mission control
-  app.py            ConsoleApp — interactive REPL with slash commands
+  app.py            ConsoleApp — rolling-transcript chat with slash commands
   screens.py        providers / config / sessions / findings / doctor views
   keys.py           non-blocking keyboard capture (POSIX + Windows)
 version.py          single source of truth for the version
@@ -126,7 +239,7 @@ execution/          command gateway, policy engine, native scan/fuzz/vuln
 parsers/            structured output parsers (nmap, httpx, gobuster, ffuf)
 learning/           self-adaptation and failure lessons
 reporting/          markdown / html / json report generation
-tests/              180 unit tests
+tests/              unit + regression tests
 ```
 
 ## Tests

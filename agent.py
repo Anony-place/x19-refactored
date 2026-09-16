@@ -43,6 +43,12 @@ from tool_scanner import scan_available_tools, scan_missing_critical, build_tool
 from brain.planner import Planner
 import brain.planner as planning
 from brain import CriticEngine, StrategistEngine, StrategyLibrary
+from brain.hypothesis_engine import MultiHypothesisEngine, HYP_NEW, HYP_TESTING
+from brain.exploit_chain import ExploitChainEngine
+from brain.team import MissionDirector, TEAM_SYSTEM_PROMPT, team_disabled, trajectories_per_iter
+from brain.escalation import Escalator
+from knowledge import KnowledgeLayer
+from brain.finding_review import adversarial_review as _adversarial_review
 from brain.frontier_gate import FrontierVerdict, check_model_for_phase, gate_status
 
 class X19:
@@ -93,6 +99,34 @@ class X19:
         self._missing_tools = {}
         self._tools_scanned = False
         # Attack planner and cognitive engines
+        # Model-owned research ledger (Naptime-style hypothesis loop). The
+        # decision JSON's "hypotheses" actions feed this; the rendered ledger
+        # is injected into every decision context.
+        self.hyp_engine = MultiHypothesisEngine()
+        # OOB oracle evidence: durable [OOB INTERACTION] lines (blind-vuln
+        # binary proof) — surfaced in context and used as finding evidence.
+        self._oob_evidence: List[str] = []
+        # Chain awareness: deterministic class-ENABLES knowledge applied to
+        # confirmed findings so the loop can steer toward critical chains.
+        self.chain_engine = ExploitChainEngine()
+        # Hierarchical bug-hunting team (boss → managers → workers). Workers
+        # execute through the same policy-gated path; the boss reviews
+        # verified findings and decomposes the target into dynamic lanes.
+        self.team = MissionDirector(executor=self._team_executor,
+                                    ai=self.ai, chain_engine=self.chain_engine)
+        self._team_planned = False
+        # Parallel research trajectories: pre-registered hypotheses with a
+        # probe command are auto-dispatched to team workers (Naptime sampling).
+        self._trajectory_dispatched: set = set()   # md5(cmd) already sent
+        self._trajectory_map: dict = {}            # md5(cmd) -> hypothesis id
+        # Frontier escalation: hard steps (critical deep-dives, flail/stuck
+        # streaks, high-impact hypotheses) may run on a stronger model from
+        # X19_ESCALATE — gate-respecting, cooldown-bounded, accounted.
+        self._escalator = Escalator()
+        # Dynamic knowledge layer: live threat feeds (CISA KEV / NVD / EPSS /
+        # searchsploit) + the user's custom corpus, retrieved by what this
+        # target actually runs — real-time focus, nothing hardcoded.
+        self.knowledge = KnowledgeLayer(memory=self.memory)
         self.planner = Planner()
         self.critic_engine = CriticEngine()
         self.strategist_engine = StrategistEngine()
@@ -1303,7 +1337,19 @@ Analyze the output carefully. Return JSON ONLY:
         self._vector_codes = {}
         self._terminated_vectors = set()
         self._hypotheses = {}
+        self.hyp_engine = MultiHypothesisEngine()
+        self._oob_evidence = []
+        try:
+            self.team.shutdown()
+        except Exception:
+            pass
+        self.team = MissionDirector(executor=self._team_executor,
+                                    ai=self.ai, chain_engine=self.chain_engine)
+        self._team_planned = False
         self._banned_plan_categories = set()
+        self._trajectory_dispatched = set()
+        self._trajectory_map = {}
+        self._escalator = Escalator()
         self._recon_no_progress_count = 0
         self._recon_total = 0
         self._forced_exploit = False
@@ -1733,6 +1779,14 @@ Analyze the output carefully. Return JSON ONLY:
         self.plugins.call_hook("on_start", self)
         # MCP: connect all servers
         self.mcp.connect_all()
+        # Custom knowledge corpus: hash-state makes this idempotent and cheap;
+        # edits to ~/.x19/knowledge between runs are picked up here.
+        try:
+            _added = self.knowledge.ingest_custom()
+            if _added:
+                print(f"{C.G}[+] Knowledge corpus: ingested {_added} new chunk(s){C.N}")
+        except Exception as _ing_err:
+            log(f"[INTEL] corpus ingestion at loop start failed: {_ing_err}")
         
         # AUTONOMY: No bootstrap recon - AI generates initial commands through reasoning
         # The World Model is seeded with target info, then the LLM decides what to run.
@@ -1866,6 +1920,10 @@ Analyze the output carefully. Return JSON ONLY:
             # Auto-unban if the agent is soft-locked on a banned category with no progress
             self._maybe_auto_unban(iteration)
 
+            # Team org: reset probe budget, plan lanes lazily once surface is
+            # known, harvest worker reports, refresh the boss review.
+            self._team_tick()
+
             # Recon saturation — surfaced only when it actually matters
             sat = self._recon_saturation()
             if _vb():
@@ -1935,7 +1993,7 @@ Analyze the output carefully. Return JSON ONLY:
             t0 = time.time()
             try:
                 ctx = self._build_context(target, previous_output)
-                response = self.ai.chat(decision_system_prompt(), ctx)
+                response = self._decision_chat(ctx)
             except Exception as e:
                 log(f"[Loop] AI decision error at iter {iteration}: {e}")
                 response = ""
@@ -1974,6 +2032,15 @@ Analyze the output carefully. Return JSON ONLY:
                 else:
                     self._ai_empty_streak = 0
                     consec_fail = 0
+                    # Model-owned research ledger: add/test/confirm/reject
+                    # hypotheses proposed in the decision JSON.
+                    hyp_notes = self.hyp_engine.apply_actions(decision.get("hypotheses"))
+                    for note in hyp_notes:
+                        print(f"{C.D}[HYP] {note}{C.N}")
+                    # Team org: spawn/assign/retire actions from the boss model.
+                    team_notes = self.team.apply_decision(decision.get("team"))
+                    for note in team_notes:
+                        print(f"{C.D}[TEAM] {note}{C.N}")
 
             if not decision:
                 self.session.data["status"] = "failed"; self.session.save()
@@ -2019,6 +2086,12 @@ Analyze the output carefully. Return JSON ONLY:
             # Resolve evidence context — always check against the last REAL tool output,
             # so findings reported without a fresh command are still verified (not auto-accepted).
             evidence_context = previous_output or ""
+            # OOB oracle lines are durable evidence for blind-vuln findings —
+            # make them visible to the verification gates regardless of what
+            # the latest command printed.
+            _oob_tail = [l for l in self._oob_evidence[-3:] if l not in evidence_context]
+            if _oob_tail:
+                evidence_context = (evidence_context + "\n" + "\n".join(_oob_tail)).strip()
 
             # Record finding — 4-gate validation engine (fast mode: skip LLM pass)
             if finding and finding.get("title"):
@@ -2051,6 +2124,21 @@ Analyze the output carefully. Return JSON ONLY:
                                 # Preserve original independent verification (HTTP cross-check)
                                 if verified and not self._manual_verify(verified):
                                     verified = None
+                    # Adversarial second reviewer (XBOW-style debate): critical
+                    # and high claims get one independent hostile review before
+                    # they can be reported. Disagreement demotes the finding —
+                    # the loop keeps hunting instead of filing a likely false
+                    # positive. Reviewer outage fails open ("unsure").
+                    if (verified
+                            and not is_fast_mode()
+                            and str(verified.get("severity", "")).lower() in ("critical", "high")):
+                        review = _adversarial_review(self.ai, verified, evidence_context)
+                        if review.get("verdict") == "false_positive":
+                            print(f"{C.Y}[!] '{verified.get('title', '?')}' demoted by adversarial review — "
+                                  f"{review.get('reason', '')[:100]}{C.N}")
+                            verified = None
+                        elif review.get("verdict") == "real":
+                            print(f"{C.G}[+] Adversarial review passed — {review.get('reason', '')[:90]}{C.N}")
                     if verified:
                         self._tick_hypothesis(
                             self._get_or_create_hypothesis(finding),
@@ -2066,6 +2154,14 @@ Analyze the output carefully. Return JSON ONLY:
                         )
                         self.model.add_finding(f)
                         self.session.add_finding(f.severity, f.title, f.description, f.evidence)
+                        # Variant analysis (Big Sleep pattern): a confirmed bug
+                        # class usually recurs in sibling endpoints/params.
+                        # Soft advisory — the model decides, never forced.
+                        self._advisories.append(
+                            f"VARIANT CHECK: '{f.title[:60]}' confirmed ({f.severity}). "
+                            "Before pivoting, enumerate sibling endpoints/parameters "
+                            "for this same bug class and test them — variants of a "
+                            "confirmed class are the highest-ROI probes.")
                         if f.evidence:
                             print(f"{C.G}[+] Evidence: {f.evidence[:120]}...{C.N}")
                             self.state_db.update_transition({"type": "finding", "title": f.title, "severity": f.severity})
@@ -3194,28 +3290,12 @@ Analyze the output carefully. Return JSON ONLY:
                 self._last_reflection = ""
                 time.sleep(1)
 
-            # OOB/Interactsh polling: check for blind interactions (SSRF, RCE callbacks, DNS out-of-band)
-            try:
-                from attacks import get_oob
-                oob = get_oob()
-                if oob and oob._available:
-                    oob_hits = oob.poll()
-                    if oob_hits:
-                        for hit in oob_hits[-5:]:
-                            msg = f"[OOB INTERACTION] {hit['protocol']}: {hit['full-id']} from {hit.get('raw',{}).get('remote-address','?')}"
-                            print(f"{C.BOLD}{C.G}{msg}{C.N}")
-                            self.model.add_finding(Finding(
-                                severity="high",
-                                title=f"OOB Interaction: {hit['protocol']} callback",
-                                description=msg,
-                                evidence=str(hit['raw'])[:500],
-                            ))
-                        previous_output = (f"[SYSTEM: {len(oob_hits)} OOB interaction(s) detected! "
-                            "This confirms a blind SSRF, RCE, or template injection. "
-                            f"Last: {oob_hits[-1]['protocol']} from {oob_hits[-1].get('raw',{}).get('remote-address','?')}. "
-                            "Escalate this finding immediately.")[:3000]
-            except Exception as _oob_err:
-                pass
+            # OOB oracle: interactsh callbacks = binary proof for blind
+            # SSRF/XXE/SQLi/RCE. Durable evidence + live event + hypothesis
+            # correlation (see _poll_oob_oracle).
+            _oob_note = self._poll_oob_oracle(previous_output)
+            if _oob_note:
+                previous_output = _oob_note
 
             # No-progress tracker: did this iter add a finding/endpoint/port?
             try:
@@ -3231,6 +3311,10 @@ Analyze the output carefully. Return JSON ONLY:
                 self._save_model_state()
 
         self._save_model_state()
+        try:
+            self.team.shutdown()
+        except Exception:
+            pass
         self.session.data["status"] = "completed" if not self.stop else "interrupted"
         self.session.save()
         self.running = False
@@ -5650,6 +5734,275 @@ Analyze the output carefully. Return JSON ONLY:
 
     # ===================== FINDING VALIDATION ENGINE =====================
 
+    def _team_executor(self, cmd: str, timeout: int):
+        """Policy-gated executor the team workers must use (never raw subprocess).
+
+        Thread-safe by design: it only touches the execution gateway (the same
+        concurrency pattern as tools.TaskManager) and the event bus — worker
+        threads never mutate session data structures."""
+        result = self.exec.run(cmd, timeout=timeout)
+        try:
+            self.session.emit_event(
+                "team", f"{str(cmd)[:70]} rc {int(getattr(result, 'returncode', 0) or 0)}",
+                lane="", probe=str(cmd)[:120])
+        except Exception:
+            pass
+        return result
+
+    def _usage_tick(self, chars_in: int, chars_out: int, secs: float,
+                    escalated: bool = False) -> None:
+        """Account one decision call into session usage (ribbon shows it)."""
+        try:
+            usage = self.session.data.setdefault("usage", {})
+            usage["calls"] = int(usage.get("calls", 0)) + 1
+            usage["chars_in"] = int(usage.get("chars_in", 0)) + int(chars_in)
+            usage["chars_out"] = int(usage.get("chars_out", 0)) + int(chars_out)
+            usage["secs"] = float(usage.get("secs", 0.0)) + float(secs)
+            if escalated:
+                usage["escalations"] = int(usage.get("escalations", 0)) + 1
+        except Exception:
+            pass
+
+    def _decision_chat(self, ctx: str) -> str:
+        """One decision call: escalate to a stronger model on hard steps
+        (gate-respecting, cooldown-bounded) and account usage."""
+        prompt = decision_system_prompt()
+        t0 = time.time()
+        ai, reason = self._escalator.pick(self)
+        if reason and ai is not None:
+            print(f"{C.M}[FRONTIER] escalated decision → {ai.name()} ({reason[:80]}){C.N}")
+            try:
+                self.session.emit_event("escalation", f"hard step → {ai.name()}: {reason[:60]}")
+            except Exception:
+                pass
+        if ai is None:
+            ai = self.ai
+        response = ""   # bound before try: a raising chat() must keep its
+                        # original error, not die on a NameError in finally
+        try:
+            response = ai.chat(prompt, ctx)
+        finally:
+            self._usage_tick(len(prompt) + len(ctx), len(response or ""),
+                             time.time() - t0, escalated=bool(reason))
+        return response
+
+    def _trajectory_lane(self) -> str:
+        """Lane for auto-dispatched hypothesis trajectories: a dedicated lane
+        if one exists/can be spawned, else any existing lane (report→hypothesis
+        mapping is by command hash, so sharing a lane is safe)."""
+        if "trajectories" in self.team.lanes:
+            return "trajectories"
+        if not self.team.lanes:
+            if self.team.spawn(
+                    "trajectories",
+                    "pre-registered hypothesis probes (parallel research trajectories)",
+                    self.team.workers_per_lane).startswith("spawned"):
+                return "trajectories"
+            return ""
+        return next(iter(self.team.lanes))
+
+    def _dispatch_parallel_trajectories(self) -> None:
+        """Naptime's sampling strategy on X19's ledger: every TESTING/NEW
+        hypothesis that pre-registers a probe command + expected evidence is
+        executed by a team worker as its own parallel trajectory. The main
+        loop keeps its next_command for judgment work; breadth runs on the
+        team. Deduped per session and bounded by the shared probe budget."""
+        if team_disabled():
+            return
+        cap = trajectories_per_iter()
+        if cap <= 0:
+            return
+        lane = self._trajectory_lane()
+        if not lane:
+            return
+        dispatched = 0
+        for hyp in self.hyp_engine.get_competing_hypotheses(limit=8, active_only=True):
+            if dispatched >= cap:
+                break
+            if hyp.state not in (HYP_NEW, HYP_TESTING):
+                continue
+            if not hyp.command or not hyp.expected_evidence:
+                continue  # pre-registration (probe + expected evidence) required
+            h = hashlib.md5(hyp.command.encode()).hexdigest()[:12]
+            if h in self._trajectory_dispatched:
+                continue
+            note = self.team.assign(lane, hyp.command,
+                                    why=f"trajectory for {hyp.id}")
+            if not note.startswith("→"):
+                break  # budget exhausted / lane gone — try again next iteration
+            self._trajectory_dispatched.add(h)
+            self._trajectory_map[h] = hyp.id
+            if len(self._trajectory_map) > 128:
+                # Evict only CLOSED hypotheses' entries — dropping an active
+                # one would orphan its future worker reports forever.
+                for k, hid in list(self._trajectory_map.items())[:-64]:
+                    h2 = self.hyp_engine.find_hypothesis(hid)
+                    if h2 is None or h2.state not in (HYP_NEW, HYP_TESTING):
+                        self._trajectory_map.pop(k, None)
+            self.hyp_engine.mark_testing(hyp.id)
+            dispatched += 1
+        if dispatched:
+            try:
+                self.session.emit_event(
+                    "team", f"{dispatched} hypothesis trajectory(ies) dispatched → {lane}")
+            except Exception:
+                pass
+
+    def _evaluate_trajectories(self, reports) -> None:
+        """Check finished trajectory reports against the hypothesis's own
+        pre-registered success criterion. A match auto-confirms (the model
+        defined the falsifier itself — pre-registration contract); a miss is
+        surfaced to the boss model, which may refine or reject the idea.
+        Findings still require the normal verified path."""
+        import re as _re
+        for rep in reports:
+            h = hashlib.md5(rep.cmd.encode()).hexdigest()[:12]
+            hyp_id = self._trajectory_map.get(h)
+            if not hyp_id:
+                continue
+            hyp = self.hyp_engine.find_hypothesis(hyp_id)
+            if hyp is None or hyp.state != HYP_TESTING:
+                continue
+            excerpt = rep.excerpt or ""
+            hit = ""
+            for ev in hyp.expected_evidence:
+                ev = str(ev or "").strip()
+                if not ev:
+                    continue
+                if len(ev) >= 4:
+                    if ev in excerpt:
+                        hit = ev
+                        break
+                elif _re.search(r"(?<![\w])" + _re.escape(ev) + r"(?![\w])", excerpt):
+                    hit = ev  # short evidence needs a word-boundary match
+                    break
+            if hit:
+                self.hyp_engine.apply_actions([{
+                    "action": "confirm", "id": hyp.id, "evidence": [hit],
+                    "reason": "pre-registered expected evidence observed in parallel trajectory",
+                }])
+                msg = f"trajectory CONFIRMED '{hyp.title[:60]}' — expected evidence matched"
+                print(f"{C.G}[TRAJ] {msg}{C.N}")
+                try:
+                    self.session.emit_event("team", msg)
+                except Exception:
+                    pass
+            else:
+                self.team.notes.append(
+                    f"trajectory for '{hyp.title[:40]}': probe ran "
+                    f"(rc {rep.rc}), expected evidence not observed yet")
+
+    def _team_tick(self) -> None:
+        """Per-iteration team maintenance: budget reset, lazy boss planning
+        (once the target's surface is known), harvest, and review."""
+        try:
+            self.team.new_iteration()
+            if not self._team_planned and not team_disabled():
+                has_surface = bool(self.model.ports or self.model.endpoints
+                                   or self.model.tech_stack)
+                if has_surface:
+                    self._team_planned = True
+                    world = (f"target: {self.target}\n"
+                             f"ports: {[(p.get('port'), p.get('service')) for p in self.model.ports[:10]]}\n"
+                             f"endpoints: {[getattr(e, 'path', e) if not isinstance(e, str) else e for e in list(self.model.endpoints)[:12]]}\n"
+                             f"tech: {dict(list(self.model.tech_stack.items())[:8])}\n"
+                             f"findings so far: {[getattr(f, 'title', '') for f in self.model.findings]}")
+                    notes = self.team.plan_with_ai(world, TEAM_SYSTEM_PROMPT)
+                    if not notes:
+                        notes = self.team.plan_from_surface(self.model)
+                    for note in notes:
+                        print(f"{C.B}[TEAM] {note}{C.N}")
+                        try:
+                            self.session.emit_event("team", note)
+                        except Exception:
+                            pass
+            self._dispatch_parallel_trajectories()
+            self.team.harvest_all()
+            self._evaluate_trajectories(self.team.pending_reports())
+            self.team.review(self.model.findings)
+        except Exception as e:
+            log(f"[TEAM] tick failed: {e}")
+
+    def _poll_oob_oracle(self, previous_output: str) -> str:
+        """Poll the interactsh client and turn callbacks into oracle evidence.
+
+        A callback is *binary* proof that the target contacted our canary —
+        exactly the "perfect verification" signal blind SSRF/XXE/SQLi/RCE
+        need. The raw callback does NOT name the vulnerability, so it is
+        never auto-filed as a high finding: it becomes durable evidence
+        (``self._oob_evidence``), a live UI event, an honest info-severity
+        lead, and — when a TESTING hypothesis used the exact canary in its
+        probe — a confirmed hypothesis. The model files the real finding
+        through the normal verified path, quoting the callback line.
+        """
+        try:
+            from attacks import get_oob as _get_oob
+            oob = _get_oob()
+        except Exception:
+            return previous_output
+        try:
+            if oob is None or not getattr(oob, "available", False):
+                return previous_output
+            hits = oob.poll() or []
+            if not hits:
+                return previous_output
+            canary = ""
+            try:
+                canary = oob.canary
+            except Exception:
+                canary = ""
+            confirmed_notes: List[str] = []
+            for hit in hits[-5:]:
+                proto = str(hit.get("protocol", "?"))
+                full_id = str(hit.get("full-id") or canary)
+                remote = str((hit.get("raw") or {}).get("remote-address", "?"))
+                msg = f"[OOB INTERACTION] {proto}: {full_id} from {remote}"
+                self._oob_evidence.append(msg)
+                print(f"{C.BOLD}{C.G}{msg}{C.N}")
+                try:
+                    self.session.emit_event("oob", f"{proto} callback from {remote}",
+                                            protocol=proto)
+                except Exception:
+                    pass
+                # Deterministic correlation: a TESTING hypothesis whose probe
+                # referenced this exact canary is confirmed by the oracle.
+                try:
+                    for hyp in self.hyp_engine.get_competing_hypotheses(limit=12, active_only=True):
+                        if hyp.command and (full_id in hyp.command
+                                            or (canary and canary in hyp.command)):
+                            self.hyp_engine.apply_actions([{
+                                "action": "confirm", "id": hyp.id,
+                                "evidence": [msg],
+                                "reason": "OOB callback on this hypothesis' canary",
+                            }])
+                            confirmed_notes.append(str(hyp.title)[:60])
+                            break
+                except Exception:
+                    pass
+                # Honest lead record (info, deduped) — the verified finding
+                # must still come from the model via the normal gates.
+                try:
+                    lead_title = f"OOB lead: {proto} callback (correlate & file)"
+                    if not any(getattr(f, "title", "") == lead_title
+                               for f in self.model.findings):
+                        self.model.add_finding(Finding(
+                            severity="info", title=lead_title,
+                            description=msg, evidence=str(hit.get("raw"))[:500],
+                        ))
+                except Exception:
+                    pass
+            del self._oob_evidence[:-8]
+            note = (f"[SYSTEM: {len(hits)} OOB interaction(s) received — binary out-of-band "
+                    "proof that the target contacted your canary. "
+                    + (f"Confirmed hypothesis: {confirmed_notes[0]}. " if confirmed_notes else "")
+                    + "If one of YOUR probes used this canary, file the matching finding NOW "
+                    "(severity per impact class) with the [OOB INTERACTION] line as evidence; "
+                    "otherwise correlate which probe triggered it before escalating.]")
+            return note[:3000]
+        except Exception as e:
+            log(f"[OOB] oracle poll failed: {e}")
+            return previous_output
+
     def _validate_finding(self, finding: dict, command: str,
                            output: str) -> ValidationResult:
         """Production-grade 4-gate finding validation engine.
@@ -5735,6 +6088,7 @@ Analyze the output carefully. Return JSON ONLY:
         is_critical_claim = any(kw in (title + " " + detail) for kw in _CRITICAL_CLAIM_KEYWORDS)
 
         exploit_indicators = [
+            r'\[OOB INTERACTION\]',  # out-of-band callback = binary blind-vuln proof
             r'uid=\d+|root:x?:0:0:', r'flag\{', r'CTF\{',
             r'\[extracted\]|\[dumped\]', r'credentials? found',
             r'successfully executed', r'administrator:\d+:\d+:',
@@ -5748,11 +6102,17 @@ Analyze the output carefully. Return JSON ONLY:
         ]
         has_exploit = any(re.search(p, output, re.I) for p in exploit_indicators)
 
-        # For critical claims, require BOTH exploit indicator AND contextual evidence
+        # For critical claims, require BOTH exploit indicator AND contextual evidence.
+        # Exception: an out-of-band callback is a binary oracle — the target
+        # physically contacted our canary — so it needs no corroboration.
+        oob_confirmed = bool(re.search(r"\[OOB INTERACTION\]", output or ""))
         if is_critical_claim:
             if not has_exploit:
                 return GateResult("security_impact", False,
                                   "Critical claim requires exploit indicators in output — none found")
+            if oob_confirmed:
+                return GateResult("security_impact", True,
+                                  "OOB callback (binary oracle) confirms the claim")
             # Require at least 3 lines of context for critical findings
             evidence = finding.get("evidence", "")
             evidence_lines = [l for l in output.split("\n") if evidence in l] if evidence else []
@@ -6887,6 +7247,74 @@ WORKSPACE: {self._file_state(target)[:400]}
         # Phase enforcement: show current phase, tool limits, and stuck status
         ctx += f"\nPHASE STATE: {self._phase_context()}\n"
 
+        # Model-owned research ledger — the agent's own open hypotheses with
+        # their next probe and expected evidence, so reasoning persists across
+        # iterations instead of being re-derived from scratch every turn.
+        hyp_ctx = self.hyp_engine.render_context()
+        if hyp_ctx:
+            ctx += "\n" + hyp_ctx + "\n"
+
+        # Chain opportunities (XBOW-style primitive chaining): which missing
+        # finding would turn the agent's own confirmed primitives into a
+        # critical chain. Knowledge is deterministic; the hunt is the model's.
+        try:
+            chain_lines = self.chain_engine.hunting_guidance(self.model.findings)
+        except Exception:
+            chain_lines = []
+        if chain_lines:
+            ctx += "\nCHAIN OPPORTUNITIES (your confirmed primitives → missing link):\n"
+            for line in chain_lines[:4]:
+                ctx += f"  - {line}\n"
+
+        # Dynamic knowledge layer (live feeds + custom corpus): focused,
+        # version-matched intel about what this target runs — never a static
+        # dump. Kept near the top-level state blocks so the model reasons
+        # with current exploitation data, not stale training memory.
+        try:
+            intel_block = self.knowledge.render_context(
+                dict(getattr(self.model, "tech_stack", {}) or {}),
+                query=f"{target} {' '.join(list(getattr(self.model, 'tech_stack', {}) or {})[:3])}",
+            )
+        except Exception as e:
+            log(f"[INTEL] context render failed: {e}")
+            intel_block = ""
+        if intel_block:
+            ctx += "\n" + intel_block + "\n"
+
+        # OOB oracle status: give the model the live canary so it can craft
+        # blind probes (SSRF/XXE/SQLi/RCE) and know that callbacks arrive as
+        # [OOB INTERACTION] evidence lines. Fallback (no interactsh binary)
+        # says so honestly instead of promising callbacks.
+        try:
+            _oob = get_oob()
+            if _oob is not None and getattr(_oob, "available", False):
+                if getattr(_oob, "_mode", "") == "binary":
+                    _canary_host = _oob.oast_url("http").replace("http://", "")
+                    ctx += ("\nOOB ORACLE ACTIVE — canary host: " + _canary_host + "\n"
+                            "  For blind classes (SSRF, XXE, blind SQLi, out-of-band RCE), make the\n"
+                            "  target fetch/connect to this host (or embed it in payloads). Callbacks\n"
+                            "  are polled automatically and appear as [OOB INTERACTION] lines — a\n"
+                            "  callback matching your probe is binary confirmation: file the finding\n"
+                            "  with that line as evidence.\n")
+                else:
+                    ctx += ("\nOOB ORACLE: out-of-band callbacks are NOT monitored in this\n"
+                            "  environment (no interactsh client) — do not report blind-vuln\n"
+                            "  findings based on expected callbacks.\n")
+            if self._oob_evidence:
+                ctx += ("RECENT OOB EVIDENCE:\n"
+                        + "\n".join(f"  {l}" for l in self._oob_evidence[-3:]) + "\n")
+        except Exception:
+            pass
+
+        # Team org status: lanes, boss review of verified findings, and raw
+        # worker evidence for the boss model to reason over.
+        try:
+            team_block = self.team.render_context()
+            if team_block:
+                ctx += "\n" + team_block + "\n"
+        except Exception:
+            pass
+
         # Tool-awareness: show what's actually available vs what the planner keeps suggesting
         tool_ctx = self._installed_tools_context()
         if tool_ctx:
@@ -6977,32 +7405,13 @@ WORKSPACE: {self._file_state(target)[:400]}
 
     def _extract_prose_command(self, raw: str) -> str:
         """Last-resort: pull a single shell command out of free-form AI prose.
-        Looks for EXEC: directives, fenced code blocks, and the first plausible
-        nmap/curl/etc. invocation in the response."""
-        if not raw:
-            return ""
-        # 1) EXEC: directive (line-based)
-        for line in raw.splitlines():
-            s = line.strip()
-            if s.upper().startswith("EXEC:"):
-                cmd = s.split(":", 1)[1].strip()
-                if cmd:
-                    return cmd
-        # 2) Fenced bash/sh code block — take the first non-empty line
-        for fence in ("```bash", "```sh", "```shell", "```"):
-            m = re.search(re.escape(fence) + r"\s*\n(.*?)```", raw, re.DOTALL | re.IGNORECASE)
-            if m:
-                for line in m.group(1).splitlines():
-                    s = line.strip()
-                    if s and not s.startswith("#"):
-                        return s
-        # 3) Inline backticked command
-        bticks = re.findall(r'`([^`\n]{8,400})`', raw)
-        for cand in bticks:
-            s = cand.strip().strip("$").strip()
-            if re.match(r'^(nmap|curl|wget|httpx|sqlmap|nuclei|ffuf|gobuster|feroxbuster|whatweb|masscan|rustscan|hydra|nc|cat|ls|cd|bash|sh|python|python3)\s', s, re.IGNORECASE):
-                return s
-        return ""
+
+        Delegates to the shared parser so EXEC: directives, fenced code blocks
+        and inline backticks are handled by one tool-agnostic implementation
+        (any plausible command line is accepted; the policy engine decides what
+        may actually run)."""
+        from brain.decision_parser import _extract_prose_command as _epc
+        return _epc(raw or "")
 
     def _normalize_decision(self, d) -> Optional[Dict]:
         """Validate planner output shape; coerce/reject so malformed JSON can't crash the loop."""
@@ -7018,6 +7427,14 @@ WORKSPACE: {self._file_state(target)[:400]}
         for k in ("thinking", "think", "reasoning", "strategy", "pivot_reason"):
             v = d.get(k)
             d[k] = v if isinstance(v, str) else ("" if v is None else str(v))
+        hyp = d.get("hypotheses")
+        if isinstance(hyp, dict):
+            hyp = [hyp]
+        d["hypotheses"] = hyp if isinstance(hyp, list) else None
+        team = d.get("team")
+        if isinstance(team, dict):
+            team = [team]
+        d["team"] = team if isinstance(team, list) else None
         # Track strategy changes — if AI keeps the same strategy for 3+ turns, it's looping.
         if d.get("strategy"):
             if not hasattr(self, "_strategy_history"):

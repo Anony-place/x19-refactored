@@ -502,11 +502,34 @@ class SQLDatabase:
 
 
 class Session:
-    def __init__(self):
+    def __init__(self, events: Optional["object"] = None):
         self.dir = Path(CONFIG.SESSIONS_DIR)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.id: Optional[str] = None
         self.data: Dict = {}
+        # Optional AgentEventBus — every agent action flows through this
+        # class, so it is the one honest place to emit observability events.
+        self.events = events
+        # Cheap monotonic bookkeeping for command duration events.
+        self._cmd_started: float = 0.0
+
+    # -- observability -----------------------------------------------------
+    def _emit(self, kind: str, text: str = "", **detail) -> None:
+        bus = getattr(self, "events", None)
+        if bus is None:
+            return
+        try:
+            bus.publish(kind, text, target=str(self.data.get("target", "")), **detail)
+        except Exception:
+            pass  # observability must never break the mission
+
+    def emit_event(self, kind: str, text: str = "", **detail) -> None:
+        """Publish a live observability event (mutates no session data)."""
+        self._emit(kind, text, **detail)
+
+    def mark_command_started(self) -> None:
+        """Note when the agent begins running a command (for durations)."""
+        self._cmd_started = time.monotonic()
 
     def create(self, target: str) -> str:
         self.id = f"x19_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -522,6 +545,7 @@ class Session:
             "os_info": "",
         }
         self.save()
+        self._emit("status", f"session started · {self.id}")
         return self.id
 
     def save(self):
@@ -531,7 +555,12 @@ class Session:
     def add_cmd(self, cmd: str, result: str, category: str = "other", returncode: int = 0):
         self.data["commands"].append({"cmd": cmd[:200], "result": result[:500], "rc": returncode, "ts": datetime.now().isoformat()})
         self.data["iterations"] = len(self.data["commands"])
+        secs = None
+        if self._cmd_started:
+            secs = round(max(0.0, time.monotonic() - self._cmd_started), 1)
+            self._cmd_started = 0.0
         self.save()
+        self._emit("command", cmd[:120], rc=returncode, category=category, secs=secs)
         try:
             SQLDatabase().save_command(self.id, cmd, result, category, returncode)
         except Exception as e:
@@ -540,14 +569,25 @@ class Session:
     def add_finding(self, severity: str, title: str, detail: str, evidence: str = ""):
         self.data["findings"].append({"severity": severity, "title": title, "detail": detail[:500], "evidence": evidence[:500], "ts": datetime.now().isoformat()})
         self.save()
+        self._emit("finding", title[:120], severity=severity)
 
     def set_ports(self, ports: str):
         self.data["ports_discovered"] = ports
         self.save()
+        self._emit("ports", str(ports)[:120])
 
     def set_os(self, os_info: str):
         self.data["os_info"] = os_info
         self.save()
+        self._emit("os", str(os_info)[:120])
+
+    def set_status(self, status: str):
+        """Central status change so the UI hears about completion/failure."""
+        prev = str(self.data.get("status", ""))
+        self.data["status"] = status
+        self.save()
+        if status != prev:
+            self._emit("status", status)
 
     def report(self) -> str:
         d = self.data

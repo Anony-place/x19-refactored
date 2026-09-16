@@ -11,9 +11,8 @@ Confidence is updated using actual observations, never trusted from LLM.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 from datetime import datetime, timezone
-import math
 import hashlib
 
 
@@ -40,6 +39,17 @@ HYP_TRANSITIONS: Dict[str, Set[str]] = {
     HYP_STALE: {HYP_NEW, HYP_TESTING, HYP_DEAD},
     HYP_DEAD: set(),
 }
+
+
+def _clamp01(value: Any) -> float:
+    """Coerce arbitrary model-supplied numbers into a safe [0, 1] float."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return 0.5
+    if f != f:  # NaN
+        return 0.5
+    return max(0.0, min(1.0, f))
 
 
 @dataclass
@@ -104,6 +114,33 @@ class CompetingHypothesis:
     @property
     def is_active(self) -> bool:
         return self.state in (HYP_NEW, HYP_TESTING)
+
+    # -- legacy aliases ----------------------------------------------------
+    # Early consumers (and the benchmark suite) used the ``estimated_*`` names;
+    # keep them as live aliases so both spellings stay valid.
+    @property
+    def estimated_information_gain(self) -> float:
+        return self.expected_information_gain
+
+    @property
+    def estimated_execution_cost(self) -> float:
+        return self.execution_cost
+
+    @property
+    def estimated_risk(self) -> float:
+        return self.risk
+
+    @estimated_information_gain.setter
+    def estimated_information_gain(self, value: float) -> None:
+        self.expected_information_gain = max(0.0, min(1.0, float(value)))
+
+    @estimated_execution_cost.setter
+    def estimated_execution_cost(self, value: float) -> None:
+        self.execution_cost = max(0.0, min(1.0, float(value)))
+
+    @estimated_risk.setter
+    def estimated_risk(self, value: float) -> None:
+        self.risk = max(0.0, min(1.0, float(value)))
 
     def transition(self, new_state: str, reason: str = "", result: str = "") -> bool:
         allowed = HYP_TRANSITIONS.get(self.state, set())
@@ -189,13 +226,29 @@ class MultiHypothesisEngine:
         content = f"{statement}:{command}:{','.join(sorted(assumptions))}"
         return hashlib.sha256(content.encode()).hexdigest()
 
-    def is_duplicate_or_rejected(self, statement: str, command: str = "", assumptions: Optional[List[str]] = None) -> bool:
-        h = self._hash_hypothesis(statement, command or "", assumptions or [])
-        return h in self._rejected_hashes
+    def _identity_hashes(self, hyp: "CompetingHypothesis") -> List[str]:
+        """Every hash a hypothesis must be findable/duplicated by.
+
+        Callers may identify a hypothesis by its full statement, its title or
+        its description (older API surface did exactly that), so all three
+        spellings hash to the same identity.
+        """
+        identities = {hyp.statement, hyp.title or "", hyp.description or ""}
+        identities.discard("")
+        return [self._hash_hypothesis(s, hyp.command, hyp.assumptions) for s in sorted(identities)]
+
+    def is_duplicate_or_rejected(self, statement: str = "", command: str = "", assumptions: Optional[List[str]] = None, *, title: str = "", description: str = "") -> bool:
+        identities = {str(statement or "").strip(), str(title or "").strip(), str(description or "").strip()}
+        identities.discard("")
+        for s in identities:
+            h = self._hash_hypothesis(s, command or "", assumptions or [])
+            if h in self._rejected_hashes:
+                return True
+        return False
 
     def add_hypothesis(
         self,
-        statement: str,
+        statement: str = "",
         title: str = "",
         description: str = "",
         command: str = "",
@@ -215,7 +268,16 @@ class MultiHypothesisEngine:
         command_alternatives: Optional[List[str]] = None,
     ) -> Optional[CompetingHypothesis]:
         assumptions = assumptions or []
-        if self.is_duplicate_or_rejected(statement, command, assumptions):
+        # ``statement`` is the canonical identity, but callers may only have a
+        # title/description/command — derive one instead of raising, so keyword
+        # calls like add_hypothesis(title=…, command=…) keep working.
+        statement = str(statement or "").strip()
+        if not statement:
+            statement = str(title or "").strip() or str(description or "").strip() \
+                or str(command or "").strip()
+        if not statement:
+            return None
+        if self.is_duplicate_or_rejected(statement, command, assumptions, title=title, description=description):
             return None
         hyp_id = self.generate_hypothesis_id(statement, command, assumptions)
         if hyp_id in self._hypotheses:
@@ -290,8 +352,9 @@ class MultiHypothesisEngine:
         hyp.transition(HYP_REJECTED, reason=reason)
         if evidence_ids:
             hyp.contradicting_evidence_ids.extend(evidence_ids)
-        h = self._hash_hypothesis(hyp.statement, hyp.command, hyp.assumptions)
-        self._rejected_hashes.add(h)
+        # Every identity spelling of this hypothesis becomes rejected, so a
+        # later add_hypothesis(title=…) cannot resurrect it either.
+        self._rejected_hashes.update(self._identity_hashes(hyp))
         for contra_id in hyp.contradicts:
             if contra_id in self._hypotheses:
                 self._hypotheses[contra_id].confidence = min(1.0, self._hypotheses[contra_id].confidence + 0.15)
@@ -353,6 +416,149 @@ class MultiHypothesisEngine:
     def get_rejected_hypotheses(self) -> List[CompetingHypothesis]:
         return [h for h in self._hypotheses.values() if h.state == HYP_REJECTED]
 
+    def find_hypothesis(self, text: Any) -> Optional[CompetingHypothesis]:
+        """Resolve a hypothesis by id, exact title/statement, or substring.
+
+        The model only ever sees short ids and titles in its context, so the
+        resolver must be forgiving: any of id → title → statement → substring
+        match is accepted.
+        """
+        t = str(text or "").strip()
+        if not t:
+            return None
+        if t in self._hypotheses:
+            return self._hypotheses[t]
+        tl = t.lower()
+        for h in self._hypotheses.values():
+            if h.title.lower() == tl or h.statement.lower() == tl:
+                return h
+        for h in self._hypotheses.values():
+            if tl in h.statement.lower() or tl in (h.title or "").lower():
+                return h
+        return None
+
+    def apply_actions(self, actions: Any) -> List[str]:
+        """Apply hypothesis actions proposed by the model in a decision.
+
+        This is the model-owned research ledger (Naptime-style): the agent —
+        not hardcoded heuristics — decides which hypotheses exist, which are
+        being tested, and which are confirmed or rejected.
+
+        Each action is a dict:
+          {"action": "add|test|confirm|reject|abandon",
+           "statement": "...", "command": "...", "expected_evidence": [...],
+           "falsification": "...", "confidence": 0.0-1.0, "impact": 0.0-1.0,
+           "evidence": [...], "reason": "..."}
+
+        Returns human-readable one-liners describing what happened (for the
+        transcript); malformed entries are skipped, never raised.
+        """
+        notes: List[str] = []
+        if isinstance(actions, dict):
+            actions = [actions]
+        if not isinstance(actions, list):
+            return notes
+        for a in actions:
+            if not isinstance(a, dict):
+                continue
+            act = str(a.get("action") or a.get("op") or "add").strip().lower()
+            stmt = str(a.get("statement") or a.get("title") or "").strip()
+            if act == "add":
+                if not stmt:
+                    continue
+                # Skip if a live/confirmed hypothesis already says this — the
+                # ledger must stay a short list of distinct research threads.
+                existing = self.find_hypothesis(stmt)
+                new_cmd = str(a.get("command") or "").strip()
+                if existing is not None:
+                    if existing.state in (HYP_NEW, HYP_TESTING, HYP_CONFIRMED):
+                        notes.append(f"duplicate ignored: {stmt[:70]}")
+                        continue
+                    # Rejected/dead threads reopen only with a genuinely
+                    # different probe — otherwise the model would re-run the
+                    # exact experiment that already falsified the idea.
+                    if not new_cmd or new_cmd == existing.command:
+                        notes.append(f"blocked (was REJECTED, same probe): {stmt[:60]}")
+                        continue
+                    notes.append(f"reopening after rejection with new probe: {stmt[:60]}")
+                if self.is_duplicate_or_rejected(stmt, new_cmd):
+                    notes.append(f"duplicate ignored: {stmt[:70]}")
+                    continue
+                ev = a.get("expected_evidence")
+                ev_list = [str(e) for e in ev if str(e).strip()] if isinstance(ev, list) else []
+                hyp = self.add_hypothesis(
+                    statement=stmt,
+                    command=str(a.get("command") or ""),
+                    expected_evidence=ev_list,
+                    falsification_condition=str(a.get("falsification") or ""),
+                    confidence=_clamp01(a.get("confidence", 0.5)),
+                    impact=_clamp01(a.get("impact", 0.5)),
+                    generation_reason=str(a.get("reason") or "model decision"),
+                )
+                if hyp:
+                    notes.append(f"new {hyp.id}: {stmt[:70]}")
+                continue
+            if act not in ("test", "confirm", "reject", "abandon", "stale", "drop"):
+                notes.append(f"unknown action '{act}'")
+                continue
+            hyp = self.find_hypothesis(a.get("id") or stmt)
+            if not hyp:
+                notes.append(f"unknown hypothesis: {str(a.get('id') or stmt)[:60]}")
+                continue
+            reason = str(a.get("reason") or "")
+            if act == "test":
+                self.mark_testing(hyp.id)
+                notes.append(f"testing {hyp.id}: {hyp.title[:60]}")
+            elif act == "confirm":
+                ev = a.get("evidence")
+                ev_ids = [str(e) for e in ev if str(e).strip()][:4] if isinstance(ev, list) else []
+                # State machine requires NEW -> TESTING -> CONFIRMED; a fresh
+                # hypothesis confirmed on first evidence passes through testing.
+                if hyp.state == HYP_NEW:
+                    self.mark_testing(hyp.id)
+                self.confirm_hypothesis(hyp.id, ev_ids)
+                if hyp.state == HYP_CONFIRMED:
+                    notes.append(f"CONFIRMED {hyp.id}: {hyp.title[:60]}")
+                else:
+                    notes.append(f"confirm rejected by state machine for {hyp.id} ({hyp.state})")
+            elif act == "reject":
+                self.reject_hypothesis(hyp.id, reason or "model rejected")
+                notes.append(f"REJECTED {hyp.id}: {hyp.title[:60]}")
+            elif act in ("abandon", "stale", "drop"):
+                self.mark_stale(hyp.id, reason or "abandoned")
+                notes.append(f"abandoned {hyp.id}: {hyp.title[:60]}")
+            else:
+                notes.append(f"unknown action '{act}'")
+        return notes
+
+    def render_context(self, limit: int = 6) -> str:
+        """Render the research ledger for the decision prompt.
+
+        Shows open threads (with their next probe and expected evidence) plus
+        recent confirmed/rejected items so the model keeps a coherent line of
+        reasoning across iterations instead of re-deriving state each turn.
+        """
+        active = self.get_competing_hypotheses(limit=max(1, limit), active_only=True)
+        if not active and not self.get_confirmed_hypotheses():
+            return ""
+        lines = ["RESEARCH LEDGER (your hypotheses — test or close them):"]
+        for h in active:
+            lines.append(f"  [{h.state}] #{h.id} {h.title}")
+            if h.command:
+                lines.append(f"      next probe: {h.command[:120]}")
+            if h.expected_evidence:
+                lines.append(f"      expect: {str(h.expected_evidence[0])[:100]}")
+        confirmed = self.get_confirmed_hypotheses()
+        if confirmed:
+            lines.append("CONFIRMED (file the finding with real evidence, or move on):")
+            for h in confirmed[-3:]:
+                lines.append(f"  + {h.title[:90]}")
+        rejected = self.get_rejected_hypotheses()
+        if rejected:
+            names = ", ".join((h.title or h.id)[:40] for h in rejected[-4:])
+            lines.append(f"REJECTED (do not revisit): {names}")
+        return "\n".join(lines)
+
     def get_learning_summary(self) -> Dict[str, Any]:
         confirmed = self.get_confirmed_hypotheses()
         rejected = self.get_rejected_hypotheses()
@@ -384,6 +590,7 @@ class MultiHypothesisEngine:
             h1 = self.add_hypothesis(
                 statement="Web directory brute-forcing will discover hidden/sensitive paths",
                 title="Directory Enumeration Discovery",
+                description="Brute-force common web paths to surface hidden admin, backup and config endpoints",
                 command="gobuster dir -u http://target -w /usr/share/wordlists/dirb/common.txt",
                 assumptions=["Web server is responding", "Standard wordlist covers common paths"],
                 expected_evidence=["HTTP 200/301 responses for discovered paths", "Interesting directories like /admin, /backup"],
@@ -402,7 +609,8 @@ class MultiHypothesisEngine:
                     h2 = self.add_hypothesis(
                         statement=f"The {tech_name} installation has vulnerable plugins/themes",
                         title=f"{tech_name} Plugin Vulnerability",
-                        command=f"wpscan --url http://target --enumerate vp,vt,u" if tech_name.lower() == 'wordpress' else f"nuclei -t /nuclei-templates/{tech_name.lower()}/",
+                        description=f"Enumerate {tech_name} plugins/themes and match versions against known public CVEs",
+                        command=("wpscan --url http://target --enumerate vp,vt,u" if tech_name.lower() == "wordpress" else f"nuclei -t /nuclei-templates/{tech_name.lower()}/"),
                         assumptions=[f"{tech_name} is installed and detectable", "Public CVEs exist for plugins/themes"],
                         expected_evidence=["CVE matches", "Version disclosure", "Plugin listings"],
                         falsification_condition="No vulnerable plugins/themes found after full enumeration",
@@ -417,6 +625,7 @@ class MultiHypothesisEngine:
             h3 = self.add_hypothesis(
                 statement=".git directory is publicly accessible and may contain sensitive history",
                 title="Git Repository Exposure",
+                description="The exposed .git directory may leak source code, history and credentials",
                 command="curl -sik http://target/.git/config",
                 assumptions=[".git directory exists", "Web server allows access to .git"],
                 expected_evidence=["Git config file content", "Repository structure disclosure"],
@@ -433,6 +642,7 @@ class MultiHypothesisEngine:
             h4 = self.add_hypothesis(
                 statement="Git commit history contains hardcoded credentials or secrets",
                 title="Credentials in Git History",
+                description="Commit logs and history often contain hardcoded secrets, keys and developer emails",
                 command="curl -sik http://target/.git/logs/HEAD",
                 assumptions=[".git is accessible", "Commits contain sensitive data"],
                 expected_evidence=["Commit messages", "Potential credential strings", "Developer emails"],
@@ -452,6 +662,7 @@ class MultiHypothesisEngine:
             h5 = self.add_hypothesis(
                 statement="SSH service accepts weak/default credentials or has misconfigurations",
                 title="SSH Weak Authentication",
+                description="Probe SSH auth methods and credential strength for weak or default configurations",
                 command="nmap -p 22 --script ssh-auth-methods,ssh-brute target",
                 assumptions=["SSH service is OpenSSH or compatible", "Default credentials may exist"],
                 expected_evidence=["Authentication method disclosure", "Valid credentials if brute succeeds"],

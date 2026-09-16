@@ -110,7 +110,10 @@ def list_sessions(limit: int = 50) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     if not directory.exists():
         return rows
-    for path in sorted(directory.glob("*.json"), reverse=True)[:limit]:
+    # Most recent first, by actual modification time — file names are not
+    # guaranteed to sort chronologically.
+    paths = sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+    for path in paths:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:

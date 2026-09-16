@@ -11,7 +11,6 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict
 
 from constants import PROVIDERS
 from config import CONFIG, CONFIG_FILE, load_config

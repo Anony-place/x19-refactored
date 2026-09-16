@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """X19 — autonomous AI security assessment platform.
 
-``run.py`` is the single supported entry point.  The default/control-plane
-surface is intentionally plain terminal output; the old full-screen workspace
-is not used unless an operator explicitly invokes the legacy ``dash`` command.
+``run.py`` is the single supported entry point. On an interactive terminal the
+default surface is the terminal application: the workspace home (status, state
+and every function), with first-run setup when no provider is configured yet.
+Non-interactive contexts (pipes, CI, ``X19_UI=plain``) get a dependency-light
+plain control plane instead, and the live dashboard stays behind ``dash``.
 
-    python run.py
-    python run.py setup
-    python run.py provider list
-    python run.py run -t <target>
-    python run.py dash -t <target>   # explicit live UI only
+    python run.py                      # workspace home (or first-run setup)
+    python run.py setup                # guided setup
+    python run.py run -t <target>      # one-shot autonomous assessment
+    python run.py dash -t <target>     # explicit live UI only
+    X19_UI=plain python run.py status  # plain control plane
 """
 
+import os
 import sys
 import traceback
 
@@ -39,7 +42,22 @@ install_cognitive_runtime()
 from logging_utils import log
 
 _RUNTIME_COMMANDS = {"runtime", "skills", "skill", "recall", "delegate", "cron"}
-_PLAIN_COMMANDS = {"", "status", "workspace", "providers", "provider", "setup", "brain"}
+#: Commands that stay on the lightweight plain control plane in every mode.
+_ALWAYS_PLAIN_COMMANDS = {"provider", "brain"}
+#: Commands served by the full terminal application on an interactive TTY.
+_APP_COMMANDS = {"", "workspace", "providers", "setup"}
+#: Commands that explicitly asked for the plain surface.
+_PLAIN_COMMANDS = {"status"}
+
+
+def _wants_plain_surface() -> bool:
+    """Plain output is for machines and people who explicitly asked for it."""
+    if os.getenv("X19_UI", "").strip().lower() == "plain":
+        return True
+    try:
+        return not (sys.stdin.isatty() and sys.stdout.isatty())
+    except Exception:
+        return True
 
 
 def _maybe_promote_learning(argv, result: int) -> None:
@@ -67,18 +85,39 @@ def main() -> int:
         from runtime_cli import dispatch
         return int(dispatch(argv) or 0)
 
-    # Provider/setup/status commands use the plain control plane. This removes
-    # the Rich workspace from the normal operator path without deleting the
-    # assessment dashboard behind the explicit `dash` command.
-    if not argv or argv[0] in _PLAIN_COMMANDS:
+    route = argv[0] if argv else ""
+
+    # Fleet mode: many targets, one bounded supervisor. Kept out of the heavy
+    # assessment CLI — it only needs the fleet supervisor + the agent graph.
+    if route == "fleet":
+        from brain.fleet import cli as fleet_cli
+        return int(fleet_cli(argv[1:]) or 0)
+
+    if route in _ALWAYS_PLAIN_COMMANDS or route in _PLAIN_COMMANDS:
         from plain_cli import main as plain_main
         return int(plain_main(argv) or 0)
 
-    # The existing CLI remains responsible for the security assessment command
-    # graph. The cognitive runtime is already installed before this import.
+    if route in _APP_COMMANDS:
+        # An explicit invocation always goes to the full CLI (which owns
+        # --json/--plain handling). Only the bare `x19` default depends on
+        # whether a human is actually watching: machines get the plain status.
+        if not route and _wants_plain_surface():
+            from plain_cli import main as plain_main
+            return int(plain_main(argv or ["status"]) or 0)
+        from cli import main as cli_main
+        # cli imports agent.py; only now can the compatibility layer bind the
+        # gateway to each X19 instance's explicit mission target.
+        install_agent_execution_policy()
+
+        routed = ["workspace"] + argv[1:] if not route else argv
+        result = int(cli_main(routed) or 0)
+        _maybe_promote_learning(argv, result)
+        return result
+
+    # The existing CLI remains responsible for the rest of the security
+    # assessment command graph. The cognitive runtime is already installed
+    # before this import.
     from cli import main as cli_main
-    # cli imports agent.py; only now can the compatibility layer bind the
-    # gateway to each X19 instance's explicit mission target.
     install_agent_execution_policy()
 
     result = int(cli_main() or 0)
