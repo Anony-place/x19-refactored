@@ -134,6 +134,48 @@ HexStrike AI (MCP, 150+ tools), D-CIPHER (44% HTB multi-agent), Anthropic
 
 ---
 
+## 2b. Parity matrix — X19 vs har top agent (code-level, honest verdicts)
+
+Har agent ki **signature capability** → X19 ka counterpart (exact code location)
+→ verdict: ✅ parity | ⚠️ partial | ❌ nahi hai. Yeh table claims nahi, code
+point karta hai.
+
+| Agent | Signature capability | X19 counterpart | Verdict |
+| --- | --- | --- | --- |
+| **XBOW** | hypothesis → micro-step exploit chain → real exploitation se validation | ledger (`brain/hypothesis_engine.py`) + chain compass (`brain/exploit_chain.py`) + 4-gate/OOB verification (`agent.py::_validate_finding`, `_poll_oob_oracle`) | ✅ process parity; ⚠️ **chain-level PoV re-run missing** (chains report hote hain bina combined-exploit re-execution ke) |
+| **XBOW** | internal reviewer debate (false-positive kill) | `brain/finding_review.py` — hostile second reviewer, critical/high pe mandatory | ✅ |
+| **Big Sleep** | iterative hypothesis research + falsifiers | ledger add/test/confirm/reject + pre-registration contract (`tests/test_trajectories.py`) | ✅ |
+| **Big Sleep** | debugger/code-browsing verification (white-box) | — X19 black-box hai: OOB oracle + output gates equivalent hain, code-browsing nahi | ⚠️ black-box equivalent only |
+| **Big Sleep** | variant analysis | VARIANT CHECK advisory on every confirmation (`agent.py` confirm block) | ✅ |
+| **Atlantis** | N-version orthogonal CRSs | fleet units + parallel trajectories + provider failover chain (3 independent "approaches") | ✅ pattern-level |
+| **Atlantis** | PoV oracle (patch re-run validation) | X19 patch nahi karta; finding-side oracle = OOB + gates | ⚠️ domain-different |
+| **Atlantis** | LLM trust tiers (augmented→opinionated→driven) | deterministic gates + "worker report alone is never proof" boundary | ✅ |
+| **ARTEMIS** | live multi-host autonomy + cost/hr | fleet mode (`brain/fleet.py`) + usage ribbon (`_usage_tick`, `X19_PRICE_PER_MTOK`) | ✅ |
+| **ARTEMIS** | GUI interaction testing | `tools.BrowserAutomation` MCP/tools se available, loop-integrated nahi | ⚠️ |
+| **Shannon** | white-box source↔dynamic correlation | black-box only — repo/artifact context feature nahi | ❌ (roadmap-worthy) |
+| **PentAGI** | planner+specialists orchestration | `brain/team.py` boss→managers→workers | ✅ |
+| **PentAGI** | Docker-isolated runtimes per agent | policy gateway hai, per-run container isolation nahi | ⚠️ operator responsibility |
+| **PentAGI** | layered memory (vector+working+episodic) | Chroma vector + session + failure-memory; **episodic layer thin** | ⚠️ |
+| **HPTSA** | hierarchical planner + task agents (4.3×) | team org + lanes | ✅ |
+| **HPTSA** | per-agent narrow contexts | ek shared decision context hai; lanes ke worker contexts separate | ⚠️ |
+| **PentestGPT** | task-tree persistence + parse/reasoning split | ledger + mission graph + `brain/decision_parser.py` | ✅ |
+| **CAI** | backend-agnostic (300+ models) | `providers.py` failover + `build_backend` + escalation chain | ✅ (design parity) |
+| **VulnBot/xOffense** | Penetration Task Graph dependencies | mission graph + task queue (`mission.py`, `brain/task_queue.py`) | ✅ |
+| **xOffense** | domain-fine-tuned model | operator-choice (provider-agnostic), in-box fine-tuning nahi | ⚠️ n/a |
+
+**Score: 10 ✅ · 8 ⚠️ · 1 ❌** — jahan ⚠️/❌ hai wahan honest reasons hain (black-box
+domain, patch-domain difference, ya genuinely missing features: chain-PoV re-run,
+white-box correlation, per-run sandboxing, episodic memory depth).
+
+### Is matrix se nikle 4 actionable gaps (priority order)
+1. **Chain PoV re-run** (XBOW/Atlantis): chain confirm hone pe combined-exploit
+   verification probe dispatch — team lanes iske liye ready hain.
+2. **Episodic memory** (PentAGI): per-target run-history ko semantic recall mein
+   compounding karna (failure-memory ko vector store se correlate).
+3. **Per-run sandboxing** (PentAGI): fleet units ko optional Docker/pod isolation.
+4. **White-box correlation** (Shannon): repo/API artifact den pe world-model
+   correlation — jab user source share kare.
+
 ## 3. Reality check (benchmark honesty)
 
 - CVE-Bench: best framework **13%** zero-day / 25% one-day exploitation of real

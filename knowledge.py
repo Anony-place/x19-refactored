@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,10 @@ from logging_utils import log
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 EPSS_URL = "https://api.first.org/data/v1/epss"
+
+# Fleet mode runs several X19 loops per process; ingestion touches the
+# SHARED corpus_state.json and the shared vector store, so serialize it.
+_INGEST_LOCK = threading.Lock()
 
 CACHE_DIR = CONFIG_DIR / "cache" / "intel"
 KNOWLEDGE_DIR = Path(os.getenv("X19_KNOWLEDGE_DIR") or (CONFIG_DIR / "knowledge"))
@@ -353,6 +358,10 @@ class KnowledgeLayer:
             except Exception as e:
                 log(f"[INTEL] corpus ingestion unavailable: {e}")
                 return 0
+        with _INGEST_LOCK:   # fleet units share state + store — serialize
+            return self._ingest_locked(memory)
+
+    def _ingest_locked(self, memory) -> int:
         try:
             KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
             state: Dict[str, str] = {}
@@ -380,7 +389,9 @@ class KnowledgeLayer:
                         added += 1
                 state[rel] = fhash
             self._ingest_state_file.parent.mkdir(parents=True, exist_ok=True)
-            self._ingest_state_file.write_text(json.dumps(state))
+            _tmp = self._ingest_state_file.with_suffix(".json.tmp")
+            _tmp.write_text(json.dumps(state))
+            os.replace(_tmp, self._ingest_state_file)   # atomic — no torn state
             return added
         except Exception as e:
             log(f"[INTEL] corpus ingestion failed: {e}")

@@ -222,3 +222,31 @@ class WiringTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EvictionSafetyTests(unittest.TestCase):
+    """Eviction must never orphan an ACTIVE hypothesis (its worker reports
+    would become unmatchable forever)."""
+
+    def test_eviction_keeps_active_hypotheses(self):
+        agent = _trajectory_agent()
+        # one genuinely active hypothesis whose mapping must survive
+        hyp = _ssti_hyp(agent)
+        agent.hyp_engine.apply_actions([{"action": "test", "statement": "SSTI"}])
+        import hashlib as _h
+        active_key = _h.md5(hyp.command.encode()).hexdigest()[:12]
+        agent._trajectory_dispatched.add(active_key)
+        agent._trajectory_map[active_key] = hyp.id
+        # pad with 130 junk entries (unknown hypothesis ids -> evictable)
+        for i in range(130):
+            junk = f"junk-cmd-{i}"
+            jk = _h.md5(junk.encode()).hexdigest()[:12]
+            agent._trajectory_dispatched.add(jk)
+            agent._trajectory_map[jk] = f"nonexistent-{i}"
+        agent._dispatch_parallel_trajectories()   # triggers eviction pass
+        self.assertIn(active_key, agent._trajectory_map,
+                      "active hypothesis mapping must survive eviction")
+        # eviction removed at least the oldest closed/unknown entry this pass;
+        # over iterations the map stays bounded while actives are protected
+        self.assertLess(len(agent._trajectory_map), 132)
+        agent.team.shutdown()
