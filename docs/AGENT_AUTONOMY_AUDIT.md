@@ -269,5 +269,9 @@ Prioritised by expected impact on real bug-hunting throughput:
 - Knowledge layer: 21 (`tests/test_knowledge_layer.py`); OOB oracle: 11
   (`tests/test_oob_oracle.py`); team org: 17 (`tests/test_team.py`);
   trajectories: 13 (`tests/test_trajectories.py`); escalation+usage: 17
-  (`tests/test_escalation.py`); fleet: 15 (`tests/test_fleet.py`).
-  Full suite: **731 passed, 20 subtests**.
+  (`tests/test_escalation.py`); fleet: 15 (`tests/test_fleet.py`);
+  full-loop integration: 1 (`tests/test_integration_loop.py`) — ek real
+  `_autonomous_loop_impl` run jismein team tick, parallel trajectory
+  dispatch → policy-gateway execution → pre-registered auto-confirm,
+  ledger/OOB/lanes context blocks aur usage accounting sab ek saath
+  composed verify hote hain. Full suite: **732 passed, 20 subtests**.
