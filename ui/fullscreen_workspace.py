@@ -32,11 +32,6 @@ from ui.console import get_console, info, warn
 class FullscreenWorkspace:
     """A restrained, production terminal workspace backed by live X19 state."""
 
-    INTERACTIVE_COMMANDS = {
-        "/target", "/provider", "/shell", "/model", "/resume",
-        "/scope",
-    }
-
     def __init__(self, app: Any):
         self.app = app
         self.console = get_console()
@@ -48,7 +43,6 @@ class FullscreenWorkspace:
         self._raw = False
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="x19-ui")
         self._chat_busy = False
-        self._last_history_len = 0
 
     # ------------------------------------------------------------------
     # Terminal input
@@ -161,7 +155,7 @@ class FullscreenWorkspace:
                 return "RUNNING", f"{task.elapsed():.0f}s"
             except Exception:
                 return "RUNNING", ""
-        if getattr(self.agent, "running", False):
+        if self._chat_busy or getattr(self.agent, "running", False):
             return "WORKING", ""
         return "READY", ""
 
@@ -170,10 +164,7 @@ class FullscreenWorkspace:
     # ------------------------------------------------------------------
     def _conversation(self) -> RenderableType:
         history = self._history()
-        width = max(30, self.console.width - 34)
-        # Keep the visible window bounded. The complete history remains owned by
-        # ConsoleApp; this is only the viewport, not a second transcript store.
-        visible = history[-18:]
+        visible = history[-16:]
         rows: list[RenderableType] = []
         for item in visible:
             role = str(item.get("role", "assistant"))
@@ -181,19 +172,19 @@ class FullscreenWorkspace:
             if role == "user":
                 head = Text()
                 head.append("you", style="bold cyan")
-                head.append("  ", style="dim")
                 rows.append(Group(head, Text(content, style="white")))
             else:
                 head = Text()
                 head.append("X19", style="bold")
                 rows.append(Group(head, Markdown(content)))
-        if not rows:
+        if self._chat_busy:
+            rows.append(Text("X19 is responding…", style="dim"))
+        elif not rows:
             rows.append(Text("No conversation yet. Type a message below.", style="dim"))
         return Panel(Group(*rows), title="Conversation", border_style="bright_blue", padding=(1, 2))
 
     def _activity(self) -> RenderableType:
         from events import summarize_event
-
         lines: list[Text] = []
         for event in list(self._events)[-12:]:
             try:
@@ -237,8 +228,6 @@ class FullscreenWorkspace:
         return Panel(table, title="Session", border_style="border")
 
     def _tools(self) -> RenderableType:
-        # Prefer the agent's runtime-discovered inventory. Fall back to the
-        # global registry only when discovery has not populated an inventory.
         tools = getattr(self.agent, "_available_tools", None)
         if isinstance(tools, dict) and tools:
             names = list(tools.keys())
@@ -288,9 +277,8 @@ class FullscreenWorkspace:
     def _footer(self) -> RenderableType:
         status, elapsed = self._status()
         line = Text()
-        line.append(" X19", style="bold")
-        line.append("  ·  ", style="dim")
-        line.append(f"{status.lower()}", style="cyan" if status != "READY" else "dim")
+        line.append(" ", style="dim")
+        line.append(status.lower(), style="cyan" if status != "READY" else "dim")
         if elapsed:
             line.append(f"  {elapsed}", style="dim")
         line.append("      ", style="dim")
@@ -300,7 +288,7 @@ class FullscreenWorkspace:
         line.append(" stop/exit   ", style="dim")
         line.append("/help", style="bold")
         line.append(" commands", style="dim")
-        return Panel(line, border_style="bright_blue", padding=(0, 1))
+        return Panel(line, border_style="border", padding=(0, 1))
 
     def _input(self) -> RenderableType:
         line = Text()
@@ -346,17 +334,20 @@ class FullscreenWorkspace:
         self._chat_busy = True
         try:
             self.app.remember("user", message)
-            reply = self.app._chat_reply(message)
+            # The fullscreen workspace already owns the Rich Live renderer;
+            # disable ConsoleApp's nested spinner/stream Live and only consume
+            # the real provider result into the shared transcript.
+            reply = self.app._chat_reply(message, render=False)
             if reply:
                 self.app.remember("assistant", reply)
         finally:
             self._chat_busy = False
 
-    def _submit_chat(self, line: str) -> None:
+    def _submit_chat(self, message: str) -> None:
         if self._chat_busy:
             warn("X19 is still responding — wait for the current reply")
             return
-        self._executor.submit(self._run_chat, line)
+        self._executor.submit(self._run_chat, message)
 
     def _submit_command(self, line: str) -> None:
         """Reuse ConsoleApp's real command handlers; this UI owns no fake logic."""
