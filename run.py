@@ -60,6 +60,30 @@ def _wants_plain_surface() -> bool:
         return True
 
 
+def _activate_fullscreen_chat() -> None:
+    """Swap the interactive chat renderer for the single-screen terminal UI."""
+    if os.getenv("X19_UI", "").strip().lower() in {"plain", "legacy"}:
+        return
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return
+    try:
+        from ui.app import ConsoleApp
+        from ui.fullscreen_workspace import FullscreenWorkspace
+
+        # Keep the existing ConsoleApp implementation intact as the fallback
+        # renderer. The new workspace owns only presentation/input; all command
+        # handlers, agent execution, policy gates and background tasks remain
+        # in the existing application.
+        ConsoleApp._legacy_run = ConsoleApp.run
+
+        def _fullscreen_run(self):
+            return FullscreenWorkspace(self).run()
+
+        ConsoleApp.run = _fullscreen_run
+    except Exception as exc:
+        log(f"FULLSCREEN_UI_FALLBACK: {type(exc).__name__}: {exc}")
+
+
 def _maybe_promote_learning(argv, result: int) -> None:
     """Promote completed assessment outcomes into reviewable skills."""
     if not argv or argv[0] != "run" or result != 0:
@@ -72,7 +96,7 @@ def _maybe_promote_learning(argv, result: int) -> None:
             print(f"[x19] learned skill promoted: {skill}")
     except Exception as exc:
         # Learning must never turn a successful security assessment into a
-        # failed command. Diagnostics are useful, but execution wins.
+        # failed security assessment. Diagnostics are useful, but execution wins.
         log(f"LEARNING_PROMOTION_FAILED: {type(exc).__name__}: {exc}")
 
 
@@ -119,6 +143,7 @@ def main() -> int:
     # before this import.
     from cli import main as cli_main
     install_agent_execution_policy()
+    _activate_fullscreen_chat()
 
     result = int(cli_main() or 0)
     _maybe_promote_learning(argv, result)
