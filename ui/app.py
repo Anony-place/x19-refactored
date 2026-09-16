@@ -51,6 +51,7 @@ COMMANDS: List[Dict[str, str]] = [
     {"name": "/config [K=V]", "help": "show configuration, or set a value", "group": "runtime"},
     {"name": "/sessions [id]", "help": "list stored sessions, or open one", "group": "runtime"},
     {"name": "/tasks [log <id>]", "help": "background tasks, or replay a task's output", "group": "runtime"},
+    {"name": "/fleet <t1,t2,…>", "help": "run several targets concurrently; /fleet status · /fleet stop", "group": "assessment"},
     {"name": "/resume [id]", "help": "load a stored session (findings + report) into this workspace", "group": "runtime"},
     {"name": "/tools", "help": "toolchain availability", "group": "runtime"},
     {"name": "/doctor", "help": "self diagnostics and health score", "group": "runtime"},
@@ -593,6 +594,91 @@ class ConsoleApp:
 
     def cmd_stop(self, *args: str) -> None:
         self._request_stop()
+
+    def cmd_fleet(self, *args: str) -> None:
+        """XBOW-style fleet: run several targets concurrently.
+
+        /fleet a.com, b.com  — confirm, then run (bounded by X19_FLEET_CONCURRENCY)
+        /fleet status        — per-target table + fleet rollup
+        /fleet stop          — cooperative stop of every unit
+        """
+        from rich.table import Table as _Table
+
+        arg = " ".join(args).strip()
+        fleet = getattr(self, "_fleet", None)
+
+        if not arg or arg.lower() == "status":
+            if fleet is None or not fleet.units:
+                info("no fleet yet — start one with /fleet target1, target2, …")
+                return
+            table = _Table(title="fleet")
+            for col in ("target", "status", "secs", "findings", "crit+high", "error"):
+                table.add_column(col)
+            for row in fleet.status_rows():
+                table.add_row(str(row["target"]), row["status"], str(row["secs"]),
+                              str(row["findings"]), str(row["crit_high"]),
+                              str(row["error"] or "—"))
+            self.console.print(table)
+            s = fleet.summary()
+            if s["shared_stacks"]:
+                info("shared stacks (intel + confirmed hypotheses transfer): "
+                     + "; ".join(f"{t} on {', '.join(h)}" for t, h in s["shared_stacks"].items()))
+            return
+
+        if arg.lower() == "stop":
+            if fleet is None or not fleet.units:
+                warn("no fleet running")
+                return
+            n = fleet.stop_all()
+            ok(f"stop requested for {n} running unit(s); queued units cancelled")
+            return
+
+        # start a new fleet
+        if fleet is not None and fleet.active_count():
+            warn("a fleet is already running — /fleet stop first")
+            return
+        targets = [t.strip() for chunk in arg.split(",") for t in chunk.split() if t.strip()]
+        if len(targets) < 2:
+            warn("fleet needs at least two targets (use /target for a single assessment)")
+            return
+        confirm = Prompt.ask(
+            f"Run {len(targets)} independent assessments (each unit passes its own scope gate)? [y/N]",
+            console=self.console, default="N",
+        ).strip().lower()
+        if confirm not in {"y", "yes"}:
+            info("fleet cancelled")
+            return
+
+        from brain.fleet import FleetSupervisor, fleet_concurrency
+
+        sup = FleetSupervisor(bus=None, max_concurrency=fleet_concurrency())
+        sup.submit(targets)
+        self._fleet = sup
+
+        def _run_fleet() -> str:
+            sup.run(wait=True, on_status=lambda t: None)
+            s = sup.summary()
+            parts = [f"{s['done']}/{s['targets']} done"]
+            if s["failed"]:
+                parts.append(f"{s['failed']} failed")
+            sev = s.get("severity") or {}
+            if sev:
+                parts.append("severity " + ", ".join(f"{k}:{v}" for k, v in sorted(sev.items())))
+            return "fleet finished — " + " · ".join(parts) + " (/fleet for the table)"
+
+        try:
+            task = self.background.start(
+                f"fleet of {len(targets)} targets",
+                _run_fleet,
+                target=f"{len(targets)} targets",
+            )
+            self._fleet_task = task
+            ok(f"fleet running in the background · {len(targets)} targets, "
+               f"max {sup.max_concurrency} concurrent · task {task.id}")
+            step("per-unit scope checks still apply; /fleet status · /fleet stop")
+        except Exception as exc:
+            warn(f"could not start fleet: {exc}")
+
 
     def cmd_tasks(self, *args: str) -> None:
         if args and args[0].lower() == "log":

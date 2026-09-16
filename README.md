@@ -147,6 +147,17 @@ models stay blocked on unauthorised exploitation), cooldown-bounded
 ribbon shows `N calls ~Tk tok` per run, and `~$X` too when you set your
 blended rate via `X19_PRICE_PER_MTOK`.
 
+## Fleet mode — many targets, one supervisor
+
+`x19 fleet -t target1,target2,target3 --max 3` runs independent assessments
+concurrently (XBOW-scale pattern): each unit is a full X19 agent with its own
+session, so the scope gate, policy engine, verification gates and team org
+are inherited per unit. Failure isolation, cooperative `/fleet stop`-style
+control, severity rollup across targets, and shared-tech-stack correlation
+(intel and confirmed hypotheses transfer between targets running the same
+stack). In the workspace: `/fleet t1, t2, t3` to launch, `/fleet status`,
+`/fleet stop`. Concurrency: `X19_FLEET_CONCURRENCY` (default 2, max 8).
+
 ## Knowledge layer (live intel + your own corpus)
 
 The agent reasons over **real-time data, not hardcoded lists**: CISA KEV

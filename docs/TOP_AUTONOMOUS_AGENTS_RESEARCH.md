@@ -190,5 +190,5 @@ HexStrike AI (MCP, 150+ tools), D-CIPHER (44% HTB multi-agent), Anthropic
 | PoV oracle for chains | ⬜ roadmap (exploit → re-run → binary proof) |
 | Hierarchical sub-agents | ✅ shipped (`brain/team.py`: MissionDirector → WorkstreamManager → ProbeWorker, policy-gated) |
 | Episodic memory layer | ⬜ roadmap (PentAGI pattern) |
-| Fleet (multi-target) | ⬜ roadmap (XBOW scale pattern) |
+| Fleet (multi-target) | ✅ shipped (`brain/fleet.py`: bounded pool, failure isolation, shared-stack correlation; `x19 fleet` + `/fleet`) |
 | OOB callback = blind-vuln oracle | ✅ shipped (`_poll_oob_oracle`: durable evidence + hypothesis correlation + gate integration) |

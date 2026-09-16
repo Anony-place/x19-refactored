@@ -87,6 +87,12 @@ def main() -> int:
 
     route = argv[0] if argv else ""
 
+    # Fleet mode: many targets, one bounded supervisor. Kept out of the heavy
+    # assessment CLI — it only needs the fleet supervisor + the agent graph.
+    if route == "fleet":
+        from brain.fleet import cli as fleet_cli
+        return int(fleet_cli(argv[1:]) or 0)
+
     if route in _ALWAYS_PLAIN_COMMANDS or route in _PLAIN_COMMANDS:
         from plain_cli import main as plain_main
         return int(plain_main(argv) or 0)

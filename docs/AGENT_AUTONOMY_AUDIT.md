@@ -221,6 +221,26 @@ Roadmap items 2 (frontier gating) aur 9 (cost transparency) close:
   `~$X` jab operator apni blended rate `X19_PRICE_PER_MTOK` se de.
 - 17 tests (`tests/test_escalation.py`).
 
+## 4h. Increment: fleet mode (multi-target supervisor)
+
+Roadmap ka aakhri bada item close — X19 ab ek process mein kai targets chala
+sakta hai (XBOW scale pattern):
+
+- **FleetSupervisor** (`brain/fleet.py`): bounded worker pool
+  (`X19_FLEET_CONCURRENCY`, default 2, max 8); har unit ek poora X19 agent
+  hai apne session ke saath — scope gate, policy engine, verification gates
+  aur team org per-unit inherit hote hain. Supervisor sirf fleet-level cheezein
+  add karta hai.
+- **Failure isolation**: ek target ka crash baaki units ko kabhi nahi chhoota;
+  lifecycle queued → running → done/failed/stopped.
+- **Cooperative control**: `stop(target)` / `stop_all()` agent ke stop flag se.
+- **Fleet summary**: severity rollup across targets + **shared tech stacks**
+  (same stack ≥2 targets pe → intel aur confirmed hypotheses transfer).
+- **Entry points**: headless `x19 fleet -t t1,t2,t3 --max N` (run.py routing,
+  nonzero exit agar koi unit fail ho) + workspace `/fleet t1, t2` /
+  `/fleet status` / `/fleet stop` (background task, ribbon note live).
+- 15 tests (`tests/test_fleet.py`).
+
 ## 5. Roadmap — what still separates X19 from big-agent caliber
 
 Prioritised by expected impact on real bug-hunting throughput:
@@ -231,9 +251,8 @@ Prioritised by expected impact on real bug-hunting throughput:
    loop to become a dispatcher over per-hypothesis micro-sessions.
 2. ~~**Frontier-model gating for hard steps**~~ → ✅ shipped (§4g:
    `X19_ESCALATE` chain, gate-respecting, cooldown-bounded).
-3. **Fleet mode**: XBOW runs hundreds of targets concurrently; X19 is
-   single-process single-target. The background task manager is the natural
-   substrate for a multi-target supervisor.
+3. ~~**Fleet mode**~~ → ✅ shipped (§4h: `FleetSupervisor`, bounded pool,
+   failure isolation, shared-stack correlation, `/fleet` + `x19 fleet`).
 4. **Blind-vuln OOB correlation**: `attacks.get_oob/oob_inject` exist; wiring
    OOB callback polling into hypothesis confirmation would close the blind
    SSRF/SQLi evidence gap.
@@ -250,4 +269,5 @@ Prioritised by expected impact on real bug-hunting throughput:
 - Knowledge layer: 21 (`tests/test_knowledge_layer.py`); OOB oracle: 11
   (`tests/test_oob_oracle.py`); team org: 17 (`tests/test_team.py`);
   trajectories: 13 (`tests/test_trajectories.py`); escalation+usage: 17
-  (`tests/test_escalation.py`). Full suite: **716 passed, 20 subtests**.
+  (`tests/test_escalation.py`); fleet: 15 (`tests/test_fleet.py`).
+  Full suite: **731 passed, 20 subtests**.
