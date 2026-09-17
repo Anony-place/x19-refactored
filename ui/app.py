@@ -73,7 +73,14 @@ class ConsoleApp:
         self._exit = False
         self.background = BackgroundTaskManager()
         self._assessment_task: Optional[BackgroundTask] = None
-        self.prompt = LivePrompt(self.console, ribbon_fn=self._ribbon, poll=self._poll_interval(), completer=self._completions, on_tick=self._drain_agent_events, on_escape=self._handle_escape)
+        self.prompt = LivePrompt(
+            self.console,
+            ribbon_fn=self._ribbon,
+            poll=self._poll_interval(),
+            completer=self._completions,
+            on_tick=self._drain_agent_events,
+            on_escape=self._handle_escape,
+        )
         self._ctrl_c_presses = 0
 
     def _drain_agent_events(self) -> bool:
@@ -116,7 +123,7 @@ class ConsoleApp:
     def _completions(self, prefix: str) -> List[str]:
         if not prefix.startswith("/"):
             return []
-        names = []
+        names: List[str] = []
         for entry in COMMANDS:
             name = str(entry.get("name", "")).split()[0]
             if name not in names:
@@ -347,7 +354,7 @@ class ConsoleApp:
             self.chat(line)
             return
         parts = line[1:].split()
-        command = parts[0].lower()
+        command = parts[0].lower() if parts else ""
         args = parts[1:]
         handler: Optional[Callable[..., None]] = getattr(self, f"cmd_{command}", None)
         if handler is None:
@@ -557,7 +564,9 @@ class ConsoleApp:
             if task is None:
                 warn(f"no such task: {args[1]}")
                 return
-            self.console.print(widgets.panel(f"task {task.id} · {task.label}", Group(*(Text(line, style="evidence") for line in task.tail(30))) if task.tail(30) else Text("no captured output", style="muted"), subtitle=f"{task.status} · {len(task.output)} lines captured"))
+            tail = task.tail(30)
+            body = Group(*(Text(line, style="evidence") for line in tail)) if tail else Text("no captured output", style="muted")
+            self.console.print(widgets.panel(f"task {task.id} · {task.label}", body, subtitle=f"{task.status} · {len(task.output)} lines captured"))
             return
         rows = [(t.id, t.label, t.target or "—", t.status, widgets.human_duration(t.elapsed()), t.note or "—") for t in self.background.recent(20)]
         if not rows:
