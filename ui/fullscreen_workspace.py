@@ -25,6 +25,7 @@ from rich.rule import Rule
 from rich.text import Text
 
 from ui.console import get_console, warn
+from ui.terminal_state import snapshot as terminal_snapshot
 
 
 class FullscreenWorkspace:
@@ -200,6 +201,19 @@ class FullscreenWorkspace:
             text.append(f"  ·  {elapsed}", style="dim")
         return text
 
+    def _telemetry(self) -> RenderableType:
+        state = terminal_snapshot(self.app)
+        text = Text()
+        text.append("health ", style="bold dim")
+        text.append(state.health, style="dim")
+        text.append("  ·  coverage ", style="bold dim")
+        text.append(state.coverage, style="dim")
+        text.append("  ·  findings ", style="bold dim")
+        text.append(str(state.findings), style="dim")
+        text.append("  ·  iter ", style="bold dim")
+        text.append(state.iteration, style="dim")
+        return text
+
     def _header(self) -> RenderableType:
         status, elapsed = self._status()
         text = Text()
@@ -237,6 +251,7 @@ class FullscreenWorkspace:
         self._drain_events()
         return Group(
             self._header(),
+            self._telemetry(),
             Rule(style="border.dim"),
             self._conversation(),
             Rule(style="border.dim"),
@@ -303,11 +318,6 @@ class FullscreenWorkspace:
         if line.startswith("/"):
             self._submit_command(line)
             return
-        # Naming a target is how an operator starts work, so it is routed through
-        # the application's deterministic intake (scope resolves, then the
-        # operator picks passive / active / verify / cancel) instead of being
-        # sent to the model — which answers with a policy lecture and invented
-        # program details. Prose still goes to chat.
         if self.app._parse_target_request(line):
             self._submit_command(line)
             return
