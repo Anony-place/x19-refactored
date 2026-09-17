@@ -858,6 +858,32 @@ class OllamaBackend(AIBackend):
             log(f"{self.label} stream error: {type(e).__name__}: {e}")
 
 
+class MockBackend(AIBackend):
+    """Offline demo backend for testing and exploring X19 without API keys."""
+    def __init__(self, model: str = "x19-demo-offline"):
+        self._model = model
+
+    def name(self) -> str:
+        return f"demo ({self._model})"
+
+    def chat(self, system: str, message: str) -> str:
+        import json
+        msg_lower = message.lower()
+        if "decision" in msg_lower or "command" in msg_lower or "next action" in msg_lower:
+            return json.dumps({
+                "thought": "X19 Demo/Offline mode: enumerating target ports and services using native tools.",
+                "command": "x19_net_scan 127.0.0.1",
+                "risk": "normal",
+                "reason": "Demo mode port reconnaissance",
+                "hypothesis": "Local network services are discoverable",
+                "expected_evidence": "Port listing and banner information",
+            })
+        return "X19 Demo Mode: Operating in offline mode. Set an AI provider key (e.g. GROQ_API_KEY) for live AI reasoning."
+
+    def chat_stream(self, system: str, message: str):
+        yield self.chat(system, message)
+
+
 def build_backend(provider_id: str, model: str, errors: Optional[Dict] = None) -> Optional[AIBackend]:
     """One-shot backend for (provider, model) with the same rules as the
     failover chain: needs_key -> _get_key_for, format dispatch. Returns None
@@ -877,6 +903,12 @@ def build_backend(provider_id: str, model: str, errors: Optional[Dict] = None) -
             return OpenAICompatBackend(provider_id, key, model)
         if fmt == "anthropic":
             return AnthropicBackend(provider_id, key, model)
+        if fmt == "google":
+            return GoogleBackend(provider_id, key, model)
+        if fmt == "ollama":
+            return OllamaBackend(model=model)
+        if fmt == "mock":
+            return MockBackend(model=model)
         errors[(provider_id, model)] = f"unsupported format {fmt}"
     except Exception as e:
         errors[(provider_id, model)] = f"{type(e).__name__}: {e}"
@@ -1396,6 +1428,8 @@ def make_ai(provider_id: str = "") -> AIBackend:
             backend = OllamaBackend(provider_id, model)
         elif fmt == "openai":
             backend = OpenAICompatBackend(provider_id, key, model)
+        elif fmt == "mock":
+            backend = MockBackend(model=model)
 
     if not backend:
         print(f"{C.R}[!] Unknown provider format: {fmt}{C.N}")

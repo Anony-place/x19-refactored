@@ -1715,22 +1715,25 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
     what = getattr(args, "what", "all")
 
-    if what in ("all", "app"):
+    if what == "all":
+        return 0 if first_run_setup(force=bool(getattr(args, "force", False))) else 1
+
+    if what == "app":
         from provider_setup import setup_if_needed
 
         if not setup_if_needed(force=bool(getattr(args, "force", False))):
             warn("app setup cancelled — no working provider saved")
-            if what == "app":
-                return 1
-        else:
-            ok("provider chain saved")
+            return 1
+        ok("provider chain saved")
+        return 0
 
-    if what in ("all", "engagement"):
+    if what == "engagement":
         rule("[panel.title]engagement setup[/]")
         profile = engagement_wizard(target=getattr(args, "target", ""))
         if profile is None:
             return 1
         info(f"run it with: x19 dash -t {profile.target} --engagement {profile.name}")
+        return 0
     return 0
 
 
@@ -2028,3 +2031,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             get_console().print(f"[app.err]✖ {code}[/]")
             return 1
         return int(code or 0)
+
+
+if __name__ == "__main__":
+    from run import main as run_main
+    sys.exit(run_main())

@@ -131,20 +131,20 @@ def main() -> int:
         # Plain status stays plain even when setup is pending -- it must not
         # pretend a run is possible. But bare interactive workspace must force
         # setup; this is the "enforce mandatory setup" fix.
+        if not route and _wants_plain_surface():
+            from plain_cli import main as plain_main
+            return int(plain_main(argv or ["status"]) or 0)
+
         if _setup_required():
             # `setup` itself is exempt -- let it run without recursion
-            if route == "setup":
-                pass
-            elif route == "providers":
+            if route in {"setup", "providers"}:
                 pass
             else:
                 # Force through CLI's first-run wizard (it owns the 4-stage flow)
                 from cli import main as cli_main
                 install_agent_execution_policy()
                 return int(cli_main(["setup"]) or 0)
-        if not route and _wants_plain_surface():
-            from plain_cli import main as plain_main
-            return int(plain_main(argv or ["status"]) or 0)
+
         from cli import main as cli_main
         install_agent_execution_policy()
         routed = ["workspace"] + argv[1:] if not route else argv
@@ -159,6 +159,13 @@ def main() -> int:
         # bare `python run.py run -t ...` must not run unverified -- force setup
         argv0 = argv[0] if argv else ""
         if argv0 in {"run", "dash", "attack", "swarm", "chat"}:
+            if not (sys.stdin.isatty() and sys.stdout.isatty()):
+                print("[x19] Setup required: no AI provider configured (non-interactive shell).")
+                print("      Please set your provider API key, for example:")
+                print("        export GROQ_API_KEY=\"gsk_...\"          # Free at https://console.groq.com")
+                print("        export OPENAI_API_KEY=\"sk-...\"")
+                print("      Or run setup interactively: python run.py setup")
+                return 1
             print("[x19] Setup required before any assessment. Starting setup wizard...")
             return int(cli_main(["setup"]) or 0)
 

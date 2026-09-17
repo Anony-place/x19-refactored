@@ -62,7 +62,7 @@ def toolchain_rows() -> List[Dict[str, Any]]:
         for name, spec in TOOLS.items():
             command = str(spec).split("|")[0].strip()
             binary = command.split()[0] if command else ""
-            if not binary or binary.startswith("{"):
+            if not binary or binary.startswith("{") or binary.startswith("__"):
                 continue
             presets.setdefault(binary, []).append(name)
     except Exception:
@@ -71,15 +71,29 @@ def toolchain_rows() -> List[Dict[str, Any]]:
     for binary in PREFERRED_BINARIES:
         presets.setdefault(binary, [])
 
-    rows = [
-        {
+    def _is_available(bin_name: str) -> Tuple[bool, str]:
+        p = shutil.which(bin_name)
+        if not p:
+            return False, ""
+        if bin_name == "httpx":
+            import subprocess
+            try:
+                res = subprocess.run([p, "-version"], capture_output=True, text=True, timeout=2)
+                if "projectdiscovery" not in (res.stdout + res.stderr).lower():
+                    return False, ""
+            except Exception:
+                return False, ""
+        return True, p
+
+    rows = []
+    for binary, names in sorted(presets.items()):
+        avail, path = _is_available(binary)
+        rows.append({
             "binary": binary,
             "presets": sorted(names)[:6],
-            "available": shutil.which(binary) is not None,
-            "path": shutil.which(binary) or "",
-        }
-        for binary, names in sorted(presets.items())
-    ]
+            "available": avail,
+            "path": path,
+        })
     return rows
 
 
@@ -388,6 +402,9 @@ def usable_providers() -> List[str]:
         elif pid == "custom_openai":
             if custom_endpoint:
                 usable.append(pid)
+        elif pid == "demo":
+            if load_config().get("AI_PROVIDER") == "demo" or os.getenv("X19_DEMO"):
+                usable.append(pid)
         elif _provider_has_key(pid):
             usable.append(pid)
     return usable
@@ -421,8 +438,17 @@ def provider_configured() -> bool:
     try:
         from provider_setup import configured_chain
         chain = configured_chain()
-        # chain must be non-empty and at least one entry still verifies against current PROVIDERS
         if not chain:
+            # If an environment key or configured provider is available, auto-populate chain
+            resolved = resolve_provider()
+            if resolved:
+                from constants import PROVIDERS
+                from config import load_config, save_config, set_data
+                model = load_config().get("AI_MODEL") or PROVIDERS.get(resolved, {}).get("default_model", "")
+                chain = [{"provider": resolved, "model": model}]
+                save_config({"AI_PROVIDER_CHAIN": chain, "AI_PROVIDER": resolved, "AI_MODEL": model})
+                set_data({"AI_PROVIDER": resolved, "AI_MODEL": model})
+                return True
             return False
         # also ensure the chain's primary provider is still importable (custom may have been removed)
         from constants import PROVIDERS as _PROVS

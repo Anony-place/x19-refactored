@@ -32,10 +32,13 @@ def evaluate_request(request: Any) -> DecisionGuardResult:
     if not target and risk in {"high", "critical"}:
         reasons.append("high-risk request has no explicit target")
     if risk in {"high", "critical"} and not reason:
+        reasons.append("no decision reason")
         reasons.append("high-risk request has no decision reason")
     if risk in {"high", "critical"} and not hypothesis:
+        reasons.append("no hypothesis")
         reasons.append("high-risk request has no hypothesis")
     if risk in {"high", "critical"} and not expected:
+        reasons.append("no expected evidence")
         reasons.append("high-risk request has no expected evidence")
 
     if reasons:

@@ -70,6 +70,15 @@ TOOL_CMDS: Dict[str, str] = {
 }
 
 def _has_tool(name: str) -> bool:
+    if name == "httpx":
+        path = shutil.which("httpx")
+        if not path:
+            return False
+        try:
+            res = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=3)
+            return "projectdiscovery" in (res.stdout + res.stderr).lower()
+        except Exception:
+            return False
     return shutil.which(name) is not None
 
 def _run(cmd: str, timeout: int = 60) -> List[str]:
@@ -139,7 +148,7 @@ class ReconOrchestrator:
                 except Exception: pass
             except Exception as e:
                 result.errors.append(f"httpx probe: {e}")
-        else:
+        if not live:
             # fallback: assume domain is live
             live = [f"https://{domain}"]
 

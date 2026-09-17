@@ -149,6 +149,16 @@ PROVIDERS = {
         "needs_key": True,
         "format": "openai",
     },
+    "demo": {
+        "name": "Demo / Offline Mode",
+        "desc": "Built-in offline mode — no API key or internet required (for testing & evaluating X19)",
+        "base_url": "mock://localhost",
+        "default_model": "x19-demo-offline",
+        "api_key_env": "X19_DEMO_KEY",
+        "api_key_config": "X19_DEMO_KEY",
+        "needs_key": False,
+        "format": "mock",
+    },
 }
 
 class C:

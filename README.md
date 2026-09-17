@@ -19,11 +19,11 @@ must be backed by real command output before they are reported.
 
 ```bash
 pip install -r requirements.txt     # requests, rich, PyJWT + research extras
+# Or on Python 3.11+ systems: pip install --break-system-packages -r requirements.txt
 python run.py                       # first run: full setup, then the workspace
 ```
 
-`x19` in older docs means `python run.py`. The single supported entry is now `python run.py` — all other invocations
-are deprecated aliases (they still work but are hidden from `--help`).
+`python run.py` is the **single canonical entry point**. For convenience, an `x19` executable launcher is also provided in the repo (and can be linked to your `PATH` or installed via `pip install -e .`). All entry points (`python run.py`, `./x19`, `x19`, `python x19.py`, `python cli.py`, `python -m x19`) now delegate to the same unified engine.
 
 ### First run
 
@@ -37,11 +37,11 @@ anything else. Four stages, each one skippable only if it is already done:
 | 3/4 | **Engagement profile** — scope, guidance cards, canaries, budget |
 | 4/4 | **Verify** — resolves the provider and shows where every piece of state lives |
 
-Setup is resumable: re-running `x19` picks up where a cancelled attempt stopped
-and skips the stages that already completed. It is mandatory — `run`, `dash`,
-`chat` and `workspace` refuse to start until a working provider exists, while
-`doctor`, `config`, `providers`, `tools`, `engagement` and `version` stay
-available so you can diagnose a broken install.
+Setup is resumable and flexible:
+- **Environment auto-detection**: If you set `GROQ_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY` in your environment, setup auto-detects it and configures it with 1 click.
+- **Offline / Demo mode**: No API key or internet? Choose "Demo / Offline Mode" during setup or run with `X19_DEMO=1` to explore the workspace and local toolchain.
+- **Save anyway option**: If an endpoint is temporarily unreachable or local Ollama is starting up, you can choose to save the configuration without failing.
+- Non-interactive / CI / headless environments print clear status and setup instructions without crashing.
 
 ## Quick start — single entry
 
