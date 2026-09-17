@@ -138,7 +138,8 @@ class CommandGateway:
     def _sandbox_state(self) -> str:
         """Human-readable reason the sandbox can or cannot run (for logs)."""
         if not getattr(self.sandbox, "available", False):
-            return "docker CLI not found"
+            reason = getattr(self.sandbox, "unavailable_reason", "") or ""
+            return reason.removeprefix("sandbox_unavailable: ").strip() or "docker CLI not found"
         image = getattr(getattr(self.sandbox, "policy", None), "image", "")
         return f"image={image or 'unset'}"
 

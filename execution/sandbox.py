@@ -8,7 +8,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from logging_utils import log
 from tools import ToolResult
+
+# Docker reports its *own* failures — image missing, daemon unreachable, bad
+# flag — with exit status 125. That is an infrastructure verdict, never the
+# exit status of the command that was supposed to run inside the container.
+_DOCKER_CLI_FAILURE = 125
+
+# stderr markers that mean "the container never ran", for the cases where the
+# docker CLI reports its own failure with a plain non-zero status instead.
+_DOCKER_INFRASTRUCTURE_MARKERS = (
+    "cannot connect to the docker daemon",
+    "is the docker daemon running",
+    "permission denied while trying to connect to the docker daemon",
+    "unable to find image",
+    "no such image",
+    "error response from daemon",
+    "oci runtime",
+    "docker: 'run' requires",
+)
 
 
 @dataclass(frozen=True)
@@ -41,16 +60,27 @@ class SandboxExecutor:
         self.workspace = Path(workspace).expanduser().resolve()
         self.policy = policy or SandboxPolicy()
         self._docker = shutil.which("docker")
+        # Sticky once docker proves unusable: an agent loop runs hundreds of
+        # commands, and each one must not pay for the same dead sandbox again.
+        self._unavailable_reason = ""
 
     @property
     def available(self) -> bool:
-        return bool(self._docker)
+        """Can this executor actually contain a command right now?"""
+        return bool(self._docker) and not self._unavailable_reason
+
+    @property
+    def unavailable_reason(self) -> str:
+        """Why the sandbox cannot run, in words an operator can act on."""
+        if not self._docker:
+            return "sandbox_unavailable: docker CLI not found"
+        return self._unavailable_reason
 
     def run(self, command: str, timeout: int = 120) -> ToolResult:
         if not command.strip():
             return ToolResult("", "", -1, "empty command")
         if not self.available:
-            return ToolResult("", "", -1, "sandbox_unavailable: docker CLI not found")
+            return ToolResult("", "", -1, self.unavailable_reason or "sandbox_unavailable")
         if not self.policy.image.strip():
             return ToolResult("", "", -1, "sandbox_unavailable: no image configured")
 
@@ -81,7 +111,28 @@ class SandboxExecutor:
         except OSError as exc:
             return ToolResult("", "", -1, f"sandbox_launch_error: {exc}")
 
+        reason = self._infrastructure_failure(completed.returncode, completed.stderr)
+        if reason:
+            # Remember it, so the next command degrades to the host immediately
+            # instead of repeating a docker invocation that cannot work.
+            self._unavailable_reason = reason
+            log(f"[SANDBOX_UNAVAILABLE] {reason}")
+            return ToolResult(completed.stdout, completed.stderr, completed.returncode, reason)
+
         return ToolResult(completed.stdout, completed.stderr, completed.returncode)
+
+    @staticmethod
+    def _infrastructure_failure(returncode: int, stderr: str) -> str:
+        """Non-empty when docker itself failed, rather than the command inside."""
+        text = (stderr or "").strip().replace("\n", " ")
+        if returncode == _DOCKER_CLI_FAILURE:
+            detail = text[:200] or "no stderr"
+            return f"sandbox_unavailable: docker exited {_DOCKER_CLI_FAILURE} ({detail})"
+        lowered = text.lower()
+        for marker in _DOCKER_INFRASTRUCTURE_MARKERS:
+            if marker in lowered:
+                return f"sandbox_unavailable: {text[:200] or marker}"
+        return ""
 
     def _docker_command(self, command: str) -> list[str]:
         p = self.policy

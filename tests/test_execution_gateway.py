@@ -1,5 +1,10 @@
+import contextlib
+import os
+import pathlib
+import shlex
 import tempfile
 import unittest
+from unittest import mock
 
 from config import CONFIG
 from execution import (
@@ -205,3 +210,110 @@ class ReasoningMappingPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SandboxDegradationTests(unittest.TestCase):
+    """A docker CLI that cannot run the image must not eat the command.
+
+    ``docker run`` reports its *own* failures — image missing, daemon
+    unreachable — with exit status 125. The gateway used to hand that back as if
+    it were the exit status of the command, so on any machine with a docker CLI
+    but no locally built ``x19-sandbox`` image (a fresh install, a CI runner)
+    every tool call died with rc=125 and the reasoning loop could never gather
+    evidence: hypotheses stayed TESTING forever.
+
+    These tests put a real fake docker executable on PATH instead of mocking
+    subprocess, because the bug lives in how a real exit status is interpreted.
+    """
+
+    IMAGE_MISSING = (
+        "Unable to find image 'x19-sandbox:latest' locally\n"
+        "docker: Error response from daemon: No such image: x19-sandbox:latest\n"
+    )
+
+    @staticmethod
+    @contextlib.contextmanager
+    def docker_cli(exit_code: int, stdout: str = "", stderr: str = ""):
+        """A throwaway `docker` on PATH that exits the way the real CLI would."""
+        with tempfile.TemporaryDirectory() as bin_dir:
+            root = pathlib.Path(bin_dir)
+            invocations = root / "invocations"
+            script = root / "docker"
+            body = "#!/bin/sh\n"
+            body += "echo x >> %s\n" % shlex.quote(str(invocations))
+            if stdout:
+                body += "printf '%%s' %s\n" % shlex.quote(stdout)
+            if stderr:
+                body += "printf '%%s' %s >&2\n" % shlex.quote(stderr)
+            body += "exit %d\n" % exit_code
+            script.write_text(body)
+            script.chmod(0o755)
+            path = bin_dir + os.pathsep + os.environ.get("PATH", "")
+            with mock.patch.dict(os.environ, {"PATH": path}):
+                yield invocations
+
+    @staticmethod
+    def docker_calls(path) -> int:
+        return path.read_text().count("x") if path.exists() else 0
+
+    def test_unusable_sandbox_degrades_to_the_host_executor(self):
+        with self.docker_cli(125, stderr=self.IMAGE_MISSING) as calls:
+            with tempfile.TemporaryDirectory() as tmp:
+                gateway = CommandGateway(ToolExecutor(tmp))
+                self.assertTrue(gateway.sandbox.available)   # the CLI is there
+                result = gateway.run(CommandRequest.from_shell("echo gateway-ok", timeout=5))
+                used_docker = self.docker_calls(calls)
+
+        self.assertTrue(result.policy.allowed)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("gateway-ok", result.stdout)
+        self.assertEqual(used_docker, 1)
+
+    def test_a_broken_sandbox_is_remembered_instead_of_retried_per_command(self):
+        with self.docker_cli(125, stderr=self.IMAGE_MISSING) as calls:
+            with tempfile.TemporaryDirectory() as tmp:
+                gateway = CommandGateway(ToolExecutor(tmp))
+                first = gateway.run(CommandRequest.from_shell("echo one", timeout=5))
+                second = gateway.run(CommandRequest.from_shell("echo two", timeout=5))
+
+                self.assertEqual((first.returncode, second.returncode), (0, 0))
+                self.assertIn("two", second.stdout)
+                self.assertFalse(gateway.sandbox.available)
+                self.assertIn("125", gateway.sandbox.unavailable_reason)
+                # the loop must not pay for a dead container on every command
+                self.assertEqual(self.docker_calls(calls), 1)
+
+    def test_a_working_sandbox_still_wins_over_the_host(self):
+        with self.docker_cli(0, stdout="sandbox-ok") as calls:
+            with tempfile.TemporaryDirectory() as tmp:
+                gateway = CommandGateway(ToolExecutor(tmp))
+                result = gateway.run(CommandRequest.from_shell("echo gateway-ok", timeout=5))
+
+                self.assertEqual(result.returncode, 0)
+                self.assertIn("sandbox-ok", result.stdout)
+                self.assertNotIn("gateway-ok", result.stdout)   # host never ran
+                self.assertTrue(gateway.sandbox.available)
+                self.assertEqual(self.docker_calls(calls), 1)
+
+    def test_a_command_failing_inside_the_sandbox_keeps_its_own_exit_code(self):
+        with self.docker_cli(3, stderr="grep: nothing matched") as calls:
+            with tempfile.TemporaryDirectory() as tmp:
+                gateway = CommandGateway(ToolExecutor(tmp))
+                result = gateway.run(CommandRequest.from_shell("echo gateway-ok", timeout=5))
+
+                # 3 is the command's verdict, not docker's — no silent host re-run
+                self.assertEqual(result.returncode, 3)
+                self.assertIn("nothing matched", result.stderr)
+                self.assertTrue(gateway.sandbox.available)
+                self.assertEqual(self.docker_calls(calls), 1)
+
+    def test_an_unreachable_daemon_is_also_an_unavailable_sandbox(self):
+        stderr = "Cannot connect to the Docker daemon at unix:///var/run/docker.sock."
+        with self.docker_cli(1, stderr=stderr):
+            with tempfile.TemporaryDirectory() as tmp:
+                gateway = CommandGateway(ToolExecutor(tmp))
+                result = gateway.run(CommandRequest.from_shell("echo daemon-ok", timeout=5))
+
+                self.assertEqual(result.returncode, 0)
+                self.assertIn("daemon-ok", result.stdout)
+                self.assertIn("Cannot connect", gateway.sandbox.unavailable_reason)
