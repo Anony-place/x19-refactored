@@ -1,9 +1,10 @@
-"""Minimal full-screen terminal workspace for X19.
+"""Production terminal workspace for X19.
 
-The UI is a presentation layer over the existing ConsoleApp. Conversation,
-provider responses, assessment events and session state all come from the real
-runtime; this module does not synthesize progress, findings, tools or agent
-messages.
+The workspace is a presentation layer over the existing ConsoleApp. It renders
+real conversation history, real provider output, real assessment events and
+real runtime state. It deliberately uses one Rich Live renderable (a Group of
+normal renderables) rather than a nested Rich Layout tree so the terminal can
+never expose ``Layout(...)`` object representations as chat output.
 """
 from __future__ import annotations
 
@@ -18,7 +19,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
 from rich.console import Group, RenderableType
-from rich.layout import Layout
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -28,7 +28,7 @@ from ui.console import get_console, warn
 
 
 class FullscreenWorkspace:
-    """A restrained, chat-first terminal workspace backed by live X19 state."""
+    """Chat-first terminal workspace backed entirely by the real X19 runtime."""
 
     def __init__(self, app: Any):
         self.app = app
@@ -46,9 +46,6 @@ class FullscreenWorkspace:
         self._saved_termios = None
         self._raw = False
 
-    # ------------------------------------------------------------------
-    # Terminal input
-    # ------------------------------------------------------------------
     def _enter_raw(self) -> bool:
         if os.name == "nt" or not sys.stdin.isatty():
             return False
@@ -87,9 +84,6 @@ class FullscreenWorkspace:
         except Exception:
             return None
 
-    # ------------------------------------------------------------------
-    # Runtime state
-    # ------------------------------------------------------------------
     def _session_data(self) -> dict:
         session = getattr(self.agent, "session", None)
         data = getattr(session, "data", {}) if session is not None else {}
@@ -115,7 +109,9 @@ class FullscreenWorkspace:
             events = self.app.background.drain_events(task)
         except Exception:
             events = []
-        self._events.extend(events or [])
+        if events:
+            with self._state_lock:
+                self._events.extend(events)
 
     def _history(self) -> list[dict]:
         with self._state_lock:
@@ -137,39 +133,55 @@ class FullscreenWorkspace:
             return str(task.status).upper(), ""
         return "READY", ""
 
-    # ------------------------------------------------------------------
-    # Chat rendering
-    # ------------------------------------------------------------------
+    @staticmethod
+    def _message_block(role: str, content: str) -> RenderableType:
+        if role == "user":
+            head = Text()
+            head.append("you", style="bold cyan")
+            head.append("  ")
+            return Group(head, Text(content, style="white"))
+        head = Text()
+        head.append("X19", style="bold bright_cyan")
+        head.append("  ")
+        return Group(head, Markdown(content))
+
     def _conversation(self) -> RenderableType:
         history = self._history()
         rows: list[RenderableType] = []
-        for item in history[-18:]:
-            role = str(item.get("role", "assistant"))
-            content = str(item.get("content", ""))
-            if role == "user":
-                rows.append(Group(Text("you", style="bold cyan"), Text(content)))
-            else:
-                rows.append(Group(Text("X19", style="bold"), Markdown(content)))
+        for item in history[-16:]:
+            rows.append(self._message_block(str(item.get("role", "assistant")), str(item.get("content", ""))))
 
         with self._state_lock:
             streaming = self._streaming_reply
             busy = self._chat_busy
             error = self._chat_error
 
-        if busy and streaming:
-            rows.append(Group(Text("X19", style="bold"), Text(streaming)))
-        elif busy:
-            rows.append(Text("X19 · responding…", style="dim"))
+        if busy:
+            if streaming:
+                rows.append(Group(Text("X19  ", style="bold bright_cyan"), Text(streaming)))
+            else:
+                rows.append(Text("X19  responding…", style="dim"))
         elif error:
-            rows.append(Text(f"X19 · {error}", style="red"))
+            rows.append(Text(f"X19  {error}", style="red"))
+
         if not rows:
             rows.append(Text("No conversation yet. Type a message below.", style="dim"))
-        return Panel(Group(*rows), title="X19", border_style="bright_blue", padding=(1, 2))
+
+        return Panel(
+            Group(*rows),
+            title=" conversation ",
+            title_align="left",
+            border_style="border",
+            padding=(1, 2),
+            expand=True,
+        )
 
     def _activity(self) -> RenderableType:
         from events import summarize_event
         lines: list[Text] = []
-        for event in list(self._events)[-4:]:
+        with self._state_lock:
+            events = list(self._events)[-4:]
+        for event in events:
             try:
                 text = summarize_event(event)
             except Exception:
@@ -182,21 +194,23 @@ class FullscreenWorkspace:
             if status:
                 lines.append(Text(f"assessment · {status}", style="dim"))
         if not lines:
-            return Text("", style="dim")
-        return Group(*lines)
+            return Text("activity  ·  idle", style="dim")
+        return Panel(Group(*lines), title=" activity ", border_style="border", padding=(0, 1), expand=True)
 
     def _input(self) -> RenderableType:
         line = Text()
-        line.append("› ", style="bold cyan")
-        line.append(self.buffer)
-        if not self.buffer:
+        line.append("you  ", style="bold cyan")
+        line.append("› ", style="bold bright_cyan")
+        if self.buffer:
+            line.append(self.buffer, style="white")
+        else:
             line.append("message or /command", style="dim")
-        return Panel(line, border_style="bright_blue", padding=(0, 1))
+        return Panel(line, title=" input ", title_align="left", border_style="border", padding=(0, 1), expand=True)
 
     def _header(self) -> RenderableType:
         status, elapsed = self._status()
         text = Text()
-        text.append("X19", style="bold")
+        text.append("X19", style="bold bright_cyan")
         text.append("  ", style="dim")
         text.append(self._target(), style="bold white")
         text.append("  ·  ", style="dim")
@@ -205,26 +219,22 @@ class FullscreenWorkspace:
         text.append(status, style="bold cyan" if status in {"RUNNING", "WORKING"} else "dim")
         if elapsed:
             text.append(f" {elapsed}", style="dim")
-        return Panel(text, border_style="border", padding=(0, 1))
+        return Panel(text, border_style="border", padding=(0, 1), expand=True)
 
     def _footer(self) -> RenderableType:
         return Text(" Enter send   Ctrl+C stop/exit   Ctrl+U clear input   /help commands", style="dim")
 
     def render(self) -> RenderableType:
+        """Build one renderable tree; never return a Rich Layout instance."""
         self._drain_events()
-        root = Layout(name="root")
-        root.split_column(
-            Layout(self._header(), name="header", size=3),
-            Layout(name="conversation", ratio=1),
-            Layout(self._activity(), name="activity", size=5),
-            Layout(self._input(), name="input", size=3),
-            Layout(self._footer(), name="footer", size=1),
+        return Group(
+            self._header(),
+            self._conversation(),
+            self._activity(),
+            self._input(),
+            self._footer(),
         )
-        return root
 
-    # ------------------------------------------------------------------
-    # Real provider execution
-    # ------------------------------------------------------------------
     def _on_chunk(self, piece: str) -> None:
         with self._state_lock:
             self._streaming_reply += piece
@@ -255,11 +265,8 @@ class FullscreenWorkspace:
             self.app.remember("user", message)
         self._executor.submit(self._run_chat, message)
 
-    # ------------------------------------------------------------------
-    # Commands
-    # ------------------------------------------------------------------
     def _submit_command(self, line: str) -> None:
-        """Run the existing command implementation outside the raw-input mode."""
+        """Run existing command handling outside raw-input mode."""
         self._exit_raw()
         live = self._live
         if live is not None:
@@ -293,7 +300,14 @@ class FullscreenWorkspace:
             return self.app._legacy_run()
         self._enter_raw()
         try:
-            live = Live(self.render(), console=self.console, screen=True, transient=False, refresh_per_second=10)
+            live = Live(
+                self.render(),
+                console=self.console,
+                screen=True,
+                transient=False,
+                refresh_per_second=10,
+                vertical_overflow="ellipsis",
+            )
             self._live = live
             with live:
                 while self.running:
