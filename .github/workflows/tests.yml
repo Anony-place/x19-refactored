@@ -19,7 +19,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install runtime deps
-        run: python -m pip install --quiet requests rich PyJWT pypdf
+        # pyte is test-only: it is the terminal emulator that lets the pty tests
+        # assert on the *screen* (row ghosts, duplicated ribbons, prompt geometry)
+        # instead of on the raw byte stream, where every repaint looks like a new
+        # line. Without it those assertions skip rather than lie.
+        run: python -m pip install --quiet requests rich PyJWT pypdf pyte
 
       - name: Compile every module
         run: |

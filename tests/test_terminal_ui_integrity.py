@@ -698,7 +698,29 @@ class StreamEncodingTests(unittest.TestCase):
 
 @unittest.skipUnless(pty_support.HAVE_PTY, "needs a pty (POSIX)")
 class LiveTerminalTests(unittest.TestCase):
-    """End to end, in a real pty: what the operator actually sees."""
+    """End to end, in a real pty: what the operator actually sees.
+
+    Row counting needs a terminal emulator: without ``pyte`` the harness can
+    only strip escape sequences, so every repaint of the prompt or ribbon shows
+    up as its own line and a row count measures the byte stream, not the screen.
+    Text-presence assertions run everywhere; geometry assertions run when pyte is
+    installed (CI installs it — see .github/workflows/tests.yml).
+    """
+
+    def assertRows(self, screen, needle: str, maximum: int, text: str) -> None:
+        if not pty_support.HAVE_PYTE:
+            return                     # not a screen, so not a row count
+        self.assertLessEqual(screen.rows_containing(needle), maximum, text)
+
+    def assertOneRow(self, screen, needle: str, text: str) -> None:
+        if not pty_support.HAVE_PYTE:
+            return
+        self.assertEqual(screen.rows_containing(needle), 1, text)
+
+    def assertNoRow(self, screen, needle: str, text: str) -> None:
+        if not pty_support.HAVE_PYTE:
+            return
+        self.assertEqual(screen.rows_containing(needle), 0, text)
 
     def test_foreign_prints_never_corrupt_the_prompt_area(self):
         screen = pty_support.run_child(
@@ -708,13 +730,14 @@ class LiveTerminalTests(unittest.TestCase):
         text = screen.text()
         self.assertIn("[tool] banner grabbed", text)
         # one committed transcript row for the message — not a prompt plus an echo
-        self.assertEqual(screen.rows_containing("you ❯ hello"), 1, text)
-        self.assertEqual(screen.rows_containing("you ›"), 0, text)
+        self.assertOneRow(screen, "you ❯ hello", text)
+        self.assertNoRow(screen, "you ›", text)
         # foreign output never shares a row with the prompt or the ribbon
-        for row in screen.rows():
-            if "[tool]" in row:
-                self.assertNotIn("you ", row, text)
-                self.assertNotIn("idle", row, text)
+        if pty_support.HAVE_PYTE:
+            for row in screen.rows():
+                if "[tool]" in row:
+                    self.assertNotIn("you ", row, text)
+                    self.assertNotIn("idle", row, text)
 
     def test_ribbon_is_never_duplicated_by_foreign_output(self):
         screen = pty_support.run_child(
@@ -722,8 +745,9 @@ class LiveTerminalTests(unittest.TestCase):
             keys=[(0.6, "/exit\r")],
             settle=3.0,
         )
-        text = screen.text()
-        self.assertLessEqual(screen.rows_containing("idle"), 1, text)
+        # The ribbon may legitimately be gone by the time /exit returns — the
+        # guarantee is that foreign output never left *extra* copies of it.
+        self.assertRows(screen, "idle", 1, screen.text())
 
     def test_wrapping_input_leaves_no_ghost_rows(self):
         long_line = "nmap -sV -sC -p- --script vuln demo.example.com " * 4
@@ -732,10 +756,11 @@ class LiveTerminalTests(unittest.TestCase):
             keys=[(0.6, long_line), (2.4, "\r"), (4.0, "/exit\r")],
         )
         text = screen.text()
-        self.assertEqual(screen.rows_containing("you ›"), 0, text)
+        self.assertIn("nmap -sV", text)
+        self.assertNoRow(screen, "you ›", text)
         # the committed line wraps across rows; nothing else may repeat it
-        self.assertLessEqual(screen.rows_containing("nmap -sV"), 3, text)
-        self.assertLessEqual(screen.rows_containing("idle"), 1, text)
+        self.assertRows(screen, "nmap -sV", 3, text)
+        self.assertRows(screen, "idle", 1, text)
 
     def test_bare_hostname_goes_to_scope_intake_not_the_chat_model(self):
         """Typing a target used to buy a policy lecture from the LLM."""
@@ -751,7 +776,7 @@ class LiveTerminalTests(unittest.TestCase):
         self.assertNotIn("How can I help you", text)
         # an unverified target is never offered an active assessment
         self.assertNotIn("active assessment under", text)
-        self.assertEqual(screen.rows_containing("you ❯ demo.example.com"), 1, text)
+        self.assertOneRow(screen, "you ❯ demo.example.com", text)
 
     def test_narrow_terminal_keeps_the_ribbon_on_one_row(self):
         screen = pty_support.run_child(
@@ -760,6 +785,8 @@ class LiveTerminalTests(unittest.TestCase):
             cols=60,
             settle=2.0,
         )
+        if not pty_support.HAVE_PYTE:
+            self.skipTest("row geometry needs pyte (pip install pyte)")
         for row in screen.rows():
             if "idle" in row:
                 self.assertIn("X19", row)
