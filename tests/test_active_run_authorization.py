@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import io
 import ipaddress
+import json
 import os
 import re
 import sys
@@ -567,6 +568,46 @@ class EntryPointTests(_EnvIsolated):
         dash_body = body("cmd_dash")
         self.assertLess(dash_body.index("_authorize_active_run(target, args)"),
                         dash_body.index("coordinator = SwarmCoordinator()"))
+
+
+    def test_a_json_run_leaves_stdout_parseable(self):
+        """Machine mode owns stdout — the run's human chatter goes to stderr.
+
+        ``ui/console.py`` promises that nothing decorative reaches stdout in
+        ``--json`` mode, but a run prints plenty with bare ``print()``: session
+        banners, tool chatter, the report path. Mixed into stdout they make
+        ``x19 run <target> --json | jq .`` fail on line 1, which is exactly what
+        the CLI smoke test in CI parses.
+        """
+
+        class NoisyAgent(self._FakeAgent):
+            def autonomous_loop(self, target):
+                super().autonomous_loop(target)
+                print(f"[+] Resumed session for {target}: 0 ports, 0 findings restored")
+                print("[Plan] web methodology — 19 steps in chain")
+
+        agent = NoisyAgent()
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(cli, "_ensure_provider", return_value=True), \
+                mock.patch.object(cli, "_make_agent",
+                                  return_value=(agent, SimpleNamespace(name=lambda: "fake"))), \
+                mock.patch.object(cli, "_maybe_start_telegram", lambda *a, **k: None), \
+                mock.patch.object(cli, "_print_ai_chain_banner", lambda: None), \
+                mock.patch.object(sys.stdin, "isatty", return_value=False), \
+                mock.patch.object(sys, "stdout", stdout), \
+                mock.patch.object(sys, "stderr", stderr), \
+                mock.patch("ui.console._json_mode", True):
+            rc = cli.cmd_run(_ns(target=LAB, json=True, quiet=False))
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(agent.calls, [LAB])          # the loop really ran
+        document = json.loads(stdout.getvalue())      # raises if stdout is polluted
+        self.assertEqual(document["target"], LAB)
+        self.assertEqual(document["status"], "complete")
+        self.assertEqual(document["iterations"], 1)
+        # …and the operator still sees everything, on the stream machines ignore
+        self.assertIn("Resumed session", stderr.getvalue())
+        self.assertIn("web methodology", stderr.getvalue())
 
 
 class FleetGateTests(_EnvIsolated):

@@ -69,5 +69,14 @@ jobs:
         run: |
           python x19.py --version
           X19_AI_BASE_URL=http://127.0.0.1:9/v1 X19_AI_MODEL=smoke \
-            python x19.py run 127.0.0.1:9 --json --max-iterations 1 \
+            python x19.py run 127.0.0.1:9 --json --max-iterations 1 > /tmp/smoke.json \
             || echo "run exited non-zero (expected: provider unreachable) — CLI contract held"
+          # Machine mode is a contract, not a hint: stdout is one JSON document
+          # and every human line went to stderr. Parse it or fail the build.
+          python - <<'PY'
+          import json, pathlib
+          raw = pathlib.Path("/tmp/smoke.json").read_text()
+          document = json.loads(raw)
+          assert document.get("target") == "127.0.0.1:9", document
+          print("smoke: stdout parsed as one JSON document —", document.get("status"))
+          PY

@@ -1766,7 +1766,8 @@ def cmd_chat(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     from providers import is_bug_bounty_mode, is_ctf_mode
-    from ui.console import banner, emit_json, get_console, info, ok, warn
+    from ui.console import (banner, emit_json, get_console, info,
+                           machine_mode_stdout, ok, warn)
     from ui import widgets
 
     # one-shot browser action (no agent required)
@@ -1838,33 +1839,38 @@ def cmd_run(args: argparse.Namespace) -> int:
             return 1
         _persist_posture(target, decision)
 
-    if not getattr(args, "quiet", False):
-        banner(__version__, subtitle="autonomous assessment")
+    # Machine mode owns stdout: everything the run prints for the operator
+    # (banner, tool chatter, report paths) goes to stderr instead, so the one
+    # JSON document emitted below is the whole of stdout and stays parseable.
+    with machine_mode_stdout():
+        if not getattr(args, "quiet", False):
+            banner(__version__, subtitle="autonomous assessment")
 
-    agent, ai = _make_agent()
-    _maybe_start_telegram(agent)
+        agent, ai = _make_agent()
+        _maybe_start_telegram(agent)
 
-    if not target:
-        from ui.app import ConsoleApp
+        if not target:
+            from ui.app import ConsoleApp
 
-        app = ConsoleApp(agent, version=__version__, ai=ai)
-        return app.run()
+            app = ConsoleApp(agent, version=__version__, ai=ai)
+            return app.run()
 
-    if getattr(args, "interactive", False):
-        from interactive import interactive
+        if getattr(args, "interactive", False):
+            from interactive import interactive
 
-        interactive(agent)
-        get_console().print(f"[app.dim]sessions: {CONFIG.SESSIONS_DIR}[/]")
-        return 0
+            interactive(agent)
+            get_console().print(f"[app.dim]sessions: {CONFIG.SESSIONS_DIR}[/]")
+            return 0
 
-    if is_bug_bounty_mode():
-        info(f"bug bounty mode — hands-free autonomous run on {target}")
-    elif is_ctf_mode():
-        info(f"CTF mode — flag hunting on {target}")
-    else:
-        info(f"auto-running assessment on {target}")
+        if is_bug_bounty_mode():
+            info(f"bug bounty mode — hands-free autonomous run on {target}")
+        elif is_ctf_mode():
+            info(f"CTF mode — flag hunting on {target}")
+        else:
+            info(f"auto-running assessment on {target}")
 
-    agent.autonomous_loop(target)
+        agent.autonomous_loop(target)
+
     findings = agent.findings()
     failed = agent.session.data.get("status") == "failed"
     if getattr(args, "json", False):
