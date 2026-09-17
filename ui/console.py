@@ -98,6 +98,27 @@ def emit_jsonl(records: Iterable[Dict[str, Any]]) -> None:
     sys.stdout.flush()
 
 
+@contextmanager
+def machine_mode_stdout():
+    """Keep stdout parseable while a long-running command talks to the operator.
+
+    ``emit_json()`` owns stdout in machine mode, but a run also prints plenty for
+    human eyes with bare ``print()`` — banners, tool chatter, the report path —
+    and none of those callers know which mode they are in. Inside this guard they
+    all land on stderr, so ``x19 run <target> --json | jq .`` parses. In human
+    mode the guard does nothing at all.
+    """
+    if not _json_mode:
+        yield
+        return
+    real_stdout = sys.stdout
+    sys.stdout = sys.stderr
+    try:
+        yield
+    finally:
+        sys.stdout = real_stdout
+
+
 # ---------------------------------------------------------------------------
 # Human output helpers
 # ---------------------------------------------------------------------------

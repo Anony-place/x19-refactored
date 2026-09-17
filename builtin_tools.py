@@ -205,6 +205,98 @@ def web_links(target: str, timeout: float = 8.0) -> dict:
         return {"ok": False, "tool": "x19_web_links", "url": start, "error": str(exc)}
 
 
+#: Headers a public web property is expected to send. Reported as facts
+#: ("absent"), never as a scored finding — scoring belongs to the assessment
+#: loop, which only runs against verified scope.
+SECURITY_HEADERS = (
+    "strict-transport-security",
+    "content-security-policy",
+    "x-content-type-options",
+    "x-frame-options",
+    "referrer-policy",
+    "permissions-policy",
+)
+
+
+def passive_recon(target: str, timeout: float = 8.0) -> dict:
+    """Read-only public observation of one host — no scanning, no exploitation.
+
+    Exactly three requests leave the machine: a DNS resolution, one TLS
+    handshake on 443 (when reachable) and one HTTP GET. That is what a browser
+    does when a human types a URL, which is why this needs no authorization
+    gate: nothing is enumerated, fuzzed, authenticated against, or attacked.
+
+    Returns plain data (``ok``/``dns``/``tls``/``http``/``observations``) so the
+    UI can render it and the agent can reason over it without scraping text.
+    """
+    host = _host(target)
+    if not host:
+        return {"ok": False, "error": "target required"}
+
+    started = time.monotonic()
+    dns = dns_lookup(host)
+    tls = tls_probe(host, timeout=min(timeout, 6.0))
+    http = http_probe(target if "://" in str(target) else host, timeout=timeout)
+
+    observations: list[str] = []
+    if dns.get("ok"):
+        addresses = dns.get("addresses") or []
+        observations.append(f"resolves to {len(addresses)} address(es): {', '.join(addresses[:4])}")
+        if dns.get("reverse"):
+            observations.append(f"reverse DNS: {dns['reverse']}")
+    else:
+        observations.append(f"DNS resolution failed: {dns.get('error', 'unknown')}")
+
+    if tls.get("ok"):
+        observations.append(f"TLS {tls.get('tls_version', '?')} · cipher {(tls.get('cipher') or ['?'])[0]}")
+        issuer = tls.get("issuer") or ()
+        issuer_name = ""
+        for rdn in issuer:
+            for key, value in rdn:
+                if key in ("organizationName", "commonName"):
+                    issuer_name = value
+                    break
+            if issuer_name:
+                break
+        if issuer_name:
+            observations.append(f"certificate issuer: {issuer_name}")
+        if tls.get("not_after"):
+            observations.append(f"certificate expires: {tls['not_after']}")
+    elif not tls.get("error", "").startswith("timed out"):
+        observations.append(f"no TLS on 443: {tls.get('error', 'unreachable')}")
+
+    if http.get("ok"):
+        observations.append(
+            f"HTTP {http.get('status')} {http.get('reason', '')} · {http.get('content_type', '?')}".strip()
+        )
+        if http.get("server"):
+            observations.append(f"server banner: {http['server']}")
+        headers = http.get("headers") or {}
+        missing = [h for h in SECURITY_HEADERS if h not in headers]
+        if missing:
+            observations.append("absent security headers: " + ", ".join(missing))
+        if headers.get("x-powered-by"):
+            observations.append(f"x-powered-by: {headers['x-powered-by']}")
+        if str(http.get("url", "")).startswith("https://") and not headers.get("strict-transport-security"):
+            observations.append("HTTPS without HSTS")
+    else:
+        observations.append(f"HTTP probe failed: {http.get('error', 'unknown')}")
+
+    return {
+        "ok": True,
+        "tool": "x19_passive_recon",
+        "target": host,
+        "requested": str(target),
+        "dns": dns,
+        "tls": tls,
+        "http": http,
+        "observations": observations,
+        "requests_sent": sum(1 for part in (dns, tls, http) if part.get("ok") or part.get("error")),
+        "secs": round(time.monotonic() - started, 2),
+        "note": "read-only public observation: DNS + TLS handshake + one HTTP GET",
+    }
+
+
 def dispatch(spec: str) -> dict:
     """Dispatch a `__x19_builtin__ ...` command without a shell."""
     parts = spec.strip().split()

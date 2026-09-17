@@ -188,9 +188,13 @@ def set_data(data: dict, save: bool = True):
         "FAST_SKIP_PROXY", "ENFORCE_SCOPE", "AUTO_LEARN_SKILLS",
         "STRICT_GATES", "UI_BANNER",
     }
+    #: Fields declared ``int`` on Config. Anything the CLI or a config file
+    #: hands over as a string is coerced here, because the run loop compares
+    #: against them (``iteration < CONFIG.MAX_ITERATIONS``) and a str makes that
+    #: a TypeError instead of an iteration cap.
     _int_keys = {
-        "MIN_ITERATIONS", "AI_MAX_TOKENS", "AI_TIMEOUT", "SUBAGENT_MAX_CONCURRENT",
-        "SUBAGENT_MAX_ITERATIONS", "CRON_POLL_SECONDS",
+        "MIN_ITERATIONS", "MAX_ITERATIONS", "AI_MAX_TOKENS", "AI_TIMEOUT",
+        "SUBAGENT_MAX_CONCURRENT", "SUBAGENT_MAX_ITERATIONS", "CRON_POLL_SECONDS",
     }
 
     for key, value in data.items():
@@ -208,7 +212,12 @@ def set_data(data: dict, save: bool = True):
             if attr_key in _bool_keys:
                 setattr(CONFIG, attr_key, str(value).lower() in ("1", "true", "yes"))
             elif attr_key in _int_keys:
-                setattr(CONFIG, attr_key, int(value))
+                try:
+                    setattr(CONFIG, attr_key, int(str(value).strip()))
+                except (TypeError, ValueError):
+                    # Keep the working value: a typo in one numeric setting must
+                    # not abort a run, and must not install a non-number either.
+                    continue
             else:
                 setattr(CONFIG, attr_key, value)
 

@@ -290,6 +290,30 @@ def cli(argv: List[str]) -> int:
     if not targets:
         print("usage: x19 fleet -t target1,target2 [--max 3]")
         return 2
+
+    # Authorization is per target: a fleet must not inherit one verified host's
+    # scope, and an unverified public host is dropped here rather than silently
+    # escalated because a sibling target happened to be in a program.
+    from scope_guard import decide_active_run
+
+    authorized: List[str] = []
+    for candidate in targets:
+        decision = decide_active_run(candidate, claimed=True)
+        if decision.allowed:
+            authorized.append(candidate)
+            print(f"[FLEET] {candidate}: {decision.reason}", flush=True)
+        else:
+            print(f"[FLEET] {candidate}: skipped — {decision.reason}", flush=True)
+    if not authorized:
+        print("[FLEET] nothing left to run — every target needs evidence", flush=True)
+        print("        X19_SCOPE_URL=<program scope url> · x19 engagement new <name> -t <host> "
+              "--target-type authorized · X19_ALLOW_UNVERIFIED=1", flush=True)
+        return 2
+    if len(authorized) != len(targets):
+        print("[FLEET] skipped targets need evidence: X19_SCOPE_URL=<program scope url> · "
+              "x19 engagement · X19_ALLOW_UNVERIFIED=1", flush=True)
+    targets = authorized
+
     sup = FleetSupervisor(max_concurrency=max_c or None)
     sup.submit(targets)
 

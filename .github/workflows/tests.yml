@@ -19,7 +19,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install runtime deps
-        run: python -m pip install --quiet requests rich PyJWT pypdf
+        # pyte is test-only: it is the terminal emulator that lets the pty tests
+        # assert on the *screen* (row ghosts, duplicated ribbons, prompt geometry)
+        # instead of on the raw byte stream, where every repaint looks like a new
+        # line. Without it those assertions skip rather than lie.
+        run: python -m pip install --quiet requests rich PyJWT pypdf pyte
 
       - name: Compile every module
         run: |
@@ -31,7 +35,33 @@ jobs:
           PY
 
       - name: Full unit + integration suite
-        run: python -m unittest discover -s tests -t . -v
+        shell: bash
+        run: |
+          set -uo pipefail
+          python -m unittest discover -s tests -t . -v 2>&1 | tee /tmp/suite.log
+          exit "${PIPESTATUS[0]}"
+
+      # Raw logs are not always reachable (a sandboxed reviewer, an expired
+      # artifact host), so a red suite has to say *what* failed on the PR itself.
+      - name: Annotate failures
+        if: failure()
+        run: |
+          python - <<'PY'
+          import pathlib, re
+          log = pathlib.Path("/tmp/suite.log").read_text(errors="replace")
+          names = re.findall(r"^(?:FAIL|ERROR): (.+)$", log, re.M)
+          for name in names[:20]:
+              print(f"::error title=failing test::{name}")
+          blocks = [b.strip() for b in re.split(r"={30,}", log)
+                    if b.strip().startswith(("FAIL:", "ERROR:"))]
+          for block in blocks[:6]:
+              body = "%0A".join(block.splitlines()[:30])
+              print(f"::error title=failure detail::{body}")
+          if not names:
+              # No FAIL/ERROR line means the run died mid-test: report where.
+              tail = "%0A".join(log.strip().splitlines()[-25:])
+              print(f"::error title=suite stopped here::{tail}")
+          PY
 
       # A fresh clone must be able to start an assessment without a manual
       # setup step when a provider is supplied by flag or environment.
@@ -39,5 +69,14 @@ jobs:
         run: |
           python x19.py --version
           X19_AI_BASE_URL=http://127.0.0.1:9/v1 X19_AI_MODEL=smoke \
-            python x19.py run 127.0.0.1:9 --json --max-iterations 1 \
+            python x19.py run 127.0.0.1:9 --json --max-iterations 1 > /tmp/smoke.json \
             || echo "run exited non-zero (expected: provider unreachable) — CLI contract held"
+          # Machine mode is a contract, not a hint: stdout is one JSON document
+          # and every human line went to stderr. Parse it or fail the build.
+          python - <<'PY'
+          import json, pathlib
+          raw = pathlib.Path("/tmp/smoke.json").read_text()
+          document = json.loads(raw)
+          assert document.get("target") == "127.0.0.1:9", document
+          print("smoke: stdout parsed as one JSON document —", document.get("status"))
+          PY

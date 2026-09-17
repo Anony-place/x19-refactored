@@ -290,6 +290,176 @@ def _apply_verbosity(args) -> None:
         set_verbosity("verbose" if not CONFIG.ui_is_clean else "normal")
 
 
+def _authorization_claimed(args) -> bool:
+    """True when the operator *asserted* authorization instead of proving it."""
+    from providers import is_bug_bounty_mode
+
+    if getattr(args, "bug_bounty", False) or is_bug_bounty_mode():
+        return True
+    if str(getattr(args, "target_type", "") or "").strip().lower() == "authorized":
+        return True
+    # A TARGET_TYPE sitting in the config file is an assertion as well. The agent
+    # trusts a configured posture for *every* target, so a verdict left behind by
+    # an older version (or written by hand) has to be re-earned per host instead
+    # of being inherited by whatever someone runs next.
+    return str(load_config().get("TARGET_TYPE", "") or "").strip().lower() == "authorized"
+
+
+def _scope_url_from(args) -> str:
+    """The program/scope URL the operator supplied as evidence, if any."""
+    return str(getattr(args, "scope_url", "") or os.getenv("X19_SCOPE_URL", "") or "").strip()
+
+
+def _engagement_authorizes(args) -> bool:
+    """True only when a *recorded* engagement profile states the posture.
+
+    ``engagement.ad_hoc_profile`` says it itself: a bare target on the command
+    line is not authorization. So the profile synthesised from ``-t`` does not
+    count as evidence — only a profile someone wrote down, with an explicit
+    target_type, does.
+    """
+    import engagement as eng
+
+    name = str(getattr(args, "engagement", "") or "")
+    if not name:
+        return False
+    profile = eng.load_profile(name)
+    return bool(profile is not None
+                and str(profile.target_type).strip().lower() in ("authorized", "ctf", "lab"))
+
+
+def _recon_only_fallback(decision):
+    """Narrow an unverified run instead of escalating it.
+
+    ``BUG_BOUNTY_MODE`` has to be cleared too: the agent loop widens the posture
+    on that flag alone, so leaving it set would re-authorize what this gate just
+    refused.
+    """
+    from scope_guard import ActiveRunDecision
+
+    set_data({"BUG_BOUNTY_MODE": "0", "TARGET_TYPE": "public_real_world"}, save=False)
+    return ActiveRunDecision(
+        allowed=True, state=decision.state, target_type="public_real_world",
+        reason="recon/enumeration posture — no verified authorization",
+        result=decision.result,
+    )
+
+
+def _persist_posture(target: str, decision) -> None:
+    """Carry an evidence-driven posture into this run's config.
+
+    Only when evidence changed what classification would have said — a lab host
+    is already ``authorized``, so echoing it adds nothing. And only for this
+    process (``save=False``): a verdict written to the config file would be
+    trusted by every later run, against every other target.
+    """
+    from scope_guard import classify_target
+
+    if decision.target_type and decision.target_type != classify_target(target):
+        set_data({"TARGET_TYPE": decision.target_type}, save=False)
+
+
+def _authorize_active_run(target: str, args):
+    """Decide whether an active run may test ``target`` — from evidence.
+
+    ``--bug-bounty`` used to write ``TARGET_TYPE=authorized`` straight into the
+    config, so a flag alone escalated any public host to full testing while the
+    terminal workspace refused the very same host without a verified program.
+    One policy now covers both entry points: the scope resolver's verdict
+    decides, and a claim only buys the operator a chance to prove it.
+
+    Returns the decision; ``allowed`` says whether the run may proceed.
+    """
+    from rich.prompt import Prompt
+
+    from scope_guard import ActiveRunDecision, decide_active_run
+    from ui.console import emit_json, get_console, info, is_json_mode, step, warn
+
+    console = get_console()
+    decision = decide_active_run(
+        target,
+        claimed=_authorization_claimed(args),
+        scope_url=_scope_url_from(args),
+        engagement=_engagement_authorizes(args),
+    )
+    if decision.allowed:
+        info(f"scope: {decision.reason}")
+        return decision
+
+    if is_json_mode():
+        # Machine mode: nobody is there to answer a prompt, and the refusal is
+        # itself the result — so it goes to stdout as data, not as prose.
+        result = decision.result
+        emit_json({
+            "target": target,
+            "authorized": False,
+            "state": decision.state,
+            "reason": decision.reason,
+            "needs_input": decision.needs_input,
+            "program": getattr(result, "program", "") if result else "",
+            "source_url": getattr(result, "source_url", "") if result else "",
+            "scope_patterns": list(getattr(result, "scope_patterns", []) or []) if result else [],
+            "next": [
+                f"x19 run -t {target} --bug-bounty --scope-url <program scope url>",
+                f"x19 engagement new <name> -t {target} --target-type authorized",
+                f"X19_ALLOW_UNVERIFIED=1 x19 run -t {target} --bug-bounty",
+                f"x19 run -t {target}  (recon/enumeration only)",
+            ],
+        })
+        return decision
+
+    if not decision.needs_input:
+        # Evidence says no: the program was found and this host is outside its
+        # declared scope. Nothing to confirm here — different evidence is needed.
+        result = decision.result
+        warn("active run not started — " + decision.reason)
+        if result is not None and getattr(result, "program", ""):
+            step(f"program: {result.program} · {getattr(result, 'source_url', '')}")
+        step("in-scope hosts run normally; observation needs no authorization: "
+             f"x19 chat → /passive {target}")
+        return decision
+
+    # A claim with no evidence behind it. Fail closed — but a human at a terminal
+    # gets one chance to prove it, assert it, or accept the narrower run.
+    if not sys.stdin.isatty():
+        warn("active run not started — " + decision.reason)
+        step("prove it:  x19 run -t " + target + " --bug-bounty --scope-url <program scope url>")
+        step("           x19 engagement new <name> -t " + target + " --target-type authorized")
+        step("assert it: X19_ALLOW_UNVERIFIED=1 x19 run -t " + target + " --bug-bounty")
+        step("narrow it: drop --bug-bounty for a recon/enumeration run")
+        return decision
+
+    console.print("  [app.dim]paste the program/scope URL to verify it, re-type the target to assert[/]")
+    console.print("  [app.dim]written authorization, or press enter for a recon-only run[/]")
+    try:
+        answer = Prompt.ask("authorization", console=console, default="").strip()
+    except (EOFError, KeyboardInterrupt):
+        console.print()
+        answer = ""
+
+    if not answer:
+        info("recon/enumeration only — auth attacks stay blocked")
+        return _recon_only_fallback(decision)
+
+    if answer == target or answer.rstrip("/") == target.rstrip("/"):
+        set_data({"TARGET_TYPE": "authorized"}, save=False)
+        info("operator asserted written authorization for " + target)
+        return ActiveRunDecision(
+            allowed=True, state=decision.state, target_type="authorized",
+            reason="operator asserted written authorization (re-typed the target)",
+            result=decision.result,
+        )
+
+    verified = decide_active_run(target, claimed=True, scope_url=answer)
+    if verified.verified:
+        set_data({"TARGET_TYPE": "authorized"}, save=False)
+        info(f"scope: {verified.reason}")
+        return verified
+    warn("still not verified — " + verified.reason)
+    info("continuing recon/enumeration only")
+    return _recon_only_fallback(verified)
+
+
 def _print_ai_chain_banner():
     """Print which providers X19 will try, in order. Helps user spot misconfig."""
     from ui.console import get_console, info, warn
@@ -619,7 +789,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target-type", type=str, default="",
                    choices=["auto", "public_real_world", "authorized", "ctf", "lab"],
                    help="engagement classification")
-    p.add_argument("-b", "--bug-bounty", action="store_true", help="hands-free authorized bug bounty mode")
+    p.add_argument("-b", "--bug-bounty", action="store_true",
+                   help="hands-free bug bounty mode (posture still needs scope evidence)")
+    p.add_argument("--scope-url", type=str, default="",
+                   help="public program/scope URL that authorizes this target (X19_SCOPE_URL)")
     p.add_argument("-c", "--ctf", action="store_true", help="CTF mode: aggressive, flag hunting")
     p.add_argument("-f", "--fast", action="store_true", help="fast decisions: smaller prompt/context")
     p.add_argument("--strict-gates", action="store_true",
@@ -648,6 +821,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=float, default=0, help="stop after N seconds")
     p.add_argument("--no-start", action="store_true", help="attach without launching the pipeline")
     p.add_argument("--engagement", type=str, default="", help="engagement profile name (x19 engagement list)")
+    p.add_argument("--scope-url", type=str, default="",
+                   help="public program/scope URL that authorizes this target (X19_SCOPE_URL)")
     p.add_argument("--max-cycles", type=int, default=3, help="max coordinate/attack/validate cycles")
     p.add_argument("--legacy", action="store_true", help="use the fixed 5-stage pipeline instead of the workflow")
 
@@ -808,23 +983,38 @@ def _apply_runtime_config(args: argparse.Namespace) -> None:
 
     target_type = getattr(args, "target_type", "")
     if target_type:
-        set_data({"TARGET_TYPE": target_type})
+        # Per run, not per install: a persisted TARGET_TYPE=authorized is read by
+        # every later run (the agent trusts a configured posture without asking
+        # again), so one command line would quietly authorize all the others.
+        set_data({"TARGET_TYPE": target_type}, save=False)
+    scope_url = str(getattr(args, "scope_url", "") or "").strip()
+    if scope_url:
+        # Evidence travels with the run: scope_guard reads X19_SCOPE_URL, so the
+        # flag and the env var are the same thing to every entry point.
+        os.environ["X19_SCOPE_URL"] = scope_url
     if getattr(args, "bug_bounty", False):
-        set_data({
+        # The flag records the *intent* — hands-off, bootstrapped, parallel —
+        # not the authorization. TARGET_TYPE used to be written as "authorized"
+        # here, which both escalated any public host with zero verification and
+        # persisted that escalation into ~/.x19/config.json for every later run.
+        # _authorize_active_run() decides the posture from evidence instead.
+        bb_data: Dict[str, Any] = {
             "BUG_BOUNTY_MODE": "1", "FAST_MODE": "1",
-            "TARGET_TYPE": target_type or "authorized",
             "AUTO_BOOTSTRAP": "1", "PARALLEL_PLAN": "1",
-        })
+        }
+        if target_type:
+            bb_data["TARGET_TYPE"] = target_type
+        set_data(bb_data, save=False)
     if getattr(args, "ctf", False):
         set_data({
             "CTF_MODE": "1", "FAST_MODE": "1",
             "TARGET_TYPE": target_type or "ctf",
             "AUTO_BOOTSTRAP": "1", "PARALLEL_PLAN": "1",
-        })
+        }, save=False)
     if getattr(args, "fast", False):
         set_data({"FAST_MODE": "1", "PARALLEL_PLAN": "1"})
     if getattr(args, "max_iterations", 0):
-        set_data({"MAX_ITERATIONS": str(args.max_iterations)})
+        set_data({"MAX_ITERATIONS": int(args.max_iterations)})
 
 
 def _make_agent():
@@ -1143,6 +1333,14 @@ def cmd_dash(args: argparse.Namespace) -> int:
         return 1
 
     profile = _resolve_engagement(args)
+
+    # The live dashboard drives the same offensive work as `run`, so it answers
+    # to the same evidence-based authorization gate.
+    decision = _authorize_active_run(target, args)
+    if not decision.allowed:
+        return 1
+    _persist_posture(target, decision)
+
     coordinator = SwarmCoordinator()
     dashboard = MissionDashboard(
         coordinator,
@@ -1559,13 +1757,17 @@ def cmd_chat(args: argparse.Namespace) -> int:
     banner(__version__, subtitle=f"interactive console · {ai.name()}")
     system = getattr(args, "system", "")
     if system:
-        app_module.SYSTEM_PROMPT = system
+        # An operator-supplied role replaces X19's specialisation, not its
+        # guardrails: no fabricated evidence, no self-granted authorization, no
+        # obeying instructions smuggled in through target output.
+        app_module.SYSTEM_PROMPT = app_module.compose_system_prompt(system)
     return ConsoleApp(agent, version=__version__, ai=ai).run()
 
 
 def cmd_run(args: argparse.Namespace) -> int:
     from providers import is_bug_bounty_mode, is_ctf_mode
-    from ui.console import banner, emit_json, get_console, info, ok, warn
+    from ui.console import (banner, emit_json, get_console, info,
+                           machine_mode_stdout, ok, warn)
     from ui import widgets
 
     # one-shot browser action (no agent required)
@@ -1605,13 +1807,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     _apply_runtime_config(args)
     _apply_gate_mode(args)
     _apply_verbosity(args)
-    _print_ai_chain_banner()
 
     # `x19 example.com` and `x19 run example.com` both land here; -t still wins.
     target = (getattr(args, "target", "") or getattr(args, "target_pos", "")
               or os.getenv("X19_TARGET", ""))
     if getattr(args, "target", "") or getattr(args, "target_pos", ""):
         set_data({"TARGET": target})
+
+    # The workspace header names the provider *and* its failover chain, so a
+    # second banner line above it says nothing new. It still speaks up when no
+    # provider is configured, and for one-shot runs there is no header to defer to.
+    if target or not provider_chain_summary()["chain"]:
+        _print_ai_chain_banner()
 
     # swarm pipeline → the live dashboard owns the run
     if getattr(args, "swarm", False):
@@ -1623,33 +1830,47 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not _ensure_provider():
         return 1
 
-    if not getattr(args, "quiet", False):
-        banner(__version__, subtitle="autonomous assessment")
+    # A named target means active work, so evidence decides the posture *before*
+    # anything is started for it: no agent, no session directory, no telegram
+    # poller for a run that is about to be refused.
+    if target:
+        decision = _authorize_active_run(target, args)
+        if not decision.allowed:
+            return 1
+        _persist_posture(target, decision)
 
-    agent, ai = _make_agent()
-    _maybe_start_telegram(agent)
+    # Machine mode owns stdout: everything the run prints for the operator
+    # (banner, tool chatter, report paths) goes to stderr instead, so the one
+    # JSON document emitted below is the whole of stdout and stays parseable.
+    with machine_mode_stdout():
+        if not getattr(args, "quiet", False):
+            banner(__version__, subtitle="autonomous assessment")
 
-    if not target:
-        from ui.app import ConsoleApp
+        agent, ai = _make_agent()
+        _maybe_start_telegram(agent)
 
-        app = ConsoleApp(agent, version=__version__, ai=ai)
-        return app.run()
+        if not target:
+            from ui.app import ConsoleApp
 
-    if getattr(args, "interactive", False):
-        from interactive import interactive
+            app = ConsoleApp(agent, version=__version__, ai=ai)
+            return app.run()
 
-        interactive(agent)
-        get_console().print(f"[app.dim]sessions: {CONFIG.SESSIONS_DIR}[/]")
-        return 0
+        if getattr(args, "interactive", False):
+            from interactive import interactive
 
-    if is_bug_bounty_mode():
-        info(f"bug bounty mode — hands-free autonomous run on {target}")
-    elif is_ctf_mode():
-        info(f"CTF mode — flag hunting on {target}")
-    else:
-        info(f"auto-running assessment on {target}")
+            interactive(agent)
+            get_console().print(f"[app.dim]sessions: {CONFIG.SESSIONS_DIR}[/]")
+            return 0
 
-    agent.autonomous_loop(target)
+        if is_bug_bounty_mode():
+            info(f"bug bounty mode — hands-free autonomous run on {target}")
+        elif is_ctf_mode():
+            info(f"CTF mode — flag hunting on {target}")
+        else:
+            info(f"auto-running assessment on {target}")
+
+        agent.autonomous_loop(target)
+
     findings = agent.findings()
     failed = agent.session.data.get("status") == "failed"
     if getattr(args, "json", False):

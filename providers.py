@@ -63,8 +63,92 @@ class AIBackend(ABC):
 
 
 # ---------------------------------------------------------------------------
+# Provider notices (routing decisions, failures)
+# ---------------------------------------------------------------------------
+#: UI sinks that would rather render a routing notice themselves than have it
+#: printed into the middle of a live prompt / streaming preview.
+_NOTICE_SINKS: List[Any] = []
+_NOTICE_LOCK = threading.Lock()
+
+
+def add_notice_sink(sink) -> None:
+    """Register ``sink(text, level)`` as the renderer for provider notices."""
+    with _NOTICE_LOCK:
+        if sink not in _NOTICE_SINKS:
+            _NOTICE_SINKS.append(sink)
+
+
+def remove_notice_sink(sink) -> None:
+    with _NOTICE_LOCK:
+        if sink in _NOTICE_SINKS:
+            _NOTICE_SINKS.remove(sink)
+
+
+def notice(text: str, *, level: str = "info") -> None:
+    """Announce a provider/routing fact once.
+
+    Always written to the log file. On screen it goes to a registered UI sink
+    when one exists (the terminal workspace renders it above the prompt), and
+    otherwise it is printed directly — which is what the plain CLI wants.
+    """
+    log(f"[provider] {text}")
+    with _NOTICE_LOCK:
+        sinks = list(_NOTICE_SINKS)
+    if sinks:
+        for sink in sinks:
+            try:
+                sink(text, level)
+            except Exception:
+                pass
+        return
+    color = {"warn": C.Y, "error": C.R}.get(level, C.D)
+    print(f"{color}{text}{C.N}", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # Streaming helpers (SSE / NDJSON)
 # ---------------------------------------------------------------------------
+def _iter_stream_lines(response):
+    """Yield decoded text lines from a streaming HTTP response, UTF-8 safe.
+
+    ``response.iter_lines(decode_unicode=True)`` decodes with
+    ``response.encoding``, which requests falls back to **ISO-8859-1** for
+    ``text/event-stream`` responses that omit a charset. Every non-ASCII byte
+    then turns into mojibake — an emoji arriving as ``ð`` followed by garbage,
+    non-Latin scripts unreadable. Decoding the raw bytes with an incremental
+    UTF-8 decoder fixes that and also keeps multi-byte characters that straddle
+    a chunk boundary intact.
+    """
+    import codecs
+
+    iter_content = getattr(response, "iter_content", None)
+    if not callable(iter_content):
+        # Test doubles and exotic transports: keep the old contract.
+        for raw in response.iter_lines(decode_unicode=True):
+            if raw is not None:
+                yield raw
+        return
+
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    buffer = ""
+    for chunk in iter_content(chunk_size=8192):
+        if not chunk:
+            continue
+        buffer += chunk if isinstance(chunk, str) else decoder.decode(chunk)
+        while True:
+            newline = buffer.find("\n")
+            if newline < 0:
+                break
+            line, buffer = buffer[:newline], buffer[newline + 1:]
+            yield line.rstrip("\r")
+    try:
+        buffer += decoder.decode(b"", final=True)
+    except Exception:
+        pass
+    if buffer:
+        yield buffer.rstrip("\r")
+
+
 def _iter_sse_data(response):
     """Yield the payload of each ``data:`` frame of an SSE response body.
 
@@ -72,7 +156,7 @@ def _iter_sse_data(response):
     ``[DONE]``. Used by the OpenAI-compatible and Anthropic streaming paths.
     """
     pending: List[str] = []
-    for raw in response.iter_lines(decode_unicode=True):
+    for raw in _iter_stream_lines(response):
         if raw is None:
             continue
         line = raw.strip()
@@ -504,7 +588,7 @@ class OpenAICompatBackend(AIBackend):
             # Nothing streamed \u2014 park this model for the session (same
             # policy as chat()) and try the next one.
             self._exhausted_models.add(model)
-        print(f"{C.R}[!] {self.label}: all models failed to stream{C.N}")
+        notice(f"[!] {self.label}: all models failed to stream", level="error")
 
 
 class AnthropicBackend(AIBackend):
@@ -755,7 +839,7 @@ class OllamaBackend(AIBackend):
                 proxies={"http": None, "https": None},
             )
             r.raise_for_status()
-            for line in r.iter_lines(decode_unicode=True):
+            for line in _iter_stream_lines(r):
                 if not line:
                     continue
                 try:
@@ -769,7 +853,7 @@ class OllamaBackend(AIBackend):
                     break
         except requests.exceptions.RequestException as e:
             log(f"{self.label} stream failed: {e}")
-            print(f"{C.Y}[*] {self.label} connection error: {e}{C.N}")
+            notice(f"[*] {self.label} connection error: {e}", level="warn")
         except Exception as e:
             log(f"{self.label} stream error: {type(e).__name__}: {e}")
 
@@ -819,6 +903,32 @@ class FailoverRouter(AIBackend):
         # Pre-built flat chain: list of (provider_id, model) in priority order.
         self._chain: List[Tuple[str, str]] = self._build_chain()
         self._suppressed = _failover_disabled()
+        #: Announcing every request buries the transcript in "[router] …" lines
+        #: — the operator cares when the route *changes*, not on every turn.
+        self._announced: Optional[Tuple[str, str]] = None
+        self._announced_failures: set = set()
+
+    def _announce_working(self, provider_id: str, model: str) -> None:
+        """Say which provider/model answered — once per change, not per call."""
+        if self._announced == (provider_id, model):
+            return
+        recovered = self._announced is not None
+        self._announced = (provider_id, model)
+        name = PROVIDERS.get(provider_id, {}).get("name", provider_id)
+        suffix = " (recovered)" if recovered else ""
+        notice(f"[router] {name}/{model}{suffix}")
+
+    def _announce_failure(self, provider_id: str, model: str) -> None:
+        """Report a combo that failed, deduplicated per (combo, reason)."""
+        reason = self._last_err_reasons.get((provider_id, model), "")
+        key = (provider_id, model, reason)
+        if key in self._announced_failures:
+            log(f"[router] {provider_id}/{model} failed again ({reason or 'unknown'}) — already announced")
+            return
+        self._announced_failures.add(key)
+        name = PROVIDERS.get(provider_id, {}).get("name", provider_id)
+        detail = f" ({reason})" if reason else ""
+        notice(f"[router] {name}/{model} failed{detail} → next", level="warn")
 
     def name(self) -> str:
         if self._working:
@@ -934,27 +1044,24 @@ class FailoverRouter(AIBackend):
                         self.primary.model = m
                     if hasattr(self.primary, "provider") and self.primary.provider != pid:
                         self.primary.provider = pid
-                    print(f"{C.D}[router] {PROVIDERS[pid]['name']}/{m}{C.N}", flush=True)
+                    self._announce_working(pid, m)
                     return result
                 # Mark this combo as exhausted; try next
                 self._exhausted.add((pid, m))
-                reason = self._last_err_reasons.get((pid, m), "")
-                if reason:
-                    print(f"{C.Y}[router] {PROVIDERS[pid]['name']}/{m} failed ({reason}) → next{C.N}", flush=True)
-                else:
-                    print(f"{C.Y}[router] {PROVIDERS[pid]['name']}/{m} failed → next{C.N}", flush=True)
+                self._announce_failure(pid, m)
 
             if not any_tried:
                 # All combos already exhausted from prior cycle — clear and retry once
-                print(f"{C.Y}[router] All previously exhausted — retrying all providers/models...{C.N}", flush=True)
+                notice("[router] all combos were exhausted — retrying every provider/model", level="warn")
                 self._exhausted.clear()
                 self._working = None
+                self._announced = None
                 continue
 
             # Actually tried all and all failed — give up
             break
 
-        print(f"{C.R}[!] FailoverRouter: all providers & models exhausted.{C.N}", flush=True)
+        notice("[router] all providers & models exhausted", level="error")
         return ""
 
     def _ordered_chain(self) -> List[Tuple[str, str]]:
@@ -1004,29 +1111,30 @@ class FailoverRouter(AIBackend):
                                     self.primary.provider = pid
                                 except Exception:
                                     pass
-                            print(f"{C.D}[router] {PROVIDERS[pid]['name']}/{m}{C.N}", flush=True)
+                            self._announce_working(pid, m)
                         yield piece
                 except Exception as e:
                     log(f"FailoverRouter stream {pid}/{m}: {type(e).__name__}: {e}")
                 if got_first:
                     return
                 self._exhausted.add((pid, m))
-                reason = self._last_err_reasons.get((pid, m), "")
-                suffix = f" ({reason})" if reason else ""
-                print(f"{C.Y}[router] {PROVIDERS[pid]['name']}/{m} failed{suffix} → next{C.N}", flush=True)
+                self._announce_failure(pid, m)
             if not tried_any:
-                print(f"{C.Y}[router] All previously exhausted — retrying all providers/models...{C.N}", flush=True)
+                notice("[router] all combos were exhausted — retrying every provider/model", level="warn")
                 self._exhausted.clear()
                 self._working = None
+                self._announced = None
                 continue
             break
-        print(f"{C.R}[!] FailoverRouter: all providers & models exhausted.{C.N}", flush=True)
+        notice("[router] all providers & models exhausted", level="error")
 
     def reset(self):
         """Re-enable previously exhausted models (e.g. after a sleep / new session)."""
         self._exhausted.clear()
         self._working = None
         self._last_err_reasons.clear()
+        self._announced = None
+        self._announced_failures.clear()
 
 
 OPENROUTER_MODELS = [
