@@ -23,8 +23,10 @@ class CommandGateway(_CommandGateway):
         policy_engine: Optional[PolicyEngine] = None,
         sandbox: Optional[SandboxExecutor] = None,
         target: str = "",
+        scope_guard=None,
     ):
-        super().__init__(executor, policy_engine=policy_engine, sandbox=sandbox, target=target)
+        # 2026: propagate scope_guard to underlying gateway (hard scope on main loop)
+        super().__init__(executor, policy_engine=policy_engine, sandbox=sandbox, target=target, scope_guard=scope_guard)
         self.telemetry = AssessmentTelemetry()
 
     def run(self, request: CommandRequest) -> CommandResult:

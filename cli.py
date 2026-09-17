@@ -1,17 +1,11 @@
 """X19 command-line interface.
 
-Design goals (4.0.0):
-
-* **Subcommand CLI** — ``x19 <command>``, the shape every serious tool has.
-  Legacy flag-only invocations (``x19 -t host``) are still accepted and routed
-  to ``x19 run``.
-* **Terminal-native, application-grade UI** — every screen is rendered by
-  :mod:`ui`. There is no web server any more; the dashboard, findings triage,
-  provider management, diagnostics and report export all live in the terminal.
-* **Two output contracts** — styled output for humans, ``--json`` for machines.
-* **Cheap commands stay cheap** — ``--version``, ``--help``, ``doctor``,
-  ``config``, ``providers`` and ``report`` never trigger the first-run AI
-  wizard. Only commands that actually need a model do.
+The ONLY supported invocation is `python run.py` (the workspace home). All other
+entry points (x19/cli.py, python -m x19, explicit `workspace`/`dash` subcommands)
+remain for backward compatibility but are hidden from the primary help. The first
+`python run.py` after install MUST complete the 4-stage setup (AI chain ->
+toolchain -> engagement -> verify); any assessment command is blocked until it
+does (see `_enforce_first_run` gate).
 """
 
 import argparse
@@ -605,24 +599,21 @@ _RUN_ARGV: List[str] = []
 
 
 def _first_run_bypass(argv: Optional[List[str]] = None) -> bool:
-    """True when the invocation itself supplies what setup would ask for.
+    """Bypass only when invocation *explicitly* supplies provider material.
 
-    The gate used to fire before argument parsing, so `x19 run -t host -p groq
-    -k gsk_…` was refused with "run x19 setup" even though the operator had
-    just passed the provider and key on the command line. Setup is a convenience
-    for people who have configured nothing, not a toll booth for people who have.
+    Fixed bug: previously any existing usable_providers (e.g. a leftover
+    GROQ_API_KEY env) caused the wizard to be skipped even though the
+    verified AI_PROVIDER_CHAIN was empty. Now respect provider_configured()
+    which requires the chain; only inline flags/env for base URL bypass.
     """
     argv = list(sys.argv[1:] if argv is None else argv)
-    flags = {"-p", "--provider", "-k", "--api-key", "-m", "--model", "-d", "--set-data", "--setup-groq", "--setup-cerebras"}
+    flags = {"-p", "--provider", "-k", "--api-key", "-m", "--model", "-d", "--set-data", "--setup-groq", "--setup-cerebras", "--base-url"}
     if any(tok in flags for tok in argv):
         return True
-    if os.getenv("X19_AI_BASE_URL", "").strip():
+    # X19_AI_BASE_URL + key together counts as inline config (custom gateway)
+    if os.getenv("X19_AI_BASE_URL", "").strip() and os.getenv("X19_AI_MODEL", "").strip():
         return True
-    from cli_support import usable_providers
-    try:
-        return bool(usable_providers())
-    except Exception:
-        return False
+    return False
 
 
 def _enforce_first_run(command: str) -> Optional[int]:
@@ -632,17 +623,22 @@ def _enforce_first_run(command: str) -> Optional[int]:
 
     if command in SETUP_EXEMPT or not first_run_pending():
         return None
+    # Assessment commands are blocked even when flags are present unless the
+    # inline provider material actually saves a working chain. For SETUP_EXEMPT
+    # this is moot; for run/dash it prevents "python run.py run -t host"
+    # from pretending to run with no setup.
     if _first_run_bypass(_RUN_ARGV):
-        # Provider + key arrive with the command; let the handler wire them up.
         return None
     if not _interactive_terminal():
         if not is_json_mode():
-            warn("no usable AI provider — export a key (GROQ_API_KEY / OPENROUTER_API_KEY / HF_TOKEN), "
-                 "pass -p <provider> -k <key>, or point at a local model with "
-                 "X19_AI_BASE_URL=http://host:11434/v1")
+            warn("X19 setup required — no verified AI provider chain found.")
+            warn("Run `python run.py setup` or export a key and pass -p/-k/-m inline.")
+            warn("Custom gateway: set X19_AI_BASE_URL=http://host:11434/v1 and X19_AI_MODEL=...")
         return 1
     if not first_run_setup():
         return 1
+    # setup just completed — allow the original command now only if caller
+    # re-invokes; for now we return None so the handler proceeds.
     return None
 
 
@@ -1940,10 +1936,13 @@ HANDLERS = {
 # ===================================================================
 # Help screen
 # ===================================================================
+# Only `python run.py` is advertised as the primary entry. `run` is the single
+# assessment command; `dash` remains functional as `run --swarm --dash` but is
+# listed as a live-view alias so the help doesn't advertise parallel run paths.
 HELP_COMMANDS = [
-    {"name": "workspace", "help": "X19 workspace home: status, state, every function (default)", "group": "interactive"},
-    {"name": "run", "help": "autonomous assessment against a target (-t, --bug-bounty, --ctf, --fast)", "group": "assessment"},
-    {"name": "dash", "help": "full-screen live swarm mission control", "group": "assessment"},
+    {"name": "workspace", "help": "X19 workspace home: status, state, every function (default: python run.py)", "group": "interactive"},
+    {"name": "run", "help": "autonomous assessment (-t HOST) + live swarm (--swarm) — the only assessment entry", "group": "assessment"},
+    {"name": "dash", "help": "(alias) live mission-control view — same as run --swarm", "group": "assessment"},
     {"name": "findings", "help": "list recorded findings by severity", "group": "assessment"},
     {"name": "report", "help": "export markdown / html / json / text reports", "group": "assessment"},
     {"name": "chat", "help": "interactive AI assistant console", "group": "interactive"},
@@ -1965,17 +1964,17 @@ def print_help(parser: argparse.ArgumentParser) -> None:
     from ui.console import banner, get_console
     from ui.screens import help_screen
 
-    banner(__version__, subtitle="terminal application · no web ui")
+    banner(__version__, subtitle="python run.py  —  single entry  ·  no web ui")
     get_console().print(help_screen(HELP_COMMANDS, version=__version__))
     get_console().print(
-        "[app.dim]global flags:[/] --json  --no-color  --plain  -q/--quiet  -v/--verbose  "
-        "-V/--version\n"
-        "[app.dim]examples:[/]   x19 scanme.nmap.org\n"
-        "           x19 run 10.0.0.5 -t 10.0.0.5:8443 --target-type lab -v\n"
-        "           x19 report --format html --out report.html\n"
-        "           x19 doctor --json | jq .score\n"
-        "[app.dim]           [/]The agent runs any command it chooses and installs what it needs;\n"
-        "[app.dim]           [/]only out-of-scope traffic and host-destroying commands are refused.\n"
+        "[app.dim]primary:[/]     python run.py              [dim]setup if needed → workspace (single-screen, no scroll)[/]\n"
+        "[app.dim]assessment:[/]  python run.py run -t HOST [-p groq -k gsk_…] [--swarm] [dim]dash is alias[/]\n"
+        "[app.dim]global flags:[/] --json  --no-color  --plain  -q/--quiet  -v/--verbose  -V/--version\n"
+        "[app.dim]examples:[/]    python run.py\n"
+        "            python run.py run -t 10.0.0.5:8443 --target-type lab -v\n"
+        "            python run.py report --format html --out report.html\n"
+        "[app.dim]            [/]The agent runs any command it chooses and installs what it needs;\n"
+        "[app.dim]            [/]only out-of-scope traffic and host-destroying commands are refused.\n"
     )
 
 

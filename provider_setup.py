@@ -50,18 +50,67 @@ def _model_list(provider_id: str) -> List[str]:
 
 def _choose_provider(used: set) -> str:
     choices = [p for p in PROVIDERS if p not in used]
+    choices_with_custom = [*choices, "__custom__"]
     print(f"\n{C.BOLD}{C.Y}Select provider:{C.N}")
     for i, pid in enumerate(choices, 1):
         info = PROVIDERS[pid]
         local = " [LOCAL]" if not info.get("needs_key") else ""
         print(f"  {C.G}[{i}]{C.N} {info['name']}{local} — {info.get('desc','')[:70]}")
+    print(f"  {C.G}[{len(choices_with_custom)}]{C.N} \u2795 Add custom OpenAI-compatible provider (base URL + API key)")
     while True:
-        raw = input(f"{C.B}[?] Provider (1-{len(choices)}): {C.N}").strip()
+        raw = input(f"{C.B}[?] Provider (1-{len(choices_with_custom)} or id): {C.N}").strip()
+        if raw.lower() in {"custom", "add", "new", "__custom__"}:
+            pid = _setup_custom_provider_flow()
+            if pid:
+                return pid
+            continue
+        if raw in PROVIDERS and raw not in used:
+            return raw
         try:
-            pid = choices[int(raw) - 1]
-            return pid
+            idx = int(raw) - 1
+            if 0 <= idx < len(choices):
+                return choices[idx]
+            if idx == len(choices):
+                pid = _setup_custom_provider_flow()
+                if pid:
+                    return pid
         except (ValueError, IndexError):
-            print(f"{C.R}[!] Invalid provider selection.{C.N}")
+            pass
+        print(f"{C.R}[!] Invalid provider selection.{C.N}")
+
+
+def _setup_custom_provider_flow() -> str | None:
+    """Collect id/name/base_url/model/api_key and persist via CUSTOM_PROVIDERS."""
+    from custom_providers import add_custom_provider
+    print(f"\n{C.BOLD}{C.Y}Custom provider -- OpenAI-compatible endpoint{C.N}")
+    print(f"{C.D}Example: vLLM http://127.0.0.1:8000/v1  |  gateway https://api.example.com/v1{C.N}")
+    pid = input(f"{C.B}[?] Provider id (e.g. my_vllm): {C.N}").strip().lower().replace(" ", "_")
+    if not pid:
+        print(f"{C.R}[!] id required{C.N}")
+        return None
+    if pid in PROVIDERS:
+        print(f"{C.R}[!] id already exists: {pid}{C.N}")
+        return None
+    name = input(f"{C.B}[?] Display name (e.g. My vLLM): {C.N}").strip() or pid
+    base_url = input(f"{C.B}[?] Base URL (https://.../v1 ): {C.N}").strip().rstrip("/")
+    if not base_url:
+        print(f"{C.R}[!] base URL required{C.N}")
+        return None
+    if not (base_url.startswith("http://") or base_url.startswith("https://")):
+        print(f"{C.R}[!] must be http(s)://{C.N}")
+        return None
+    model = input(f"{C.B}[?] Default model (e.g. llama3 / Qwen/Qwen3-32B): {C.N}").strip() or "local"
+    api_key = getpass.getpass(f"{C.B}[?] API key (Enter to skip for local/no-auth): {C.N}").strip()
+    api_key_env = input(f"{C.B}[?] Env var for key (optional, e.g. MY_VLLM_KEY): {C.N}").strip()
+    try:
+        entry = add_custom_provider(pid, name, base_url, model, api_key_env=api_key_env, api_key=api_key)
+        print(f"{C.G}[+] Custom provider '{pid}' added -> {base_url} / {model}{C.N}")
+        if api_key or api_key_env:
+            print(f"{C.D}Key saved to {CONFIG_FILE} ({entry.get('api_key_config','')}){C.N}")
+        return pid
+    except Exception as exc:
+        print(f"{C.R}[!] {exc}{C.N}")
+        return None
 
 
 def _choose_model(provider_id: str) -> str:
@@ -88,7 +137,17 @@ def _choose_model(provider_id: str) -> str:
 
 def _verify(provider_id: str, model: str, key: str) -> Tuple[bool, str]:
     """Perform a real, provider-specific minimal API request."""
-    info = PROVIDERS[provider_id]
+    info = PROVIDERS.get(provider_id, {}) or {}
+    # custom providers have no special format but still OpenAI-compat; treat like openai
+    if not info:
+        # may be recently added custom not yet in PROVIDERS import cache – load fresh via custom_providers
+        try:
+            from custom_providers import load_custom_providers as _lcp
+            _cp = _lcp().get(provider_id)
+            if _cp:
+                info = {"base_url": _cp.get("base_url",""), "format": "openai", "name": _cp.get("name", provider_id)}
+        except Exception:
+            pass
     if provider_id == "ollama":
         try:
             r = requests.get(info["base_url"].rstrip("/") + "/api/tags", timeout=5)
@@ -178,7 +237,7 @@ def setup_if_needed(force: bool = False) -> bool:
         more = input(f"{C.B}[?] Add another fallback provider? (y/N): {C.N}").strip().lower()
         if more != "y":
             break
-        if len(used) == len(PROVIDERS):
+        if len(used) == len(PROVIDERS):  # PROVIDERS already includes custom after add
             break
 
     save_config({CHAIN_KEY: chain})

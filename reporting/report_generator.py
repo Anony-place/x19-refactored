@@ -21,6 +21,16 @@ from reporting.compliance import (
 )
 from reporting.remediation import remediation_for, remediation_summary
 
+try:
+    from reporting.sarif import to_sarif  # SARIF 2.1.0 (Strix/Shannon pattern)
+except Exception:  # pragma: no cover
+    to_sarif = None  # type: ignore
+try:
+    from reporting.autofix import triage as autofix_triage, draft_pr as autofix_draft  # CypherFix
+except Exception:  # pragma: no cover
+    autofix_triage = None  # type: ignore
+    autofix_draft = None  # type: ignore
+
 
 class SecurityReportGenerator:
     """Generates structured defensive security assessment and remediation reports."""
@@ -301,6 +311,29 @@ class SecurityReportGenerator:
             ],
             "metadata": self.metadata
         }, indent=2, default=str)
+
+    def sarif(self) -> dict:
+        """SARIF 2.1.0 dict for GitHub Code Scanning (Strix pattern)."""
+        if to_sarif is None:
+            return {"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", "runs": []}
+        return to_sarif(self.findings, target=self.target)
+
+    def sarif_json(self, pretty: bool = True) -> str:
+        import json as _json
+        return _json.dumps(self.sarif(), indent=2 if pretty else None)
+
+    def autofix_groups(self):
+        """Grouped fix proposals (RedAMon CypherFix triage)."""
+        if autofix_triage is None:
+            return []
+        return autofix_triage(self.findings)
+
+    def draft_autofix(self, workspace=None):
+        """Write draft PR stub to x19_workspace/autofix/<slug>/DRAFT_PR.md."""
+        if autofix_draft is None or autofix_triage is None:
+            return None
+        groups = autofix_triage(self.findings)
+        return autofix_draft(groups, target=self.target, workspace=workspace)
 
     @staticmethod
     def _risk_label(score: float) -> str:

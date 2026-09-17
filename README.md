@@ -22,8 +22,8 @@ pip install -r requirements.txt     # requests, rich, PyJWT + research extras
 python run.py                       # first run: full setup, then the workspace
 ```
 
-`x19` below means `python run.py` (or the `x19` entry point if you install the
-package).
+`x19` in older docs means `python run.py`. The single supported entry is now `python run.py` — all other invocations
+are deprecated aliases (they still work but are hidden from `--help`).
 
 ### First run
 
@@ -43,15 +43,22 @@ and skips the stages that already completed. It is mandatory — `run`, `dash`,
 `doctor`, `config`, `providers`, `tools`, `engagement` and `version` stay
 available so you can diagnose a broken install.
 
-## Quick start
+## Quick start — single entry
 
 ```bash
-x19                                         # workspace home: status + every function
-x19 engagement new acme -t acme.example.com --target-type authorized
-x19 dash -t acme.example.com --engagement acme   # live assessment, in scope
-x19 run  -t scanme.nmap.org                 # one-shot autonomous assessment
-x19 findings                                # what it found, by severity
-x19 report --format html --out report.html  # exportable report
+python run.py                               # ONLY supported command — setup if needed → single-screen workspace (no scroll)
+python run.py run -t scanme.nmap.org        # one-shot autonomous assessment (alias: python run.py already blocks until setup)
+python run.py --help                        # all subcommands (run is the only assessment entry; dash is its live-view alias)
+# Any `x19` / `python -m x19` / `python x19.py` invocation works but prints a deprecation hint — use run.py.
+```
+
+After setup you can also manage state directly:
+
+```bash
+python run.py setup app                     # re-run provider wizard (add custom base URL + API key)
+python run.py providers                     # show failover chain
+python run.py findings                      # what it found, by severity
+python run.py report --format html --out report.html
 ```
 
 ## Authorization is evidence, not a flag
@@ -110,12 +117,12 @@ Global flags: `--json`, `--no-color`, `--plain`, `-q/--quiet`, `-v/--verbose`,
 `-V/--version`. Legacy flag-first invocations still work: `x19 -t host` is
 routed to `x19 run -t host`.
 
-## The terminal workspace (`x19 chat`)
+## The terminal workspace (`python run.py`)
 
-`x19 chat` is a rolling-transcript console — every message renders once, so
-nothing flickers — with a **live status ribbon** above the prompt. Long work
-never blocks the conversation: assessments run on background threads while you
-keep typing.
+`python run.py` lands in a single-screen workspace — header + telemetry strip + compact conversation + footer,
+no scrolling (XBOW/Hermes-inspired, more powerful). The chat view underneath is a rolling transcript — every
+message renders once, so nothing flickers — with a **live status ribbon** above the prompt. Long work never blocks
+the conversation: assessments run on background threads while you keep typing.
 
 ```
  X19   X19 4.0.0 (3cde5d5)  ·  terminal workspace

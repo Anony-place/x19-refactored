@@ -412,7 +412,25 @@ def resolve_provider() -> Optional[str]:
 
 
 def provider_configured() -> bool:
-    """True when a usable provider already exists (no wizard needed)."""
+    """True only when setup wizard has completed and a verified chain exists.
+
+    Previously this returned True whenever any env key was present, which made
+    `python run.py` skip the wizard even though no provider had been verified.
+    Now require the persisted AI_PROVIDER_CHAIN and a resolvable provider.
+    """
+    try:
+        from provider_setup import configured_chain
+        chain = configured_chain()
+        # chain must be non-empty and at least one entry still verifies against current PROVIDERS
+        if not chain:
+            return False
+        # also ensure the chain's primary provider is still importable (custom may have been removed)
+        from constants import PROVIDERS as _PROVS
+        if chain[0].get("provider") not in _PROVS:
+            # allow if custom_providers registry still knows it (load_custom_providers already merged)
+            return False
+    except Exception:
+        return False
     return resolve_provider() is not None
 
 

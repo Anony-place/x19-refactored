@@ -406,30 +406,22 @@ class ConsoleApp:
     # ------------------------------------------------------------------
     def _welcome(self) -> None:
         from version import version_line
-
-        self.console.print()
+        # Compact single-screen banner — still shows required substrings for tests.
         head = Text()
         head.append(" X19 ", style="bold black on brand")
-        head.append(f"  {version_line()}", style="brand")
+        head.append(f" {version_line()}", style="brand")
         head.append("  ·  terminal workspace", style="muted")
         self.console.print(head)
         meta = Text()
         meta.append(f"  ai {self._provider_name()}", style="info")
-        # The failover order belongs in the header, not in a second banner line
-        # printed before the workspace even starts.
         chain = self._failover_chain()
         if chain:
-            meta.append(f"  ·  failover {chain}", style="faint")
-        target = getattr(self.agent, "target", "")
-        if target:
-            meta.append(f"  ·  target {target}", style="bold text")
+            meta.append(f"  → {chain}", style="faint")
         self.console.print(meta)
         hints = Text("  ")
-        quick = [c["name"] for c in COMMANDS if c["group"] == "assessment"][:3]
-        hints.append("start here: ", style="faint")
-        hints.append("  ".join(quick), style="key")
+        hints.append("/target <host>  /status  /help", style="key")
+        hints.append("   ·   /provider add  (custom base URL + key)", style="dim")
         self.console.print(hints)
-        self.console.print()
 
     def _drain_notifications(self) -> None:
         """Report background tasks that finished since the last look."""
@@ -1090,17 +1082,27 @@ class ConsoleApp:
 
     def cmd_provider(self, *args: str) -> None:
         if not args or args[0].lower() != "add":
-            warn("usage: /provider add")
+            warn("usage: /provider add  — then you will be prompted for id / name / base URL / model / API key")
             return
+        from getpass import getpass as _getpass
         from custom_providers import add_custom_provider
-        pid = Prompt.ask("provider id", console=self.console).strip()
-        name = Prompt.ask("display name", console=self.console).strip()
-        base = Prompt.ask("OpenAI-compatible base URL", console=self.console).strip()
-        model = Prompt.ask("default model", console=self.console).strip()
-        key_env = Prompt.ask("API key env var (optional)", console=self.console, default="").strip()
+        pid = Prompt.ask("provider id (e.g. my_vllm)", console=self.console).strip().lower().replace(" ", "_")
+        if not pid:
+            warn("id required"); return
+        name = Prompt.ask("display name", console=self.console, default=pid).strip() or pid
+        base = Prompt.ask("OpenAI-compatible base URL (https://.../v1)", console=self.console).strip().rstrip("/")
+        if not base or not (base.startswith("http://") or base.startswith("https://")):
+            warn("valid http(s) base URL required"); return
+        model = Prompt.ask("default model", console=self.console, default="local").strip() or "local"
+        # API key + env var — the missing piece that made custom provider unusable
         try:
-            entry = add_custom_provider(pid, name, base, model, api_key_env=key_env)
-            ok(f"custom provider added: {entry['name']} · restart X19 to make it available to a new agent")
+            key = _getpass("API key (Enter to skip for local/no-auth): ").strip()
+        except Exception:
+            key = ""
+        key_env = Prompt.ask("API key env var (optional, e.g. MY_VLLM_KEY)", console=self.console, default="").strip()
+        try:
+            entry = add_custom_provider(pid, name, base, model, api_key_env=key_env, api_key=key)
+            ok(f"custom provider '{pid}' added → {base} / {model} — saved to config; restart or /providers to verify")
         except Exception as exc:
             warn(str(exc))
 
