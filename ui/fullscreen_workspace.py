@@ -143,14 +143,31 @@ class FullscreenWorkspace:
         return Group(head, Markdown(content))
 
     def _conversation(self) -> RenderableType:
+        # Height-bounded transcript: older messages are elided so the whole
+        # workspace fits without scrolling (XBOW/Hermes single-screen).
+        import shutil
+        try:
+            _, rows_term = shutil.get_terminal_size((120, 32))
+        except Exception:
+            rows_term = 32
+        # chrome budget: header 1, telemetry 1, rules 2, activity 1, input 1, footer 1, padding 2
+        avail = max(6, rows_term - 12)
         history = self._history()
         rows: list[RenderableType] = []
 
-        for item in history[-14:]:
+        # Each history item ~2-4 lines; budget conversatively as items count.
+        # Show fewer when terminal is short, more when tall.
+        max_items = 6 if avail < 14 else (10 if avail < 20 else 14)
+        # If single item is huge markdown, rich will wrap; we keep items small by truncating long content
+        for item in history[-max_items:]:
             role = str(item.get("role", "assistant"))
             content = str(item.get("content", ""))
             if not content:
                 continue
+            # clamp huge single messages to ~8 lines to prevent one msg filling screen
+            lines = content.splitlines()
+            if len(lines) > 12:
+                content = "\n".join(lines[:12]) + "\n… (truncated — /sessions or /findings for full)"
             if role == "user":
                 rows.append(self._user_line(content))
             else:
@@ -164,6 +181,9 @@ class FullscreenWorkspace:
 
         if busy:
             if streaming:
+                # clamp streaming preview similarly
+                if len(streaming.splitlines()) > 12:
+                    streaming = "\n".join(streaming.splitlines()[:12]) + "\n… streaming…"
                 rows.append(self._assistant_block(streaming))
             else:
                 rows.append(Text("X19  thinking…", style="dim"))
@@ -171,8 +191,21 @@ class FullscreenWorkspace:
             rows.append(Text(f"X19  {error}", style="red"))
 
         if not rows:
-            rows.append(Text("No messages yet. Start with a target, question, or /command.", style="dim"))
+            rows.append(Text("No messages yet.  /target <host>  •  /help  •  type a question", style="dim"))
+            rows.append(Text("Tip: python run.py setup  to reconfigure provider/base URL", style="dim"))
 
+        # If still too many lines vs avail, drop oldest
+        # Approx: each item ~3 lines; enforce max rows roughly
+        approx_lines = len(rows) * 2.2
+        while approx_lines > avail and len(rows) > 3:
+            # remove oldest message block (2 entries: msg + blank)
+            rows = rows[2:]
+            approx_lines = len(rows) * 2.2
+            if rows and isinstance(rows[0], Text) and not rows[0].plain.strip():
+                rows = rows[1:]
+        if approx_lines > avail and len(rows) > 3:
+            rows.insert(0, Text(f"… {len(history)-max_items} older messages hidden — scroll not needed", style="dim"))
+            rows.insert(1, Text(""))
         return Group(*rows)
 
     def _activity(self) -> RenderableType:
@@ -203,20 +236,29 @@ class FullscreenWorkspace:
 
     def _telemetry(self) -> RenderableType:
         state = terminal_snapshot(self.app)
-        text = Text()
+        text = Text(no_wrap=True, overflow="ellipsis")
         text.append("health ", style="bold dim")
         text.append(state.health, style="dim")
-        text.append("  ·  coverage ", style="bold dim")
+        text.append("  ·  cov ", style="bold dim")
         text.append(state.coverage, style="dim")
         text.append("  ·  findings ", style="bold dim")
-        text.append(str(state.findings), style="dim")
+        text.append(str(state.findings), style="bright_white" if state.findings else "dim")
         text.append("  ·  iter ", style="bold dim")
         text.append(state.iteration, style="dim")
-        # 2026: attack credits (XBOW) + tools (MCP)
         text.append("  ·  credits ", style="bold dim")
         text.append(state.credits, style="dim")
         text.append("  ·  tools ", style="bold dim")
         text.append(state.tools, style="dim")
+        # truncate to terminal width if needed (no wrap)
+        import shutil
+        try:
+            cols,_ = shutil.get_terminal_size((120,32))
+        except Exception:
+            cols=120
+        if text.cell_len > cols-2:
+            # rich Text will ellipsis via Live vertical_overflow, but horizontal we truncate
+            plain = text.plain
+            text = Text(plain[:cols-4] + "…", style="dim", no_wrap=True, overflow="ellipsis")
         return text
 
     def _header(self) -> RenderableType:
@@ -249,10 +291,15 @@ class FullscreenWorkspace:
         return line
 
     def _footer(self) -> RenderableType:
-        return Text("/help  /status  /stop  /exit    ·    enter send    ·    ctrl+c stop/exit", style="dim")
+        return Text("python run.py  ·  /help  /target  /stop  /exit    ·  enter send  ·  esc stop  ·  ctrl+c quit", style="dim")
 
     def render(self) -> RenderableType:
-        """Build the complete terminal view without Rich Layout objects."""
+        """Single-screen render: header + telemetry + conversation + activity + input + footer.
+
+        No nested Live/Layout, no scrollable panels — the whole workspace must fit
+        within the terminal height. `Live(..., screen=True, vertical_overflow='ellipsis')`
+        guarantees any overflow is replaced by ellipsis, not by scrolling.
+        """
         self._drain_events()
         return Group(
             self._header(),
@@ -261,7 +308,6 @@ class FullscreenWorkspace:
             self._conversation(),
             Rule(style="border.dim"),
             self._activity(),
-            Text(""),
             self._input(),
             self._footer(),
         )

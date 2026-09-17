@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """X19 — autonomous AI security assessment platform.
 
-``run.py`` is the single supported entry point. On an interactive terminal the
-default surface is the terminal application: the workspace home (status, state
-and every function), with first-run setup when no provider is configured yet.
-Non-interactive contexts (pipes, CI, ``X19_UI=plain``) get a dependency-light
-plain control plane instead, and the live dashboard stays behind ``dash``.
+``run.py`` is the ONLY supported entry point. Run it without args on a
+human terminal — X19 will guide setup if needed and then show the single-screen
+workspace (no scrolling, XBOW/Hermes-class). All other entry points are
+deprecated internal aliases kept for backward compatibility only.
 
-    python run.py                      # workspace home (or first-run setup)
-    python run.py setup                # guided setup
-    python run.py run -t <target>      # one-shot autonomous assessment
-    python run.py dash -t <target>     # explicit live UI only
-    X19_UI=plain python run.py status  # plain control plane
+    python run.py                      # <-- use this. Setup if needed → workspace
+    python run.py --help               # all commands (including hidden aliases)
+
+Non-interactive contexts (pipes, CI, X19_UI=plain) get the plain control plane.
 """
 
 import os
@@ -100,6 +98,14 @@ def _maybe_promote_learning(argv, result: int) -> None:
         log(f"LEARNING_PROMOTION_FAILED: {type(exc).__name__}: {exc}")
 
 
+def _setup_required() -> bool:
+    """True when the 4-stage AI chain setup has not been completed."""
+    try:
+        from cli_support import provider_configured
+        return not provider_configured()
+    except Exception:
+        return False
+
 def main() -> int:
     argv = list(sys.argv[1:])
 
@@ -122,25 +128,40 @@ def main() -> int:
         return int(plain_main(argv) or 0)
 
     if route in _APP_COMMANDS:
-        # An explicit invocation always goes to the full CLI (which owns
-        # --json/--plain handling). Only the bare `x19` default depends on
-        # whether a human is actually watching: machines get the plain status.
+        # Plain status stays plain even when setup is pending -- it must not
+        # pretend a run is possible. But bare interactive workspace must force
+        # setup; this is the "enforce mandatory setup" fix.
+        if _setup_required():
+            # `setup` itself is exempt -- let it run without recursion
+            if route == "setup":
+                pass
+            elif route == "providers":
+                pass
+            else:
+                # Force through CLI's first-run wizard (it owns the 4-stage flow)
+                from cli import main as cli_main
+                install_agent_execution_policy()
+                return int(cli_main(["setup"]) or 0)
         if not route and _wants_plain_surface():
             from plain_cli import main as plain_main
             return int(plain_main(argv or ["status"]) or 0)
         from cli import main as cli_main
-        # cli imports agent.py; only now can the compatibility layer bind the
-        # gateway to each X19 instance's explicit mission target.
         install_agent_execution_policy()
-
         routed = ["workspace"] + argv[1:] if not route else argv
         result = int(cli_main(routed) or 0)
         _maybe_promote_learning(argv, result)
         return result
 
-    # The existing CLI remains responsible for the rest of the security
-    # assessment command graph. The cognitive runtime is already installed
-    # before this import.
+    # Mandatory setup gate for authenticated assessments (run/dash/attack).
+    if _setup_required():
+        from cli import main as cli_main
+        install_agent_execution_policy()
+        # bare `python run.py run -t ...` must not run unverified -- force setup
+        argv0 = argv[0] if argv else ""
+        if argv0 in {"run", "dash", "attack", "swarm", "chat"}:
+            print("[x19] Setup required before any assessment. Starting setup wizard...")
+            return int(cli_main(["setup"]) or 0)
+
     from cli import main as cli_main
     install_agent_execution_policy()
     _activate_fullscreen_chat()

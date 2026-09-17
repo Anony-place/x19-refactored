@@ -115,10 +115,41 @@ def _choose_provider() -> str | None:
     print("Providers:")
     for i, pid in enumerate(ids, 1):
         print(f"  {i:2}. {pid:14} {PROVIDERS[pid]['name']}")
-    raw = input("Provider number or id: ").strip()
+    print(f"  {len(ids)+1:2}. ➕ Add custom OpenAI-compatible provider (base URL + API key)")
+    raw = input("Provider number, id, or 'custom': ").strip()
+    # custom trigger
+    if raw.lower() in {"custom", "add", "new", str(len(ids)+1)}:
+        return _create_custom_interactive()
     if raw.isdigit() and 1 <= int(raw) <= len(ids):
         return ids[int(raw) - 1]
     return raw if raw in PROVIDERS else None
+
+
+def _create_custom_interactive() -> str | None:
+    from custom_providers import add_custom_provider
+    print("\nCustom provider -- OpenAI-compatible")
+    pid = input("Provider id (e.g. my_vllm): ").strip().lower().replace(" ", "_")
+    if not pid:
+        print("[!] id required")
+        return None
+    if pid in PROVIDERS:
+        print(f"[!] id already exists: {pid}")
+        return None
+    name = input("Display name: ").strip() or pid
+    base_url = input("Base URL (https://.../v1 ): ").strip().rstrip("/")
+    if not base_url or not (base_url.startswith("http://") or base_url.startswith("https://")):
+        print("[!] valid http(s) base URL required")
+        return None
+    model = input("Default model: ").strip() or "local"
+    api_key = getpass.getpass("API key (Enter to skip for local/no-auth): ").strip()
+    api_key_env = input("Env var for key (optional): ").strip()
+    try:
+        add_custom_provider(pid, name, base_url, model, api_key_env=api_key_env, api_key=api_key)
+        print(f"[+] Custom provider '{pid}' -> {base_url} / {model}")
+        return pid
+    except Exception as exc:
+        print(f"[!] {exc}")
+        return None
 
 
 def interactive_setup() -> bool:
@@ -219,5 +250,31 @@ def provider_command(argv: list[str]) -> int:
         set_data({"AI_PROVIDER": pid, "AI_MODEL": model}, save=True)
         print(f"[+] active provider: {pid}/{model}")
         return 0
-    print("usage: x19 provider list | discover <provider> | test <provider> | use <provider> [--model MODEL] [--key KEY]")
+    if action == "add" and len(argv) >= 2:
+        # x19 provider add <id> --name NAME --base-url URL [--model M] [--key KEY] [--key-env ENV]
+        pid = argv[1].lower().replace(" ", "_")
+        if pid in PROVIDERS:
+            print(f"[!] already exists: {pid}")
+            return 2
+        name = base_url = model = key = key_env = ""
+        i = 2
+        while i < len(argv):
+            if argv[i] == "--name" and i+1 < len(argv): name = argv[i+1]; i+=2; continue
+            if argv[i] == "--base-url" and i+1 < len(argv): base_url = argv[i+1]; i+=2; continue
+            if argv[i] == "--model" and i+1 < len(argv): model = argv[i+1]; i+=2; continue
+            if argv[i] == "--key" and i+1 < len(argv): key = argv[i+1]; i+=2; continue
+            if argv[i] == "--key-env" and i+1 < len(argv): key_env = argv[i+1]; i+=2; continue
+            i+=1
+        if not base_url or not (base_url.startswith("http://") or base_url.startswith("https://")):
+            print("[!] --base-url https://.../v1 required")
+            return 2
+        try:
+            from custom_providers import add_custom_provider as _add
+            _add(pid, name or pid, base_url.rstrip("/"), model or "local", api_key_env=key_env, api_key=key)
+            print(f"[+] Custom provider '{pid}' added -> {base_url}")
+            return 0
+        except Exception as exc:
+            print(f"[!] {exc}")
+            return 1
+    print("usage: x19 provider list | discover <provider> | test <provider> | use <provider> [--model MODEL] [--key KEY] | add <id> --base-url URL [--name NAME] [--model M] [--key KEY]")
     return 2
