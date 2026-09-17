@@ -15,6 +15,7 @@ import threading
 import time
 import unittest
 from contextlib import redirect_stdout
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -788,3 +789,37 @@ class ExtraCommandTests(unittest.TestCase):
     def test_help_lists_every_command(self):
         documented = {entry["name"] for entry in cli.HELP_COMMANDS}
         self.assertEqual(documented, set(cli.COMMANDS))
+
+
+class RuntimeConfigCoercionTests(unittest.TestCase):
+    """Numbers the run loop compares against must arrive as numbers.
+
+    ``x19 run --max-iterations 1`` used to hand the string "1" to CONFIG, and
+    the loop's ``iteration < CONFIG.MAX_ITERATIONS`` then died with a TypeError
+    before the first decision — which is also why the CI smoke step exited
+    non-zero for a reason nobody read.
+    """
+
+    def test_max_iterations_is_coerced_and_a_typo_keeps_the_working_cap(self):
+        from config import CONFIG, set_data
+
+        previous = CONFIG.MAX_ITERATIONS
+        try:
+            set_data({"MAX_ITERATIONS": "7"}, save=False)
+            self.assertEqual(CONFIG.MAX_ITERATIONS, 7)
+            self.assertTrue(0 < CONFIG.MAX_ITERATIONS)      # the loop's own comparison
+            set_data({"MAX_ITERATIONS": "nonsense"}, save=False)
+            self.assertEqual(CONFIG.MAX_ITERATIONS, 7)      # never install a non-number
+        finally:
+            CONFIG.MAX_ITERATIONS = previous
+
+    def test_the_run_flag_sets_an_int(self):
+        from config import CONFIG
+
+        previous = CONFIG.MAX_ITERATIONS
+        try:
+            with mock.patch("config.save_config"):
+                cli._apply_runtime_config(_ns(max_iterations=3))
+            self.assertEqual(CONFIG.MAX_ITERATIONS, 3)
+        finally:
+            CONFIG.MAX_ITERATIONS = previous

@@ -1014,7 +1014,7 @@ def _apply_runtime_config(args: argparse.Namespace) -> None:
     if getattr(args, "fast", False):
         set_data({"FAST_MODE": "1", "PARALLEL_PLAN": "1"})
     if getattr(args, "max_iterations", 0):
-        set_data({"MAX_ITERATIONS": str(args.max_iterations)})
+        set_data({"MAX_ITERATIONS": int(args.max_iterations)})
 
 
 def _make_agent():
