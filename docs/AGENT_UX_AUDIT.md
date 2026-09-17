@@ -226,3 +226,28 @@ $ x19 dash -t paytm.com --once --no-start
 $ x19 dash -t www.paytm.com --once --no-start
 • scope: verified — Paytm Bug Bounty declares *.paytm.com                # mission control renders
 ```
+
+## 10. Addendum — merging with main's full-screen workspace
+
+`main` moved while this branch was open: `run.py` now swaps `ConsoleApp.run` for
+a full-screen renderer (`ui/fullscreen_workspace.py`) on a tty, and
+`_chat_reply()` grew `render=`/`on_chunk=` so an embedded workspace can own
+presentation. Rebasing onto it surfaced five things worth recording, because
+each one is a way the two designs could have quietly cancelled each other out:
+
+| # | Defect | Cause | Fix |
+|---|--------|-------|-----|
+| A11 | The new default surface sent a bare hostname straight to the model — the exact failure round 2 fixed | `FullscreenWorkspace._submit()` routed anything not starting with `/` to `_submit_chat()`, bypassing `ConsoleApp.handle()` and therefore the deterministic intake | Non-slash lines are offered to `_parse_target_request()` first; a target goes through `app.handle()` (scope resolves, operator picks), prose still goes to chat |
+| A12 | Two `_chat_reply()` rewrites collided | This branch wrapped the call in a notice sink + transcript context; main added `render`/`on_chunk` gating | One method with both: `render=False` means no spinner, no nested `Live`, no warnings painted into somebody else's layout, chunks handed to `on_chunk` — while the hardened prompt, the bounded transcript and the notice sink stay |
+| A13 | Worker output escaped capture for every manager but the first | `_QuietStream` is installed once per process but bound to the constructing manager's thread-local, and a process can build several managers (workspace, dashboard, fleet). Under `unittest discover` this failed outright; under pytest per-test stdout capture hid it | A weak registry of manager capture states; the wrapper and `output_is_captured()` both ask "does *this thread* belong to a task?" — which is also what the prompt's output guard needs to know |
+| A14 | `x19 run --max-iterations N` died before its first decision | `_apply_runtime_config` passed `str(N)` and `MAX_ITERATIONS` was missing from `set_data`'s int-coerced keys, so the loop's `iteration < CONFIG.MAX_ITERATIONS` raised `TypeError`. This — not an unreachable provider — is why the CI smoke step exited non-zero | `MAX_ITERATIONS` joins `_int_keys`, coercion tolerates a typo by keeping the working cap, and the CLI hands over the int the parser validated |
+| A15 | A refusal in `--json` mode was prose on stderr and an interactive prompt | The gate spoke through `info`/`warn`/`step`, which are silent in machine mode, then offered a `Prompt.ask` | Machine mode emits one JSON document (`authorized`, `state`, `reason`, `program`, `scope_patterns`, `next`) on stdout and never prompts |
+
+Verification after the rebase: `pytest tests/` **846 passed, 20 subtests**, and
+the command CI actually runs — `python -m unittest discover -s tests -t .` —
+**829 tests, OK** (it was failing on `main` before this branch touched it).
+`ui/fullscreen_workspace.py` is covered by eight new tests: intake routing for a
+bare host / prose / a local file, `render=False` streaming to `on_chunk` with
+nothing painted, the hardened prompt and transcript surviving `render=False`, a
+provider failure staying silent, and the non-tty fallback to the rolling
+transcript.
