@@ -12,6 +12,8 @@ from typing import Any, Dict, List
 import re
 
 from brain.coverage import CoverageMatrix
+from brain.decision_guard import evaluate_request
+from brain.atlas import attach_atlas
 
 
 def _now() -> str:
@@ -29,13 +31,16 @@ class TrajectoryEvent:
     status: str = ""
     returncode: int = -1
     evidence: str = ""
+    decision_level: str = ""
+    decision_reasons: tuple[str, ...] = ()
+    atlas_tags: List[Dict[str, str]] = field(default_factory=list)
     timestamp: str = field(default_factory=_now)
 
 
 @dataclass
 class TargetHealth:
     """Small explicit state machine derived only from observed execution."""
-    state: str = "unknown"  # unknown|reachable|degraded|blocked|offline
+    state: str = "unknown"
     consecutive_failures: int = 0
     observations: int = 0
     last_error: str = ""
@@ -69,7 +74,7 @@ class TargetHealth:
 
 _DOMAIN_PATTERNS = {
     "injection": (r"\bsqlmap\b", r"\bsql\b", r"\bxpath\b", r"\bldap\b", r"\bcommand injection\b"),
-    "access-control": (r"\bauthz\b", r"\bidor\b", r"\baccess.?control\b", r"\bidor\b"),
+    "access-control": (r"\bauthz\b", r"\bidor\b", r"\baccess.?control\b"),
     "authentication": (r"\bauth\b", r"\blogin\b", r"\bjwt\b", r"\bpassword\b", r"\bcredential\b"),
     "session": (r"\bsession\b", r"\bcookie\b", r"\bcsrf\b", r"\btoken\b"),
     "ssrf": (r"\bssrf\b", r"\binteractsh\b", r"\boob\b", r"\bcallback\b"),
@@ -83,11 +88,6 @@ _DOMAIN_PATTERNS = {
 
 
 def infer_domains(command: str, reason: str = "", hypothesis: str = "", metadata: Dict[str, Any] | None = None) -> List[str]:
-    """Infer advisory security domains from explicit request context.
-
-    This is a telemetry classifier, not an attack planner. An explicit
-    ``security_domains`` metadata field takes precedence when present.
-    """
     metadata = metadata or {}
     explicit = metadata.get("security_domains")
     if isinstance(explicit, (list, tuple)):
@@ -102,9 +102,16 @@ class AssessmentTelemetry:
         self.health = TargetHealth()
         self.events: List[TrajectoryEvent] = []
 
+    @staticmethod
+    def _decision_fields(request: Any):
+        guard = evaluate_request(request)
+        metadata = attach_atlas(getattr(request, "metadata", None))
+        return guard, metadata.get("atlas_tags", [])
+
     def record_start(self, request: Any) -> None:
         domains = infer_domains(request.command, request.reason, request.hypothesis, request.metadata)
         endpoint = str(request.target or "").strip()
+        guard, atlas_tags = self._decision_fields(request)
         if endpoint:
             self.coverage.ensure_endpoint(endpoint)
             for domain in domains:
@@ -112,12 +119,14 @@ class AssessmentTelemetry:
         self.events.append(TrajectoryEvent(
             request_id=request.request_id, phase="execution.start", command=request.command,
             target=endpoint, hypothesis_id=request.hypothesis_id, reason=request.reason,
+            decision_level=guard.level, decision_reasons=guard.reasons, atlas_tags=atlas_tags,
         ))
 
     def record_result(self, result: Any) -> None:
         request = result.request
         endpoint = str(request.target or "").strip()
         domains = infer_domains(request.command, request.reason, request.hypothesis, request.metadata)
+        guard, atlas_tags = self._decision_fields(request)
         status = "covered" if result.policy.allowed and not result.error else "blocked" if not result.policy.allowed else "testing"
         evidence = (result.stdout or result.stderr or "")[:1200]
         if endpoint:
@@ -128,11 +137,15 @@ class AssessmentTelemetry:
             request_id=request.request_id, phase="execution.result", command=request.command,
             target=endpoint, hypothesis_id=request.hypothesis_id, reason=request.reason,
             status=status, returncode=result.returncode, evidence=evidence,
+            decision_level=guard.level, decision_reasons=guard.reasons, atlas_tags=atlas_tags,
         ))
 
     def context_block(self) -> str:
         blocks = [self.coverage.context_block()]
         blocks.append(f"TARGET HEALTH: state={self.health.state} failures={self.health.consecutive_failures}")
+        if self.events:
+            weak = sum(1 for event in self.events[-50:] if event.decision_level == "weak")
+            blocks.append(f"DECISION QUALITY: weak_recent={weak}/{min(50, len(self.events))}")
         return "\n".join(x for x in blocks if x)
 
     def to_dict(self) -> dict:
