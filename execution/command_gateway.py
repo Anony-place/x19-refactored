@@ -11,6 +11,12 @@ from execution.scope_guard import ScopeGuard, ScopeViolationError
 from logging_utils import log
 from tools import ToolExecutor, ToolResult
 
+# 2026 TrafficMind hook (Strix/RedAMon pattern) — optional, no hard dep
+try:
+    from execution.traffic_mind import get_traffic_mind  # type: ignore
+except Exception:  # pragma: no cover
+    get_traffic_mind = None  # type: ignore
+
 
 class CommandGateway:
     """Mandatory execution entry point for new architecture modules.
@@ -190,6 +196,26 @@ class CommandGateway:
                     f"({self._sandbox_state()}) — executing on host backend"
                 )
                 result = self.executor.run(request.command, timeout=request.timeout)
+
+        # 2026: TrafficMind capture (HMAC-tagged history, Strix/RedAMon parity)
+        if get_traffic_mind is not None:
+            try:
+                tm = get_traffic_mind()
+                tm.capture(
+                    target=request.target or "",
+                    method="EXEC",
+                    url=request.command[:500],
+                    request_headers=request.command[:2000],
+                    request_body="",
+                    response_status=int(getattr(result, "returncode", 0) or 0),
+                    response_headers="",
+                    response_body=str(getattr(result, "stdout", "") or "")[:4000],
+                    tags="gateway",
+                    tool=str(request.tool or ""),
+                    command_id=str(request.request_id or ""),
+                )
+            except Exception:
+                pass
 
         # P0: count every actual command execution
         self._command_count += 1

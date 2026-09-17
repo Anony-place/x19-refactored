@@ -54,3 +54,11 @@ target/
 .mypy_cache/
 .pytest_cache/
 .hypothesis/
+
+# X19 runtime workspaces (not committed — external-storage convention)
+x19_workspace/
+x19_sessions/
+x19_agent.log
+*.db
+*.sqlite
+*.sqlite3

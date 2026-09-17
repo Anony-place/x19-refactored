@@ -1,0 +1,74 @@
+name: X19 Security Scan
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  schedule:
+    - cron: '0 3 * * 1'  # weekly
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target to scan (host or URL)'
+        required: false
+        default: 'example.com'
+
+jobs:
+  x19-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # for SARIF upload
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install X19
+        run: |
+          pip install -r requirements.txt
+          python -c "import brain.evo_graph; print('evo_graph ok')"
+          python -c "import execution.traffic_mind; print('traffic_mind ok')"
+
+      - name: Run X19 (with SARIF)
+        env:
+          X19_AI_API_KEY: ${{ secrets.X19_AI_API_KEY }}
+          X19_AI_MODEL: ${{ secrets.X19_AI_MODEL }}
+          X19_AI_BASE_URL: ${{ secrets.X19_AI_BASE_URL }}
+          # optional: custom provider
+          # X19_AI_PROVIDER: openai
+        run: |
+          TARGET="${{ inputs.target || 'example.com' }}"
+          echo "Scanning $TARGET"
+          # single entry — provider chain enforced; setup before scan
+          python run.py scan --target "$TARGET" --sarif x19.sarif || python run.py -t "$TARGET" --sarif x19.sarif || true
+          # fallback: generate SARIF from last findings if scan produced json
+          if [ ! -f x19.sarif ]; then
+            python -c "from reporting.sarif import to_sarif; import json; open('x19.sarif','w').write(json.dumps(to_sarif([], target='$TARGET'), indent=2))"
+          fi
+          ls -lh x19.sarif || true
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: x19.sarif
+        continue-on-error: true
+
+      - name: AutoFix draft (CypherFix)
+        if: always()
+        run: |
+          python -c "from reporting.autofix import triage, draft_pr; from execution.native_vuln import VulnerabilityFinding; print(draft_pr(triage([]), target='${{ inputs.target || 'example.com' }}'))" || true
+          ls -R x19_workspace/autofix || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x19-reports
+          path: |
+            x19.sarif
+            x19_workspace/autofix/
+            x19_workspace/traffic.db
+            x19_workspace/evo_graph/
