@@ -373,7 +373,7 @@ def _authorize_active_run(target: str, args):
     from rich.prompt import Prompt
 
     from scope_guard import ActiveRunDecision, decide_active_run
-    from ui.console import get_console, info, step, warn
+    from ui.console import emit_json, get_console, info, is_json_mode, step, warn
 
     console = get_console()
     decision = decide_active_run(
@@ -384,6 +384,28 @@ def _authorize_active_run(target: str, args):
     )
     if decision.allowed:
         info(f"scope: {decision.reason}")
+        return decision
+
+    if is_json_mode():
+        # Machine mode: nobody is there to answer a prompt, and the refusal is
+        # itself the result — so it goes to stdout as data, not as prose.
+        result = decision.result
+        emit_json({
+            "target": target,
+            "authorized": False,
+            "state": decision.state,
+            "reason": decision.reason,
+            "needs_input": decision.needs_input,
+            "program": getattr(result, "program", "") if result else "",
+            "source_url": getattr(result, "source_url", "") if result else "",
+            "scope_patterns": list(getattr(result, "scope_patterns", []) or []) if result else [],
+            "next": [
+                f"x19 run -t {target} --bug-bounty --scope-url <program scope url>",
+                f"x19 engagement new <name> -t {target} --target-type authorized",
+                f"X19_ALLOW_UNVERIFIED=1 x19 run -t {target} --bug-bounty",
+                f"x19 run -t {target}  (recon/enumeration only)",
+            ],
+        })
         return decision
 
     if not decision.needs_input:

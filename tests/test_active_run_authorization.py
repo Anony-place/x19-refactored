@@ -373,6 +373,30 @@ class CliGateTests(_EnvIsolated):
         self.assertTrue(decision.allowed)
         self.assertEqual(decision.target_type, "public_real_world")
 
+    def test_json_mode_refusal_is_machine_readable_and_never_prompts(self):
+        """`--json` consumers get the refusal as a document, not as prose."""
+        import json as jsonlib
+
+        from ui.console import init_console
+
+        asked = mock.MagicMock(side_effect=AssertionError("must not prompt in json mode"))
+        stdout = io.StringIO()
+        init_console(force_terminal=False, json_mode=True)
+        try:
+            with mock.patch.object(sys, "stdout", stdout), \
+                    mock.patch.object(sys.stdin, "isatty", return_value=True), \
+                    mock.patch("rich.prompt.Prompt.ask", asked):
+                decision = cli._authorize_active_run(PUBLIC, _ns(bug_bounty=True))
+        finally:
+            init_console(force_terminal=False, json_mode=False)
+        self.assertFalse(decision.allowed)
+        asked.assert_not_called()
+        payload = jsonlib.loads(stdout.getvalue())
+        self.assertFalse(payload["authorized"])
+        self.assertEqual(payload["target"], PUBLIC)
+        self.assertTrue(payload["needs_input"])
+        self.assertTrue(any("--scope-url" in step for step in payload["next"]))
+
     def test_a_posture_left_in_the_config_file_is_a_claim_not_evidence(self):
         """The sticky half of the same bug: an old verdict must not be inherited."""
         with mock.patch.object(cli, "load_config", return_value={"TARGET_TYPE": "authorized"}):
