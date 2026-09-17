@@ -212,6 +212,11 @@ class FullscreenWorkspace:
         text.append(str(state.findings), style="dim")
         text.append("  ·  iter ", style="bold dim")
         text.append(state.iteration, style="dim")
+        # 2026: attack credits (XBOW) + tools (MCP)
+        text.append("  ·  credits ", style="bold dim")
+        text.append(state.credits, style="dim")
+        text.append("  ·  tools ", style="bold dim")
+        text.append(state.tools, style="dim")
         return text
 
     def _header(self) -> RenderableType:

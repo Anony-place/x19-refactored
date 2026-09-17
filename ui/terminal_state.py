@@ -19,6 +19,9 @@ class TerminalMissionState:
     findings: int = 0
     iteration: str = "—"
     activity: str = "idle"
+    # 2026: attack credits + MCP tool count
+    credits: str = "—"
+    tools: str = "—"
 
 
 def snapshot(app: Any) -> TerminalMissionState:
@@ -69,6 +72,28 @@ def snapshot(app: Any) -> TerminalMissionState:
     except Exception:
         pass
 
+    # 2026: attack credits (XBOW) + tool count (MCP)
+    credits = "—"
+    try:
+        from brain.attack_credits import get_budget
+        b = get_budget()
+        credits = f"{b.spent}/{b.total}"
+    except Exception:
+        pass
+    tools = "—"
+    try:
+        from execution.mcp_gateway import MCPGateway
+        # prefer live gateway if app has one
+        gw = getattr(app, "_mcp_gateway", None) or getattr(getattr(app, "agent", None), "_mcp_gateway", None)
+        if gw is not None and hasattr(gw, "tools"):
+            tools = str(len(gw.tools))
+        else:
+            # fallback: scanner count
+            from tool_scanner import scan_tools
+            tools = str(len(scan_tools() or {}))
+    except Exception:
+        pass
+
     return TerminalMissionState(
         target=target,
         provider=str(provider),
@@ -78,4 +103,6 @@ def snapshot(app: Any) -> TerminalMissionState:
         findings=findings,
         iteration=iteration,
         activity=activity,
+        credits=credits,
+        tools=tools,
     )

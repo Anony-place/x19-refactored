@@ -1,20 +1,37 @@
-# X19 Competitive Gap Analysis Matrix
+# X19 Competitive Gap Analysis — Sep 2026 Refresh (Top-10 Benchmarked)
 
-Comparing **X19** against leading autonomous offensive security platforms and research paradigms (XBOW, PentestGPT, CAI, Mythic Autonomous Workflows).
+Comparing **X19** against 2026 autonomous offensive platforms & research: XBOW (web bounty), Big Sleep (0-day depth), Atlantis/AIxCC (find-and-patch), Shannon (white-box 96.15%), NodeZero ($2B graph-based), PentAGI (15.5k microservices), CAI (300 backends), HexStrike (MCP 150+), Strix (prod-ready 57/100), HPTSA (hierarchical 4.3×), plus ARTEMIS live-network & CHECKMATE PDDL.
 
-| Capability Dimension | X19 Baseline | Industry Benchmarks (XBOW / CAI / PentestGPT) | X19 Target Evolution State | Gap Classification |
-| :--- | :--- | :--- | :--- | :--- |
-| **Agent Loop Architecture** | Hybrid (LLM + heuristics in `agent.py`) | Evidence-driven closed loop (Observe -> Hypothesis -> Test -> Verify) | Fully evidence-driven autonomous reasoning loop | Functional -> Advanced |
-| **Hypothesis Generation** | Single finding / linear suggestions | Competing hypothesis trees scored by information gain vs. cost/risk | `MultiHypothesisEngine` prioritized by $\frac{\text{InfoGain} \times \text{Prob}}{\text{Cost} \times \text{Risk}}$ | Functional -> Advanced |
-| **World Model & State Graph** | Relational `TargetModel` & Enriched `WorldModel` | Dynamic Target Knowledge Graph with state transitions | Multi-entity Graph (Hosts, Ports, Endpoints, Auth Contexts, Vulnerabilities) | Functional -> Advanced |
-| **Failure Analysis & Recovery** | Basic tool error logging & failure memory | Multi-class failure taxonomy & strategy adjustment | Structured classification (Auth, Scope, Rate Limit, Invalid Hyp) + Penalty Decay | Basic -> Advanced |
-| **Stateful Web Autonomy** | Endpoint-level HTTP fuzzing | Multi-step stateful workflow testing (Role A vs Role B / BOLA / IDOR) | Context-aware session/role workflow testing & differential response analysis | Basic -> Functional |
-| **Vulnerability Verification** | Regex pattern matching + LLM pass | 4-gate multi-stage verification (Suspicious -> Reproducible -> Verified) | Strict 4-gate verification engine with zero false positives | Functional -> Best-in-Class |
-| **Scope Enforcement Boundary** | `PolicyEngine` inspects commands textually before `subprocess` runs them; `ScopeGuard` offers a real socket-level check but is only wired into the swarm coordinator, not the main loop | Network proxy / container sandbox limits | Container/namespace isolation so scope is enforced by the OS, not by parsing a shell string | Basic (regex reference extraction is bypassable; not a boundary) |
-| **Stopping Intelligence** | Iteration cap & basic saturation checks | Evidence-based termination criteria (Target convergence / Budget) | Multi-criteria evidence-driven termination engine | Basic -> Advanced |
+| Capability Dimension | X19 Baseline (Sep 2026) | 2026 Industry Benchmark | X19 Target (Production) | Gap | Priority |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Agent Loop** | Hybrid LLM+heuristics in `agent.py` but evidence-driven Observe→Hypothesize→Test→Verify+Learn loop shipped (ledger + strategist + critic) | XBOW 5-step learn→map→coordinate→execute→validate (5 agents + validator); Atlantis tiers; CHECKMATE PDDL 20% win deterministic | Fully evidence-driven loop with chain PoV re-run + 1-click Verify | Functional → Best | P1 |
+| **Hypothesis Generation** | `MultiHypothesisEngine` NEW→TESTING→CONFIRMED scored by 0.25C+0.35IG+0.20(1-Cost)+0.20(1-Risk), attempt_count, falsifiers, pre-registration | Big Sleep variant analysis + parallel trajectories N-version, XBOW micro-step chains 48 steps | Attack-credit budgeted hypothesis trees, variant sweep + N-version parallel | ✅ → Advanced | P2 |
+| **World Model / Knowledge Graph** | `WorldModel` + `AttackGraph` typed edges (HOST_HAS_SERVICE etc.) hosts/services/endpoints/creds/tech/vulns | NodeZero hosts/services/creds/AD/cloud/identities graph+reasoning; PentAGI Neo4j/Graphiti + pgvector | Persisted KG (Neo4j/pgvector) + AD/cloud identities + white-box source edges (Shannon) | Functional → Advanced | P2 |
+| **Failure Analysis & Recovery** | `CriticEngine` multi-class taxonomy + penalty decay + hard block 3, saturation detection, linked to strategy | Atlantis LLM trust tiers + HPTSA narrow context diagnosis | Correlate failure-memory ↔ episodic vector store, per-lane narrow context | ✅ → Best | P3 |
+| **Stateful Web Autonomy** | Endpoint-level HTTP fuzzing + `native_fuzzer` + BOLA/IDOR diff checks, `BrowserAutomation` exists not integrated | Strix proxy+ browser+ terminal+ Python exploit env; NodeZero WebApp BOLA/IDOR/business logic chaining; XBOW WAF mutation | Browser+proxy+stateful role-diff workflow, multi-step chain testing | Basic → Functional | P2 |
+| **Vulnerability Verification** | Regex+LLM replaced by **4-gate** (unexpected, impact, reproducibility, evidence) + stale+HTTP cross-check + OOB oracle 8-ring + hostile reviewer mandatory high/crit | XBOW independent validator layer zero false positives + Big Sleep crash oracle + NodeZero proof-of-exploit + safety SLLM per-action | Add chain PoV re-run (combined exploit re-execution) + 1-click Verify after fix — binary oracle per chain | Functional → Best-class ✅ partial | P1 |
+| **Scope Enforcement** | `PolicyEngine` textual before subprocess + `ScopeGuard` socket-level BUT only in `brain/coordinator.py` & natives (enforce=False), regex catches query-string/flag values but bypassable | NodeZero deterministic + ephemeral VPC per test; Plexicus signed-scope replay-verified; PentAGI Docker per-agent; OS/network namespace | OS/network namespace isolation + signed-scope + replay; ScopeGuard on **every** CommandGateway run, sandbox mandatory (no silent host fallback for net) | **Basic (not a boundary)** → Container | **P0 critical** |
+| **Execution Isolation** | `SandboxExecutor` Docker `x19-sandbox:latest` network=none read-only cap-drop ALL tmpfs 256m, `available` sticky, `auto` prefers sandbox but **degrades to host** | PentAGI per-agent Docker Kali 20+; HexStrike 150+ via FastMCP; NodeZero ephemeral infra; gVisor option | Per-agent/per-tool containers, gVisor, 150→200+ tools via MCP, hard fail-closed for network | Partial → Isolated | P0 |
+| **Tool Scale & Abstraction** | ~70 binaries via `tool_scanner.py` + `mcp_client.py` thin client, `tools.py` 8 tools, `parsers/` 4 | HexStrike 150+ (25 net/40 web/20 cloud/25 binary/20 OSINT) FastMCP intent→execution; Penligent 200+; CAI 300 backends | `execution/mcp_gateway.py` FastMCP server + smart caching + retry/resilience + compact CI mode | Basic → 150+ | P1 |
+| **Memory** | Chroma vector + session + failure-memory (3-layer but episodic thin) | PentAGI 3-layer pgvector+working+episodic + Neo4j Graphiti + Langfuse/ClickHouse | `learning/episodic_memory.py` + Graphiti/Chroma correlation, compounding cross-engagement | Basic → Advanced | P2 |
+| **Observability** | `events.py` local events, ribbon `N calls ~Tk tok ~$X`, no OTEL | PentAGI OTEL→VictoriaMetrics/Jaeger/Loki/Grafana + Langfuse/ClickHouse/Redis/MinIO; XBOW every packet+treemap | `runtime/observability.py` OTEL spans + packet treemap + Langfuse | Basic → Adv | P2 |
+| **Cost Transparency** | Usage ribbon + `brain/escalation.py` frontier gate + `X19_PRICE_PER_MTOK` | XBOW attack credits (40 light vs full), ARTEMIS $59/hr | `brain/attack_credits.py` per-chain credits + treemap | Partial → Full | P2 |
+| **Stopping Intelligence** | Iter cap + saturation + multi-criteria + budget (commands/llm_calls/seconds) | Evidence convergence + budget + PoV oracle | Evidence-driven termination (Target convergence / Budget / PoV success) | Basic → Adv | P2 |
+| **White-box Correlation** | Black-box only | Shannon 96.15% source↔dynamic, CodeAnt repo scan | Optional `brain/whitebox_correlator.py` repo artifact→graph edge | ❌ → Optional | P3 |
+| **Compliance/Audit** | Markdown/JSON reports, events audit trail | XBOW SOC2/ISO27001/PCI/NIS2 audit logs; NodeZero Compliance; Plexicus replay | Signed-scope + replay-verified evidence bundle, compliance mapping | Basic → Adv | P3 |
 
----
+## Key Takeaways 2026
 
-## Key Takeaways
-1. **Scope Safety:** `PolicyEngine`'s textual check is decent and now catches destinations hidden in query strings and flag values, but parsing a shell command is not a security boundary. `ScopeGuard` has the socket-level logic; it needs to be installed on the path the agent actually executes (arbitrary shell via `subprocess`) rather than only inside `brain/coordinator.py`.
-2. **Reasoning Loop:** The main area for competitive advantage is transforming hypothesis generation and vulnerability verification into a strict, evidence-based, multi-stage reasoning pipeline.
+1. **Scope still P0 not-a-boundary.** `PolicyEngine` textual is decent (query-string/flag extraction) but parsing shell is not a boundary. `ScopeGuard` socket-level exists but not on `CommandGateway.run` (the shell path the agent actually uses). Fix: install `ScopeGuard` check in gateway, add signed-scope artifact, make sandbox fail-closed for network egress. Done below in code patch §6.1.
+
+2. **Validation needs chain PoV re-run + 1-click Verify.** 4-gate+review+OOB kills single-step false positives (XBOW validator parity). But XBOW 48-step chains and NodeZero attack paths prove *combined* exploit; X19 reports chains without combined re-execution. Next: `brain/pov_validator.py` dispatched via team workers as binary oracle, then 1-click Verify after customer patch (NodeZero/Horizon3 pattern).
+
+3. **Tool scale needs MCP, not shell strings.** HexStrike proves MCP is fastest-growing pattern: FastMCP server wrapping 150 tools as functions + intent translation + retry. X19's `tool_scanner` finds 70 binaries and `mcp_client` can call one server — need `mcp_gateway` server side to reach 200 (Penligent parity).
+
+4. **Memory needs episodic depth.** PentAGI 3-layer is benchmark; X19's episodic is thin (failure-memory not correlated). `learning/episodic_memory.py` + Graphiti bridges this.
+
+5. **Observability needs OTEL.** PentAGI's VictoriaMetrics/Jaeger/Loki/Grafana + Langfuse is product-grade; X19 has ribbon only. `runtime/observability.py` adds span tracing.
+
+## Parity Score 2026: 6 ✅ · 10 ⚠️ · 4 ❌ → Target after P0/P1: 12 ✅ · 6 ⚠️ · 2 ❌
+
+Shipped since last gap: hierarchical team (HPTSA 4.3×), parallel trajectories (Naptime sampling), frontier escalation, fleet (2-8), OOB oracle, knowledge layer, ATLAS guard. Next to ship: hard scope, MCP, PoV, episodic, observability, attack credits, white-box (optional).

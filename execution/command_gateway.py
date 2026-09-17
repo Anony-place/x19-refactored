@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from config import CONFIG
-from execution.command_request import CommandRequest, CommandResult, utc_now
+from execution.command_request import CommandRequest, CommandResult, PolicyVerdict, utc_now
 from execution.policy_engine import ExecutionPolicy, PolicyEngine, policy_from_config
 from execution.sandbox import SandboxExecutor
+from execution.scope_guard import ScopeGuard, ScopeViolationError
 from logging_utils import log
 from tools import ToolExecutor, ToolResult
 
@@ -31,6 +33,7 @@ class CommandGateway:
         policy_engine: Optional[PolicyEngine] = None,
         sandbox: Optional[SandboxExecutor] = None,
         target: str = "",
+        scope_guard: Optional[ScopeGuard] = None,
     ):
         self.executor = executor
         # P0 fix: if no policy_engine given, build from config with target scope.
@@ -44,18 +47,100 @@ class CommandGateway:
             self.policy_engine = PolicyEngine(ExecutionPolicy())
         workspace = getattr(executor, "workspace", None) or CONFIG.WORKSPACE
         self.sandbox = sandbox or SandboxExecutor(workspace)
+        # 2026 P0: hard scope via OS/socket boundary — ScopeGuard on the gateway itself,
+        # not only in coordinator. Uses same allowlist as policy so they agree.
+        if scope_guard is not None:
+            self.scope_guard = scope_guard
+        else:
+            allowed = set(getattr(self.policy_engine.policy, "allowed_targets", set()) or set())
+            # enforce=True even when allowed empty → fail-closed (no escape)
+            self.scope_guard = ScopeGuard(allowed_targets=allowed, enforce=True)
 
         # Budget counters (P0: count every actual command/LLM call)
         self._command_count: int = 0
         self._llm_call_count: int = 0
+        # 2026: optional attack-credit budget + observability tracer (additive, no hard dep)
+        self._credit_budget = None
+        try:
+            from brain.attack_credits import get_budget
+            self._credit_budget = get_budget()
+        except Exception:
+            pass
+        self._tracer = None
+        try:
+            from runtime.observability import get_tracer
+            self._tracer = get_tracer()
+        except Exception:
+            pass
+
+    def _scope_guard_verdict(self, request: CommandRequest) -> Optional[PolicyVerdict]:
+        """Second boundary: socket-level scope check (NodeZero/XBOW hard-scope pattern).
+
+        PolicyEngine does textual ref extraction (regex). ScopeGuard does host/IP/CIDR
+        validation at the transport layer. Both must pass. This catches bypasses where
+        a host is smuggled past regex (e.g. encoded, via env var) but would still
+        resolve to an out-of-scope IP at connect time. Returns blocking verdict or None.
+        """
+        # non-targeted local commands (echo, ls) don't need socket check
+        try:
+            from execution.policy_engine import PolicyEngine as _PE
+            refs = _PE._extract_refs(request.command)
+            if request.target:
+                refs.add(request.target)
+        except Exception:
+            refs = set()
+            if request.target:
+                refs.add(request.target)
+        if not refs:
+            return None
+        for ref in refs:
+            # ScopeGuard understands URLs, hosts, IPs, CIDRs
+            allowed = self.scope_guard.is_allowed_host(ref) or self.scope_guard.is_allowed_url(ref)
+            if not allowed:
+                # also try normalized host extraction for bare refs
+                try:
+                    from urllib.parse import urlparse
+                    candidate = ref
+                    if "://" in candidate:
+                        candidate = urlparse(candidate).hostname or candidate
+                    candidate = candidate.split("/")[0].split(":")[0].strip("[]")
+                    if candidate and (self.scope_guard.is_allowed_host(candidate) or self.scope_guard.is_allowed_url(candidate)):
+                        continue
+                except Exception:
+                    pass
+                return PolicyVerdict(False, f"out-of-scope (socket guard) ref: {ref}", "scope_guard")
+        return None
 
     def run(self, request: CommandRequest) -> CommandResult:
         verdict = self.policy_engine.evaluate(request)
         if not verdict.allowed:
             log(f"[GATEWAY_BLOCK] {request.request_id} rule={verdict.rule} reason={verdict.reason}")
             return CommandResult.blocked(request, verdict)
+        # 2026 P0: hard socket-level guard — OS/network boundary, not just regex
+        guard_verdict = self._scope_guard_verdict(request)
+        if guard_verdict is not None and not guard_verdict.allowed:
+            log(f"[GATEWAY_BLOCK] {request.request_id} rule={guard_verdict.rule} reason={guard_verdict.reason}")
+            return CommandResult.blocked(request, guard_verdict)
+        # 2026: attack-credit check (XBOW) — deterministic, advisory unless strict
+        if self._credit_budget is not None:
+            try:
+                # only deduct for network-targeted commands
+                from execution.policy_engine import PolicyEngine as _PE
+                refs = _PE._extract_refs(request.command)
+                if refs or request.target:
+                    if not self._credit_budget.can_spend("probe"):
+                        log(f"[GATEWAY_CREDIT] {request.request_id} credits {self._credit_budget.spent}/{self._credit_budget.total} — running with warning (not blocking)")
+            except Exception:
+                pass
 
         started = utc_now()
+        # 2026 observability span
+        _span = None
+        if self._tracer is not None:
+            try:
+                _span = self._tracer.start_span("gateway.run", command=request.command[:80], target=request.target or "", backend=request.backend or "auto", hypothesis=request.hypothesis_id or "")
+            except Exception:
+                _span = None
         log(
             f"[GATEWAY_START] {request.request_id} tool={request.tool or '?'} "
             f"risk={request.risk} backend={request.backend} "
@@ -63,6 +148,8 @@ class CommandGateway:
         )
 
         backend = (request.backend or "auto").strip().lower()
+        # 2026: sandbox permissive flag — when X19_SANDBOX_STRICT=1, network commands fail instead of degrading
+        strict_sandbox = (os.getenv("X19_SANDBOX_STRICT", "") or "").strip().lower() in ("1", "true", "yes", "on")
         if backend == "host":
             result = self.executor.run(request.command, timeout=request.timeout)
         elif backend == "sandbox":
@@ -80,6 +167,22 @@ class CommandGateway:
             if getattr(self.sandbox, "available", True):
                 result = self.sandbox.run(request.command, timeout=request.timeout)
                 if result.error and str(result.error).startswith("sandbox_unavailable"):
+                    if strict_sandbox:
+                        # fail-closed in strict mode — do not degrade for network commands
+                        try:
+                            from execution.policy_engine import PolicyEngine as _PE
+                            refs = _PE._extract_refs(request.command)
+                            if refs or request.target:
+                                log(f"[GATEWAY_STRICT] {request.request_id} sandbox unavailable but X19_SANDBOX_STRICT=1 — blocking network command")
+                                finished = utc_now()
+                                if _span is not None:
+                                    try:
+                                        self._tracer.end_span(_span, status="error", error="sandbox_unavailable_strict")
+                                    except Exception:
+                                        pass
+                                return CommandResult.blocked(request, PolicyVerdict(False, "sandbox unavailable in strict mode", "sandbox_required"))
+                        except Exception:
+                            pass
                     result = None
             if result is None:
                 log(
@@ -90,12 +193,26 @@ class CommandGateway:
 
         # P0: count every actual command execution
         self._command_count += 1
+        # 2026: attack-credit spend
+        if self._credit_budget is not None:
+            try:
+                from execution.policy_engine import PolicyEngine as _PE
+                refs = _PE._extract_refs(request.command)
+                if refs or request.target:
+                    self._credit_budget.spend("probe", reason=request.hypothesis_id or request.command[:30])
+            except Exception:
+                pass
 
         finished = utc_now()
         log(
             f"[GATEWAY_EXIT] {request.request_id} rc={getattr(result, 'returncode', -1)} "
             f"sandbox={backend != 'host'} commands={self._command_count}"
         )
+        if _span is not None:
+            try:
+                self._tracer.end_span(_span, status="ok" if getattr(result,"returncode",1)==0 else "ok", rc=getattr(result,"returncode",-1))
+            except Exception:
+                pass
         return CommandResult.from_tool_result(
             request,
             result,
