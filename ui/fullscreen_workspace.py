@@ -318,6 +318,11 @@ class FullscreenWorkspace:
         if line.startswith("/"):
             self._submit_command(line)
             return
+        # Naming a target is how an operator starts work, so it is routed through
+        # the application's deterministic intake (scope resolves, then the
+        # operator picks passive / active / verify / cancel) instead of being
+        # sent to the model — which answers with a policy lecture and invented
+        # program details. Prose still goes to chat.
         if self.app._parse_target_request(line):
             self._submit_command(line)
             return
