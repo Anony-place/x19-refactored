@@ -48,17 +48,43 @@ def _model_list(provider_id: str) -> List[str]:
     return models
 
 
+def _detected_env_providers() -> Dict[str, str]:
+    detected = {}
+    for pid, info in PROVIDERS.items():
+        env_var = info.get("api_key_env", "")
+        if env_var and os.getenv(env_var):
+            detected[pid] = env_var
+    return detected
+
+
 def _choose_provider(used: set) -> str:
+    detected = _detected_env_providers()
     choices = [p for p in PROVIDERS if p not in used]
     choices_with_custom = [*choices, "__custom__"]
+
+    pref_pid = None
+    for pid in choices:
+        if pid in detected:
+            pref_pid = pid
+            break
+
     print(f"\n{C.BOLD}{C.Y}Select provider:{C.N}")
     for i, pid in enumerate(choices, 1):
         info = PROVIDERS[pid]
         local = " [LOCAL]" if not info.get("needs_key") else ""
-        print(f"  {C.G}[{i}]{C.N} {info['name']}{local} — {info.get('desc','')[:70]}")
-    print(f"  {C.G}[{len(choices_with_custom)}]{C.N} \u2795 Add custom OpenAI-compatible provider (base URL + API key)")
+        det = f" {C.G}[KEY DETECTED: {detected[pid]}]{C.N}" if pid in detected else ""
+        print(f"  {C.G}[{i}]{C.N} {info['name']}{local}{det} — {info.get('desc','')[:65]}")
+    print(f"  {C.G}[{len(choices_with_custom)}]{C.N} ➕ Add custom OpenAI-compatible provider (base URL + API key)")
+    if pref_pid:
+        print(f"  {C.C}[Enter] Auto-select detected provider: {PROVIDERS[pref_pid]['name']}{C.N}")
+
     while True:
-        raw = input(f"{C.B}[?] Provider (1-{len(choices_with_custom)} or id): {C.N}").strip()
+        try:
+            raw = input(f"{C.B}[?] Provider (1-{len(choices_with_custom)} or id): {C.N}").strip()
+        except (EOFError, KeyboardInterrupt):
+            raise
+        if not raw and pref_pid:
+            return pref_pid
         if raw.lower() in {"custom", "add", "new", "__custom__"}:
             pid = _setup_custom_provider_flow()
             if pid:
@@ -137,6 +163,8 @@ def _choose_model(provider_id: str) -> str:
 
 def _verify(provider_id: str, model: str, key: str) -> Tuple[bool, str]:
     """Perform a real, provider-specific minimal API request."""
+    if provider_id in {"demo", "mock"}:
+        return True, "demo offline mode active"
     info = PROVIDERS.get(provider_id, {}) or {}
     # custom providers have no special format but still OpenAI-compat; treat like openai
     if not info:
@@ -198,47 +226,89 @@ def setup_if_needed(force: bool = False) -> bool:
     if existing and not force:
         return True
 
+    # Non-interactive handling: auto-configure from env if key exists, or cleanly guide user
+    import sys
+    if not sys.stdin.isatty():
+        detected = _detected_env_providers()
+        if detected:
+            first_pid = next(iter(detected))
+            info = PROVIDERS[first_pid]
+            models = _model_list(first_pid)
+            model = models[0] if models else info.get("default_model", "")
+            chain = [{"provider": first_pid, "model": model}]
+            save_config({CHAIN_KEY: chain})
+            set_data({"AI_PROVIDER": first_pid, "AI_MODEL": model})
+            print(f"[+] Non-interactive: auto-configured '{first_pid}' ({model}) from {detected[first_pid]}.")
+            return True
+        print(f"\n{C.R}[!] Setup required: no AI provider configured (non-interactive shell).{C.N}")
+        print(f"{C.Y}Export an API key to configure X19, for example:{C.N}")
+        print("    export GROQ_API_KEY=\"gsk_...\"          # Free at https://console.groq.com")
+        print("    export OPENAI_API_KEY=\"sk-...\"")
+        print("    export OPENROUTER_API_KEY=\"sk-or-...\"")
+        print("Or run the interactive wizard in a terminal: python run.py setup\n")
+        return False
+
     print(f"\n{C.BOLD}{C.C}X19 AI CONFIGURATION{C.N}")
     print(f"{C.D}Choose the exact provider/model failover order. X19 will not reorder it silently.{C.N}\n")
     chain: List[Dict[str, str]] = []
     used = set()
 
-    while True:
-        role = "Primary" if not chain else f"Fallback #{len(chain)}"
-        print(f"\n{C.BOLD}{role}{C.N}")
-        pid = _choose_provider(used)
-        model = _choose_model(pid)
+    try:
+        while True:
+            role = "Primary" if not chain else f"Fallback #{len(chain)}"
+            print(f"\n{C.BOLD}{role}{C.N}")
+            pid = _choose_provider(used)
+            model = _choose_model(pid)
 
-        key = ""
-        if PROVIDERS[pid].get("needs_key"):
-            key = _key(pid)
-            if not key:
-                key = getpass.getpass(f"{C.B}[?] {PROVIDERS[pid]['name']} API key: {C.N}").strip()
-                if key:
-                    _save_key(pid, key)
+            key = ""
+            if PROVIDERS[pid].get("needs_key"):
+                key = _key(pid)
+                if not key:
+                    key = getpass.getpass(f"{C.B}[?] {PROVIDERS[pid]['name']} API key: {C.N}").strip()
+                    if key:
+                        _save_key(pid, key)
 
-        print(f"{C.Y}[*] Verifying {PROVIDERS[pid]['name']} / {model} ...{C.N}")
-        ok, detail = _verify(pid, model, key)
-        if not ok:
-            print(f"{C.R}[!] Verification failed: {detail}{C.N}")
-            print(f"{C.Y}    This provider/model will NOT be saved as a working chain entry.{C.N}")
-            retry = input(f"{C.B}[?] Try this provider again? (Y/n): {C.N}").strip().lower()
-            if retry != "n":
-                continue
-            if not chain:
-                print(f"{C.R}[!] A working primary provider is required. Setup cancelled.{C.N}")
-                return False
-            break
+            print(f"{C.Y}[*] Verifying {PROVIDERS[pid]['name']} / {model} ...{C.N}")
+            ok, detail = _verify(pid, model, key)
+            if not ok:
+                print(f"{C.R}[!] Verification failed: {detail}{C.N}")
+                save_anyway = input(f"{C.B}[?] Save this provider anyway? (y/N): {C.N}").strip().lower()
+                if save_anyway == "y":
+                    ok = True
+                    print(f"{C.Y}[!] Saved {PROVIDERS[pid]['name']} / {model} without verification.{C.N}")
+                else:
+                    retry = input(f"{C.B}[?] Try another provider? (Y/n): {C.N}").strip().lower()
+                    if retry != "n":
+                        continue
+                    if not chain:
+                        demo_choice = input(f"{C.B}[?] Enable Demo / Offline Mode instead? (Y/n): {C.N}").strip().lower()
+                        if demo_choice != "n":
+                            chain.append({"provider": "demo", "model": "x19-demo-offline"})
+                            used.add("demo")
+                            print(f"{C.G}[+] Enabled Demo / Offline mode!{C.N}")
+                            break
+                        print(f"{C.R}[!] A working primary provider is required. Setup cancelled.{C.N}")
+                        return False
+                    break
 
-        chain.append({"provider": pid, "model": model})
-        used.add(pid)
-        print(f"{C.G}[+] Verified: {PROVIDERS[pid]['name']} / {model}{C.N}")
+            if ok:
+                chain.append({"provider": pid, "model": model})
+                used.add(pid)
+                print(f"{C.G}[+] Verified: {PROVIDERS[pid]['name']} / {model}{C.N}")
 
-        more = input(f"{C.B}[?] Add another fallback provider? (y/N): {C.N}").strip().lower()
-        if more != "y":
-            break
-        if len(used) == len(PROVIDERS):  # PROVIDERS already includes custom after add
-            break
+            more = input(f"{C.B}[?] Add another fallback provider? (y/N): {C.N}").strip().lower()
+            if more != "y":
+                break
+            if len(used) >= len(PROVIDERS):
+                break
+
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n{C.Y}[!] Setup cancelled by user.{C.N}")
+        return False
+
+    if not chain:
+        print(f"{C.R}[!] No provider configured. Setup incomplete.{C.N}")
+        return False
 
     save_config({CHAIN_KEY: chain})
     # Keep legacy primary fields synchronized with the user's explicit primary.
@@ -247,6 +317,7 @@ def setup_if_needed(force: bool = False) -> bool:
     print(f"\n{C.G}{C.BOLD}X19 AI setup complete ✓{C.N}")
     for i, entry in enumerate(chain):
         role = "PRIMARY" if i == 0 else f"FALLBACK {i}"
-        print(f"  {role}: {PROVIDERS[entry['provider']]['name']} → {entry['model']}")
+        prov_name = PROVIDERS.get(entry['provider'], {}).get('name', entry['provider'])
+        print(f"  {role}: {prov_name} → {entry['model']}")
     print(f"{C.D}Saved to {CONFIG_FILE}{C.N}\n")
     return True

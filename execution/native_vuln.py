@@ -111,20 +111,23 @@ class NativeVulnEngine:
                 verify=False,
                 allow_redirects=False
             )
-            if injected_host in resp.text or injected_host in resp.headers.get("Location", ""):
-                findings.append(VulnerabilityFinding(
-                    title="Host Header Injection",
-                    severity="high",
-                    target=base_url,
-                    endpoint="/",
-                    description="The server reflects untrusted Host / X-Forwarded-Host headers in response body or redirects, enabling password reset poisoning / web cache poisoning.",
-                    evidence=f"Host: {injected_host} reflected in response body or Location header.",
-                    remediation="Validate Host headers against an explicit server-side whitelist.",
-                    cvss_score=7.3,
-                    cwe_id="CWE-644",
-                    poc_command=f"curl -sik -H 'Host: {injected_host}' {base_url}",
-                    confirmed=True
-                ))
+            # Must not be an error page rejecting the host
+            if resp.status_code not in (400, 403, 404, 500, 502, 503):
+                loc = resp.headers.get("Location", "")
+                if (injected_host in loc) or (injected_host in resp.text and ("<a " in resp.text or "<form " in resp.text or "<script " in resp.text or "<link " in resp.text)):
+                    findings.append(VulnerabilityFinding(
+                        title="Host Header Injection",
+                        severity="high",
+                        target=base_url,
+                        endpoint="/",
+                        description="The server reflects untrusted Host / X-Forwarded-Host headers in response links, scripts or redirects.",
+                        evidence=f"Host: {injected_host} reflected in response body or Location header.",
+                        remediation="Validate Host headers against an explicit server-side whitelist.",
+                        cvss_score=7.3,
+                        cwe_id="CWE-644",
+                        poc_command=f"curl -sik -H 'Host: {injected_host}' {base_url}",
+                        confirmed=True
+                    ))
         except Exception:
             pass
         return findings
@@ -158,27 +161,41 @@ class NativeVulnEngine:
     def check_ssti(self, base_url: str) -> List[VulnerabilityFinding]:
         findings: List[VulnerabilityFinding] = []
         ssti_params = ["q", "search", "name", "template", "view", "title"]
-        payload = "{{7*7}}"
+        calc_pairs = [(7777, 7777, "60481729"), (9999, 9999, "99980001")]
+
+        baseline_text = ""
+        try:
+            baseline_resp = self.session.get(base_url, timeout=self.timeout, verify=False, allow_redirects=False)
+            baseline_text = baseline_resp.text
+        except Exception:
+            pass
+
         for param in ssti_params:
-            test_url = f"{base_url}/?{param}={urllib.parse.quote(payload)}"
-            try:
-                resp = self.session.get(test_url, timeout=self.timeout, verify=False, allow_redirects=False)
-                if resp.status_code == 200 and "49" in resp.text and payload not in resp.text:
-                    findings.append(VulnerabilityFinding(
-                        title="Server-Side Template Injection (SSTI)",
-                        severity="critical",
-                        target=base_url,
-                        endpoint=f"/?{param}=",
-                        description=f"Parameter '{param}' evaluated server-side template expression {{7*7}} -> 49.",
-                        evidence=f"Expression '{{7*7}}' evaluated to '49' in response body.",
-                        remediation="Do not pass raw user input into template engine render contexts; use safe context variables.",
-                        cvss_score=9.8,
-                        cwe_id="CWE-1336",
-                        poc_command=f"curl -sik '{test_url}'",
-                        confirmed=True
-                    ))
-            except Exception:
-                pass
+            for num1, num2, expected_val in calc_pairs:
+                payload = f"{{{{{num1}*{num2}}}}}"
+                test_url = f"{base_url}/?{param}={urllib.parse.quote(payload)}"
+                try:
+                    resp = self.session.get(test_url, timeout=self.timeout, verify=False, allow_redirects=False)
+                    if (resp.status_code == 200
+                            and expected_val in resp.text
+                            and payload not in resp.text
+                            and expected_val not in baseline_text):
+                        findings.append(VulnerabilityFinding(
+                            title="Server-Side Template Injection (SSTI)",
+                            severity="critical",
+                            target=base_url,
+                            endpoint=f"/?{param}=",
+                            description=f"Parameter '{param}' evaluated server-side template expression {payload} -> {expected_val}.",
+                            evidence=f"Expression '{payload}' evaluated to '{expected_val}' in response body.",
+                            remediation="Do not pass raw user input into template engine render contexts; use safe context variables.",
+                            cvss_score=9.8,
+                            cwe_id="CWE-1336",
+                            poc_command=f"curl -sik '{test_url}'",
+                            confirmed=True
+                        ))
+                        break
+                except Exception:
+                    pass
         return findings
 
     def check_api_key_leakage(self, base_url: str) -> List[VulnerabilityFinding]:
@@ -382,11 +399,15 @@ class NativeVulnEngine:
 
     def check_open_redirect(self, base_url: str) -> List[VulnerabilityFinding]:
         findings: List[VulnerabilityFinding] = []
+        parsed_target = urllib.parse.urlparse(base_url)
+        target_host = parsed_target.netloc.split(":")[0].lower()
+
+        external_dest = "https://bing.com" if "example.com" in target_host else "https://example.com"
         redirect_payloads = [
-            ("url", "https://example.com"),
-            ("redirect", "https://example.com"),
-            ("next", "https://example.com"),
-            ("target", "https://example.com"),
+            ("url", external_dest),
+            ("redirect", external_dest),
+            ("next", external_dest),
+            ("target", external_dest),
         ]
 
         for param, payload in redirect_payloads:
@@ -395,7 +416,8 @@ class NativeVulnEngine:
                 resp = self.session.get(test_url, timeout=self.timeout, verify=False, allow_redirects=False)
                 if resp.status_code in (301, 302, 303, 307, 308):
                     loc = resp.headers.get("Location", "")
-                    if loc.startswith("https://example.com"):
+                    loc_host = urllib.parse.urlparse(loc).netloc.split(":")[0].lower()
+                    if loc_host and loc_host != target_host and (loc.startswith(payload) or loc_host in payload):
                         findings.append(VulnerabilityFinding(
                             title="Unvalidated Open Redirect",
                             severity="medium",
@@ -444,7 +466,20 @@ class NativeVulnEngine:
         test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
         try:
             resp = self.session.get(test_url, timeout=self.timeout, verify=False)
-            if resp.status_code == 500 or "SQL" in resp.text or "Syntax error" in resp.text:
+            sql_error_patterns = [
+                r"you have an error in your sql syntax",
+                r"warning: mysql",
+                r"unclosed quotation mark after the character string",
+                r"pg_query\(\): query failed",
+                r"sqlite3\.operationalerror",
+                r"ora-[0-9]{5}",
+                r"syntax error (?:in|near|for) (?:sql|\w+)",
+                r"syntax error in sql statement",
+                r"sql command not properly ended",
+                r"microsoft ole db provider for odbc drivers",
+            ]
+            has_sql_error = any(re.search(pat, resp.text, re.IGNORECASE) for pat in sql_error_patterns)
+            if resp.status_code == 500 or has_sql_error:
                 return VulnerabilityFinding(
                     title="SQL Injection Anomaly",
                     severity="high",
@@ -553,25 +588,25 @@ class NativeVulnEngine:
             ("Azure", "404 Web Site not found", "high", 7.5),
             ("Shopify", "Sorry, this shop is currently unavailable.", "medium", 6.5),
             ("Fastly", "Fastly error: unknown domain", "high", 7.5),
-            ("Ghost", "The thing you were looking for is gone.", "medium", 5.3),
         ]
         try:
             resp = self.session.get(base_url, timeout=self.timeout, verify=False)
-            for service, fingerprint, severity, cvss in takeover_fingerprints:
-                if fingerprint in resp.text:
-                    findings.append(VulnerabilityFinding(
-                        title=f"Potential Subdomain Takeover ({service})",
-                        severity=severity,
-                        target=base_url,
-                        endpoint="/",
-                        description=f"Target page matched dangling cloud service fingerprint for {service}.",
-                        evidence=f"Fingerprint matched: '{fingerprint}' in response body.",
-                        remediation=f"Remove dangling DNS CNAME record or claim the orphaned {service} resource.",
-                        cvss_score=cvss,
-                        cwe_id="CWE-284",
-                        poc_command=f"curl -sik {base_url}",
-                        confirmed=True
-                    ))
+            if resp.status_code in (404, 502, 503):
+                for service, fingerprint, severity, cvss in takeover_fingerprints:
+                    if fingerprint in resp.text:
+                        findings.append(VulnerabilityFinding(
+                            title=f"Potential Subdomain Takeover ({service})",
+                            severity=severity,
+                            target=base_url,
+                            endpoint="/",
+                            description=f"Target page matched dangling cloud service fingerprint for {service} with HTTP {resp.status_code}.",
+                            evidence=f"Fingerprint matched: '{fingerprint}' in HTTP {resp.status_code} response body.",
+                            remediation=f"Remove dangling DNS CNAME record or claim the orphaned {service} resource.",
+                            cvss_score=cvss,
+                            cwe_id="CWE-284",
+                            poc_command=f"curl -sik {base_url}",
+                            confirmed=True
+                        ))
         except Exception:
             pass
         return findings

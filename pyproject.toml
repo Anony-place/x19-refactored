@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "x19"
+version = "4.0.0"
+description = "Autonomous AI security assessment platform"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.31.0",
+    "rich>=13.0.0",
+    "PyJWT>=2.8.0",
+]
+
+[project.scripts]
+x19 = "run:main"

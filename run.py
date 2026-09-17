@@ -109,6 +109,21 @@ def _setup_required() -> bool:
 def main() -> int:
     argv = list(sys.argv[1:])
 
+    # All known top-level subcommands
+    _ALL_KNOWN_COMMANDS = (
+        _RUNTIME_COMMANDS | _ALWAYS_PLAIN_COMMANDS | _APP_COMMANDS | _PLAIN_COMMANDS |
+        {"run", "dash", "chat", "report", "findings", "sessions", "config", "doctor",
+         "tools", "engagement", "debug", "upgrade", "version", "completion", "fleet"}
+    )
+
+    # Route direct target invocation to run:
+    # E.g. `x19 example.com`, `x19 -t example.com`, `python run.py example.com`
+    if argv:
+        if argv[0] in {"-t", "--target"}:
+            argv = ["run"] + argv
+        elif argv[0] not in _ALL_KNOWN_COMMANDS and not argv[0].startswith("-"):
+            argv = ["run"] + argv
+
     # Hermes-style runtime commands stay lightweight and never load the full
     # offensive graph.
     if argv and argv[0] in _RUNTIME_COMMANDS:
@@ -131,20 +146,20 @@ def main() -> int:
         # Plain status stays plain even when setup is pending -- it must not
         # pretend a run is possible. But bare interactive workspace must force
         # setup; this is the "enforce mandatory setup" fix.
+        if not route and _wants_plain_surface():
+            from plain_cli import main as plain_main
+            return int(plain_main(argv or ["status"]) or 0)
+
         if _setup_required():
             # `setup` itself is exempt -- let it run without recursion
-            if route == "setup":
-                pass
-            elif route == "providers":
+            if route in {"setup", "providers"}:
                 pass
             else:
                 # Force through CLI's first-run wizard (it owns the 4-stage flow)
                 from cli import main as cli_main
                 install_agent_execution_policy()
                 return int(cli_main(["setup"]) or 0)
-        if not route and _wants_plain_surface():
-            from plain_cli import main as plain_main
-            return int(plain_main(argv or ["status"]) or 0)
+
         from cli import main as cli_main
         install_agent_execution_policy()
         routed = ["workspace"] + argv[1:] if not route else argv
@@ -159,6 +174,13 @@ def main() -> int:
         # bare `python run.py run -t ...` must not run unverified -- force setup
         argv0 = argv[0] if argv else ""
         if argv0 in {"run", "dash", "attack", "swarm", "chat"}:
+            if not (sys.stdin.isatty() and sys.stdout.isatty()):
+                print("[x19] Setup required: no AI provider configured (non-interactive shell).")
+                print("      Please set your provider API key, for example:")
+                print("        export GROQ_API_KEY=\"gsk_...\"          # Free at https://console.groq.com")
+                print("        export OPENAI_API_KEY=\"sk-...\"")
+                print("      Or run setup interactively: python run.py setup")
+                return 1
             print("[x19] Setup required before any assessment. Starting setup wizard...")
             return int(cli_main(["setup"]) or 0)
 
@@ -166,7 +188,7 @@ def main() -> int:
     install_agent_execution_policy()
     _activate_fullscreen_chat()
 
-    result = int(cli_main() or 0)
+    result = int(cli_main(argv) or 0)
     _maybe_promote_learning(argv, result)
     return result
 

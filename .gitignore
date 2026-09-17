@@ -59,6 +59,8 @@ target/
 x19_workspace/
 x19_sessions/
 x19_agent.log
+.x19_sandbox/
+.x19debugger_backups/
 *.db
 *.sqlite
 *.sqlite3

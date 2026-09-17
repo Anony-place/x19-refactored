@@ -146,8 +146,12 @@ def _looks_like_shell_command(s: str) -> bool:
 
 
 def _normalize_decision(d: Any) -> Optional[Dict[str, Any]]:
-    if not isinstance(d, dict) or "completed" not in d:
+    if not isinstance(d, dict):
         return None
+    if "command" in d and "next_command" not in d:
+        d["next_command"] = d["command"]
+    if "completed" not in d:
+        d["completed"] = False if d.get("next_command") else True
     d["completed"] = bool(d.get("completed"))
     nc = d.get("next_command")
     d["next_command"] = nc.strip() if isinstance(nc, str) else ""

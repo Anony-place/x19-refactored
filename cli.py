@@ -740,6 +740,34 @@ def cmd_workspace(args: argparse.Namespace) -> int:
         store_dir=snapshot["store_dir"],
         sessions_dir=snapshot["sessions_dir"],
     ))
+
+    # In interactive human terminal, prompt for immediate action
+    if sys.stdin.isatty() and sys.stdout.isatty() and not getattr(args, "plain", False) and not getattr(args, "json", False):
+        from rich.prompt import Prompt
+        console = get_console()
+        console.print()
+        console.print("[bold cyan]Quick Action:[/] Enter target to assess (e.g. [green]scanme.nmap.org[/]), or command ([green]chat[/], [green]doctor[/], [green]setup[/], [green]tools[/], [green]q[/] to exit):")
+        try:
+            choice = Prompt.ask("[bold blue]x19[/]", console=console).strip()
+            if not choice or choice.lower() in {"q", "quit", "exit"}:
+                return 0
+            if choice.lower() == "chat":
+                return cmd_chat(args)
+            if choice.lower() == "doctor":
+                return cmd_doctor(args)
+            if choice.lower() == "setup":
+                return cmd_setup(args)
+            if choice.lower() == "tools":
+                return cmd_tools(args)
+            target_arg = choice
+            if target_arg.startswith("-t "):
+                target_arg = target_arg[3:].strip()
+            run_args = build_parser().parse_args(["run", "-t", target_arg])
+            return cmd_run(run_args)
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return 0
+
     return 0
 
 
@@ -1715,22 +1743,25 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
     what = getattr(args, "what", "all")
 
-    if what in ("all", "app"):
+    if what == "all":
+        return 0 if first_run_setup(force=bool(getattr(args, "force", False))) else 1
+
+    if what == "app":
         from provider_setup import setup_if_needed
 
         if not setup_if_needed(force=bool(getattr(args, "force", False))):
             warn("app setup cancelled — no working provider saved")
-            if what == "app":
-                return 1
-        else:
-            ok("provider chain saved")
+            return 1
+        ok("provider chain saved")
+        return 0
 
-    if what in ("all", "engagement"):
+    if what == "engagement":
         rule("[panel.title]engagement setup[/]")
         profile = engagement_wizard(target=getattr(args, "target", ""))
         if profile is None:
             return 1
         info(f"run it with: x19 dash -t {profile.target} --engagement {profile.name}")
+        return 0
     return 0
 
 
@@ -2028,3 +2059,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             get_console().print(f"[app.err]✖ {code}[/]")
             return 1
         return int(code or 0)
+
+
+if __name__ == "__main__":
+    from run import main as run_main
+    sys.exit(run_main())
