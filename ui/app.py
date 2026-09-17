@@ -1,9 +1,9 @@
 """Terminal-native X19 chat workspace.
 
 The terminal is a UI, not an execution log. The conversation is a rolling
-transcript — every message is rendered exactly once, while long-running
+transcript — every message renders exactly once, while long-running
 assessments execute on quiet background threads. A live status ribbon above the
-input line keeps the operator informed.
+prompt keeps the operator informed.
 """
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 from rich.console import Group
 from rich.markdown import Markdown
-from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
+from rich.panel import Panel
 
 from ui import widgets
 from ui.background import BackgroundTask, BackgroundTaskManager
@@ -62,7 +62,13 @@ ROLE_AGENT = "assistant"
 
 
 class ConsoleApp:
-    """A rolling-transcript workspace with the agent working in the background."""
+    """A rolling-transcript terminal workspace with one owner for the screen.
+
+    The application intentionally does not create a second Rich Live/layout
+    tree for chat. Input owns the prompt/ribbon redraw; transcript messages are
+    durable console output. This prevents Rich ``Layout(...)`` reprs or nested
+    Live renderers from leaking into the user's terminal.
+    """
 
     def __init__(self, agent: Any = None, *, version: str = "", ai: Any = None):
         self.agent = agent
@@ -766,12 +772,7 @@ class ConsoleApp:
         self._echo_agent(reply)
 
     def _chat_reply(self, message: str, *, render: bool = True, on_chunk: Optional[Callable[[str], None]] = None) -> Optional[str]:
-        """Get a provider reply.
-
-        ``render=False`` lets an embedded workspace own presentation. In that
-        mode ``on_chunk`` receives real provider chunks so the host can render
-        the response without starting a nested Rich Live instance.
-        """
+        """Get a provider reply without nesting a long-lived Rich renderer."""
         from contextlib import nullcontext
         con = self.console
         stream = getattr(self.ai, "chat_stream", None)
@@ -782,44 +783,30 @@ class ConsoleApp:
                     reply = self.ai.chat(SYSTEM_PROMPT, message) or ""
                 except Exception as exc:
                     if render:
-                        warn(f"provider request failed: {type(exc).__name__}")
+                        warn(f"provider request failed: {type(exc).__name__}: {exc}")
                     return None
             if reply and on_chunk is not None:
                 on_chunk(reply)
             return reply
 
         chunks: List[str] = []
-        live = None
-        if render and con.is_terminal and not getattr(con, "no_color", False):
-            from rich.live import Live
-            from rich.text import Text as _Text
-            live = Live(_Text("", style="muted"), console=con, transient=True, refresh_per_second=12, vertical_overflow="ellipsis")
         try:
-            if live is not None:
-                live.__enter__()
             for piece in stream(SYSTEM_PROMPT, message):
                 if not piece:
                     continue
                 chunks.append(piece)
                 if on_chunk is not None:
                     on_chunk(piece)
-                if live is not None:
-                    tail = "".join(chunks)[-400:]
-                    live.update(_Text(f"✎ {tail}", style="muted"))
         except KeyboardInterrupt:
-            if live is not None:
-                live.__exit__(None, None, None)
             if render:
                 warn("stream interrupted")
-            return ("".join(chunks) or None)
+            reply = "".join(chunks)
+            return reply or None
         except Exception as exc:
-            if live is not None:
-                live.__exit__(None, None, None)
             if render:
-                warn(f"provider request failed: {type(exc).__name__}")
+                warn(f"provider request failed: {type(exc).__name__}: {exc}")
             return None
-        if live is not None:
-            live.__exit__(None, None, None)
+
         reply = "".join(chunks)
         if not reply.strip():
             if render:
