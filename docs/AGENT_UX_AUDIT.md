@@ -251,3 +251,30 @@ bare host / prose / a local file, `render=False` streaming to `on_chunk` with
 nothing painted, the hardened prompt and transcript surviving `render=False`, a
 provider failure staying silent, and the non-tty fallback to the rolling
 transcript.
+
+## 11. Addendum — what CI taught this branch
+
+Four more defects, all found by running the suite the way CI runs it (a plain
+`pip install`, `python -m unittest discover`, a runner with a docker CLI and no
+sandbox image) rather than the way a developer's box happens to be set up:
+
+| # | Defect | Cause | Fix |
+|---|--------|-------|-----|
+| A16 | On a machine with docker installed but no `x19-sandbox` image, *every* command the agent ran died with rc=125, so the loop never gathered evidence and hypotheses stalled in `TESTING` forever | `docker run` reports its own failures — image missing, daemon unreachable — with exit status **125**, and the gateway handed that back as if it were the command's exit status. Graceful degradation only looked for an error string starting with `sandbox_unavailable`, which a real docker failure never sets | `SandboxExecutor` classifies 125 (and the daemon/image stderr markers) as `sandbox_unavailable`, remembers it so a loop does not pay for a dead container per command, and the gateway's existing host fallback then engages. A command failing *inside* a working container keeps its own exit code and is never re-run on the host |
+| A17 | `x19 run <target> --json` printed 6 KB of coloured progress before the JSON document, so `… --json \| jq .` failed on line 1 — against the contract `ui/console.py` states in its own docstring | The console helpers know about machine mode, but a run also prints with bare `print()` (session banners, tool chatter, report paths) and none of those callers know which mode they are in | `machine_mode_stdout()` redirects `sys.stdout` to stderr for the human part of `cmd_run`; `emit_json()` runs after it, so stdout is exactly one document. Verified end to end: stdout 128 bytes of JSON, the 6.4 KB of chatter on stderr. The CI smoke step now parses stdout instead of merely tolerating a non-zero exit |
+| A18 | The pty screen-shape tests failed on any checkout without `pyte`, and CI never installed it | Row counting needs a terminal emulator. Without `pyte` the harness strips escape sequences, so every repaint becomes its own line and a row count measures the byte stream, not the screen | Geometry assertions live behind `assertRows`/`assertOneRow`/`assertNoRow`, which stay quiet without `pyte`; text-presence assertions run everywhere; the narrow-terminal geometry test skips with a reason rather than passing vacuously. CI installs `pyte`, so the geometry is enforced where it matters |
+| A19 | A red `suite` check said nothing but "Process completed with exit code 1" | The raw Actions log is served from a host that is not always reachable (a sandboxed reviewer, an expired artifact signature), so the failure could not be read from the PR | The suite step tees its output and, on failure, publishes check annotations: every `FAIL`/`ERROR` test name, the first few tracebacks, and — when the run died mid-test instead of failing an assertion — the tail of the verbose log showing where it stopped. `PIPESTATUS` keeps the step's exit code the suite's, not `tee`'s. This is what exposed A16 |
+
+A16 is the one worth dwelling on: it is invisible on a developer machine without
+docker (the gateway degrades immediately) and invisible in a container with a
+working sandbox, so it only appears on a *fresh install that has docker but never
+built the image* — which is most machines, and every CI runner. Reproducing it
+needs one line: put a `docker` that exits 125 on `PATH` and run the suite. That
+is what `SandboxDegradationTests` now does, with a real fake executable rather
+than a mocked `subprocess`, because the bug lives in how a real exit status is
+interpreted.
+
+Verification: `pytest tests/` **854 passed, 20 subtests**; the command CI runs,
+`python -m unittest discover -s tests -t .`, **835 tests, OK** — both with and
+with a broken docker CLI on `PATH`, and both with and without `pyte` installed
+(without it, one geometry test reports a skip instead of a lie).
