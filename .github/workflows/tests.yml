@@ -35,7 +35,33 @@ jobs:
           PY
 
       - name: Full unit + integration suite
-        run: python -m unittest discover -s tests -t . -v
+        shell: bash
+        run: |
+          set -uo pipefail
+          python -m unittest discover -s tests -t . -v 2>&1 | tee /tmp/suite.log
+          exit "${PIPESTATUS[0]}"
+
+      # Raw logs are not always reachable (a sandboxed reviewer, an expired
+      # artifact host), so a red suite has to say *what* failed on the PR itself.
+      - name: Annotate failures
+        if: failure()
+        run: |
+          python - <<'PY'
+          import pathlib, re
+          log = pathlib.Path("/tmp/suite.log").read_text(errors="replace")
+          names = re.findall(r"^(?:FAIL|ERROR): (.+)$", log, re.M)
+          for name in names[:20]:
+              print(f"::error title=failing test::{name}")
+          blocks = [b.strip() for b in re.split(r"={30,}", log)
+                    if b.strip().startswith(("FAIL:", "ERROR:"))]
+          for block in blocks[:6]:
+              body = "%0A".join(block.splitlines()[:30])
+              print(f"::error title=failure detail::{body}")
+          if not names:
+              # No FAIL/ERROR line means the run died mid-test: report where.
+              tail = "%0A".join(log.strip().splitlines()[-25:])
+              print(f"::error title=suite stopped here::{tail}")
+          PY
 
       # A fresh clone must be able to start an assessment without a manual
       # setup step when a provider is supplied by flag or environment.
