@@ -18,6 +18,7 @@ import threading
 import time
 import traceback
 import uuid
+import weakref
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,6 +36,34 @@ FINISHED_STATES = ("completed", "failed", "cancelled")
 #: output guard asks this before repainting itself around a foreign write.
 _current_manager: Optional["BackgroundTaskManager"] = None
 
+#: Every manager's capture state, newest and oldest alike. The stream wrapper is
+#: installed once per *process* but managers are not one-per-process: a workspace,
+#: a dashboard and a fleet each build one. Binding capture to whichever manager
+#: got there first silently stopped capturing for all the later ones — their
+#: workers printed straight through to the terminal and their ``tail()`` stayed
+#: empty. Held weakly, so a discarded manager takes its entry with it.
+_capture_locals: "weakref.WeakSet" = weakref.WeakSet()
+
+
+def _captured_task() -> Optional["BackgroundTask"]:
+    """The task capturing the *calling thread's* output, whichever manager owns it.
+
+    At most one can match: ``task`` lives in a thread-local and a worker thread
+    runs one task at a time, clearing it in ``finally``.
+    """
+    try:
+        locals_ = list(_capture_locals)
+    except Exception:
+        return None
+    for local in locals_:
+        try:
+            task = getattr(local, "task", None)
+        except Exception:
+            continue
+        if task is not None:
+            return task
+    return None
+
 
 def output_is_captured() -> bool:
     """True when the *calling thread's* stdout/stderr writes are captured.
@@ -42,11 +71,8 @@ def output_is_captured() -> bool:
     Background worker output goes into the task ring buffer instead of the
     terminal, so the terminal UI must not redraw anything for it.
     """
-    manager = _current_manager
-    if manager is None:
-        return False
     try:
-        return getattr(manager._local, "task", None) is not None
+        return _captured_task() is not None
     except Exception:
         return False
 
@@ -150,7 +176,7 @@ class _QuietStream:
 
     # -- capture -----------------------------------------------------------
     def _capture(self, data: str) -> None:
-        task: Optional[BackgroundTask] = getattr(self.local, "task", None)
+        task = _captured_task()
         if task is None:
             return
         lines = str(data).splitlines()
@@ -163,13 +189,13 @@ class _QuietStream:
                 task.note = last[:120]
 
     def write(self, data: str) -> int:
-        if getattr(self.local, "task", None) is not None:
+        if _captured_task() is not None:
             self._capture(data)
             return len(data)
         return self.original.write(data)
 
     def flush(self) -> None:
-        if getattr(self.local, "task", None) is None:
+        if _captured_task() is None:
             self.original.flush()
 
     def isatty(self) -> bool:
@@ -188,6 +214,7 @@ class BackgroundTaskManager:
         self._lock = threading.RLock()
         self._tasks: Dict[str, BackgroundTask] = {}
         self._local = threading.local()
+        _capture_locals.add(self._local)
         self._stdout = sys.stdout
         self._stderr = sys.stderr
         if not isinstance(sys.stdout, _QuietStream):

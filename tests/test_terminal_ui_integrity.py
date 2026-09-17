@@ -782,6 +782,55 @@ class StreamingAI:
             yield piece
 
 
+class CaptureRegistryTests(unittest.TestCase):
+    """Worker output capture must survive more than one manager per process.
+
+    The stream wrapper is installed once, and it used to be bound to the first
+    manager's thread-local — so every manager created after it (a dashboard, a
+    fleet, a second workspace) ran workers whose output went straight to the
+    terminal while ``task.tail()`` stayed empty. Under pytest this hid behind
+    per-test stdout capture; under ``unittest discover`` it failed outright.
+    """
+
+    def _task_on(self, manager, line: str):
+        task = manager.start("capture probe", lambda: print(line) or "done")
+        task.join(timeout=5)
+        return task
+
+    def test_the_second_manager_still_captures_its_workers(self):
+        first = background_module.BackgroundTaskManager()
+        second = background_module.BackgroundTaskManager()      # the wrapper is already installed
+        first_task = self._task_on(first, "[FIRST] captured")
+        second_task = self._task_on(second, "[SECOND] captured")
+        self.assertEqual(first_task.status, "completed")
+        self.assertEqual(second_task.status, "completed")
+        self.assertIn("[FIRST] captured", "\n".join(first_task.tail(10)))
+        self.assertIn("[SECOND] captured", "\n".join(second_task.tail(10)))
+
+    def test_output_is_captured_reports_the_owning_manager(self):
+        manager = background_module.BackgroundTaskManager()
+        seen: list[bool] = []
+
+        def probe():
+            seen.append(background_module.output_is_captured())
+            return "ok"
+
+        task = manager.start("probe", probe)
+        task.join(timeout=5)
+        self.assertEqual(seen, [True])
+        # The main thread is never captured — it owns the terminal.
+        self.assertFalse(background_module.output_is_captured())
+
+    def test_a_discarded_manager_does_not_leak_its_capture_state(self):
+        before = len(list(background_module._capture_locals))
+        for _ in range(20):
+            background_module.BackgroundTaskManager()
+        import gc
+
+        gc.collect()
+        self.assertLessEqual(len(list(background_module._capture_locals)), before + 1)
+
+
 @unittest.skipIf(os.name == "nt", "the full-screen workspace is a POSIX tty surface")
 class FullscreenWorkspaceTests(AppCase):
     """main's full-screen terminal and this branch's intake must both survive.
