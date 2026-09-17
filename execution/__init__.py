@@ -1,6 +1,8 @@
 """Typed execution boundary for X19 command execution."""
 
-from execution.command_gateway import CommandGateway, GatewayExecutorAdapter
+# The exported gateway adds observational assessment telemetry while keeping
+# the original CommandGateway as the final policy/execution authority.
+from execution.instrumented_gateway import CommandGateway, GatewayExecutorAdapter
 from execution.command_request import CommandRequest, CommandResult, PolicyVerdict
 from execution.policy_engine import ExecutionPolicy, PolicyEngine, policy_from_config
 from execution.sandbox import SandboxExecutor, SandboxPolicy
