@@ -481,6 +481,7 @@ def _print_ai_chain_banner():
 SETUP_EXEMPT = {
     "setup", "version", "completion", "doctor", "config",
     "providers", "debug", "upgrade", "tools", "engagement",
+    "findings", "report", "sessions",
 }
 
 
