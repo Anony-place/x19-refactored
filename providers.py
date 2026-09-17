@@ -860,19 +860,25 @@ class OllamaBackend(AIBackend):
 
 class MockBackend(AIBackend):
     """Offline demo backend for testing and exploring X19 without API keys."""
-    def __init__(self, model: str = "x19-demo-offline"):
-        self._model = model
+    def __init__(self, model: str = "x19-demo-offline", provider: str = "demo"):
+        self.provider = provider
+        self.model = model
+        self.label = f"demo({model})"
 
     def name(self) -> str:
-        return f"demo ({self._model})"
+        return f"demo ({self.model})"
 
     def chat(self, system: str, message: str) -> str:
         import json
         msg_lower = message.lower()
-        if "decision" in msg_lower or "command" in msg_lower or "next action" in msg_lower:
+        if "decision" in msg_lower or "command" in msg_lower or "next action" in msg_lower or "json" in system.lower() or "planner" in msg_lower:
             return json.dumps({
+                "completed": False,
+                "next_command": "x19_net_scan scanme.nmap.org",
+                "command": "x19_net_scan scanme.nmap.org",
                 "thought": "X19 Demo/Offline mode: enumerating target ports and services using native tools.",
-                "command": "x19_net_scan 127.0.0.1",
+                "thinking": "X19 Demo/Offline mode: enumerating target ports and services using native tools.",
+                "reasoning": "Demo mode port reconnaissance",
                 "risk": "normal",
                 "reason": "Demo mode port reconnaissance",
                 "hypothesis": "Local network services are discoverable",
@@ -1048,8 +1054,8 @@ class FailoverRouter(AIBackend):
         return ""
 
     def chat(self, system: str, message: str) -> str:
-        # If user disabled failover, just use primary
-        if self._suppressed:
+        # If user disabled failover, or using demo/mock backend, use primary directly
+        if self._suppressed or isinstance(self.primary, MockBackend) or getattr(self.primary, "provider", "") in {"demo", "mock"}:
             return self.primary.chat(system, message)
 
         for attempt in range(2):

@@ -2,6 +2,7 @@
 
 from parsers.base import BaseParser
 from parsers.nmap import NmapParser
+from parsers.masscan import MasscanParser
 from parsers.httpx import HttpxParser
 from parsers.gobuster import GobusterParser
 from parsers.ffuf import FfufParser
@@ -9,6 +10,7 @@ from parsers.ffuf import FfufParser
 __all__ = [
     "BaseParser",
     "NmapParser",
+    "MasscanParser",
     "HttpxParser",
     "GobusterParser",
     "FfufParser",

@@ -976,6 +976,10 @@ Analyze the output carefully. Return JSON ONLY:
             from parsers.ffuf import FfufParser
             for ep in FfufParser().parse(command, stdout, stderr):
                 self.model.add_endpoint(ep["url"], status=ep["status"])
+        elif "masscan" in command:
+            from parsers.masscan import MasscanParser
+            for p in MasscanParser().parse(command, stdout, stderr):
+                self.model.add_port(p["port"], p["proto"], p["service"], p.get("version", ""))
         else:
             # Live hosts from httpx output (capture status code for scoring) - Fallback
             if '[200]' in stdout or '[301]' in stdout or '[302]' in stdout:
@@ -7407,8 +7411,12 @@ WORKSPACE: {self._file_state(target)[:400]}
 
     def _normalize_decision(self, d) -> Optional[Dict]:
         """Validate planner output shape; coerce/reject so malformed JSON can't crash the loop."""
-        if not isinstance(d, dict) or "completed" not in d:
+        if not isinstance(d, dict):
             return None
+        if "command" in d and "next_command" not in d:
+            d["next_command"] = d["command"]
+        if "completed" not in d:
+            d["completed"] = False if d.get("next_command") else True
         d["completed"] = bool(d.get("completed"))
         nc = d.get("next_command")
         d["next_command"] = nc.strip() if isinstance(nc, str) else ""

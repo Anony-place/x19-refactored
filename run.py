@@ -109,6 +109,21 @@ def _setup_required() -> bool:
 def main() -> int:
     argv = list(sys.argv[1:])
 
+    # All known top-level subcommands
+    _ALL_KNOWN_COMMANDS = (
+        _RUNTIME_COMMANDS | _ALWAYS_PLAIN_COMMANDS | _APP_COMMANDS | _PLAIN_COMMANDS |
+        {"run", "dash", "chat", "report", "findings", "sessions", "config", "doctor",
+         "tools", "engagement", "debug", "upgrade", "version", "completion", "fleet"}
+    )
+
+    # Route direct target invocation to run:
+    # E.g. `x19 example.com`, `x19 -t example.com`, `python run.py example.com`
+    if argv:
+        if argv[0] in {"-t", "--target"}:
+            argv = ["run"] + argv
+        elif argv[0] not in _ALL_KNOWN_COMMANDS and not argv[0].startswith("-"):
+            argv = ["run"] + argv
+
     # Hermes-style runtime commands stay lightweight and never load the full
     # offensive graph.
     if argv and argv[0] in _RUNTIME_COMMANDS:
@@ -173,7 +188,7 @@ def main() -> int:
     install_agent_execution_policy()
     _activate_fullscreen_chat()
 
-    result = int(cli_main() or 0)
+    result = int(cli_main(argv) or 0)
     _maybe_promote_learning(argv, result)
     return result
 

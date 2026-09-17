@@ -481,7 +481,6 @@ def _print_ai_chain_banner():
 SETUP_EXEMPT = {
     "setup", "version", "completion", "doctor", "config",
     "providers", "debug", "upgrade", "tools", "engagement",
-    "findings", "report", "sessions",
 }
 
 
@@ -741,6 +740,34 @@ def cmd_workspace(args: argparse.Namespace) -> int:
         store_dir=snapshot["store_dir"],
         sessions_dir=snapshot["sessions_dir"],
     ))
+
+    # In interactive human terminal, prompt for immediate action
+    if sys.stdin.isatty() and sys.stdout.isatty() and not getattr(args, "plain", False) and not getattr(args, "json", False):
+        from rich.prompt import Prompt
+        console = get_console()
+        console.print()
+        console.print("[bold cyan]Quick Action:[/] Enter target to assess (e.g. [green]scanme.nmap.org[/]), or command ([green]chat[/], [green]doctor[/], [green]setup[/], [green]tools[/], [green]q[/] to exit):")
+        try:
+            choice = Prompt.ask("[bold blue]x19[/]", console=console).strip()
+            if not choice or choice.lower() in {"q", "quit", "exit"}:
+                return 0
+            if choice.lower() == "chat":
+                return cmd_chat(args)
+            if choice.lower() == "doctor":
+                return cmd_doctor(args)
+            if choice.lower() == "setup":
+                return cmd_setup(args)
+            if choice.lower() == "tools":
+                return cmd_tools(args)
+            target_arg = choice
+            if target_arg.startswith("-t "):
+                target_arg = target_arg[3:].strip()
+            run_args = build_parser().parse_args(["run", "-t", target_arg])
+            return cmd_run(run_args)
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return 0
+
     return 0
 
 
