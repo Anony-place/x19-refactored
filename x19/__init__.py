@@ -37,6 +37,11 @@ from . import orchestration
 from . import mission
 from . import interface
 from . import loop
+from . import knowledge
+from . import datasets
+from . import offensive
+from . import autonomous
+from . import learning
 
 __all__ = [
     "identity",
@@ -49,4 +54,9 @@ __all__ = [
     "mission",
     "interface",
     "loop",
+    "knowledge",
+    "datasets",
+    "offensive",
+    "autonomous",
+    "learning",
 ]

@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "web",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP",
+    "version": "1.0",
+    "applicable_technologies": ["web"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/04-Testing_for_Client_Side_URL_Redirect"]
+  },
+  "vuln_class": "open_redirect",
+  "cwe": "CWE-601",
+  "description": "Open redirect occurs when app redirects to user-supplied URL without validation, allowing phishing.",
+  "methodology": {
+    "testing": ["Test with https://evil.com, //evil.com, /%09/evil.com, check if redirects to evil.com via Location header"],
+    "evidence": "Request with evil.com returns 302 with Location: https://evil.com, tool output",
+    "verification": "Reproduce with external URL, confirm redirect"
+  },
+  "payloads": {"witness": ["https://evil.com", "//evil.com", "/%09/evil.com", "https://evil.com%2f%2e%2e"]},
+  "remediation": "Allow list for redirect URLs, validate param"
+}

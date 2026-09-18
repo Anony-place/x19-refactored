@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "source": "CWE Top 25 Most Dangerous Software Weaknesses",
+    "license": "Public Domain (MITRE CWE is public)",
+    "date": "2026-09-18",
+    "category": "cwe",
+    "confidence": "high",
+    "provenance": "Synthesized from CWE Top 25 public list (https://cwe.mitre.org/top25/), not verbatim, with our own descriptions",
+    "version": "2023",
+    "applicable_technologies": ["all"],
+    "references": [
+      "https://cwe.mitre.org/top25/archive/2023/2023_cwe_top25.html",
+      "https://cwe.mitre.org/"
+    ]
+  },
+  "cwe_top25": [
+    {
+      "cwe_id": "CWE-79",
+      "name": "Cross-site Scripting",
+      "owasp": "A03:2021-Injection",
+      "description": "Improper neutralization of input during web page generation leads to XSS.",
+      "vuln_class": "xss",
+      "severity": "high",
+      "common_payloads": ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>", "javascript:alert(1)"],
+      "testing": "Reflected, stored, DOM XSS via payloads in inputs, headers, etc.",
+      "remediation": "Output encoding, Content Security Policy, validate input"
+    },
+    {
+      "cwe_id": "CWE-89",
+      "name": "SQL Injection",
+      "owasp": "A03:2021-Injection",
+      "description": "Improper neutralization of special elements used in SQL command leads to SQLi.",
+      "vuln_class": "sqli",
+      "severity": "critical",
+      "common_payloads": ["' OR 1=1 --", "' UNION SELECT 1,2,3 --", "1; DROP TABLE users --"],
+      "testing": "Test with single quote, time-based, boolean-based, union-based",
+      "remediation": "Parameterized queries, ORM, least privilege"
+    },
+    {
+      "cwe_id": "CWE-20",
+      "name": "Improper Input Validation",
+      "owasp": "A03:2021-Injection",
+      "description": "Product receives input or data, but does not validate or incorrectly validates.",
+      "vuln_class": "other",
+      "severity": "high",
+      "testing": "Fuzzing, boundary testing",
+      "remediation": "Whitelist validation, reject bad input"
+    },
+    {
+      "cwe_id": "CWE-352",
+      "name": "Cross-Site Request Forgery",
+      "owasp": "A01:2021-Broken Access Control",
+      "description": "Web app does not verify request was intentionally provided by user.",
+      "vuln_class": "csrf",
+      "severity": "medium",
+      "testing": "Check for anti-CSRF tokens",
+      "remediation": "Anti-CSRF tokens, SameSite cookies"
+    },
+    {
+      "cwe_id": "CWE-22",
+      "name": "Path Traversal",
+      "owasp": "A01:2021-Broken Access Control",
+      "description": "Improper limitation of pathname to restricted directory.",
+      "vuln_class": "other",
+      "severity": "high",
+      "common_payloads": ["../../../etc/passwd", "....//....//etc/passwd"],
+      "testing": "Test with traversal payloads in file params",
+      "remediation": "Validate file paths, use allow list, chroot"
+    },
+    {
+      "cwe_id": "CWE-125",
+      "name": "Out-of-bounds Read",
+      "owasp": "N/A",
+      "description": "Software reads data past end or before beginning of buffer.",
+      "vuln_class": "other",
+      "severity": "high",
+      "testing": "Fuzzing, code review",
+      "remediation": "Bounds checking"
+    },
+    {
+      "cwe_id": "CWE-78",
+      "name": "OS Command Injection",
+      "owasp": "A03:2021-Injection",
+      "description": "Improper neutralization of special elements used in OS command.",
+      "vuln_class": "other",
+      "severity": "critical",
+      "common_payloads": ["; ls", "| ls", "`ls`", "$(ls)"],
+      "testing": "Test with command injection payloads in inputs that might go to OS",
+      "remediation": "Avoid OS calls, validate input, least privilege"
+    },
+    {
+      "cwe_id": "CWE-862",
+      "name": "Missing Authorization",
+      "owasp": "A01:2021-Broken Access Control",
+      "description": "Software does not perform authorization check when actor attempts to access resource.",
+      "vuln_class": "bola",
+      "severity": "high",
+      "testing": "Test IDOR/BOLA by changing IDs, test BFLA",
+      "remediation": "Check authorization for every request, deny by default"
+    },
+    {
+      "cwe_id": "CWE-434",
+      "name": "Unrestricted Upload of File with Dangerous Type",
+      "owasp": "A03:2021-Injection",
+      "description": "Software allows upload of dangerous file type without validation.",
+      "vuln_class": "other",
+      "severity": "high",
+      "testing": "Upload php, jsp, etc. if file upload exists",
+      "remediation": "Validate file type, extension, content, store outside web root"
+    },
+    {
+      "cwe_id": "CWE-94",
+      "name": "Code Injection",
+      "owasp": "A03:2021-Injection",
+      "description": "Improper control of generation of code.",
+      "vuln_class": "ssti",
+      "severity": "critical",
+      "common_payloads": ["{{7*7}}", "${7*7}", "<%= 7*7 %>"],
+      "testing": "Test SSTI with template payloads",
+      "remediation": "Avoid eval, validate input, sandbox"
+    }
+  ],
+  "mapping": {
+    "xss": "CWE-79",
+    "sqli": "CWE-89",
+    "ssti": "CWE-94",
+    "ssrf": "CWE-918",
+    "xxe": "CWE-611",
+    "idor": "CWE-639",
+    "bola": "CWE-862",
+    "bfla": "CWE-863",
+    "auth_bypass": "CWE-287",
+    "open_redirect": "CWE-601",
+    "csrf": "CWE-352",
+    "path_traversal": "CWE-22"
+  }
+}

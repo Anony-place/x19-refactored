@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, Public SSTI knowledge",
+    "license": "CC BY-SA 4.0 + Public Domain",
+    "date": "2026-09-18",
+    "category": "web",
+    "confidence": "high",
+    "provenance": "Synthesized from public SSTI knowledge",
+    "version": "1.0",
+    "applicable_technologies": ["web", "template"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/18-Testing_for_Server_Side_Template_Injection"]
+  },
+  "vuln_class": "ssti",
+  "cwe": "CWE-94",
+  "description": "SSTI occurs when user input is embedded in template without proper sanitization, allowing code execution.",
+  "payloads": {
+    "witness": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "#{7*7}", "{{7*'7'}}"],
+    "detection": "If {{7*7}} returns 49, possible SSTI",
+    "bypass": ["{{7*7}}", "{{7*'7'}}", "{{config}}", "{{self}}"]
+  },
+  "methodology": {
+    "testing": ["Test with {{7*7}} — if 49 in response, possible SSTI", "Try different syntax for different engines (Jinja2, Twig, etc.)", "Never use RCE payloads without approval"],
+    "evidence": "Request with {{7*7}} returns 49, tool output",
+    "verification": "Reproduce with math payload, check engine, try to get config without RCE"
+  },
+  "severity": {"critical": "SSTI leading to RCE", "high": "SSTI with code execution", "medium": "SSTI with limited impact"},
+  "remediation": "Avoid user input in templates, sandbox, validate input"
+}

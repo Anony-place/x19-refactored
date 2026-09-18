@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "source": "Public false positive knowledge, bug bounty experience",
+    "license": "MIT (our synthesis)",
+    "date": "2026-09-18",
+    "category": "false_positive",
+    "confidence": "medium",
+    "provenance": "Synthesized from public knowledge of common false positives",
+    "version": "1.0",
+    "applicable_technologies": ["all"],
+    "references": []
+  },
+  "false_positives": [
+    {
+      "vuln_class": "xss",
+      "indicators": ["Payload inside HTML comment <!-- <script> -->", "Payload HTML-encoded &lt;script&gt;", "CSP blocks execution", "Payload reflected but not in executable context (e.g., inside <title> without breaking out)"],
+      "verification": "Check if payload actually executes, check context, check CSP"
+    },
+    {
+      "vuln_class": "sqli",
+      "indicators": ["Generic error not SQL-specific", "WAF blocking with generic message", "Input validation rejecting quote but not SQLi", "Error from different layer (e.g., app error not DB error)"],
+      "verification": "Check if error is genuine SQL error, try boolean/time/union to confirm, not just error"
+    },
+    {
+      "vuln_class": "idor",
+      "indicators": ["Endpoint returns 403 for other IDs (proper authz)", "Data returned is public, not private", "ID is random UUID and not guessable, returns 404 not 403 but still not IDOR"],
+      "verification": "Check if data is actually private, check if authz check exists, try with two accounts"
+    },
+    {
+      "vuln_class": "ssrf",
+      "indicators": ["URL validation via allow list, blocks private IPs", "Response does not contain internal data, just generic", "Out-of-band detection without approval, not valid"],
+      "verification": "Check if internal data returned, check if allow list blocks, reproduce with internal URL"
+    },
+    {
+      "vuln_class": "open_redirect",
+      "indicators": ["Redirect via allow list, blocks external", "Redirect requires user interaction and is expected (e.g., login redirect)"],
+      "verification": "Check if external redirect allowed, check if allow list"
+    }
+  ],
+  "defensive_validation": "Review findings for false positives: check alternative explanations, config, WAF, etc. Validate defensively: is finding actually exploitable, or is there mitigation? Identify false positive patterns. Provide alternative explanations."
+}
