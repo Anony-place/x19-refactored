@@ -1,12 +1,12 @@
-# X19 Phase 3 — Datasets and Offensive Knowledge — COMPLETE
+# X19 Phase 3 — Datasets, Knowledge, and Evidence-Backed Orchestration
 
 **Date:** 2026-09-18
-**Branch:** arena/01a0b495-x19-refactored
+**Branch:** x19-product-refactor
 **Phase:** 3 — Datasets and Offensive Knowledge + Fully Autonomous Offensive Team
 
 ## Summary
 
-Added public security knowledge base and bug bounty datasets with full metadata compliance, and made X19 fully autonomous like an overall offensive team. All knowledge is from public authoritative sources, synthesized in our own words, no verbatim copyrighted text, no secrets/PII/credentials/tokens.
+Added public security knowledge base and bug bounty datasets with full metadata compliance, and wired X19 orchestration to the existing runtime delegation rail without introducing a second agent framework. All knowledge is from public authoritative sources, synthesized in our own words, no verbatim copyrighted text, no secrets/PII/credentials/tokens.
 
 ## Knowledge Base (`knowledge/`)
 
@@ -173,17 +173,17 @@ Added public security knowledge base and bug bounty datasets with full metadata 
 
 - **AutonomousTeamConfig:** target, authorized_domains, excluded_assets, program_name, objectives, max_iterations, time_limit_seconds, concurrency_limit, rate_limit_ms, auto_verify, auto_report
 - **AutonomousOffensiveTeam:**
-  - Wires together: mission_manager, boss, knowledge base, datasets, offensive methodology, payload generator, loop, operator interface
-  - `create_autonomous_mission(config)` — create mission with explicit scope, decompose into 7 tasks (recon, attack surface, hypothesis, web+api parallel, verification, reporting), set operator current mission, returns mission + summary with knowledge and datasets stats
-  - `autonomous_recon(mission, discoveries)` — autonomous recon using methodology from knowledge base, adds discoveries to mission, builds attack surface model, adds timeline event, saves
-  - `autonomous_hypothesis_generation(mission)` — generate hypotheses from recon using knowledge base, prioritize, add to mission, timeline, save
-  - `autonomous_testing(mission, hypotheses)` — for each hypothesis (limit 5 for safety), generate payloads via PayloadGenerator, get testing methodology, create testing task assigned to specialist mapped via _get_specialist_for_vuln (xss→web_security, sqli→web_security, bola→api_security, etc.), add to mission
-  - `_get_specialist_for_vuln(vuln_class)` — map vuln class to specialist role
-  - `autonomous_verification(mission)` — verify candidate findings using knowledge base verification strategy and false positive indicators, check evidence, transition to UNDER_VERIFICATION→VERIFIED or REJECTED, timeline, save
+  - Wires together mission state, Boss, knowledge/datasets, offensive methodology, payload generation, the existing runtime delegation mechanism, and operator controls.
+  - `create_autonomous_mission(config)` — validates explicit scope and creates a persisted mission/task plan.
+  - `autonomous_recon(mission, discoveries)` — records discoveries supplied by real tool/runtime output and derives an attack-surface model; it does not invent assets.
+  - `autonomous_hypothesis_generation(mission)` — derives testable hypotheses from recorded observations.
+  - `autonomous_testing(mission, hypotheses)` — creates bounded specialist tasks; actual execution is delegated through the runtime `delegate_task` rail.
+  - `autonomous_verification(mission)` — queues evidence-backed candidates for real verification and never self-certifies a finding.
+  - `run_autonomous_mission(...)` — leaves missions active until real delegated work reports results; it emits no synthetic progress, findings, verification, or completion state.rategy and false positive indicators, check evidence, transition to UNDER_VERIFICATION→VERIFIED or REJECTED, timeline, save
   - `autonomous_report(mission)` — generate evidence-based report via OperatorInterface, L3/L4 only verified, timeline, save
   - `run_autonomous_mission(config, initial_discoveries)` — run fully autonomous mission SCOPE→PLAN→RECON→ATTACK_SURFACE→HYPOTHESIS→TEST→OBSERVE→CORRELATE→VERIFY→CLASSIFY→REPORT→LEARN→REASSESS:
     - SCOPE and PLAN done in create_autonomous_mission
-    - RECON with provided or default discoveries (api.target.com, endpoints /api/users, /search, /api/fetch, tech nginx, react, node, auth jwt)
+    - RECON only from real supplied runtime/tool discoveries; no default target/endpoint/technology fixtures
     - ATTACK_SURFACE via build_attack_surface_model
     - HYPOTHESIS via generate_hypotheses_from_recon (e.g., 9 hypotheses from 6 endpoints)
     - TEST via autonomous_testing
