@@ -59,9 +59,9 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
         if db is not None:
             db.close()
 
-    print(f"\nResume this session with:\n  hermes --tui --resume {target}")
+    print(f"\nResume this session with:\n  x19 --tui --resume {target}")
     if title:
-        print(f'  hermes --tui -c "{title}"')
+        print(f'  x19 --tui -c "{title}"')
     print(f"\nSession:        {target}")
     if title:
         print(f"Title:          {title}")
