@@ -351,17 +351,26 @@ class BossOrchestrator:
         return mission.get_stats()
 
     def pause_mission(self, mission: MissionState) -> MissionState:
-        """Pause mission — Operator control."""
+        """Pause mission and prevent new runtime delegations."""
+        try:
+            from tools.delegate_tool_registry import set_spawn_paused
+            set_spawn_paused(True)
+        except Exception:
+            pass
         mission.status = MissionStatus.PAUSED
         mission.set_phase(MissionPhase.PAUSED)
-        mission.add_timeline_event(MissionPhase.PAUSED, "Mission paused by Operator", "operator")
+        mission.add_timeline_event(MissionPhase.PAUSED, "Mission paused by Operator; new delegation blocked", "operator")
         self.mission_manager.save_mission(mission)
         return mission
 
     def resume_mission(self, mission: MissionState) -> MissionState:
-        """Resume mission."""
+        """Resume mission and allow new runtime delegations."""
+        try:
+            from tools.delegate_tool_registry import set_spawn_paused
+            set_spawn_paused(False)
+        except Exception:
+            pass
         mission.status = MissionStatus.ACTIVE
-        # Restore previous phase or go to reassess
         mission.set_phase(MissionPhase.REASSESS)
         mission.add_timeline_event(MissionPhase.REASSESS, "Mission resumed by Operator", "operator")
         self.mission_manager.save_mission(mission)
