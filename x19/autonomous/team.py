@@ -227,44 +227,29 @@ class AutonomousOffensiveTeam:
         return mapping.get(vuln_class.lower(), "web_security")
 
     def autonomous_verification(self, mission: MissionState) -> Dict[str, Any]:
-        """Autonomous verification of candidate findings using knowledge base."""
-
+        """Queue candidates for real specialist verification; never self-certify findings."""
         candidates = mission.findings.list_by_status(FindingStatus.CANDIDATE)
-
-        verified_count = 0
-        for finding in candidates[:3]:  # Limit for safety
-            # Get verification strategy
-            verification = self.offensive.get_verification_strategy(finding.vuln_class.value)
-            false_positive = self.offensive.get_false_positive_indicators(finding.vuln_class.value)
-
-            # In real autonomous, verification specialist would use real tools to reproduce
-            # For autonomous team logic, we simulate verification decision based on evidence
-
-            # Check if finding has evidence
-            if len(finding.evidence) > 0 and finding.evidence[0].tool_output:
-                # Has evidence, move to under verification then verified (if not false positive)
-                if false_positive and any(indicator.lower() in finding.observed_evidence.lower() for indicator in str(false_positive).lower().split(",")):
-                    # Potential false positive, need more checks
-                    finding.transition_to(FindingStatus.NEEDS_MORE_EVIDENCE)
-                else:
-                    finding.transition_to(FindingStatus.UNDER_VERIFICATION)
-                    # Simulate verification success if evidence looks genuine
-                    finding.transition_to(FindingStatus.VERIFIED, verified_by="verification")
-                    verified_count += 1
+        queued = 0
+        for finding in candidates[:3]:
+            if finding.evidence and any(e.tool_output for e in finding.evidence):
+                if finding.transition_to(FindingStatus.UNDER_VERIFICATION):
+                    queued += 1
             else:
-                # No evidence, reject
-                finding.transition_to(FindingStatus.REJECTED, reason="No evidence, missing tool output")
-
+                finding.transition_to(FindingStatus.NEEDS_MORE_EVIDENCE, reason="Missing tool evidence")
             mission.findings.update(finding)
 
-        mission.add_timeline_event(MissionPhase.VERIFY, f"Autonomous verification: {verified_count} verified from {len(candidates)} candidates", "verification")
-
+        mission.add_timeline_event(
+            MissionPhase.VERIFY,
+            f"Verification queue prepared: {queued} evidence-backed candidates",
+            "verification",
+        )
         self.mission_manager.save_mission(mission)
-
         return {
-            "status": "completed",
+            "status": "pending" if queued else "completed",
             "candidates": len(candidates),
-            "verified": verified_count,
+            "queued_for_verification": queued,
+            "verified": len(mission.findings.list_verified()),
+            "note": "Verified status is written only from real verification results.",
         }
 
     def autonomous_report(self, mission: MissionState) -> str:
