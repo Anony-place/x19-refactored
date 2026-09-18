@@ -2,13 +2,13 @@
 X19 Identity Architecture
 
 Proper identity layer rather than scattering personality text throughout Python files.
-Implements X19 identity through Hermes' actual prompt/personality architecture.
+Implements X19 identity through the existing prompt/personality architecture.
 
 Usage:
     from x19.identity import get_x19_identity, get_x19_soul_md, is_x19_enabled
 
 The identity is loaded via prompt_builder's SOUL mechanism when X19 mode is active,
-or falls back to Hermes default when not.
+or resolves to the explicit legacy identity only when X19 is disabled.
 """
 
 from .core import (
