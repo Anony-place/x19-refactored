@@ -311,7 +311,7 @@ termux = [
   "python-telegram-bot[webhooks]==22.8",
   "x19[cron]",
   "x19[mcp]",
-  "hermes-agent[honcho]",
+  "x19[honcho]",
   "hermes-agent[acp]",
 ]
 termux-all = [
