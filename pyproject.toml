@@ -309,7 +309,7 @@ azure-identity = ["azure-identity==1.25.3"]
 termux = [
   # Baseline Android / Termux path for reliable fresh installs.
   "python-telegram-bot[webhooks]==22.8",
-  "hermes-agent[cron]",
+  "x19[cron]",
   "hermes-agent[mcp]",
   "hermes-agent[honcho]",
   "hermes-agent[acp]",
