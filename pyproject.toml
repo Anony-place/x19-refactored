@@ -310,7 +310,7 @@ termux = [
   # Baseline Android / Termux path for reliable fresh installs.
   "python-telegram-bot[webhooks]==22.8",
   "x19[cron]",
-  "hermes-agent[mcp]",
+  "x19[mcp]",
   "hermes-agent[honcho]",
   "hermes-agent[acp]",
 ]
