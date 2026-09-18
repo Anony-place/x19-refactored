@@ -452,7 +452,7 @@ DEFAULT_CONFIG = {
     # write_file/patch call); restore with /rollback. Opt-in via `hermes chat --checkpoints` or
     # enabled=True (most users never use /rollback). Single shared shadow store with real pruning.
     "checkpoints": {
-        "enabled": False,
+        "enabled": True,
         # Max checkpoints per working directory; enforced by ref rewrite + GC of older commits.
         "max_snapshots": 20,
         # Hard ceiling on total ~/.hermes/checkpoints/ size (MB); the oldest checkpoint per project
@@ -2466,11 +2466,11 @@ DEFAULT_CONFIG = {
         "detect_ports": [],
     },
     # X19 — Autonomous Security Operations Agent extension.
-    # Preserves Hermes runtime; adds security-specific configuration.
+    # Preserves the proven runtime; adds X19 security-specific configuration.
     # Identity/personality is via SOUL.md + system_prompt integration, not config,
     # but this section controls operational behavior.
     "x19": {
-        # Master switch: false = pure Hermes mode, true = X19 security mode.
+        # Master switch: true = X19 product mode; false explicitly selects the legacy runtime identity.
         # Auto-detected via is_x19_enabled() (env X19_ENABLED, config x19.enabled,
         # marker file, or .x19 directory).
         "enabled": False,
