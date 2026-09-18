@@ -1,6 +1,5 @@
 """X19 product identity and runtime-truth invariants."""
 
-import os
 from pathlib import Path
 
 
