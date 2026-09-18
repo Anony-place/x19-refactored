@@ -377,7 +377,19 @@ class BossOrchestrator:
         return mission
 
     def stop_mission(self, mission: MissionState, reason: str = "Stopped by Operator") -> MissionState:
-        """Stop mission — Operator control."""
+        """Stop mission and cancel live child work owned by this runtime."""
+        try:
+            from tools.delegate_tool_registry import list_active_subagents, interrupt_subagent, set_spawn_paused
+            set_spawn_paused(True)
+            for child in list_active_subagents():
+                child_id = child.get("id") if isinstance(child, dict) else getattr(child, "id", None)
+                if child_id:
+                    try:
+                        interrupt_subagent(str(child_id), reason=reason)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         mission.status = MissionStatus.STOPPED
         mission.set_phase(MissionPhase.STOPPED)
         mission.add_timeline_event(MissionPhase.STOPPED, reason, "operator")
