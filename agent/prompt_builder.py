@@ -194,17 +194,13 @@ DEFAULT_AGENT_IDENTITY = _resolve_default_identity()
 # The actual per-turn resolution happens in system_prompt.py::_identity_parts which checks X19 dynamically
 
 HERMES_AGENT_HELP_GUIDANCE = (
-    # Injected only when skill_view exists AND the hermes-agent skill is installed (system_prompt.py slot
-    # resolution). No "when the two differ" clause: docs-are-authoritative already carries the precedence.
-    "You run X19, an autonomous security operations product built on a proven agent runtime. For X19 features and runtime behavior, use the repository documentation and actual tool/runtime state as authoritative; never invent capabilities or results."
+    "You run X19, an autonomous security operations product built on a proven agent runtime. "
+    "For X19 features and runtime behavior, use repository documentation and actual tool/runtime state as authoritative; "
+    "never invent capabilities or results. The live delegation rail is `delegate_task`; mission state is authoritative for status."
 )
 
-# Variant for sessions without the skills toolset (e.g. Blank Slate): naming skill_view() there would dangle.
-HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS = (
-    "You run X19, an autonomous security operations product built on a proven agent runtime. Treat X19 repository documentation and actual runtime state as authoritative; never invent capabilities or results."
-)
-
-
+# Compatibility alias: internal imports/tests may retain the upstream constant name.
+HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS = HERMES_AGENT_HELP_GUIDANCE
 # Keep the every-session memory scope even when task knowledge cannot be saved as a skill.
 def build_memory_guidance(
     memory_enabled: bool = True, profile_enabled: bool = True, *, skill_manage_available: bool = True,
