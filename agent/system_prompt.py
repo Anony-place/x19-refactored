@@ -566,17 +566,17 @@ def _identity_parts(agent: Any, ctx_len: Optional[int]) -> Tuple[List[str], bool
     instructions, scoped to the agent's OWN home) or the default identity.
     Returns ``(parts, soul_loaded)``.
 
-    X19 extension: if X19 mode enabled and no SOUL.md, use X19 identity instead of Hermes default.
-    This preserves Hermes baseline (SOUL.md still wins) while providing X19 personality architecture.
+    X19 extension: X19 is the primary runtime identity. User SOUL content remains supported as operator customization.
     """
     wants_soul = agent.load_soul_identity or not agent.skip_context_files
     _soul_content = _pb.load_soul_md(ctx_len, home_override=_agent_home(agent)) if wants_soul else None
-    if _soul_content:
-        return ([_soul_content], True)
-    # X19 identity check — proper architecture, not scattered text
     x19_identity = _get_x19_identity_if_enabled()
     if x19_identity:
+        if _soul_content:
+            return ([x19_identity, _soul_content], True)
         return ([x19_identity], False)
+    if _soul_content:
+        return ([_soul_content], True)
     return ([DEFAULT_AGENT_IDENTITY], False)
 
 
