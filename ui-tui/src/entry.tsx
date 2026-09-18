@@ -16,7 +16,7 @@ import { recordParentLifecycle } from './lib/parentLog.js'
 import { resetTerminalModes } from './lib/terminalModes.js'
 
 if (!process.stdin.isTTY) {
-  console.log('hermes-tui: no TTY')
+  console.log('x19-tui: no TTY')
   process.exit(0)
 }
 
@@ -56,7 +56,7 @@ setRpcErrorLogSink(line => gw.recordLog(line))
 gw.start()
 
 const dumpNotice = (snap: MemorySnapshot, dump: HeapDumpResult | null) =>
-  `hermes-tui: ${snap.level} memory (${formatBytes(snap.heapUsed)}) — auto heap dump → ${dump?.heapPath ?? dump?.diagPath ?? '(failed)'}\n`
+  `x19-tui: ${snap.level} memory (${formatBytes(snap.heapUsed)}) — auto heap dump → ${dump?.heapPath ?? dump?.diagPath ?? '(failed)'}\n`
 
 let consecutiveDeadStreamErrors = 0
 
@@ -93,7 +93,7 @@ setupGracefulExit({
     consecutiveDeadStreamErrors = 0
 
     try {
-      process.stderr.write(`hermes-tui lifecycle ${scope}: ${message.slice(0, 2000)}\n`)
+      process.stderr.write(`x19-tui lifecycle ${scope}: ${message.slice(0, 2000)}\n`)
     } catch {
       // stderr may be the dead stream itself.
     }
@@ -104,7 +104,7 @@ setupGracefulExit({
     // what tells SIGHUP (terminal/SSH dropped) apart from a real SIGTERM.
     recordParentLifecycle(`graceful-exit received signal=${signal} → killing gateway`)
     resetTerminalModes()
-    process.stderr.write(`hermes-tui lifecycle: received ${signal}\n`)
+    process.stderr.write(`x19-tui lifecycle: received ${signal}\n`)
   },
   // The dashboard chat tab has no in-page restart path after the PTY child
   // exits. Ignore SIGINT there so Ctrl+C cannot kill the embedded TUI if raw
