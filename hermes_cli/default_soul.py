@@ -1,6 +1,6 @@
 """Default SOUL.md template seeded into HERMES_HOME on first run.
 
-X19 extension: provides X19 identity when X19 mode enabled, preserving Hermes default as fallback.
+X19 product default: seeds the X19 identity through the existing SOUL pipeline.
 This implements X19 personality through Hermes' actual SOUL mechanism, not scattered text.
 """
 
@@ -36,24 +36,18 @@ except Exception:
     )
 
 
-def get_default_soul_md(x19_enabled: bool = False) -> str:
+def get_default_soul_md(x19_enabled: bool = True) -> str:
     """Return appropriate default SOUL.md based on mode.
 
     Args:
-        x19_enabled: If True, return X19 identity. If False, return Hermes default.
-                     Auto-detects via x19.identity.is_x19_enabled() if not explicitly passed.
+        x19_enabled: True selects X19 identity. False explicitly selects the legacy upstream identity.
 
     Returns:
         SOUL.md content string
     """
-    if not x19_enabled:
-        try:
-            from x19.identity import is_x19_enabled
-            x19_enabled = is_x19_enabled()
-        except Exception:
-            x19_enabled = False
-
-    return X19_DEFAULT_SOUL_MD if x19_enabled else DEFAULT_SOUL_MD
+    if x19_enabled:
+        return X19_DEFAULT_SOUL_MD
+    return DEFAULT_SOUL_MD
 
 _SCAFFOLD_HEAD = (
     "# Hermes Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\n"
