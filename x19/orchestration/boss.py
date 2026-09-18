@@ -397,12 +397,25 @@ class BossOrchestrator:
         return mission
 
     def kill_all_tasks(self, mission: MissionState) -> MissionState:
-        """Kill all running tasks — Operator KILL ALL control."""
+        """Kill mission tasks and interrupt all live delegated workers."""
+        try:
+            from tools.delegate_tool_registry import list_active_subagents, interrupt_subagent, set_spawn_paused
+            set_spawn_paused(True)
+            for child in list_active_subagents():
+                child_id = child.get("id") if isinstance(child, dict) else getattr(child, "id", None)
+                if child_id:
+                    try:
+                        interrupt_subagent(str(child_id), reason="KILL ALL requested by Operator")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         for task in mission.tasks.tasks.values():
             if task.status in (TaskStatus.RUNNING, TaskStatus.ASSIGNED, TaskStatus.PENDING):
                 task.status = TaskStatus.CANCELLED
                 task.updated_at = datetime.utcnow()
 
-        mission.add_timeline_event(mission.phase, "All tasks killed by Operator", "operator")
+        mission.add_timeline_event(mission.phase, "All mission tasks killed by Operator", "operator")
         self.mission_manager.save_mission(mission)
         return mission
