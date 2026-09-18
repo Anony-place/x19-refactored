@@ -1,5 +1,5 @@
 {
-  "name": "hermes-agent",
+  "name": "x19",
   "version": "1.0.0",
   "description": "X19 — Autonomous Security Operations Agent with real terminal, streaming, delegation, memory, skills, sessions, and gateway capabilities.",
   "private": true,
