@@ -176,19 +176,19 @@ def is_x19_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
     """
     Check if X19 mode is enabled.
 
-    Resolution order (explicit → implicit, fail-safe to Hermes):
+    Resolution order (explicit → implicit, defaulting to X19 in this repository):
     1. Explicit config dict passed in (config['x19']['enabled'])
     2. Environment variable X19_ENABLED (1/true/yes/on = True, 0/false/no/off = False)
     3. Config file (load_config_readonly) x19.enabled
     4. Marker files: .x19/enabled, x19/enabled, .x19_mode, X19_MODE
     5. SOUL.md contains X19 marker (if SOUL.md exists in HERMES_HOME or repo root)
-    6. Default: False (Hermes baseline) — X19 is opt-in to preserve baseline tests
+    6. Default: True (X19 product runtime). The standalone baseline remains on the `hermes-baseline` branch.
 
     This ensures:
-    - Hermes baseline (no x19 config, no env var, no marker) → False, pure Hermes
-    - x19-refactored repo with X19_ENABLED=1 or marker → True, X19 mode
-    - Operator can enable via config.yaml x19.enabled=true or env var
-    - No auto-enable merely because x19/ package directory exists (would break tests)
+    - x19-refactored repo with no override → True, X19 mode
+    - Operator can explicitly disable with config.yaml `x19.enabled=false` or `X19_ENABLED=0`
+    - Explicit config/env/marker/SOUL settings still override the repository default
+    - The standalone baseline remains available on `hermes-baseline` and is not modified
     """
     # 1. Explicit config dict
     if config is not None:
@@ -303,8 +303,8 @@ def is_x19_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
     except Exception:
         pass
 
-    # 6. Default: False — Hermes baseline, X19 opt-in
-    return False
+    # 6. Default: True — X19 is the product identity for this repository.
+    return True
 
 
 def get_x19_identity(config: Optional[Dict[str, Any]] = None, custom_override: Optional[str] = None) -> str:
