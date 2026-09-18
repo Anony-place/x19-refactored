@@ -222,6 +222,56 @@ class BossOrchestrator:
 
         return ready
 
+    def delegate_ready_tasks(self, mission: MissionState, parent_agent: Any, *, background: bool = True) -> List[Dict[str, Any]]:
+        """Dispatch ready X19 tasks through the existing runtime delegate_task rail."""
+        if mission.status != MissionStatus.ACTIVE:
+            return []
+
+        from tools.delegate_tool import delegate_task
+
+        dispatched: List[Dict[str, Any]] = []
+        for task in self.get_next_tasks(mission):
+            self._assert_scope_for_task(mission, task)
+            args = self.build_delegation_args(task, mission)
+            args["background"] = background
+            task.start()
+            mission.tasks.tasks[task.id] = task
+            mission.add_timeline_event(
+                mission.phase,
+                f"Delegating task: {task.id} → {task.assigned_to}",
+                "boss",
+            )
+            try:
+                receipt = delegate_task(parent_agent=parent_agent, **args)
+            except Exception as exc:
+                task.fail(str(exc))
+                mission.add_timeline_event(
+                    mission.phase,
+                    f"Delegation failed: {task.id} — {exc}",
+                    "boss",
+                )
+                self.mission_manager.save_mission(mission)
+                raise
+            dispatched.append({
+                "task_id": task.id,
+                "assigned_to": task.assigned_to,
+                "receipt": receipt,
+            })
+
+        self.mission_manager.save_mission(mission)
+        return dispatched
+
+    def _assert_scope_for_task(self, mission: MissionState, task: Task) -> None:
+        """Fail closed before a task reaches the live delegation rail."""
+        if not mission.scope:
+            raise ValueError(f"Mission {mission.id} has no authorized scope")
+        enforcer = ScopeEnforcer(mission.scope)
+        allowed, reason = enforcer.is_target_allowed(task.target)
+        if not allowed:
+            task.block(f"Scope denied: {reason}", requires_approval=False)
+            self.mission_manager.save_mission(mission)
+            raise PermissionError(f"Task {task.id} denied by mission scope: {reason}")
+
     def build_delegation_args(self, task: Task, mission: MissionState) -> Dict[str, Any]:
         """Build delegate_task arguments for a task."""
         role = get_role(task.assigned_to)
