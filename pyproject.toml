@@ -1,7 +1,7 @@
 
 
 [project]
-name = "hermes-agent"
+name = "x19"
 version = "0.21.3"
 description = "X19 — Autonomous Security Operations Agent built on a proven agent runtime"
 readme = "README.md"
