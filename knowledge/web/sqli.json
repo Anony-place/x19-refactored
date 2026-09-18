@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, OWASP SQL Injection Prevention Cheat Sheet",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "web",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP public docs, our own methodology",
+    "version": "1.0",
+    "applicable_technologies": ["web", "sql", "database"],
+    "references": [
+      "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/05-Testing_for_SQL_Injection",
+      "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+    ]
+  },
+  "vuln_class": "sqli",
+  "cwe": "CWE-89",
+  "owasp": "A03:2021-Injection",
+  "description": "SQL Injection occurs when user input is directly included in SQL query without proper sanitization, allowing attacker to manipulate query, extract data, or execute commands.",
+  "types": [
+    {
+      "type": "error_based",
+      "description": "Error messages reveal SQL errors, indicating injection point",
+      "testing": "Inject single quote ', double quote \", check for SQL error in response"
+    },
+    {
+      "type": "boolean_based",
+      "description": "Blind SQLi where response differs based on true/false condition",
+      "testing": "Inject ' AND 1=1 -- vs ' AND 1=2 --, check response difference"
+    },
+    {
+      "type": "time_based",
+      "description": "Blind SQLi where response delayed based on condition",
+      "testing": "Inject ' AND SLEEP(5) --, check if response delayed 5 seconds"
+    },
+    {
+      "type": "union_based",
+      "description": "Union SELECT to extract data",
+      "testing": "Inject ' UNION SELECT 1,2,3 --, check if numbers reflected"
+    }
+  ],
+  "methodology": {
+    "recon": "Identify inputs that might go to DB: URL params (id, user), form fields (login, search), headers. Check for SQL errors in normal usage.",
+    "hypothesis": "If input causes SQL error or changes behavior with quote, possible SQLi. If numeric ID, test with ' OR 1=1.",
+    "testing": [
+      "Witness: single quote ' — check for error",
+      "Boolean: ' AND 1=1 -- vs ' AND 1=2 -- — check difference",
+      "Time: ' AND SLEEP(5) -- — check delay (use minimal 2-3 sec to avoid DoS)",
+      "Union: ' UNION SELECT 1,2,3 -- — check reflection",
+      "Never use destructive payloads like DROP TABLE without approval"
+    ],
+    "evidence": "Request with payload, response with SQL error or time delay or data extraction, tool output (sqlmap with --risk 1, minimal)",
+    "verification": "Reproduce with minimal proof, check if error is genuine SQL error not generic, try bypasses, confirm not false positive",
+    "false_positive_indicators": ["Generic error not SQL-specific", "WAF blocking with generic message", "Input validation rejecting quote but not SQLi"]
+  },
+  "payloads": {
+    "witness": [
+      "'",
+      "\"",
+      "' OR '1'='1",
+      "' OR 1=1 --",
+      "1' OR '1'='1"
+    ],
+    "boolean": [
+      "' AND 1=1 --",
+      "' AND 1=2 --",
+      "' AND 'a'='a",
+      "' AND 'a'='b"
+    ],
+    "time": [
+      "' AND SLEEP(2) --",
+      "' OR SLEEP(2) --",
+      "'; WAITFOR DELAY '0:0:2' --"
+    ],
+    "union": [
+      "' UNION SELECT 1,2,3 --",
+      "' UNION SELECT NULL,NULL,NULL --"
+    ]
+  },
+  "severity": {
+    "critical": "SQLi allowing data extraction, authentication bypass, or RCE, no user interaction",
+    "high": "SQLi with limited data extraction or requiring user interaction",
+    "medium": "SQLi with error disclosure only, no data extraction proven",
+    "low": "Potential SQLi but blocked by WAF or input validation, needs bypass"
+  },
+  "remediation": "Parameterized queries (prepared statements), ORM, input validation, least privilege DB user, WAF as defense in depth, not primary",
+  "report_template": "SQL Injection at {endpoint} via {param}: payload {payload} causes {error_or_delay_or_data}. Repro: {steps}. Impact: {impact}. Remediation: {remediation}"
+}

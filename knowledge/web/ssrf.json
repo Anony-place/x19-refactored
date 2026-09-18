@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, OWASP SSRF Prevention Cheat Sheet",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "web",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP public docs",
+    "version": "1.0",
+    "applicable_technologies": ["web"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/19-Testing_for_Server-Side_Request_Forgery"]
+  },
+  "vuln_class": "ssrf",
+  "cwe": "CWE-918",
+  "owasp": "A10:2021-SSRF",
+  "description": "SSRF occurs when web app fetches remote resource without validating user-supplied URL, allowing attacker to make requests to internal systems.",
+  "methodology": {
+    "recon": "Identify inputs that fetch URLs: image URL, webhook URL, file import, etc.",
+    "testing": ["Test with http://127.0.0.1, http://localhost, http://[::1], http://internal", "Test with http://169.254.169.254 for cloud metadata (requires approval, high-impact)", "Use Burp Collaborator or similar for out-of-band detection (with approval)"],
+    "evidence": "Request to internal URL returns internal data or time delay, tool output",
+    "verification": "Reproduce with internal URL, check if response contains internal data, bypass via encoding, 0.0.0.0, etc."
+  },
+  "payloads": {
+    "witness": ["http://127.0.0.1", "http://localhost", "http://[::1]", "http://0.0.0.0"],
+    "cloud_metadata": ["http://169.254.169.254/latest/meta-data/ (requires approval, high-impact)"],
+    "bypass": ["http://0.0.0.0", "http://127.1", "http://[::ffff:127.0.0.1]", "http://127.0.0.1%09"]
+  },
+  "severity": {"critical": "SSRF to cloud metadata or internal admin, RCE", "high": "SSRF to internal services", "medium": "SSRF with limited impact", "low": "SSRF blocked by allow list"},
+  "remediation": "Validate URLs, allow list, deny list for private IPs, disable unnecessary URL schemas",
+  "safety": "Cloud metadata probing requires Operator approval, high-impact, no destructive actions"
+}

@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "source": "Public bug bounty methodology, our synthesis",
+    "license": "MIT (our synthesis)",
+    "date": "2026-09-18",
+    "category": "methodology",
+    "confidence": "high",
+    "provenance": "Synthesized from public bug bounty writeups and methodology, no private data",
+    "version": "1.0",
+    "applicable_technologies": ["all"],
+    "references": ["https://www.hackerone.com/hacktivity", "https://www.bugcrowd.com/resource/what-is-bug-bounty/"]
+  },
+  "methodology": {
+    "phases": [
+      {"phase": "scope", "description": "Define authorized targets, exclusions, allowed actions from program scope"},
+      {"phase": "recon", "description": "Asset discovery: subdomains, endpoints, tech, auth surface (read-only)"},
+      {"phase": "attack_surface", "description": "Map inputs, sinks, trust boundaries, auth flows"},
+      {"phase": "hypothesis", "description": "Generate testable hypotheses from recon observations, map to CWE/OWASP"},
+      {"phase": "test", "description": "Test with witness payloads (minimal proof, not destructive), capture evidence"},
+      {"phase": "observe", "description": "Capture tool output, response behavior, timing, errors as evidence"},
+      {"phase": "correlate", "description": "Map observations against known vuln classes (CWE, OWASP, CVE)"},
+      {"phase": "verify", "description": "Verification specialist reproduces candidates, bypass exhaustion before false-positive"},
+      {"phase": "classify", "description": "Severity (CVSS 3.1), confidence, impact, remediation"},
+      {"phase": "report", "description": "Evidence-based report, L3/L4 only for verified, L1/L2 as candidates, never rejected as confirmed"},
+      {"phase": "learn", "description": "Store successful/failed workflows, false positives, verification strategies with provenance"},
+      {"phase": "reassess", "description": "Check remaining scope, uncovered areas, new hypotheses from learnings"}
+    ],
+    "evidence_first": "Distinguish OBSERVATION (tool saw), HYPOTHESIS (might be vuln), TEST (planned action), EVIDENCE (tool output), VERIFIED FINDING (confirmed with repro steps). Never auto-convert observation to vulnerability.",
+    "scope_enforcement": "Every mission must have explicit scope: target, authorized domains/IPs, excluded assets, allowed/prohibited actions, time/budget/concurrency. Boss enforces before delegating. Never silently expand.",
+    "verification": "Candidate findings must go through verification specialist before reporting. Lifecycle: CANDIDATE → UNDER_VERIFICATION → VERIFIED or REJECTED. Bypass exhaustion before false-positive dismissal.",
+    "reporting": "L3/L4 only for VERIFIED findings with high/confirmed confidence, L1/L2 as candidates pending verification, never rejected as confirmed. Every finding must have: ID, target, endpoint, vuln class, severity, confidence, repro steps, evidence, tool output ref, timestamps, agent, verification status, remediation.",
+    "rate_limiting": "200ms between active requests per host by default, don't bypass without operator approval",
+    "controls": "Operator retains PAUSE/STOP/KILL ALL/RESET, high-impact actions require approval"
+  }
+}

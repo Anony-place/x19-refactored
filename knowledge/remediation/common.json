@@ -1,0 +1,29 @@
+{
+  "metadata": {
+    "source": "OWASP Cheat Sheets, Public remediation knowledge",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "remediation",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP cheat sheets",
+    "version": "1.0",
+    "applicable_technologies": ["all"],
+    "references": ["https://cheatsheetseries.owasp.org/"]
+  },
+  "remediations": {
+    "xss": "Output encoding (HTML, attribute, JS, URL), Content Security Policy, validate input, use frameworks that auto-escape, HttpOnly cookies, X-XSS-Protection",
+    "sqli": "Parameterized queries (prepared statements), ORM, input validation, least privilege DB user, WAF as defense in depth",
+    "ssti": "Avoid user input in templates, sandbox, validate input, least privilege",
+    "ssrf": "Validate URLs, allow list, deny list for private IPs, disable unnecessary URL schemas, use allow list",
+    "xxe": "Disable XML external entities, use JSON, validate XML, patch libraries",
+    "idor": "Authorization check for every request, random IDs (UUID), deny by default, log access failures",
+    "bola": "Check authorization for every request, random unpredictable IDs, deny by default",
+    "bfla": "Check authorization for every request, method-level authz, deny by default",
+    "auth_bypass": "Proper authentication, authorization, MFA, secure session management, no default creds, strong password policy",
+    "open_redirect": "Allow list for redirect URLs, validate redirect param, no user-controlled redirect without validation",
+    "s3_exposure": "Private ACL, block public access, encryption, logging, versioning",
+    "cors_misconfig": "Validate Origin, allow list, not *, no credentials with *",
+    "csrf": "Anti-CSRF tokens, SameSite cookies, validate Origin/Referer",
+    "general": "Defense in depth, least privilege, validate input, encode output, secure defaults, logging, monitoring"
+  }
+}

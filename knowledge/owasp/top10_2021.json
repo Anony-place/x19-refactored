@@ -1,0 +1,110 @@
+{
+  "metadata": {
+    "source": "OWASP Top 10 2021",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "owasp",
+    "confidence": "high",
+    "provenance": "Synthesized summary from OWASP Top 10 2021 public documentation (https://owasp.org/www-project-top-ten/), not verbatim",
+    "version": "2021",
+    "applicable_technologies": ["web", "api", "all"],
+    "references": [
+      "https://owasp.org/www-project-top-ten/",
+      "https://owasp.org/Top10/A01_2021-Broken_Access_Control/",
+      "https://owasp.org/Top10/A02_2021-Cryptographic_Failures/",
+      "https://owasp.org/Top10/A03_2021-Injection/"
+    ]
+  },
+  "owasp_top10_2021": [
+    {
+      "id": "A01",
+      "name": "Broken Access Control",
+      "cwe": ["CWE-200", "CWE-201", "CWE-352", "CWE-264", "CWE-862", "CWE-863"],
+      "description": "Access control enforces policy such that users cannot act outside of their intended permissions. Failures lead to unauthorized information disclosure, modification, or destruction of data.",
+      "common_vulns": ["BOLA/IDOR", "BFLA", "CORS misconfig", "privilege escalation"],
+      "testing_approach": "Test for IDOR/BOLA by changing IDs, test BFLA by accessing admin endpoints with low-privilege user, test CORS, test privilege escalation",
+      "remediation": "Deny by default, implement access control checks server-side, disable directory listing, log access failures"
+    },
+    {
+      "id": "A02",
+      "name": "Cryptographic Failures",
+      "cwe": ["CWE-259", "CWE-327", "CWE-331"],
+      "description": "Failures related to cryptography leading to exposure of sensitive data. Focus on data in transit and at rest.",
+      "common_vulns": ["exposed sensitive data", "weak crypto", "hardcoded secrets (in code, but we check for exposure)"],
+      "testing_approach": "Check for sensitive data exposure in responses, check TLS config, check for weak hashing, check for sensitive data in logs",
+      "remediation": "Encrypt sensitive data at rest and in transit, use strong crypto, disable weak ciphers, proper key management"
+    },
+    {
+      "id": "A03",
+      "name": "Injection",
+      "cwe": ["CWE-79", "CWE-89", "CWE-73", "CWE-77", "CWE-917"],
+      "description": "User-supplied data not validated, filtered, or sanitized. Host can interpret it as command or query.",
+      "common_vulns": ["XSS", "SQLi", "SSTI", "SSRF", "XXE", "command injection", "LDAP injection"],
+      "testing_approach": "Test with witness payloads: XSS <script>alert(1)</script>, SQLi ' OR 1=1, SSTI {{7*7}}, SSRF http://127.0.0.1, XXE <!ENTITY xxe SYSTEM 'file:///etc/passwd'>",
+      "remediation": "Validate input, parameterized queries, ORM, escape output, least privilege"
+    },
+    {
+      "id": "A04",
+      "name": "Insecure Design",
+      "cwe": ["CWE-209", "CWE-256", "CWE-501", "CWE-73"],
+      "description": "Missing or ineffective control design. Shift-left, threat modeling, secure design patterns.",
+      "common_vulns": ["business logic flaws", "insecure design patterns"],
+      "testing_approach": "Threat modeling, review design docs, test business logic flows for bypass",
+      "remediation": "Secure design patterns, threat modeling, defense in depth, write user stories with security"
+    },
+    {
+      "id": "A05",
+      "name": "Security Misconfiguration",
+      "cwe": ["CWE-16", "CWE-2"],
+      "description": "Missing appropriate security hardening, misconfigured permissions, unnecessary features enabled, default accounts.",
+      "common_vulns": ["exposed .env, config, backup files", "directory listing", "verbose error messages", "unnecessary features"],
+      "testing_approach": "Check for exposed config files, check error messages, check default accounts, check unnecessary HTTP methods",
+      "remediation": "Hardening, remove unused features, review configs, automated scanning"
+    },
+    {
+      "id": "A06",
+      "name": "Vulnerable and Outdated Components",
+      "cwe": ["CWE-937", "CWE-1035", "CWE-1104"],
+      "description": "Using components with known vulnerabilities, not scanning, not upgrading.",
+      "common_vulns": ["outdated JS libraries", "outdated server software"],
+      "testing_approach": "Check for outdated components via headers, check JS libraries, use CVE database",
+      "remediation": "Inventory components, monitor CVEs, update, use SCA tools"
+    },
+    {
+      "id": "A07",
+      "name": "Identification and Authentication Failures",
+      "cwe": ["CWE-287", "CWE-297", "CWE-384", "CWE-522", "CWE-613"],
+      "description": "Failures related to authentication, session management.",
+      "common_vulns": ["auth bypass", "session fixation", "credential stuffing", "weak password policy"],
+      "testing_approach": "Test auth bypass, session management, brute force protection, password policy",
+      "remediation": "MFA, strong password policy, secure session management, no default creds"
+    },
+    {
+      "id": "A08",
+      "name": "Software and Data Integrity Failures",
+      "cwe": ["CWE-829", "CWE-494", "CWE-502"],
+      "description": "Code and infrastructure that does not protect against integrity violations, insecure deserialization.",
+      "common_vulns": ["insecure deserialization", "insecure CI/CD"],
+      "testing_approach": "Check deserialization, check CI/CD pipeline, check for unsigned data",
+      "remediation": "Digital signatures, verify integrity, secure deserialization, secure CI/CD"
+    },
+    {
+      "id": "A09",
+      "name": "Security Logging and Monitoring Failures",
+      "cwe": ["CWE-117", "CWE-223", "CWE-532"],
+      "description": "Insufficient logging, monitoring, alerting, incident response.",
+      "common_vulns": ["insufficient logging", "no alerting"],
+      "testing_approach": "Check if actions are logged, check for sensitive data in logs, test monitoring",
+      "remediation": "Log auth failures, input validation failures, use SIEM, alerting"
+    },
+    {
+      "id": "A10",
+      "name": "Server-Side Request Forgery",
+      "cwe": ["CWE-918"],
+      "description": "SSRF flaws occur when web app fetches remote resource without validating user-supplied URL.",
+      "common_vulns": ["SSRF"],
+      "testing_approach": "Test with SSRF payloads: http://127.0.0.1, http://169.254.169.254 (cloud metadata, requires approval), http://internal",
+      "remediation": "Validate URLs, deny list, disable unnecessary URL schemas, use allow list"
+    }
+  ]
+}

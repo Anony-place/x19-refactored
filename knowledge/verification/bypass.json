@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "source": "Public bypass techniques, OWASP",
+    "license": "Public Domain + CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "verification",
+    "confidence": "high",
+    "provenance": "Public knowledge bypass techniques",
+    "version": "1.0",
+    "applicable_technologies": ["web", "api"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/"]
+  },
+  "bypass_techniques": {
+    "xss": ["Case variation <ScRiPt>", "Encoding %3Cscript%3E", "Different tags <svg onload>", "Event handlers onerror, onload", "CSP bypass via JSONP, etc. (if CSP)"],
+    "sqli": ["Case variation", "Encoding", "Comments /**/", "Different quotes", "WAF bypass via payload variation"],
+    "idor": ["Change ID format (int to UUID, etc.)", "Try different endpoints with same ID", "Try without auth, with low-privilege"],
+    "auth_bypass": ["Try none algorithm for JWT", "Try weak secret", "Try auth logic flaws (e.g., ?admin=true)", "Try method override"],
+    "ssrf": ["0.0.0.0 bypass", "127.1 bypass", "[::ffff:127.0.0.1]", "DNS rebinding (with approval)", "URL encoding"],
+    "general": ["Try different HTTP methods", "Try different content types", "Try parameter pollution", "Try header injection"]
+  },
+  "verification_strategy": "Bypass exhaustion: try alternative payloads, encodings, methods before dismissing as false positive. Never auto-reject without trying bypasses. Never auto-confirm without reproduction.",
+  "evidence_required": "Every verification must have: candidate ID, repro attempts, tool output, observed behavior, final status, evidence"
+}

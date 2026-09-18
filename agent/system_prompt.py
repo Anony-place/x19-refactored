@@ -539,17 +539,53 @@ def _memory_parts(agent: Any) -> List[str]:
     return parts
 
 
+def _get_x19_identity_if_enabled() -> Optional[str]:
+    """Return X19 identity if X19 mode is enabled, else None. Fail-open to Hermes default."""
+    try:
+        from x19.identity import is_x19_enabled, get_x19_identity
+        if is_x19_enabled():
+            return get_x19_identity()
+    except Exception:
+        pass
+    return None
+
+
+def _get_x19_guidance_blocks() -> List[str]:
+    """Return X19 guidance blocks if enabled, else empty."""
+    try:
+        from x19.identity import is_x19_enabled, get_x19_guidance_blocks
+        if is_x19_enabled():
+            return get_x19_guidance_blocks()
+    except Exception:
+        pass
+    return []
+
+
 def _identity_parts(agent: Any, ctx_len: Optional[int]) -> Tuple[List[str], bool]:
     """SOUL.md (primary identity; cron keeps the persona while skipping cwd
     instructions, scoped to the agent's OWN home) or the default identity.
-    Returns ``(parts, soul_loaded)``."""
+    Returns ``(parts, soul_loaded)``.
+
+    X19 extension: if X19 mode enabled and no SOUL.md, use X19 identity instead of Hermes default.
+    This preserves Hermes baseline (SOUL.md still wins) while providing X19 personality architecture.
+    """
     wants_soul = agent.load_soul_identity or not agent.skip_context_files
     _soul_content = _pb.load_soul_md(ctx_len, home_override=_agent_home(agent)) if wants_soul else None
-    return ([_soul_content], True) if _soul_content else ([DEFAULT_AGENT_IDENTITY], False)
+    if _soul_content:
+        return ([_soul_content], True)
+    # X19 identity check — proper architecture, not scattered text
+    x19_identity = _get_x19_identity_if_enabled()
+    if x19_identity:
+        return ([x19_identity], False)
+    return ([DEFAULT_AGENT_IDENTITY], False)
 
 
 def _guidance_parts(agent: Any) -> List[str]:
-    """Universal + tool-aware + model-gated guidance blocks, each gated by its config.yaml key."""
+    """Universal + tool-aware + model-gated guidance blocks, each gated by its config.yaml key.
+
+    X19 extension: injects X19 security, evidence, team, operator, and mission guidance when X19 mode enabled.
+    This implements X19 personality through Hermes' actual prompt architecture, not fake templates.
+    """
     parts: List[str] = []
     if agent.valid_tool_names:
         parts += [
@@ -559,6 +595,12 @@ def _guidance_parts(agent: Any) -> List[str]:
             ) if getattr(agent, flag, True)
         ]
     parts.append(_tool_guidance_block(agent))  # None/empty entries are dropped by _join_tier
+
+    # X19 guidance injection — proper identity architecture
+    x19_blocks = _get_x19_guidance_blocks()
+    if x19_blocks:
+        parts.extend(x19_blocks)
+
     if not agent.valid_tool_names:
         return parts
     # Steering only lands inside tool results, so only reachable with tools.

@@ -1,0 +1,84 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide v4, OWASP XSS Cheat Sheet, Public Knowledge",
+    "license": "CC BY-SA 4.0 (OWASP) + Public Domain (payloads)",
+    "date": "2026-09-18",
+    "category": "web",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP Testing Guide and public XSS knowledge, our own methodology summary",
+    "version": "1.0",
+    "applicable_technologies": ["web", "javascript", "html"],
+    "references": [
+      "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/02-Testing_for_Stored_Cross_Site_Scripting",
+      "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+    ]
+  },
+  "vuln_class": "xss",
+  "cwe": "CWE-79",
+  "owasp": "A03:2021-Injection",
+  "description": "Cross-Site Scripting occurs when application includes untrusted data in web page without proper validation or escaping, allowing attacker to execute scripts in victim's browser.",
+  "types": [
+    {
+      "type": "reflected",
+      "description": "Payload reflected immediately in response, needs victim to click link",
+      "example": "https://target.com/search?q=<script>alert(1)</script>",
+      "testing": "Inject payload in URL params, headers, check if reflected unescaped"
+    },
+    {
+      "type": "stored",
+      "description": "Payload stored on server (DB, etc.) and executed when victim views page",
+      "example": "Comment with <script>alert(1)</script> stored and shown to all users",
+      "testing": "Inject payload in forms that store data (comments, profiles), check if executed on retrieval"
+    },
+    {
+      "type": "dom",
+      "description": "Vulnerability in client-side JavaScript that processes untrusted data via DOM",
+      "example": "document.innerHTML = location.hash",
+      "testing": "Check JS for DOM sinks like innerHTML, document.write, eval with location.hash, etc."
+    }
+  ],
+  "methodology": {
+    "recon": "Identify inputs: URL params, form fields, headers, cookies that are reflected or stored. Check for WAF.",
+    "hypothesis": "If input reflected without encoding, possible XSS. If stored and later rendered, possible stored XSS. If JS uses DOM with user data, possible DOM XSS.",
+    "testing": [
+      "Test with minimal witness: <script>alert(1)</script> or <img src=x onerror=alert(1)>",
+      "Try different contexts: HTML, attribute, JavaScript, URL",
+      "Try encoding bypasses: URL encode, HTML encode, case variation",
+      "Check CSP: if CSP blocks, may need bypass or report as low severity",
+      "For DOM XSS: check JS sources (location, referrer, postMessage) and sinks (innerHTML, eval, etc.)"
+    ],
+    "evidence": "Request with payload, response showing payload unescaped or executed, screenshot, tool output",
+    "verification": "Reproduce with minimal payload, check if script executes, try bypasses for WAF, confirm not false positive (e.g., payload inside comment or encoded)",
+    "false_positive_indicators": ["Payload inside HTML comment", "Payload HTML-encoded (&lt;script&gt;)", "CSP blocks execution", "Payload reflected but not in executable context"]
+  },
+  "payloads": {
+    "witness": [
+      "<script>alert(1)</script>",
+      "<img src=x onerror=alert(1)>",
+      "\"><script>alert(1)</script>",
+      "';alert(1)//",
+      "<svg onload=alert(1)>"
+    ],
+    "bypasses": [
+      "<ScRiPt>alert(1)</ScRiPt>",
+      "<script%20>alert(1)</script>",
+      "<img src=x onerror=alert(1)>",
+      "javascript:alert(1)",
+      "<iframe src=javascript:alert(1)>"
+    ],
+    "context_specific": {
+      "html": "<script>alert(1)</script>",
+      "attribute": "\"><img src=x onerror=alert(1)>",
+      "javascript": "';alert(1)//",
+      "url": "javascript:alert(1)"
+    }
+  },
+  "severity": {
+    "critical": "Stored XSS affecting all users, no user interaction, high impact (account takeover)",
+    "high": "Reflected XSS with user interaction, or stored with limited scope",
+    "medium": "DOM XSS requiring specific conditions, or XSS with CSP bypass needed",
+    "low": "XSS with strong CSP blocking, or requiring unlikely user interaction"
+  },
+  "remediation": "Output encoding (HTML, attribute, JS, URL), Content Security Policy, validate input, use frameworks that auto-escape, HttpOnly cookies",
+  "report_template": "Reflected XSS at {endpoint} via {param}: payload {payload} reflected unescaped, executed in browser. Repro: {steps}. Impact: {impact}. Remediation: {remediation}"
+}

@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "source": "OWASP API Security Top 10 2023",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "api",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP API Top 10",
+    "version": "2023",
+    "applicable_technologies": ["api"],
+    "references": ["https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/"]
+  },
+  "vuln_class": "bfla",
+  "cwe": "CWE-863",
+  "owasp": "API5:2023 Broken Function Level Authorization",
+  "description": "BFLA occurs when API does not check if user is authorized to perform requested function (e.g., admin function with low-privilege user).",
+  "methodology": {
+    "testing": ["Auth as low-privilege user, try to access admin endpoints: /api/admin/users, /api/admin/settings — should be 403, if 200 then BFLA", "Try different HTTP methods with low-privilege"],
+    "evidence": "Request as low-privilege to admin endpoint returns 200 with admin data, tool output",
+    "verification": "Reproduce with low-privilege and admin accounts, confirm low-privilege can access admin function"
+  },
+  "remediation": "Check authorization for every function, deny by default, role-based access control"
+}

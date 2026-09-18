@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "source": "Public bug bounty methodology, our synthesis",
+    "license": "MIT",
+    "date": "2026-09-18",
+    "provenance": "Synthesized from public methodology, no private data",
+    "version": "1.0"
+  },
+  "methodologies": [
+    {
+      "vuln_class": "xss",
+      "affected_component": "search, comment, profile, any input reflected",
+      "prerequisite": "Input reflected or stored without encoding",
+      "discovery_methodology": "Recon: identify inputs that are reflected or stored. Check for WAF. Test with witness payload <script>alert(1)</script> or <img src=x onerror=alert(1)>. Check context: HTML, attribute, JS, URL.",
+      "evidence_pattern": "Request with payload, response with payload unescaped or executed, screenshot, tool output (curl, browser)",
+      "validation_method": "Reproduce with minimal payload, check if script executes, try bypasses for WAF, confirm not false positive (comment, encoded, CSP)",
+      "false_positive_indicators": ["Payload inside HTML comment", "Payload HTML-encoded", "CSP blocks", "Not in executable context"],
+      "impact": "Account takeover, session hijacking, defacement, depending on context",
+      "remediation": "Output encoding, CSP, validate input, frameworks auto-escape",
+      "report_structure": "Endpoint, param, payload, observed evidence, repro steps, impact, remediation, references (CWE-79, OWASP A03)"
+    },
+    {
+      "vuln_class": "bola",
+      "affected_component": "API endpoints with object IDs: /api/users/{id}, /api/documents/{id}",
+      "prerequisite": "Endpoint uses ID, auth required, but no ownership check",
+      "discovery_methodology": "Recon: identify API endpoints with IDs, check if IDs sequential/predictable, check auth. Test: auth as user A, try to access user B's object by changing ID. Minimal proof, not full PII extraction.",
+      "evidence_pattern": "Request as user A to /api/users/124 (other user) returns 200 with other user data (redact PII to last 6 chars in chat, full to evidence file), tool output (curl)",
+      "validation_method": "Reproduce with two test accounts, confirm user A can access user B's data, check if authz missing, try without auth (should be 401), try different ID formats",
+      "false_positive_indicators": ["Returns 403 for other IDs (proper authz)", "Data public not private", "Random UUID not guessable"],
+      "impact": "Access to other users' PII, financial data, depending on endpoint",
+      "remediation": "Authorization check for every request, random UUIDs, deny by default",
+      "report_structure": "Endpoint, method, IDs (user A and B), observed evidence (200 with other user data), repro steps, impact, remediation, references (CWE-862, OWASP API1)"
+    },
+    {
+      "vuln_class": "sqli",
+      "affected_component": "Any input that goes to SQL: URL params (id), form fields (login, search)",
+      "prerequisite": "Input included in SQL query without sanitization",
+      "discovery_methodology": "Recon: identify inputs that might go to DB. Test: single quote ' for error, boolean ' AND 1=1 -- vs ' AND 1=2 -- for difference, time ' AND SLEEP(2) -- for delay (minimal 2 sec), union ' UNION SELECT 1,2,3 -- for reflection. Never destructive without approval.",
+      "evidence_pattern": "Request with payload causes SQL error or time delay or data, tool output (curl, sqlmap --risk 1 minimal)",
+      "validation_method": "Reproduce with minimal proof, check if error genuine SQL error, try bypasses, confirm not false positive (generic error, WAF)",
+      "false_positive_indicators": ["Generic error not SQL-specific", "WAF blocking generic", "Input validation rejecting quote but not SQLi"],
+      "impact": "Data extraction, auth bypass, RCE depending on DB and query",
+      "remediation": "Parameterized queries, ORM, input validation, least privilege DB user",
+      "report_structure": "Endpoint, param, payload, observed (error/delay/data), repro steps, impact, remediation, references (CWE-89, OWASP A03)"
+    },
+    {
+      "vuln_class": "ssrf",
+      "affected_component": "Inputs that fetch URLs: image URL, webhook URL, file import, etc.",
+      "prerequisite": "App fetches remote resource without validating user-supplied URL",
+      "discovery_methodology": "Recon: identify inputs that fetch URLs. Test: http://127.0.0.1, http://localhost, http://[::1], http://0.0.0.0 for internal. For cloud metadata http://169.254.169.254 requires approval high-impact. Use collaborator for out-of-band with approval.",
+      "evidence_pattern": "Request to internal URL returns internal data or time delay, tool output",
+      "validation_method": "Reproduce with internal URL, check if internal data returned, bypass via 0.0.0.0, 127.1, etc.",
+      "false_positive_indicators": ["Allow list blocks private IPs", "Response generic not internal data", "Out-of-band without approval"],
+      "impact": "Access to internal services, cloud metadata (critical), RCE depending on service",
+      "remediation": "Validate URLs, allow list, deny list for private IPs, disable unnecessary schemas",
+      "report_structure": "Endpoint, param, payload (internal URL), observed (internal data), repro steps, impact, remediation, references (CWE-918, OWASP A10)"
+    }
+  ]
+}

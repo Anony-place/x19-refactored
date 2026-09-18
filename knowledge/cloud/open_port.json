@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "source": "Public cloud security knowledge",
+    "license": "Public Domain",
+    "date": "2026-09-18",
+    "category": "cloud",
+    "confidence": "high",
+    "provenance": "Public knowledge",
+    "version": "1.0",
+    "applicable_technologies": ["cloud", "network"],
+    "references": []
+  },
+  "vuln_class": "open_port",
+  "description": "Open ports exposing services that should not be public.",
+  "methodology": {
+    "recon": "Check for open ports via nmap (requires approval, high-impact) or via headers, etc. (read-only)",
+    "testing": ["Check if port scanning allowed, if so nmap -p 80,443,22, etc. with approval", "Check for exposed services via banner grabbing (read-only)"],
+    "evidence": "nmap output showing open ports, banner, tool output",
+    "verification": "Reproduce with nmap, confirm port open, check if service should be public"
+  },
+  "remediation": "Firewall, close unnecessary ports, least privilege",
+  "safety": "Port scanning requires Operator approval, high-impact"
+}

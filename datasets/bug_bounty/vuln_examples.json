@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "source": "Synthetic but realistic examples based on public methodology, no private reports",
+    "license": "MIT (our synthesis)",
+    "date": "2026-09-18",
+    "provenance": "Synthetic examples created from public methodology, no private data, no PII, no secrets, normalized, deduped, classified",
+    "version": "1.0"
+  },
+  "examples": [
+    {
+      "id": "EX-XSS-001",
+      "vuln_class": "xss",
+      "affected_component": "/search?q=",
+      "prerequisite": "q param reflected without encoding",
+      "discovery_methodology": "Recon: spider /search, check if q param reflected. Test: /search?q=<script>alert(1)</script> returns payload unescaped in HTML.",
+      "evidence_pattern": "GET /search?q=<script>alert(1)</script> -> 200, body contains <script>alert(1)</script> unescaped, executes in browser",
+      "validation_method": "Reproduce with witness payload, check if executes, try bypasses, confirm not inside comment or encoded",
+      "false_positive_indicators": ["Payload inside comment", "Encoded &lt;script&gt;", "CSP blocks"],
+      "impact": "Reflected XSS, requires user click, can steal session if HttpOnly not set, low to high depending on context",
+      "remediation": "Output encoding, CSP, validate input",
+      "report_structure": "Endpoint: /search, Param: q, Payload: <script>alert(1)</script>, Evidence: response contains payload unescaped, Repro: 1. Go to /search?q=<script>alert(1)</script> 2. Observe alert, Impact: session hijacking, Remediation: encode output",
+      "severity": "high",
+      "confidence": "high",
+      "cwe": "CWE-79",
+      "owasp": "A03:2021"
+    },
+    {
+      "id": "EX-BOLA-001",
+      "vuln_class": "bola",
+      "affected_component": "/api/users/{id}",
+      "prerequisite": "Endpoint uses numeric ID, auth required, but no ownership check",
+      "discovery_methodology": "Recon: check /api/users/me returns id 123 for user A. Test: as user A, GET /api/users/124 (user B) returns 200 with user B data (minimal proof, redact PII).",
+      "evidence_pattern": "GET /api/users/124 with user A token -> 200, body contains other user data (redact PII to last 6 chars in chat)",
+      "validation_method": "Reproduce with two accounts: user A (id 123) and user B (id 124), confirm user A can access user B data, check without auth should be 401, try different IDs",
+      "false_positive_indicators": ["Returns 403 for other IDs", "Data public", "Random UUID"],
+      "impact": "Access to other users' PII, critical if sensitive data",
+      "remediation": "Authorization check, random UUIDs, deny by default",
+      "report_structure": "Endpoint: /api/users/{id}, Method: GET, IDs: user A 123, user B 124, Evidence: user A token to /api/users/124 returns 200 with other user data, Repro: 1. Auth as user A 2. GET /api/users/124 3. Observe other user data, Impact: PII exposure, Remediation: check authz",
+      "severity": "critical",
+      "confidence": "high",
+      "cwe": "CWE-862",
+      "owasp": "API1:2023"
+    },
+    {
+      "id": "EX-SQLI-001",
+      "vuln_class": "sqli",
+      "affected_component": "/api/users?id=",
+      "prerequisite": "id param goes to SQL without sanitization",
+      "discovery_methodology": "Recon: /api/users?id=123 returns user. Test: /api/users?id=123' causes SQL error, /api/users?id=123 AND 1=1 returns same, AND 1=2 returns different, SLEEP(2) delays 2 sec.",
+      "evidence_pattern": "GET /api/users?id=123' -> 500 with SQL error, GET /api/users?id=123 AND SLEEP(2) -> delay 2 sec",
+      "validation_method": "Reproduce with quote for error, boolean for difference, time for delay (minimal 2 sec), confirm genuine SQL error not generic",
+      "false_positive_indicators": ["Generic error not SQL-specific", "WAF blocking generic"],
+      "impact": "Data extraction, auth bypass, RCE depending on DB",
+      "remediation": "Parameterized queries, ORM",
+      "report_structure": "Endpoint: /api/users, Param: id, Payload: ' AND SLEEP(2) --, Evidence: delay 2 sec, Repro: 1. GET /api/users?id=123 AND SLEEP(2) -- 2. Observe delay, Impact: data extraction, Remediation: parameterized queries",
+      "severity": "critical",
+      "confidence": "high",
+      "cwe": "CWE-89",
+      "owasp": "A03:2021"
+    },
+    {
+      "id": "EX-SSRF-001",
+      "vuln_class": "ssrf",
+      "affected_component": "/api/fetch?url=",
+      "prerequisite": "url param fetches remote resource without validation",
+      "discovery_methodology": "Recon: /api/fetch?url=https://example.com returns example.com content. Test: /api/fetch?url=http://127.0.0.1 returns internal data or 200, http://169.254.169.254 requires approval.",
+      "evidence_pattern": "GET /api/fetch?url=http://127.0.0.1 -> 200 with internal data or 200, tool output",
+      "validation_method": "Reproduce with internal URL, check if internal data returned, bypass via 0.0.0.0, etc.",
+      "false_positive_indicators": ["Allow list blocks private IPs", "Generic response not internal data"],
+      "impact": "Access to internal services, cloud metadata if approved and vulnerable, RCE",
+      "remediation": "Validate URLs, allow list, deny private IPs",
+      "report_structure": "Endpoint: /api/fetch, Param: url, Payload: http://127.0.0.1, Evidence: returns internal data, Repro: 1. GET /api/fetch?url=http://127.0.0.1 2. Observe internal, Impact: internal access, Remediation: validate URLs",
+      "severity": "high",
+      "confidence": "high",
+      "cwe": "CWE-918",
+      "owasp": "A10:2021"
+    }
+  ]
+}

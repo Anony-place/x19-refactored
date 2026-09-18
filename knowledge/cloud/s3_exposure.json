@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "source": "Public cloud security knowledge, OWASP",
+    "license": "Public Domain + CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "cloud",
+    "confidence": "high",
+    "provenance": "Synthesized from public cloud security knowledge",
+    "version": "1.0",
+    "applicable_technologies": ["cloud", "aws", "s3"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/"]
+  },
+  "vuln_class": "s3_exposure",
+  "description": "S3 bucket misconfiguration exposing sensitive data publicly.",
+  "methodology": {
+    "recon": "Check for S3 bucket references in JS, config, etc. (read-only)",
+    "testing": ["Check if bucket listable: curl https://bucket.s3.amazonaws.com/ — should be 403, if 200 with file list then exposed", "Check for exposed .env, config, backup in S3 (read-only, within scope)"],
+    "evidence": "curl output showing bucket listing or file content, tool output",
+    "verification": "Reproduce with curl, confirm public access, check if sensitive data"
+  },
+  "remediation": "Private ACL, block public access, encryption, logging",
+  "safety": "Read-only, within scope, no data deletion, redact sensitive"
+}

@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, OWASP API Security Top 10",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "auth",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP public docs",
+    "version": "1.0",
+    "applicable_technologies": ["web", "api"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References"]
+  },
+  "vuln_class": "idor",
+  "aliases": ["bola"],
+  "cwe": "CWE-639",
+  "description": "IDOR occurs when app exposes direct reference to internal object (ID) without authorization check.",
+  "methodology": {
+    "testing": ["Change ID by 1, check if other user data returned", "Test with two accounts", "Minimal proof, not full PII extraction"],
+    "evidence": "Request as user A to ID of user B returns 200 with other user data (redact PII)",
+    "verification": "Reproduce with two accounts, confirm authz missing"
+  },
+  "payloads": {"witness": ["Change id 123 to 124", "Change id in body, URL, etc."]},
+  "remediation": "Authorization check for every request, random IDs (UUID), deny by default"
+}

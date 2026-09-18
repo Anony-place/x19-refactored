@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "source": "CVSS 3.1, Public severity knowledge",
+    "license": "Public Domain",
+    "date": "2026-09-18",
+    "category": "vuln_classes",
+    "confidence": "high",
+    "provenance": "Public CVSS knowledge",
+    "version": "3.1",
+    "applicable_technologies": ["all"],
+    "references": ["https://www.first.org/cvss/v3.1/specification-document"]
+  },
+  "cvss": {
+    "critical": "9.0-10.0, e.g., RCE, SQLi with data extraction, BOLA with PII",
+    "high": "7.0-8.9, e.g., XSS, SSRF, IDOR, auth bypass",
+    "medium": "4.0-6.9, e.g., open redirect, CORS misconfig, info disclosure",
+    "low": "0.1-3.9, e.g., missing headers, verbose errors",
+    "info": "Informational, e.g., tech disclosure"
+  },
+  "confidence": {
+    "confirmed": "Verified by specialist with reproduction, high confidence",
+    "high": "Reproduced, clear evidence",
+    "medium": "Likely, needs more verification",
+    "low": "Possible, weak evidence"
+  },
+  "classification": "Severity based on impact, exploitability, CVSS 3.1 vector"
+}

@@ -1,0 +1,77 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, Public Bug Bounty Methodology, Our Synthesis",
+    "license": "CC BY-SA 4.0 (OWASP) + Our own synthesis (MIT)",
+    "date": "2026-09-18",
+    "category": "methodology",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP Testing Guide and public bug bounty methodology, our own words",
+    "version": "1.0",
+    "applicable_technologies": ["all"],
+    "references": [
+      "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/",
+      "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/"
+    ]
+  },
+  "phase": "recon",
+  "description": "Reconnaissance is read-only, low-risk asset discovery: subdomains, endpoints, tech fingerprint, auth surface. Never active payloads.",
+  "methodology": {
+    "subdomain_enum": {
+      "description": "Discover subdomains of target",
+      "tools": ["subfinder (if installed), amass (if installed), crt.sh via web_search, DNS brute force with caution"],
+      "techniques": [
+        "Check certificate transparency logs via web_search (crt.sh)",
+        "Check DNS records (A, CNAME, MX, TXT)",
+        "Brute force with small wordlist, rate limit 200ms, stop if no new after 2 iterations",
+        "Check for wildcard DNS"
+      ],
+      "evidence": "List of subdomains with source (crt.sh, DNS, brute force), tool output",
+      "scope_enforcement": "Only authorized domains, respect rate limits, stop if endless recon"
+    },
+    "endpoint_discovery": {
+      "description": "Discover endpoints, API routes, hidden paths",
+      "tools": ["web_search for docs, browser for spidering, terminal with curl, ffuf/gobuster if installed (with approval)"],
+      "techniques": [
+        "Spider web app via browser (navigate, snapshot)",
+        "Check robots.txt, sitemap.xml, .well-known/",
+        "Check JS files for API endpoints, hardcoded paths",
+        "Check for API docs: /api/docs, /swagger, /openapi.json, /graphql",
+        "Brute force with small wordlist only if authorized and rate limited"
+      ],
+      "evidence": "List of endpoints with method, discovered via (spider, JS, docs, brute force), tool output",
+      "scope_enforcement": "Only authorized domains, read-only GETs, no active brute force without approval"
+    },
+    "tech_fingerprint": {
+      "description": "Identify tech stack: server, framework, JS libraries, etc.",
+      "tools": ["wappalyzer via browser, headers via curl, web_search for tech detection"],
+      "techniques": [
+        "Check Server header, X-Powered-By, etc.",
+        "Check HTML meta, JS libraries (React, Angular, etc.)",
+        "Check for framework-specific paths (e.g., /wp-admin for WordPress)",
+        "Check for API tech: REST, GraphQL, gRPC"
+      ],
+      "evidence": "Tech stack list with version if available, source (header, HTML, JS), tool output"
+    },
+    "auth_surface": {
+      "description": "Map authentication flows: login, registration, password reset, session, JWT, OAuth, etc.",
+      "tools": ["browser for auth flows, curl for API auth, web_search for auth methodology"],
+      "techniques": [
+        "Check for login, registration, password reset pages",
+        "Check for JWT: decode (no verification) to see claims",
+        "Check for OAuth: authorization code flow, implicit flow",
+        "Check for session: cookie, localStorage, etc.",
+        "Map auth flows for later auth testing"
+      ],
+      "evidence": "Auth flows list with endpoints, method, tech (JWT, OAuth, session), tool output"
+    }
+  },
+  "rate_limiting": "200ms between active requests per host by default, don't bypass without operator approval",
+  "stopping_conditions": [
+    "No new assets after 2 iterations",
+    "Time/budget exhausted",
+    "Scope covered",
+    "Operator stops"
+  ],
+  "anti_loop": "Detect endless recon: if no new assets after 2 iterations, stop recon and move to attack surface modeling",
+  "output": "Asset inventory: subdomains, endpoints, tech fingerprint, auth surface, with evidence and tool output references"
+}

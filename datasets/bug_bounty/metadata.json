@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "source": "Public bug bounty methodology, our synthesis, no private data",
+    "license": "MIT (our synthesis) + Public Domain (methodology is public knowledge)",
+    "date": "2026-09-18",
+    "provenance": "Synthesized from public bug bounty methodology (HackerOne Hacktivity public, Bugcrowd public resources, OWASP), no private reports, PII removed, secrets removed, normalized, deduped, classified",
+    "version": "1.0",
+    "references": [
+      "https://www.hackerone.com/hacktivity",
+      "https://www.bugcrowd.com/resource/what-is-bug-bounty/",
+      "https://owasp.org/www-project-web-security-testing-guide/"
+    ],
+    "safety": "No secrets, PII, credentials, tokens. All examples synthetic but realistic based on public methodology, not actual private reports. Normalized, deduped, classified.",
+    "categories": ["web", "api", "auth", "cloud", "methodology"]
+  }
+}

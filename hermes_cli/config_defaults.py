@@ -2465,7 +2465,59 @@ DEFAULT_CONFIG = {
         # Extra ports detection probes for an external llama-server (besides 8080).
         "detect_ports": [],
     },
-    "_config_version": 45,  # Config schema version - bump this when adding new required fields
+    # X19 — Autonomous Security Operations Agent extension.
+    # Preserves Hermes runtime; adds security-specific configuration.
+    # Identity/personality is via SOUL.md + system_prompt integration, not config,
+    # but this section controls operational behavior.
+    "x19": {
+        # Master switch: false = pure Hermes mode, true = X19 security mode.
+        # Auto-detected via is_x19_enabled() (env X19_ENABLED, config x19.enabled,
+        # marker file, or .x19 directory).
+        "enabled": False,
+        # Optional path to custom SOUL.md for X19; empty = use x19/identity/core.py
+        # template. When set, overrides both Hermes default and X19 default.
+        "soul_path": "",
+        # Optional identity override: short string appended to X19 identity
+        # (e.g. additional traits). Empty = use X19 core identity verbatim.
+        "identity_override": "",
+        # Scope of autonomous operation: human operator controls PAUSE/STOP/KILL.
+        # This section documents allowed scope; enforcement is in runtime.
+        "scope": {
+            "authorized_targets": [],  # list of domains/IPs/ranges allowed
+            "excluded_assets": [],  # never touch even if in authorized_targets
+            "allowed_actions": ["read", "scan", "test"],  # read/scan/test/exploit/report
+            "prohibited_actions": ["dos", "data_destruction", "unauthorized_access"],
+        },
+        # Security team hierarchy: Boss -> Managers -> Specialists (11 defined).
+        "team": {
+            "boss_enabled": True,
+            "managers": ["recon", "web", "api", "cloud", "infra"],
+            "specialists": [
+                "recon", "web", "api", "websec", "apisec",
+                "auth", "authz", "cloud", "infra", "vuln", "exploit_verif"
+            ],
+        },
+        # Evidence-first findings lifecycle.
+        "findings": {
+            "require_evidence": True,  # never claim vuln without evidence
+            "min_confidence": "medium",  # low/medium/high/critical
+            "lifecycle": ["observation", "hypothesis", "test", "evidence", "verified"],
+        },
+        # Mission loop: SCOPE→PLAN→RECON→...→LEARN→REASSESS with anti-loop.
+        "mission": {
+            "loop": [
+                "SCOPE", "PLAN", "RECON", "ATTACK_SURFACE",
+                "HYPOTHESIS", "TEST", "OBSERVE", "CORRELATE",
+                "VERIFY", "CLASSIFY", "REPORT", "LEARN", "REASSESS"
+            ],
+            "anti_loop": {
+                "enabled": True,
+                "max_same_action": 3,
+                "strategy": "detect→record→change→specialist→escalate→stop",
+            },
+        },
+    },
+    "_config_version": 46,  # Config schema version - bump this when adding new required fields (46: x19 section)
 }
 
 
@@ -2934,4 +2986,18 @@ OPTIONAL_ENV_VARS = {
     "HERMES_EPHEMERAL_SYSTEM_PROMPT": _setting(
         "Ephemeral system prompt injected at API-call time (never persisted to sessions)",
         "Ephemeral system prompt", None),
+    # ── X19 settings ──
+    "X19_ENABLED": _setting(
+        "Enable X19 Autonomous Security Operations mode (true/false/auto). "
+        "When enabled, X19 identity and security guidance are injected via "
+        "Hermes SOUL/prompt architecture.", "Enable X19 mode", None),
+    "X19_SOUL_PATH": _setting(
+        "Optional path to custom X19 SOUL.md file (overrides x19/identity template)",
+        "X19 SOUL path", None),
+    "X19_IDENTITY_OVERRIDE": _setting(
+        "Optional additional identity traits appended to X19 core identity",
+        "X19 identity override", None),
+    "X19_SCOPE_FILE": _setting(
+        "Path to X19 scope definition file (authorized targets, exclusions)",
+        "X19 scope file", None),
 }

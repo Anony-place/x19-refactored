@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, OWASP CORS Cheat Sheet",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "network",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP",
+    "version": "1.0",
+    "applicable_technologies": ["web", "api"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/07-Testing_Cross_Origin_Resource_Sharing"]
+  },
+  "vuln_class": "cors_misconfig",
+  "cwe": "CWE-942",
+  "description": "CORS misconfig allows attacker to read cross-origin responses, leading to data theft.",
+  "methodology": {
+    "testing": ["Test with Origin: https://evil.com, check if Access-Control-Allow-Origin returns evil.com and Access-Control-Allow-Credentials true", "Test with null origin, etc."],
+    "evidence": "Request with Origin evil.com returns ACAO evil.com and ACAC true, tool output",
+    "verification": "Reproduce with evil origin, confirm misconfig"
+  },
+  "payloads": {"witness": ["Origin: https://evil.com"]},
+  "remediation": "Validate Origin via allow list, not *, no credentials with *"
+}

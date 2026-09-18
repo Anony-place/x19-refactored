@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide, OWASP XXE Prevention Cheat Sheet",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "web",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP public docs",
+    "version": "1.0",
+    "applicable_technologies": ["web", "xml"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/07-Testing_for_XML_Injection"]
+  },
+  "vuln_class": "xxe",
+  "cwe": "CWE-611",
+  "owasp": "A05:2021-Security Misconfiguration",
+  "description": "XXE occurs when XML parser processes external entities, allowing attacker to read files, SSRF, etc.",
+  "methodology": {
+    "recon": "Identify endpoints that accept XML: API with Content-Type application/xml, file upload XML, etc.",
+    "testing": ["Test with <!DOCTYPE foo [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]> and use &xxe; in XML", "Test with out-of-band via http://collaborator (with approval)"],
+    "evidence": "Request with XXE payload returns file content or internal data, tool output",
+    "verification": "Reproduce with file read payload, confirm file content, check if external entity processing enabled"
+  },
+  "payloads": {
+    "witness": ["<!DOCTYPE foo [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><foo>&xxe;</foo>"],
+    "bypass": ["<!DOCTYPE foo [<!ENTITY xxe SYSTEM 'file:///etc/hosts'>]>"]
+  },
+  "remediation": "Disable external entities, use JSON, patch XML parser, validate XML"
+}

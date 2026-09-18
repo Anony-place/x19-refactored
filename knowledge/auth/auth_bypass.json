@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "source": "OWASP Testing Guide",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "auth",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP",
+    "version": "1.0",
+    "applicable_technologies": ["web", "api"],
+    "references": ["https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/"]
+  },
+  "vuln_class": "auth_bypass",
+  "cwe": "CWE-287",
+  "description": "Auth bypass occurs when attacker can access protected resource without proper authentication.",
+  "methodology": {
+    "testing": ["Try to access protected endpoint without auth — should be 401", "Try with low-privilege token to access admin — should be 403", "Check for JWT none algorithm, weak secret, etc.", "Check for auth logic flaws"],
+    "evidence": "Request without auth returns 200 with protected data, tool output",
+    "verification": "Reproduce without auth, confirm protected data returned"
+  },
+  "remediation": "Proper authentication, authorization, MFA, secure session management"
+}

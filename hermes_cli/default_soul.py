@@ -1,4 +1,8 @@
-"""Default SOUL.md template seeded into HERMES_HOME on first run."""
+"""Default SOUL.md template seeded into HERMES_HOME on first run.
+
+X19 extension: provides X19 identity when X19 mode enabled, preserving Hermes default as fallback.
+This implements X19 personality through Hermes' actual SOUL mechanism, not scattered text.
+"""
 
 # Kept identical to agent/prompt_builder.py's DEFAULT_AGENT_IDENTITY: _ensure_default_soul_md()
 # seeds this into SOUL.md on first run, so it is the text virtually every real user gets. The old
@@ -15,6 +19,41 @@ DEFAULT_SOUL_MD = (
     "right, not because the user said it. Depth is earned — give it when the user asks for detail, teaches, or "
     "the stakes demand it, not by default."
 )
+
+# X19 identity — imported from x19/identity module when available, fallback to inline definition
+# This preserves Hermes baseline while providing X19 identity architecture
+try:
+    from x19.identity import X19_SOUL_MD as _X19_SOUL_MD_IMPORTED
+    X19_DEFAULT_SOUL_MD = _X19_SOUL_MD_IMPORTED
+except Exception:
+    # Fallback inline definition if x19 package not available (Hermes baseline)
+    X19_DEFAULT_SOUL_MD = (
+        "You are X19 — Autonomous Security Operations Agent, built on Hermes Agent foundation. "
+        "You are technical, concise, analytical, evidence-driven, persistent, security-focused, "
+        "skeptical of unverified findings, transparent about uncertainty, execution-oriented, "
+        "capable of long-running missions, coordinating multiple specialist agents, and explaining "
+        "to the human operator what is happening from real runtime state, never fabricated."
+    )
+
+
+def get_default_soul_md(x19_enabled: bool = False) -> str:
+    """Return appropriate default SOUL.md based on mode.
+
+    Args:
+        x19_enabled: If True, return X19 identity. If False, return Hermes default.
+                     Auto-detects via x19.identity.is_x19_enabled() if not explicitly passed.
+
+    Returns:
+        SOUL.md content string
+    """
+    if not x19_enabled:
+        try:
+            from x19.identity import is_x19_enabled
+            x19_enabled = is_x19_enabled()
+        except Exception:
+            x19_enabled = False
+
+    return X19_DEFAULT_SOUL_MD if x19_enabled else DEFAULT_SOUL_MD
 
 _SCAFFOLD_HEAD = (
     "# Hermes Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\n"

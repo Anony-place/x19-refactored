@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "source": "Public bug bounty program patterns, our synthesis",
+    "license": "MIT",
+    "date": "2026-09-18",
+    "provenance": "Synthesized from public program scopes (HackerOne, Bugcrowd public), no private data",
+    "version": "1.0"
+  },
+  "patterns": [
+    {
+      "pattern": "wildcard_domain",
+      "description": "Program allows *.target.com",
+      "example": "Authorized: *.target.com, target.com",
+      "interpretation": "All subdomains of target.com in scope, plus target.com itself",
+      "testing_approach": "Enum subdomains via crt.sh, DNS, etc., test each subdomain within scope, respect exclusions",
+      "common_exclusions": ["*.internal.target.com", "admin.target.com", "legacy.target.com"]
+    },
+    {
+      "pattern": "api_scope",
+      "description": "Program includes API endpoints",
+      "example": "Authorized: api.target.com, target.com/api/*",
+      "interpretation": "API endpoints in scope, need to test for BOLA, BFLA, etc.",
+      "testing_approach": "Discover API endpoints via docs, JS, spidering, test for API Top 10"
+    },
+    {
+      "pattern": "mobile_scope",
+      "description": "Program includes mobile apps",
+      "example": "Authorized: mobile app com.target.app",
+      "interpretation": "Mobile app in scope, need to test API backend, mobile-specific issues",
+      "testing_approach": "Decompile APK/IPA (if authorized), check API endpoints, check for hardcoded secrets (but we check for exposure, not extraction beyond minimal)"
+    },
+    {
+      "pattern": "out_of_scope",
+      "description": "Common out-of-scope patterns",
+      "examples": ["DoS", "Social engineering", "Physical", "Brute force without approval", "Cloud metadata probing without approval", "Accessing other users' PII beyond minimal proof"],
+      "interpretation": "These are typically out-of-scope or require approval, need to check program scope",
+      "testing_approach": "Avoid out-of-scope, request approval for high-impact, minimal proof for PII"
+    }
+  ]
+}

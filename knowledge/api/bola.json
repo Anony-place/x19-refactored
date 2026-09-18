@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "source": "OWASP API Security Top 10 2023, OWASP Testing Guide",
+    "license": "CC BY-SA 4.0",
+    "date": "2026-09-18",
+    "category": "api",
+    "confidence": "high",
+    "provenance": "Synthesized from OWASP API Security Top 10 public docs",
+    "version": "2023",
+    "applicable_technologies": ["api", "rest", "graphql"],
+    "references": [
+      "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/",
+      "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References"
+    ]
+  },
+  "vuln_class": "bola",
+  "aliases": ["idor", "IDOR"],
+  "cwe": "CWE-639, CWE-862",
+  "owasp": "API1:2023 Broken Object Level Authorization, A01:2021 Broken Access Control",
+  "description": "Broken Object Level Authorization occurs when API does not properly check if user is authorized to access requested object (e.g., user ID, document ID). Attacker can access other users' data by changing ID.",
+  "methodology": {
+    "recon": "Identify API endpoints that use object IDs: /api/users/{id}, /api/documents/{id}, /api/orders/{id}. Check if IDs are sequential or predictable. Check auth: does endpoint require auth? Does it check ownership?",
+    "hypothesis": "If endpoint uses ID and does not check if current user owns object, possible BOLA. If IDs sequential, easy to test.",
+    "testing": [
+      "Authenticate as user A, get own object ID (e.g., /api/users/me returns id 123)",
+      "Try to access other user's object: /api/users/124, /api/users/122 with user A's token",
+      "If returns other user's data, BOLA confirmed — minimal proof, not full data extraction",
+      "Test with witness: change ID by 1, check if 200 with other user data vs 403",
+      "Never access other users' PII beyond minimal proof (e.g., check if returns 200, not extract full PII)",
+      "Test BFLA: try to access admin endpoints with low-privilege user (e.g., /api/admin/users with user token)"
+    ],
+    "evidence": "Request as user A to /api/users/124, response 200 with other user data (redact PII to last 6 chars in chat, full to evidence file), tool output (curl)",
+    "verification": "Reproduce with two test accounts (user A and B), confirm user A can access user B's data, check if proper authz check missing, bypass exhaustion: try different ID formats, try without auth (should be 401)",
+    "false_positive_indicators": ["Endpoint returns 403 for other user IDs (proper authz)", "Endpoint returns 404 not 403 but still not authorized (could be IDOR but need to check)", "Data returned is public, not private"]
+  },
+  "payloads": {
+    "witness": [
+      "Change ID: /api/users/123 → /api/users/124",
+      "Change ID in body: {\"id\": 123} → {\"id\": 124}",
+      "Change ID in JWT? No, JWT should not contain object ID for authz",
+      "Try without auth: should be 401"
+    ],
+    "bfla": [
+      "Access /api/admin/users with low-privilege token — should be 403, if 200 then BFLA",
+      "Access /api/users with POST, PUT, DELETE as low-privilege — check method-level authz"
+    ]
+  },
+  "severity": {
+    "critical": "BOLA allowing access to sensitive data (PII, financial) of any user, no user interaction, high impact",
+    "high": "BOLA allowing access to non-sensitive data or limited users",
+    "medium": "BOLA requiring specific conditions or limited impact",
+    "low": "BOLA with public data or requiring unlikely conditions"
+  },
+  "remediation": "Check authorization for every request, use random unpredictable IDs (UUID), implement proper access control, deny by default, log access failures",
+  "report_template": "BOLA at {endpoint}: user A (id {id_a}) can access user B's data (id {id_b}) via {method} {endpoint}. Repro: {steps}. Evidence: {evidence}. Impact: {impact}. Remediation: {remediation}"
+}
