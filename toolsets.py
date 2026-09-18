@@ -238,6 +238,69 @@ TOOLSETS = {
             "hermes-qqbot", "hermes-webhook", "hermes-yuanbao",
         ],
     ),
+
+    # ── X19 Security Operations Toolsets ──
+    # These toolsets map to X19 specialist roles and reuse Hermes tool infrastructure.
+    # Each specialist gets a tailored toolset via ROLE_TOOLSETS mapping.
+
+    "x19-recon": _ts(
+        "X19 Recon — asset discovery, endpoint enumeration, tech fingerprint (read-only, low-risk)",
+        ["terminal", "web_search", "web_extract", "read_file", "write_file", "search_files"],
+    ),
+    "x19-web": _ts(
+        "X19 Web Security — XSS, SQLi, SSTI, SSRF, XXE, open redirect, etc. with real tools",
+        ["terminal", "browser_navigate", "browser_snapshot", "web_search", "read_file", "write_file", "search_files"],
+    ),
+    "x19-api": _ts(
+        "X19 API Security — BOLA, BFLA, injection, mass assignment, excessive data exposure",
+        ["terminal", "web_search", "read_file", "write_file", "search_files"],
+    ),
+    "x19-auth": _ts(
+        "X19 Auth/AuthZ — auth bypass, IDOR, BOLA, BFLA, privilege escalation, session management",
+        ["terminal", "browser_navigate", "browser_snapshot", "web_search", "read_file", "write_file"],
+    ),
+    "x19-cloud": _ts(
+        "X19 Cloud/Infra — S3 exposure, IAM misconfig, metadata, open ports, exposed configs",
+        ["terminal", "web_search", "read_file", "write_file", "search_files"],
+    ),
+    "x19-vuln-research": _ts(
+        "X19 Vuln Research — correlate observations against CWE, OWASP, CVE, bug-bounty methodology",
+        ["web_search", "read_file", "write_file", "search_files", "skills_list", "skill_view"],
+    ),
+    "x19-bugbounty": _ts(
+        "X19 Bug-Bounty Research — program scope interpretation, impact assessment, report quality",
+        ["web_search", "read_file", "write_file", "search_files", "skills_list", "skill_view"],
+    ),
+    "x19-verification": _ts(
+        "X19 Exploit Verification — reproduce candidate findings, bypass exhaustion before false-positive dismissal",
+        ["terminal", "browser_navigate", "browser_snapshot", "web_search", "read_file", "write_file"],
+    ),
+    "x19-evidence": _ts(
+        "X19 Evidence/Reporting — collect evidence, prepare evidence-based reports, L3/L4 only for verified",
+        ["read_file", "write_file", "search_files", "todo_list"],
+    ),
+    "x19-defensive": _ts(
+        "X19 Defensive Validation — false-positive review, defensive validation, alternative explanations",
+        ["terminal", "web_search", "read_file", "write_file", "browser_navigate", "browser_snapshot"],
+    ),
+    "x19-boss": _ts(
+        "X19 Boss/Commander — owns mission, defines scope, splits assessment, delegates to Managers",
+        ["delegate_task", "todo_list", "read_file", "write_file", "search_files", "memory"],
+    ),
+    "x19-manager": _ts(
+        "X19 Security Manager — coordinates assessment domain, delegates to specialists",
+        ["delegate_task", "todo_list", "read_file", "write_file", "search_files", "terminal", "web_search"],
+    ),
+    # Composite X19 toolsets
+    "x19-all": _ts(
+        "X19 Full — all X19 security toolsets for Boss/Commander",
+        [],
+        includes=[
+            "x19-recon", "x19-web", "x19-api", "x19-auth", "x19-cloud",
+            "x19-vuln-research", "x19-bugbounty", "x19-verification", "x19-evidence", "x19-defensive",
+            "x19-boss", "x19-manager", "delegation", "todo", "file", "terminal", "web", "browser",
+        ],
+    ),
 }
 
 

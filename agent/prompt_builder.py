@@ -155,7 +155,8 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return (content[end + 4:].lstrip("\n") or content) if end != -1 else content
 
 
-DEFAULT_AGENT_IDENTITY = (
+# Hermes baseline identity — kept as clean reference, used when X19 mode disabled
+HERMES_DEFAULT_AGENT_IDENTITY = (
     # A behavior spec (sizing rule, named prohibitions, earned-depth escape hatch), not a trait list — trait
     # lists change nothing. Maintainer rule: models UNDER-explore by default; never re-add an exploration-thrift line.
     "You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of the ask "
@@ -165,6 +166,32 @@ DEFAULT_AGENT_IDENTITY = (
     "Plain claims over adjectives; when unsure, say so plainly. Agree because it's right, not because the user said "
     "it. Depth is earned — give it when the user asks for detail, teaches, or the stakes demand it, not by default."
 )
+
+# X19 identity integration — proper architecture, not scattered text
+# This preserves Hermes baseline while providing X19 personality via x19/identity module
+def _get_x19_identity_for_prompt_builder() -> Optional[str]:
+    """Return X19 identity if X19 mode enabled and x19 package available, else None."""
+    try:
+        from x19.identity import is_x19_enabled, get_x19_identity
+        if is_x19_enabled():
+            return get_x19_identity()
+    except Exception:
+        pass
+    return None
+
+
+# DEFAULT_AGENT_IDENTITY now dynamically resolves to X19 when enabled, Hermes otherwise
+# This is evaluated at import time for backward compat, but _identity_parts in system_prompt.py
+# also checks dynamically per-turn (more reliable for gateway multiplexing)
+def _resolve_default_identity() -> str:
+    x19_id = _get_x19_identity_for_prompt_builder()
+    return x19_id if x19_id else HERMES_DEFAULT_AGENT_IDENTITY
+
+
+DEFAULT_AGENT_IDENTITY = _resolve_default_identity()
+
+# Keep alias for tests that import DEFAULT_AGENT_IDENTITY expecting Hermes string
+# The actual per-turn resolution happens in system_prompt.py::_identity_parts which checks X19 dynamically
 
 HERMES_AGENT_HELP_GUIDANCE = (
     # Injected only when skill_view exists AND the hermes-agent skill is installed (system_prompt.py slot
@@ -1489,6 +1516,17 @@ def _truncate_content(
     return content[:head_chars] + marker + content[-tail_chars:]
 
 
+def _get_x19_soul_md_if_enabled() -> Optional[str]:
+    """Return X19 SOUL.md content if X19 mode enabled, else None. Used as fallback when no SOUL.md file."""
+    try:
+        from x19.identity import is_x19_enabled, get_x19_soul_md
+        if is_x19_enabled():
+            return get_x19_soul_md()
+    except Exception:
+        pass
+    return None
+
+
 def load_soul_md(context_length: Optional[int] = None, home_override: "Path | None" = None) -> Optional[str]:
     """SOUL.md from HERMES_HOME (identity slot #1), or None.
 
@@ -1499,6 +1537,9 @@ def load_soul_md(context_length: Optional[int] = None, home_override: "Path | No
     session_db path). Without it, resolution is ambient — which on a thread that lost the HERMES_HOME
     ContextVar falls back to the launch home and reads the wrong profile's SOUL.md (#50233, same class as
     the skills-index leak fixed in #86313).
+
+    X19 extension: if no SOUL.md file exists but X19 mode enabled, returns X19 SOUL.md as fallback.
+    This implements X19 identity through Hermes' actual SOUL mechanism.
     """
     try:
         from hermes_cli.config import ensure_hermes_home
@@ -1507,6 +1548,16 @@ def load_soul_md(context_length: Optional[int] = None, home_override: "Path | No
         logger.debug("Could not ensure HERMES_HOME before loading SOUL.md: %s", e)
     soul_path = (Path(home_override) if home_override is not None else get_hermes_home()) / "SOUL.md"
     if not soul_path.exists():
+        # X19 fallback: if no SOUL.md but X19 enabled, return X19 SOUL template
+        # This allows X19 repo to have identity without requiring user to create SOUL.md
+        x19_soul = _get_x19_soul_md_if_enabled()
+        if x19_soul:
+            return _truncate_content(
+                _scan_context_content(x19_soul, "SOUL.md (X19 default)", user_authored=False),
+                "SOUL.md (X19 default)",
+                context_length=context_length,
+                read_path=str(soul_path),
+            )
         return None
     try:
         content = (_read_text_with_timeout(soul_path) or "").strip()
