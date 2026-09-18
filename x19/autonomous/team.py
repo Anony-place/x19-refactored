@@ -264,112 +264,51 @@ class AutonomousOffensiveTeam:
 
         return report
 
-    def run_autonomous_mission(self, config: AutonomousTeamConfig, initial_discoveries: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
-        """Run fully autonomous mission: SCOPE→PLAN→RECON→...→REPORT→LEARN→REASSESS."""
+    def run_autonomous_mission(
+        self,
+        config: AutonomousTeamConfig,
+        initial_discoveries: Optional[Dict[str, List[str]]] = None,
+        parent_agent: Any = None,
+    ) -> Dict[str, Any]:
+        """Create and advance an X19 mission from real runtime evidence only.
 
-        # Create mission
+        Planning never implies execution. When parent_agent is supplied, ready work is
+        dispatched through Hermes' real delegate_task rail. Without it, the mission remains
+        active and reports that a live agent context is required for delegation.
+        """
         mission, msg = self.create_autonomous_mission(config)
         if not mission:
             return {"status": "failed", "error": msg}
 
-        results = {"mission_id": mission.id, "phases": {}}
-
-        # SCOPE and PLAN already done in create_autonomous_mission
-        results["phases"]["scope"] = {"status": "completed", "target": config.target}
-        results["phases"]["plan"] = {"status": "completed", "tasks": mission.tasks.get_stats()["total"]}
-
-        # RECON
-        discoveries = initial_discoveries or {
-            "subdomains": [f"api.{config.target.replace('https://','').replace('http://','')}", f"admin.{config.target.replace('https://','').replace('http://','')}"],
-            "endpoints": [f"{config.target}/api/users", f"{config.target}/search?q=test", f"{config.target}/api/fetch?url=https://example.com"],
-            "tech": ["nginx", "react", "node"],
-            "auth": ["login", "jwt"],
+        results: Dict[str, Any] = {
+            "mission_id": mission.id,
+            "status": "active",
+            "phases": {
+                "scope": {"status": "completed", "target": config.target},
+                "plan": {"status": "completed", "tasks": mission.tasks.get_stats()["total"]},
+            },
         }
 
-        recon_result = self.autonomous_recon(mission, discoveries)
-        results["phases"]["recon"] = recon_result
+        if initial_discoveries is not None:
+            results["phases"]["recon"] = self.autonomous_recon(mission, initial_discoveries)
 
-        # ATTACK SURFACE
-        attack_surface = self.offensive.build_attack_surface_model(mission.discoveries)
-        results["phases"]["attack_surface"] = {"status": "completed", "model": attack_surface}
-
-        # HYPOTHESIS
-        hypotheses = self.autonomous_hypothesis_generation(mission)
-        results["phases"]["hypothesis"] = {"status": "completed", "count": len(hypotheses), "hypotheses": [h.__dict__ if hasattr(h, '__dict__') else h for h in hypotheses[:3]]}
-
-        # TEST
-        testing_result = self.autonomous_testing(mission, hypotheses)
-        results["phases"]["test"] = testing_result
-
-        # Simulate some findings from testing (in real autonomous, specialists would create findings via tools)
-        # For autonomous team demo, we create candidate findings from hypotheses
-        from x19.findings import create_candidate_finding, VulnClass, Severity, Confidence
-
-        for hyp in hypotheses[:2]:
-            try:
-                vc = VulnClass(hyp.vuln_class)
-            except ValueError:
-                vc = VulnClass.OTHER
-
-            finding = create_candidate_finding(
-                target=config.target,
-                endpoint=hyp.endpoint,
-                vuln_class=vc,
-                observed_evidence=hyp.observation,
-                tool_output=f"Tool output for {hyp.vuln_class} at {hyp.endpoint} with payload {hyp.payloads[0] if hyp.payloads else 'test'}",
-                tool_name="terminal",
-                agent_id=self._get_specialist_for_vuln(hyp.vuln_class),
-                severity=Severity.HIGH if hyp.severity == "critical" else Severity.MEDIUM,
-                confidence=Confidence.MEDIUM,
-                cwe_id=hyp.cwe,
-                owasp_category=hyp.owasp,
-            )
-            mission.findings.add(finding)
-
-        self.mission_manager.save_mission(mission)
-
-        results["phases"]["observe"] = {"status": "completed", "findings": len(mission.findings.findings)}
-        results["phases"]["correlate"] = {"status": "completed", "by_class": mission.findings.get_stats()}
-
-        # VERIFY
-        verify_result = self.autonomous_verification(mission)
-        results["phases"]["verify"] = verify_result
-
-        # CLASSIFY
-        verified = mission.findings.list_verified()
-        results["phases"]["classify"] = {"status": "completed", "verified": len(verified)}
-
-        # REPORT
-        if config.auto_report:
-            report = self.autonomous_report(mission)
-            results["phases"]["report"] = {"status": "completed", "report_length": len(report), "report_path": mission.report_path}
-
-        # LEARN
-        mission.add_lesson("FACT", f"Autonomous mission {mission.id} completed for target {config.target}", f"Mission {mission.id} timeline", "high")
-        mission.add_lesson("OBSERVATION", f"Discoveries: {mission.discoveries}", f"Mission {mission.id} discoveries", "medium")
-        mission.add_lesson("LESSON", f"Generated {len(hypotheses)} hypotheses, {len(verified)} verified", f"Mission {mission.id} results", "medium")
-
-        results["phases"]["learn"] = {"status": "completed", "lessons": len(mission.lessons)}
-
-        # REASSESS
-        results["phases"]["reassess"] = {
-            "status": "completed",
-            "should_continue": False,
-            "stop_reason": "Autonomous mission completed, all phases done",
-            "final_stats": mission.get_stats(),
-        }
-
-        mission.set_phase(MissionPhase.COMPLETED)
-        from x19.orchestration.mission_state import MissionStatus
-        mission.status = MissionStatus.COMPLETED
-
-        self.mission_manager.save_mission(mission)
+        if parent_agent is not None:
+            dispatched = self.boss.delegate_ready_tasks(mission, parent_agent, background=True)
+            results["delegation"] = {
+                "status": "dispatched" if dispatched else "idle",
+                "tasks": [{"task_id": d["task_id"], "assigned_to": d["assigned_to"]} for d in dispatched],
+            }
+        else:
+            results["delegation"] = {
+                "status": "pending",
+                "reason": "Live parent agent context required to invoke delegate_task",
+            }
 
         results["final_status"] = mission.get_stats()
-        results["status"] = "completed"
-
+        results["note"] = ("Mission remains active until real delegated work reports completion; no synthetic discoveries, "
+                            "findings, verification, or completion are emitted.")
+        self.mission_manager.save_mission(mission)
         return results
-
     def get_team_status(self) -> Dict[str, Any]:
         """Get offensive team status — like overall offensive team."""
 
