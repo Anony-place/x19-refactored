@@ -4,7 +4,7 @@ X19 — Autonomous Security Operations Agent
 Built on a proven upstream agent runtime. Provides hierarchical security team,
 evidence-driven assessment, and autonomous bug-bounty research capabilities.
 
-This package contains X19-specific extensions that reuse Hermes' proven
+This package contains the X19 product runtime extensions and reuses the proven
 runtime, tool, skill, memory, session, delegation, terminal, provider,
 and learning architecture.
 
