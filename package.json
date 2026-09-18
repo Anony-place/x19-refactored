@@ -1,7 +1,7 @@
 {
   "name": "hermes-agent",
   "version": "1.0.0",
-  "description": "An AI agent with advanced tool-calling capabilities, featuring a flexible toolsets system for organizing and managing tools.",
+  "description": "X19 — Autonomous Security Operations Agent with real terminal, streaming, delegation, memory, skills, sessions, and gateway capabilities.",
   "private": true,
   "workspaces": [
     "apps/*",
