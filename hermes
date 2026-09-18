@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Hermes Agent CLI launcher.
+Legacy compatibility launcher for X19.
 
-This wrapper should behave like the installed `hermes` command, including
-subcommands such as `gateway`, `cron`, and `doctor`.
+The historical ``hermes`` executable remains available for compatibility only.
+New installs and documentation use the ``x19`` command.
 """
 
 if __name__ == "__main__":
