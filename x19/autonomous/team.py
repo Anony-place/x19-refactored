@@ -272,7 +272,7 @@ class AutonomousOffensiveTeam:
         """Create and advance an X19 mission from real runtime evidence only.
 
         Planning never implies execution. When parent_agent is supplied, ready work is
-        dispatched through Hermes' real delegate_task rail. Without it, the mission remains
+        dispatched through the existing runtime delegate_task rail. Without it, the mission remains
         active and reports that a live agent context is required for delegation.
         """
         mission, msg = self.create_autonomous_mission(config)
