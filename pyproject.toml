@@ -312,7 +312,7 @@ termux = [
   "x19[cron]",
   "x19[mcp]",
   "x19[honcho]",
-  "hermes-agent[acp]",
+  "x19[acp]",
 ]
 termux-all = [
   # Best-effort "install all" profile for Termux. Same policy as [all]:
