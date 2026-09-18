@@ -107,8 +107,7 @@ class AutonomousOffensiveTeam:
         if not recon_method:
             recon_method = self.kb.get_methodology("information_gathering")
 
-        # Simulate recon discoveries (in real autonomous, specialists would use real tools via delegation)
-        # For autonomous team, we use provided discoveries and enhance with knowledge
+        # These discoveries must originate from real tool/runtime output. This method only records evidence and derives an attack-surface model.
 
         for dtype, items in discoveries.items():
             for item in items:
