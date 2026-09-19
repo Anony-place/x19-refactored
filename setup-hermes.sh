@@ -13,7 +13,7 @@
 # 2. Creates a Python 3.11 virtual environment
 # 3. Installs the appropriate dependency set for the platform
 # 4. Creates .env from template (if not exists)
-# 5. Symlinks the 'hermes' CLI command into a user-facing bin dir
+# 5. Symlinks the 'x19' CLI command into a user-facing bin dir
 # 6. Runs the setup wizard (optional)
 # ============================================================================
 
@@ -388,7 +388,7 @@ X19_BIN="$SCRIPT_DIR/venv/bin/x19"
 COMMAND_LINK_DIR="$(get_command_link_dir)"
 COMMAND_LINK_DISPLAY_DIR="$(get_command_link_display_dir)"
 mkdir -p "$COMMAND_LINK_DIR"
-ln -sf "$X19_BIN" "$COMMAND_LINK_DIR/hermes"
+ln -sf "$X19_BIN" "$COMMAND_LINK_DIR/x19"
 echo -e "${GREEN}✓${NC} Symlinked x19 → $COMMAND_LINK_DISPLAY_DIR/x19"
 
 if is_termux; then
@@ -465,7 +465,7 @@ if is_termux; then
     echo "     x19 setup"
     echo ""
     echo "  2. Start chatting:"
-    echo "     hermes"
+    echo "     x19"
     echo ""
 else
     echo "  1. Reload your shell:"
@@ -475,7 +475,7 @@ else
     echo "     x19 setup"
     echo ""
     echo "  3. Start chatting:"
-    echo "     hermes"
+    echo "     x19"
     echo ""
 fi
 echo "Other commands:"
@@ -495,5 +495,5 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
     echo ""
     # Run directly with venv Python (no activation needed)
-    "$SCRIPT_DIR/venv/bin/python" -m hermes_cli.main setup
+    "$SCRIPT_DIR/venv/bin/python" -m x19_cli.main setup
 fi
