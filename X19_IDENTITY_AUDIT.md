@@ -536,6 +536,41 @@ at 26 and nothing looked missing. Production's shim set has four members —
 `x19_cli/_install_repair.py:375` adds `x19-gateway` to the console-script names —
 so the list is restored to all four distinct `.exe` names.
 
+**Four more, found by asking where the name had to be an executable.** The
+heuristic above keys on a file mentioning one entry point but not another. A
+second, independent one keys on grammar instead: at the branch point, `bin/…`,
+`….exe`, `exec …`, `command -v …`, `which …` and `test -x …` are positions where
+the agent launcher's name can only be an executable, never a package, a URL or a
+directory. Excluding the install domain — which matches `bin/` shapes only because
+it appears in URLs — leaves 18 lines in 10 files, of which 14 were already right.
+The four that were not:
+
+- `x19_cli/main_install_repair.py` described the Windows shim failure as
+  "``x19.exe`` and ``x19-acp.exe`` present but ``x19.exe`` missing" — the same file
+  present and missing in one sentence. The pair that is present is the agent and
+  ACP shims; the one that goes missing is the CLI.
+- `scripts/install.ps1:3085` carried the same contradiction into its comment:
+  "a broken `x19` command while x19.exe / x19-acp.exe exist".
+- `tests/x19_cli/test_profiles.py` built a `FakeProc` whose argv was a bare
+  interpreter exec'ing `.local/bin/x19`, where the case is meant to be the agent
+  shim — the neighbouring proc already covers ACP.
+- `tests/x19_state/test_fts_runtime_rebuild.py` parametrized
+  `test_uninspectable_x19_process_remains_a_holder` with
+  `("/usr/local/bin/x19", "serve")` where the row was the agent launcher, leaving
+  two rows that differed only in their subcommand.
+
+The last two are the point of the exercise. Both feed a process-identification
+predicate whose production input is the executable set, so a fixture that names
+the wrong executable makes the test insensitive to losing that executable:
+
+| | production set intact | agent name dropped from the production set |
+| --- | --- | --- |
+| before the two fixture fixes | pass | pass — 2/2 and 12/12, blind to it |
+| after | pass | fail — 1 and 1 |
+
+That is the whole failure mode in one table: the fixtures agreed with production
+while production was correct, and kept agreeing after it was broken.
+
 **The Docker group remap addressed a user that does not exist.** `Dockerfile`
 creates the runtime user with `useradd -u 10000 -m -d /opt/data x19`, but
 `docker/stage2-hook.sh` ran `groupmod -o -g "$X19_GID" hermes`, `id -G hermes`
@@ -578,6 +613,7 @@ twice in one scope:
 | Shell / Nix / PowerShell word lists and arrays | 82 | every `for … in` list and bracketed string array | 2 — both fixed |
 | Python list/tuple/set members containing a product name | 6,624 | every collection with ≥2 `x19*` members | 4 — 1 fixed (`SHIM_NAMES`), 3 benign |
 | Adjacent duplicate product names in prose (all files, CJK-aware) | 13,912 | every line | 28 — 4 fixed, 24 benign |
+| Executable-position references at the branch point (`bin/`, `.exe`, `exec`, `command -v`, `which`, `test -x`) | 482 → 18 | 10 files, domain matches excluded | 4 — all fixed |
 
 Two more real duplicates came out of that sweep, both the same shape: a member
 written twice where the second silently wins. `tools/cronjob_tools.py` declared

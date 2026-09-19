@@ -664,7 +664,7 @@ class TestDeleteProfile:
 
         self_pid = os.getpid()
         procs = [
-            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/x19",
+            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/x19-agent",
                             "--profile", "coder", "serve"]),
             FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/x19-acp",
                             "--profile", "coder", "serve"]),

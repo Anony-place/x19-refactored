@@ -162,7 +162,7 @@ class TestRuntimeFtsRebuild:
         "argv",
         (
             ("/usr/local/bin/x19", "gateway"),
-            ("/usr/local/bin/x19", "serve"),
+            ("/usr/local/bin/x19-agent", "serve"),
             ("/usr/local/bin/x19-acp", "--stdio"),
             ("/usr/bin/python3", "-m", "x19_cli.main", "gateway"),
             ("/usr/bin/python3", "-m", "acp_adapter"),

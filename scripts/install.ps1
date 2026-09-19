@@ -3082,7 +3082,7 @@ except Exception:
         # uv on Windows can register x19.exe in dist-info/RECORD but fail to
         # materialise the .exe (file lock during self-update, distlib edge case).
         # Catch it here so a fresh install/update does not finish with a broken
-        # `x19` command while x19.exe / x19-acp.exe exist
+        # `x19` command while x19-agent.exe / x19-acp.exe exist
         $scriptsDir = Join-Path $InstallDir "venv\Scripts"
         $pythonExe = Join-Path $scriptsDir "python.exe"
         if ((Test-Path $scriptsDir) -and (Test-Path $pythonExe)) {

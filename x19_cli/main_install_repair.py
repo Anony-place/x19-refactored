@@ -1059,7 +1059,7 @@ def _verify_console_scripts_installed(
     file never lands (live shim locked, launcher write skipped), so ``x19`` drops off PATH
     after a "successful" install. Missing shims get ``--reinstall -e .`` under quarantine.
 
-    The symptom is ``x19.exe`` and ``x19-acp.exe`` present but ``x19.exe`` missing, so
+    The symptom is ``x19-agent.exe`` and ``x19-acp.exe`` present but ``x19.exe`` missing, so
     ``x19`` drops off PATH even though the install reported success (issue #52931).
     """
     if not _is_windows():
