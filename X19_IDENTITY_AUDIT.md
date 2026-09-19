@@ -37,7 +37,7 @@ CI gate. `--json` emits the same data machine-readably.
 | --- | --- |
 | Token searched | `hermes`, case-insensitive |
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
-| Corpus | every git-tracked file: **13,912** |
+| Corpus | every git-tracked file: **13,913** |
 | Files with a match | **94** |
 | Lines with a match | **333** |
 | Non-Latin matches | **0**, outside the detector and this report |
@@ -54,7 +54,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 94 files and 333 lines over the same 13,912 tracked files. Two
+   the same 94 files and 333 lines over the same 13,913 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
