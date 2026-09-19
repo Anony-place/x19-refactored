@@ -9,7 +9,7 @@ import pytest
 
 from agent import codex_runtime, runtime_cwd
 from agent.transports import codex_app_server_session
-from hermes_state import SessionDB
+from x19_state import SessionDB
 from plugins.memory.honcho import HonchoMemoryProvider
 from plugins.memory.honcho.client import HonchoClientConfig
 from run_agent import AIAgent
@@ -19,7 +19,7 @@ from tools import terminal_tool
 @pytest.fixture
 def workspace_runtime(monkeypatch, tmp_path):
     # server imports start a background GitHub update check; disable it before import.
-    monkeypatch.setattr("hermes_cli.banner.prefetch_update_check", lambda: None)
+    monkeypatch.setattr("x19_cli.banner.prefetch_update_check", lambda: None)
     from tui_gateway import server
 
     old, new, other = (tmp_path / name for name in ("old-repo", "new-repo", "other-repo"))
@@ -37,7 +37,7 @@ def workspace_runtime(monkeypatch, tmp_path):
     monkeypatch.setattr("model_tools.get_tool_definitions", lambda *a, **k: [])
     monkeypatch.setattr("model_tools.check_toolset_requirements", lambda *a, **k: {})
     monkeypatch.setattr("agent.process_bootstrap.OpenAI", MagicMock())
-    monkeypatch.setattr("hermes_cli.config.load_config_readonly", lambda: {"memory": {"provider": "honcho"}})
+    monkeypatch.setattr("x19_cli.config.load_config_readonly", lambda: {"memory": {"provider": "honcho"}})
     # Real Honcho initialization/routing, but tools-only lazy mode never creates peers.
     config = HonchoClientConfig(
         enabled=True, api_key="test-key", session_strategy="per-directory",

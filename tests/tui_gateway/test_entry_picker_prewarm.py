@@ -7,9 +7,9 @@ did — the first ``/model`` open in a TUI session blocked on serial /v1/models
 fetches for every authenticated provider (#72021).
 
 These tests pin the entrypoint wiring itself (the helper's own worker/once
-guard is covered in ``tests/hermes_cli/test_picker_prewarm.py``):
+guard is covered in ``tests/x19_cli/test_picker_prewarm.py``):
 
-- ``main()`` invokes ``hermes_cli.model_switch_providers.prewarm_picker_cache_async``
+- ``main()`` invokes ``x19_cli.model_switch_providers.prewarm_picker_cache_async``
   exactly once, AFTER the ``gateway.ready`` event is written (banner shown,
   user about to type — the idle window the prewarm is meant to fill).
 - The startup path stays non-blocking: with the prewarm spied out, ``main()``
@@ -26,10 +26,10 @@ from __future__ import annotations
 
 import io
 
-import hermes_cli.model_switch as ms
+import x19_cli.model_switch as ms
 from tui_gateway import entry
-import hermes_cli.model_switch_providers
-from hermes_cli import model_switch_providers
+import x19_cli.model_switch_providers
+from x19_cli import model_switch_providers
 
 
 def _run_main(monkeypatch, events, *, prewarm=None):
@@ -53,7 +53,7 @@ def _run_main(monkeypatch, events, *, prewarm=None):
 
     monkeypatch.setattr(entry, "write_json", _write_json)
 
-    # entry.main() imports the helper lazily from hermes_cli.model_switch,
+    # entry.main() imports the helper lazily from x19_cli.model_switch,
     # so the spy must live on that module, not on entry.
     if prewarm is None:
         def prewarm():

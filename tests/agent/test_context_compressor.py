@@ -16,7 +16,7 @@ from agent.context_compressor import (
     _summarize_tool_result,
     _is_summary_access_or_quota_error,
 )
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 class StubProviderError(Exception):
@@ -220,7 +220,7 @@ class TestSummarizeToolResultClarify:
             # gateway/run.py timeout + delivery-failure paths
             "[user did not respond within 15m]",
             "[clarify prompt could not be delivered]",
-            # hermes_cli/oneshot.py no-user callback
+            # x19_cli/oneshot.py no-user callback
             "[oneshot mode: no user available. Pick the best option from "
             "['a', 'b'] using your own judgment and continue.]",
         ],
@@ -250,7 +250,7 @@ class TestSummarizeToolResultClarify:
         """Producer→recognizer drift guard: run the REAL oneshot no-user
         callback and assert its output is filtered. If the producer's wording
         drifts away from _CLARIFY_NON_RESPONSE_PREFIXES, this fails."""
-        from hermes_cli.oneshot import _oneshot_clarify_callback
+        from x19_cli.oneshot import _oneshot_clarify_callback
 
         sentinels = (
             _oneshot_clarify_callback("Deploy when?", choices=["a", "b"]),
@@ -917,7 +917,7 @@ class TestAuthFailureAborts:
         err = RuntimeError(
             "Provider 'opencode-zen' is set in config.yaml but no API key was "
             "found. Set the OPENCODE-ZEN_API_KEY environment variable, or switch "
-            "to a different provider with hermes model."
+            "to a different provider with x19 model."
         )
         with patch(
             "agent.context_compressor.get_model_context_length", return_value=100000
@@ -2299,7 +2299,7 @@ class TestThresholdTokensCap:
     def test_default_config_disabled_and_no_behavior_change(self):
         """DEFAULT_CONFIG ships threshold_tokens=None (disabled) and both
         None and 0 leave the ratio-based trigger byte-identical."""
-        from hermes_cli.config import DEFAULT_CONFIG
+        from x19_cli.config import DEFAULT_CONFIG
         assert DEFAULT_CONFIG["compression"]["threshold_tokens"] is None
 
         with patch("agent.context_compressor.get_model_context_length", return_value=1_000_000):
@@ -2343,13 +2343,13 @@ class TestTruncateToolCallArgsJson:
         import json as _json
         shrink = self._helper()
         original = _json.dumps({
-            "path": "~/.hermes/skills/shopping/browser-setup-notes.md",
+            "path": "~/.x19/skills/shopping/browser-setup-notes.md",
             "content": "# Shopping Browser Setup Notes\n\n" + "abc " * 400,
         })
         assert len(original) > 500
         shrunk = shrink(original)
         parsed = _json.loads(shrunk)  # must not raise
-        assert parsed["path"] == "~/.hermes/skills/shopping/browser-setup-notes.md"
+        assert parsed["path"] == "~/.x19/skills/shopping/browser-setup-notes.md"
         assert parsed["content"].endswith("...[truncated]")
         assert len(shrunk) < len(original)
 
@@ -2389,7 +2389,7 @@ class TestTruncateToolCallArgsJson:
             )
         huge_content = "# Shopping Browser Setup Notes\n\n## Overview\n" + "x " * 400
         args_payload = _json.dumps({
-            "path": "~/.hermes/skills/shopping/browser-setup-notes.md",
+            "path": "~/.x19/skills/shopping/browser-setup-notes.md",
             "content": huge_content,
         })
         assert len(args_payload) > 500  # triggers the Pass-3 shrink
@@ -2408,7 +2408,7 @@ class TestTruncateToolCallArgsJson:
         shrunk = result[1]["tool_calls"][0]["function"]["arguments"]
         # Must parse — otherwise downstream provider returns 400
         parsed = _json.loads(shrunk)
-        assert parsed["path"] == "~/.hermes/skills/shopping/browser-setup-notes.md"
+        assert parsed["path"] == "~/.x19/skills/shopping/browser-setup-notes.md"
         assert parsed["content"].endswith("...[truncated]")
 
 

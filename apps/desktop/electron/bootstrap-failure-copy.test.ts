@@ -26,15 +26,15 @@ test('lead sentence is plain and actionable; raw error is confined to the Detail
 test('missing stage and missing error still produce a complete message', () => {
   const message = describeBootstrapFailure(null, undefined)
 
-  assert.match(message, /^Setting up Hermes stopped before it could finish\./)
+  assert.match(message, /^Setting up X19 stopped before it could finish\./)
   assert.match(message, /\nDetails: unknown error$/)
 })
 
 test('missing-install-part copy names Repair install and keeps the path in Details', () => {
-  const message = missingInstallPartMessage('Python environment missing at /home/me/.hermes/venv')
+  const message = missingInstallPartMessage('Python environment missing at /home/me/.x19/venv')
   const [lead, details] = message.split('Details: ')
 
   assert.match(lead, /Repair install/)
   assert.doesNotMatch(lead, /venv|install\.ps1|\//)
-  assert.equal(details, 'Python environment missing at /home/me/.hermes/venv')
+  assert.equal(details, 'Python environment missing at /home/me/.x19/venv')
 })

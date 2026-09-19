@@ -106,7 +106,7 @@ function recordingDeps(ws: FakeWriteStream, { renameError }: { renameError?: Err
 // Separator-agnostic: path.join emits backslashes on Windows, so the expectation
 // is "short hidden .part name, same directory as the destination", not a
 // literal POSIX string.
-const TEMP_BASENAME = /^\.hermes-download-[0-9a-f]{8}\.part$/
+const TEMP_BASENAME = /^\.x19-download-[0-9a-f]{8}\.part$/
 
 // path.join normalizes separators (``/tmp`` -> ``\\tmp`` on Windows) while the
 // literal destination strings in these tests do not, so compare normalized forms.
@@ -269,7 +269,7 @@ test('pumpStreamToFile never unlinks a temp path it did not create when the excl
 
   const promise = pumpStreamToFile(res as never, '/tmp/out.bin', deps)
 
-  const eexist: any = new Error("EEXIST: file already exists, open '/tmp/.hermes-download-deadbeef.part'")
+  const eexist: any = new Error("EEXIST: file already exists, open '/tmp/.x19-download-deadbeef.part'")
 
   eexist.code = 'EEXIST'
   ws.emit('error', eexist)

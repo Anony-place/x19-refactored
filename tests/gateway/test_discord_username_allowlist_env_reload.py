@@ -7,7 +7,7 @@ Sequence under test:
      memory (``_allowed_user_ids``) and mirrors them into ``os.environ``.
   3. The gateway's per-turn env hot-reload
      (``_reload_runtime_env_preserving_config_authority`` ->
-     ``load_hermes_dotenv(override=True)``) restores the RAW username strings
+     ``load_x19_dotenv(override=True)``) restores the RAW username strings
      from the file into the process env.
   4. ``GatewayAuthorizationMixin._is_user_authorized`` compares the sender's
      numeric ``user_id`` against the env allowlist.

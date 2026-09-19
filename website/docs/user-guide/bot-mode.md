@@ -1,16 +1,16 @@
 ---
 title: "Bot Mode"
-description: "Turn your Hermes profiles into a roster of named Bots — each with its own chat, role, model, memory, skills, and avatar. Bots run routines, share group chats, and message each other."
+description: "Turn your X19 profiles into a roster of named Bots — each with its own chat, role, model, memory, skills, and avatar. Bots run routines, share group chats, and message each other."
 ---
 
 # Bot Mode
 
-**Bot Mode** turns your [Hermes profiles](./profiles.md) into a roster of named **Bots**. Each Bot has its own role, model, memory, skills, and avatar; Bots run recurring routines, deliberate together in group chats, and message each other directly. Build a specialist Bot once and it is there forever, one click away.
+**Bot Mode** turns your [X19 profiles](./profiles.md) into a roster of named **Bots**. Each Bot has its own role, model, memory, skills, and avatar; Bots run recurring routines, deliberate together in group chats, and message each other directly. Build a specialist Bot once and it is there forever, one click away.
 
 Bot Mode ships **built into the [desktop app](./desktop.md)** and is **on by default** — no install needed. It appears as a **Bots** tab next to Sessions in the left sidebar, with a **Routines** tile docked beside the conversation while the Bots tab is active.
 
 :::tip A Bot is a profile
-There is no new primitive to learn: a Bot **is** a Hermes profile — isolated config, memory, skills, credentials, and chat history under `~/.hermes/profiles/<name>/`. Bot Mode is a UI over that primitive, so everything you do in it is visible from the CLI too: `hermes -p <bot> chat` opens the same agent, and Bot routines appear in `hermes cron list`. No core patches, no background daemons, no extra storage.
+There is no new primitive to learn: a Bot **is** a X19 profile — isolated config, memory, skills, credentials, and chat history under `~/.x19/profiles/<name>/`. Bot Mode is a UI over that primitive, so everything you do in it is visible from the CLI too: `x19 -p <bot> chat` opens the same agent, and Bot routines appear in `x19 cron list`. No core patches, no background daemons, no extra storage.
 
 See [Profiles, agents, and bots](./profiles.md#profiles-agents-and-bots) for how
 Bot Mode relates to messaging bots and delegated subagents.
@@ -51,10 +51,10 @@ An **Advanced** disclosure opens the full capabilities surface:
 
 - **Clone from an existing profile** — start from another Bot's config, skills, SOUL, and memory, or pick **Fresh profile** for a clean start.
 - **Create empty** — skip the bundled skills entirely for a minimal profile.
-- **Model & provider pin** — give the Bot its own model. Any provider/model pair Hermes knows about works, and different Bots can run on different models side by side. Leave it unset to inherit from the launch profile.
+- **Model & provider pin** — give the Bot its own model. Any provider/model pair X19 knows about works, and different Bots can run on different models side by side. Leave it unset to inherit from the launch profile.
 - **Custom SOUL.md** — the Bot's persona and standing instructions.
 - **Per-skill, per-toolset, and per-MCP-server enablement** — tick exactly the capabilities this specialist needs.
-- **Copy API keys from the main profile** — on by default. Each Bot gets its own credential store: static API keys are copied in, while single-use OAuth logins (Anthropic, OpenAI Codex, xAI) are not copied — sign the Bot in itself with `hermes -p <name> auth add <provider>`. See [Every profile owns its credentials](./profiles.md#every-profile-owns-its-credentials).
+- **Copy API keys from the main profile** — on by default. Each Bot gets its own credential store: static API keys are copied in, while single-use OAuth logins (Anthropic, OpenAI Codex, xAI) are not copied — sign the Bot in itself with `x19 -p <name> auth add <provider>`. See [Every profile owns its credentials](./profiles.md#every-profile-owns-its-credentials).
 
 ### Choosing which machine it lives on ("Create on")
 
@@ -80,15 +80,15 @@ Every Bot gets a face:
 - **Geometric faces** — the classic 7 shapes × 10 colors. During a focused live turn, the owning Bot leans and looks upward with three animated dots, then eases back to idle when the turn ends. Ownership includes the connection, so same-named Bots on different gateways do not borrow the pose. Background workers keep their existing working animation; photos, blob faces and sigils keep their own rendering.
 - **An uploaded image** — any picture you like.
 - **An AI-generated portrait** — when an image backend is configured, generated in place (this rides the standard `image.generate` RPC and works over both local and remote gateways).
-- **A pixel pet** — a companion from the [petdex gallery](./features/pets.md) that bounces beside the avatar while the Bot is busy. Run `hermes pets` in a terminal to explore the gallery.
+- **A pixel pet** — a companion from the [petdex gallery](./features/pets.md) that bounces beside the avatar while the Bot is busy. Run `x19 pets` in a terminal to explore the gallery.
 
 A Bot's look, title, and description are stored in the profile's metadata on the backend, so the same Bot appears the same way on every desktop connected to that backend.
 
 ## Routines
 
-The **Routines** pane attaches recurring tasks to the Bot that does them — "summarize my inbox every morning" lives next to the Bot responsible for it. The pane docks beside the chat only while the Bots tab is active and steps aside when you switch back to Sessions (older desktop builds keep it always visible). Closing it with its ✕ hides it until you next leave and re-enter the Bots tab, when it comes back as the collapsed right-edge tab. A structured schedule picker builds the schedule (frequency first, then only the detail that matters), with an Advanced field exposing the raw Hermes schedule string.
+The **Routines** pane attaches recurring tasks to the Bot that does them — "summarize my inbox every morning" lives next to the Bot responsible for it. The pane docks beside the chat only while the Bots tab is active and steps aside when you switch back to Sessions (older desktop builds keep it always visible). Closing it with its ✕ hides it until you next leave and re-enter the Bots tab, when it comes back as the collapsed right-edge tab. A structured schedule picker builds the schedule (frequency first, then only the detail that matters), with an Advanced field exposing the raw X19 schedule string.
 
-Routines are plain [Hermes cron jobs](./features/cron.md) namespaced `[bot:<name>] <routine>` — they also show up in `hermes cron list` and the core Cron page. Runs land in the Bot's own chat history, so the result is right where you would talk to that Bot anyway.
+Routines are plain [X19 cron jobs](./features/cron.md) namespaced `[bot:<name>] <routine>` — they also show up in `x19 cron list` and the core Cron page. Runs land in the Bot's own chat history, so the result is right where you would talk to that Bot anyway.
 
 ## Groups and group chats
 
@@ -115,7 +115,7 @@ Right-click a local Bot → **Manage groups** to add or remove it from any numbe
 
 To edit an existing room as a unit, use **Manage members** — from the room header's people icon or the **Manage members…** button in **Group settings**. The checklist pre-selects the current members and lists every local and Connections Bot; add or remove several at once and **Save members** applies the new roster (still 2–6 Bots) while the room, its history and each member's room session stay in place. A removed Bot takes no further turns; an added Bot reads the recent room history on its first turn. **Cancel** changes nothing.
 
-**Rooms follow your gateways, not one Desktop.** Each room's recent transcript, members, picture, and name are mirrored into the shared profile metadata of **every** gateway your Desktop is connected to, with per-gateway versioning so two Desktops writing at once merge instead of overwriting each other. Open Hermes Desktop on another machine against the same gateway (local network, Tailscale, anywhere) and the room appears with its history; gateway-only clients see it too. Rooms carry a durable internal identity, so renaming one changes just its display name everywhere, disbanding one removes it permanently on every client — even ones that were offline at the time — and recreating a same-name group starts a genuinely fresh room. If a gateway dies or is removed, nothing is lost: every connected Desktop keeps the full room locally and re-seeds any gateway it reconnects to. (The full orchestration log stays in each Desktop's local storage; the shared mirror is a bounded recent-history projection.)
+**Rooms follow your gateways, not one Desktop.** Each room's recent transcript, members, picture, and name are mirrored into the shared profile metadata of **every** gateway your Desktop is connected to, with per-gateway versioning so two Desktops writing at once merge instead of overwriting each other. Open X19 Desktop on another machine against the same gateway (local network, Tailscale, anywhere) and the room appears with its history; gateway-only clients see it too. Rooms carry a durable internal identity, so renaming one changes just its display name everywhere, disbanding one removes it permanently on every client — even ones that were offline at the time — and recreating a same-name group starts a genuinely fresh room. If a gateway dies or is removed, nothing is lost: every connected Desktop keeps the full room locally and re-seeds any gateway it reconnects to. (The full orchestration log stays in each Desktop's local storage; the shared mirror is a bounded recent-history projection.)
 
 A group's identity is editable, at creation and after:
 
@@ -134,25 +134,25 @@ Use the **Move up** and **Move down** arrows beside a room to choose its positio
 
 - **One visible conversation.** Public messages and each member's reply stay readable in arrival order, with the speaker's name and timestamp. Starting another topic does not collapse earlier replies. **Reply in thread** continues that topic without reordering the room; **Activity** is a secondary status view, not a replacement for messages. Private Bot Chats remain separate.
 - Your message triggers up to **three serial rounds** of member turns. @-mentioned Bots respond (everyone responds when nobody is mentioned); each Bot replies briefly or passes, and the room settles when a full round stays silent.
-- Teammates can hand off to the primary Bot with `@hermes`, including in older saved rooms; Bots on other gateways keep their device-qualified tags (for example, `@default-vera`).
+- Teammates can hand off to the primary Bot with `@x19`, including in older saved rooms; Bots on other gateways keep their device-qualified tags (for example, `@default-vera`).
 - Bots pull each other in with `@name`, and escalate real judgment calls to you with `@user` — the group row shows a **needs you** badge when that happens. Pending questions and command approvals also light that badge; resolving the last prompt clears only prompt attention, not an independent mention. A command approval in the room answers on the click itself — `once`, `session`, `always` or `deny` sends at once, with no second button to find. Prompts follow a renamed room, while disbanding retires them even if a member's in-flight poll arrives later.
 - Hard caps (10 messages per send, 3 rounds) keep rooms from spinning.
 - Each member keeps its own persistent room session, so room context survives like any other conversation.
 - **Not every Bot replies to every message.** Speaking is each member's own choice — a Bot replies only when it has something new to add and passes otherwise, and @-mentioning specific members scopes the round to them. Expect the members you addressed (or whoever has something to say) to speak, and the rest to stay quiet.
-- **Rooms keep running when you close the Desktop.** When every member of a room lives on the same gateway, that gateway owns turn scheduling through a durable driver: closing Hermes Desktop (or losing its connection) does not stop a room mid-discussion, and the Desktop simply catches up from the room's log when it reconnects. `groups.capabilities` on the gateway reports `driver: true` when this applies. More than one room worker may share a home — the messaging gateway (`hermes gateway run`) and the Desktop's own backend (`hermes serve`) both run one — and whichever holds the room's driver lease runs the next turn; a member's room session is held only for the duration of its turn, so the lease can move between workers without a turn being refused. Room state lives in the install's root `shared-state.db`; installs that created rooms before that file existed (when rooms were still kept in the root `state.db`) get those rooms copied across once, on the first open after updating, so pre-existing Group Chats stay reachable. Rooms whose members span several machines are different: each member's turns run on its own gateway, and the cross-connection courier described under *Bot-to-bot messaging* still applies to them.
+- **Rooms keep running when you close the Desktop.** When every member of a room lives on the same gateway, that gateway owns turn scheduling through a durable driver: closing X19 Desktop (or losing its connection) does not stop a room mid-discussion, and the Desktop simply catches up from the room's log when it reconnects. `groups.capabilities` on the gateway reports `driver: true` when this applies. More than one room worker may share a home — the messaging gateway (`x19 gateway run`) and the Desktop's own backend (`x19 serve`) both run one — and whichever holds the room's driver lease runs the next turn; a member's room session is held only for the duration of its turn, so the lease can move between workers without a turn being refused. Room state lives in the install's root `shared-state.db`; installs that created rooms before that file existed (when rooms were still kept in the root `state.db`) get those rooms copied across once, on the first open after updating, so pre-existing Group Chats stay reachable. Rooms whose members span several machines are different: each member's turns run on its own gateway, and the cross-connection courier described under *Bot-to-bot messaging* still applies to them.
 
 - **Mentions read as identities.** In the transcript a routed `@bot` mention, the human handoff `@user`, and the broadcasts `@everyone` / `@all` render as inline references (accent text, not pills); unknown `@words` and e-mail addresses stay plain. Hover a Bot's message and use **Reply to @handle** to seed `@handle ` into the composer, so your next send goes to that Bot only (when a same-named Bot from a Connection shares the room, the tag is device-qualified, e.g. `@reviewer-mini` / `@reviewer-local`) — **Reply in thread** still continues the whole thread. If a reply box for a *different* thread is open, **Reply to** seeds the main composer instead and so starts a fresh thread; use **Reply in thread** to continue that thread.
 - **Rooms can span machines.** **New Group Chat** is available as soon as two Bots are selectable across all your registered connections — one Bot on this device plus one on another gateway is enough. The picker seats Bots from any registered connection; each member's turns run on its own machine, in its own room session there. Cross-machine members carry a device badge (`dixie · Mac Mini`) in the room and in other members' transcripts, and the disambiguated `@name-device` handle works in room mentions — so same-named agents on two machines never blur together.
 - **Rooms show the same identity as the roster.** Transcript rows, the “X is thinking…” line and Activity rows resolve each member's title and avatar by its owning connection and profile — re-titling a Bot or changing its picture updates every room it sits in, remote members keep their own titles, and two same-named Bots on different connections never borrow each other's avatar. When two members would still read identically, Activity appends the connection label (`Reviewer · Mac Mini`).
-- **Plugins can watch members work.** The durable room log records `turn.started` and `turn.settled`; what a member does in between (tools, approvals, streamed text) is projected to plugins through the [`on_room_member_activity`](/user-guide/features/hooks#on_room_member_activity) hook with room, member and turn coordinates, so community clients can build tool cards and live member status on top of Group Chat without reading Hermes internals.
+- **Plugins can watch members work.** The durable room log records `turn.started` and `turn.settled`; what a member does in between (tools, approvals, streamed text) is projected to plugins through the [`on_room_member_activity`](/user-guide/features/hooks#on_room_member_activity) hook with room, member and turn coordinates, so community clients can build tool cards and live member status on top of Group Chat without reading X19 internals.
 
 ## Bot-to-bot messaging
 
 Bots message each other with attribution, and you can hand work off from any chat:
 
 - **@mentions** — type `@researcher have a look at this` in any chat and the composer's `@` autocomplete helps you pick the right Bot; on send, the mention is resolved against the live roster and the active Bot is told exactly who you mean (profile, friendly name, and device for cross-connection Bots). The Bot then composes its own message and sends it with `message_agent` — your text is never forwarded verbatim, and the reply comes back attributed to that agent. An email address or an unknown `@` passes through untouched. Bots on other connected machines are reachable the same way: the Desktop relays the message over that connection's own socket (see *Bots across machines* below).
-- **Renamed Bots keep their tags in sync** — give a Bot a friendly name (the pencil in its chat header, or `hermes profile rename`) and it becomes taggable by that name: a Bot titled *Research Buddy* answers to `@research-buddy` (and `@researchbuddy`), in regular chats and in group rooms alike. The composer's `@` autocomplete offers the renamed tag and also matches when you type the old profile name, which keeps resolving too. This includes the primary Bot: rename it *Maia* and group-turn prompts introduce it as `@maia`, its inter-agent messages sign as `Message from 🤖 Maia (@hermes)`, and teammates can `message_agent(target="maia")` it — `@hermes` stays a working alias.
-- **Direct messages** — every Bot Chat carries the `message_agent` tool: a Bot messages a teammate by calling `message_agent(target="researcher", message="…")`. The target is the teammate's profile name, its friendly name (`hermes profile rename` or the Bot Mode title — `Scribe`, `Dr. Foo`) or the `@`-tag the Desktop inserts for it (`@scribe`, `@dr-foo`, `@drfoo`); `@hermes` always means the primary Bot. A profile name is matched first, so it can never be hijacked by another Bot's friendly name, and a friendly name shared by two Bots is refused with the roster instead of guessing. The tool validates the target against the live roster, prefixes the sender's `Message from 🤖 <friendly name> (@<handle>):` attribution automatically, and delivers into the teammate's canonical Bot Chat. Delivery is **fire-and-forget**: the sender gets an acknowledgement, finishes its turn, and the reply arrives later as a background completion notification. The message travels as a real parameter (nothing shell-interpreted — quotes, `$(...)`, and backticks arrive verbatim), and the Bot composes its own message rather than forwarding your words. The teammate roster — names **and roles** from each profile's title/description — is part of every Bot Chat's system prompt, so Bots know who does what before choosing a recipient. The tool exists **only** in canonical Bot Chat sessions on Bot-Mode-managed installs; regular chats, group-room member sessions, and CLI sessions never see it.
+- **Renamed Bots keep their tags in sync** — give a Bot a friendly name (the pencil in its chat header, or `x19 profile rename`) and it becomes taggable by that name: a Bot titled *Research Buddy* answers to `@research-buddy` (and `@researchbuddy`), in regular chats and in group rooms alike. The composer's `@` autocomplete offers the renamed tag and also matches when you type the old profile name, which keeps resolving too. This includes the primary Bot: rename it *Maia* and group-turn prompts introduce it as `@maia`, its inter-agent messages sign as `Message from 🤖 Maia (@x19)`, and teammates can `message_agent(target="maia")` it — `@x19` stays a working alias.
+- **Direct messages** — every Bot Chat carries the `message_agent` tool: a Bot messages a teammate by calling `message_agent(target="researcher", message="…")`. The target is the teammate's profile name, its friendly name (`x19 profile rename` or the Bot Mode title — `Scribe`, `Dr. Foo`) or the `@`-tag the Desktop inserts for it (`@scribe`, `@dr-foo`, `@drfoo`); `@x19` always means the primary Bot. A profile name is matched first, so it can never be hijacked by another Bot's friendly name, and a friendly name shared by two Bots is refused with the roster instead of guessing. The tool validates the target against the live roster, prefixes the sender's `Message from 🤖 <friendly name> (@<handle>):` attribution automatically, and delivers into the teammate's canonical Bot Chat. Delivery is **fire-and-forget**: the sender gets an acknowledgement, finishes its turn, and the reply arrives later as a background completion notification. The message travels as a real parameter (nothing shell-interpreted — quotes, `$(...)`, and backticks arrive verbatim), and the Bot composes its own message rather than forwarding your words. The teammate roster — names **and roles** from each profile's title/description — is part of every Bot Chat's system prompt, so Bots know who does what before choosing a recipient. The tool exists **only** in canonical Bot Chat sessions on Bot-Mode-managed installs; regular chats, group-room member sessions, and CLI sessions never see it.
 
 Local messages also reach a Bot Chat that stays open in Desktop or the TUI. The receiving backend keeps ownership: it reads durable ingress on its existing notification poller, admits immediately when idle, or waits until the running turn and already queued human prompts finish. A `queued` acknowledgement confirms durable admission, **not** a completed reply. The target profile retains the delivery ID and receipt under `runtime/bot_live_delivery/`; `settled` confirms completion. A crashed or cancelled imported turn is not automatically replayed, and pending work pinned to a departed owner remains inspectable rather than being silently rerun. Do not resend a delivery whose outcome is unknown. Older backends without live-delivery capability retain the existing ownership refusal; restart that backend after upgrading.
 
@@ -169,23 +169,23 @@ agent:
 
 `agent.bot_mode_protocol` is only the master switch. Before the protocol section — or the `message_agent` tool — is injected, two further conditions must hold, and on a desktop install the Bots pane satisfies both for you the moment it creates a Bot:
 
-1. **The session is titled exactly `Bot Chat`.** That exact title is the canonical chat's identity (it is what the desktop plugin's createCanonicalChat uses and what `hermes -p <bot> chat -c "Bot Chat"` resumes); any other title, or an untitled scratch session, gets neither the section nor the tool.
-2. **At least one profile on the install carries a `ui_meta: { hermes-bots: … }` block in its `profile.yaml`.** This is the "Bot-Mode-managed" marker the desktop plugin writes for every Bot it owns; the gate scans every profile, so one marked profile marks the whole install. There is no CLI command that writes it.
+1. **The session is titled exactly `Bot Chat`.** That exact title is the canonical chat's identity (it is what the desktop plugin's createCanonicalChat uses and what `x19 -p <bot> chat -c "Bot Chat"` resumes); any other title, or an untitled scratch session, gets neither the section nor the tool.
+2. **At least one profile on the install carries a `ui_meta: { x19-bots: … }` block in its `profile.yaml`.** This is the "Bot-Mode-managed" marker the desktop plugin writes for every Bot it owns; the gate scans every profile, so one marked profile marks the whole install. There is no CLI command that writes it.
 
 The practical consequence: on a **headless install with no desktop app** (gateway plus Telegram, say) nothing ever writes either marker, so `message_agent` is unreachable even though the docs-level switch is on — bots message each other fine over the messaging platform, but the agent-side `message_agent` tool never appears. To enable it headless, satisfy both conditions by hand:
 
 ```bash
 # the canonical forever-chat, created once per Bot (later runs resume it)
-hermes -p <bot> chat -c "Bot Chat" --create-if-missing
+x19 -p <bot> chat -c "Bot Chat" --create-if-missing
 ```
 
 ```yaml
-# ~/.hermes/profiles/<any-bot>/profile.yaml — an empty block is enough to mark the install
+# ~/.x19/profiles/<any-bot>/profile.yaml — an empty block is enough to mark the install
 ui_meta:
-  hermes-bots: {}
+  x19-bots: {}
 ```
 
-From the next turn in that Bot Chat the teammate roster, the protocol section, and `message_agent` are all picked up — including over `hermes -p <bot> chat` on a purely terminal box.
+From the next turn in that Bot Chat the teammate roster, the protocol section, and `message_agent` are all picked up — including over `x19 -p <bot> chat` on a purely terminal box.
 
 :::note
 Bot-to-bot delivery is per-invocation: the receiving Bot picks the message up when it next runs. Live interrupt of a Bot mid-conversation is future work.
@@ -202,8 +202,8 @@ A failed delivery turn is retried at most once, and only when a retry can actual
 
 When a target has no live Desktop or TUI owner, local delivery opens that
 profile's canonical Bot Chat through a quiet CLI turn. The transport prefers
-the Hermes entrypoint beside the sending runtime's Python interpreter, so an
-unrelated or older `hermes` on a service's `PATH` cannot take precedence when
+the X19 entrypoint beside the sending runtime's Python interpreter, so an
+unrelated or older `x19` on a service's `PATH` cannot take precedence when
 that sibling entrypoint exists. `--in ~` selects the working directory; the
 explicit Bot Chat title is resolved in the target profile's session database.
 
@@ -213,27 +213,27 @@ A failed bot turn or relay delivery carries a machine-readable `reason` code alo
 
 ### Messaging across connected machines (the Desktop relay)
 
-Every gateway you register in **Settings → Connections** — local, remote URL, SSH, Hermes Cloud, docker — is a persistent line the Desktop holds open, and Bot Mode uses those lines for messaging automatically. No extra setup:
+Every gateway you register in **Settings → Connections** — local, remote URL, SSH, X19 Cloud, docker — is a persistent line the Desktop holds open, and Bot Mode uses those lines for messaging automatically. No extra setup:
 
 - **Rosters propagate on their own.** While the Desktop runs, it periodically tells each connected gateway which agents live on the *other* connections. Every Bot Chat's teammate roster then lists them ("Teammates on OTHER connected machines"), with names, roles, and which machine they're on — and the roster refreshes when agents appear, disappear, or get renamed (capability epoch).
 - **`message_agent` reaches them directly.** A Bot on your laptop messages the cloud agent with `message_agent(target="moxie", …)` exactly like a local teammate. If the same handle exists on several machines, disambiguate with `target="moxie@<connection>"` (the tool's error tells the Bot the exact forms). Delivery rides the Desktop: the sending gateway queues the message, the Desktop relays it to the target connection's own gateway, the target Bot runs a turn in its canonical Bot Chat, and the reply comes back to the sender as the same background completion notification local DMs use. Messages to different Bots are delivered side by side, so one Bot's long turn never delays another Bot's mail (or ages it past `bot_mode.envelope_ttl_seconds`); messages to the *same* Bot are delivered in order, one turn at a time.
-- **The Desktop is the courier.** Cross-connection delivery works while a Desktop that knows both connections is running (it holds the sockets and the credentials — gateways never see each other's auth). If the Desktop is closed mid-delivery, the sender's Bot is told the reply didn't arrive rather than left hanging. For always-on machine-to-machine messaging with no Desktop in the loop, register a peer (`hermes peer`, below) — the two routes coexist.
+- **The Desktop is the courier.** Cross-connection delivery works while a Desktop that knows both connections is running (it holds the sockets and the credentials — gateways never see each other's auth). If the Desktop is closed mid-delivery, the sender's Bot is told the reply didn't arrive rather than left hanging. For always-on machine-to-machine messaging with no Desktop in the loop, register a peer (`x19 peer`, below) — the two routes coexist.
 
-### Bot-initiated DMs across machines (`hermes peer`)
+### Bot-initiated DMs across machines (`x19 peer`)
 
 Bots on one machine can message Bots on **another machine's gateway** without any desktop in the loop. Register the other gateway as a *peer* (its API server URL + `API_SERVER_KEY`):
 
 ```bash
-hermes peer add spark --url http://spark.lan:8377 --key <API_SERVER_KEY>
-hermes peer list
-hermes peer dm spark < /tmp/dm.txt        # message body from a file (nothing shell-interpreted)
-hermes peer dm spark/researcher < /tmp/dm.txt   # named profile on a multiplexed peer
-hermes peer run spark --idempotency-key ticket-123 < /tmp/long-task.txt
-hermes peer status spark run_abc123
-hermes peer stop spark run_abc123
+x19 peer add spark --url http://spark.lan:8377 --key <API_SERVER_KEY>
+x19 peer list
+x19 peer dm spark < /tmp/dm.txt        # message body from a file (nothing shell-interpreted)
+x19 peer dm spark/researcher < /tmp/dm.txt   # named profile on a multiplexed peer
+x19 peer run spark --idempotency-key ticket-123 < /tmp/long-task.txt
+x19 peer status spark run_abc123
+x19 peer stop spark run_abc123
 ```
 
-`hermes peer dm` delivers into the remote agent's canonical Bot Chat over the peer's existing API server, runs one agent turn there, and prints the reply on stdout — the exact cross-machine twin of the local `hermes -p <bot> chat` command.
+`x19 peer dm` delivers into the remote agent's canonical Bot Chat over the peer's existing API server, runs one agent turn there, and prints the reply on stdout — the exact cross-machine twin of the local `x19 -p <bot> chat` command.
 
 Use `peer dm` only for short queries and receipts because it holds one HTTP
 connection until the turn finishes. For a long turn, `peer run` returns a
@@ -244,7 +244,7 @@ with that exact run ID to interrupt it without targeting another turn.
 
 Once a peer is registered, the messaging protocol taught to every Bot Chat (`agent.bot_mode_protocol`) automatically includes the peer roster, and `message_agent` accepts peer targets directly — `message_agent(target="spark/researcher", …)`, or `target="spark"` for the peer's main agent — so **your bots learn on their own** that teammates exist on other machines and how to reach them. Registering or removing a peer refreshes each Bot Chat's protocol on its next message (capability epoch).
 
-Requirements: the peer machine runs the `api_server` gateway platform with a strong `API_SERVER_KEY`; reachability is your network's business (LAN, Tailscale, VPN). The key is a credential and lives in `~/.hermes/.env` as `HERMES_PEER_<NAME>_KEY`; peer names/URLs live in `config.yaml` under `bot_peers`.
+Requirements: the peer machine runs the `api_server` gateway platform with a strong `API_SERVER_KEY`; reachability is your network's business (LAN, Tailscale, VPN). The key is a credential and lives in `~/.x19/.env` as `X19_PEER_<NAME>_KEY`; peer names/URLs live in `config.yaml` under `bot_peers`.
 
 :::note One-way reachability (NAT)
 Cross-gateway links are direct gateway-to-gateway connections — Desktop is a
@@ -321,15 +321,15 @@ promotion, demotion, or replay will merge them.
 
 ## Bots across machines
 
-When you register several backends in **Settings → Connections** — the local runtime, remote gateways, SSH hosts, Hermes Cloud instances — the roster shows the Bots from **every** connected source, persistently: SSH sources are inventoried without spawning anything on the remote box, and machines that are momentarily unreachable keep their last-known rows instead of vanishing. When the same profile name exists on several sources, handles disambiguate as `@name-device` (for example `@research-homelab`). A Bot's chats, sessions, memory, and routines live on the machine that owns the profile.
+When you register several backends in **Settings → Connections** — the local runtime, remote gateways, SSH hosts, X19 Cloud instances — the roster shows the Bots from **every** connected source, persistently: SSH sources are inventoried without spawning anything on the remote box, and machines that are momentarily unreachable keep their last-known rows instead of vanishing. When the same profile name exists on several sources, handles disambiguate as `@name-device` (for example `@research-homelab`). A Bot's chats, sessions, memory, and routines live on the machine that owns the profile.
 
-Clicking a Connections Bot does **not** hop your window onto that machine — stay in your chat and `@mention` it, seat it in a group chat, or create new agents on it directly with the **Create on** picker. Cloud and local agents share one roster this way: register your Hermes Cloud instance and your desktop (say, over Tailscale or SSH) and their Bots can message each other and sit in the same rooms, with each agent's work running on its own machine. Bot-to-bot DMs across those machines go through the Desktop relay automatically (see *Messaging across connected machines* above).
+Clicking a Connections Bot does **not** hop your window onto that machine — stay in your chat and `@mention` it, seat it in a group chat, or create new agents on it directly with the **Create on** picker. Cloud and local agents share one roster this way: register your X19 Cloud instance and your desktop (say, over Tailscale or SSH) and their Bots can message each other and sit in the same rooms, with each agent's work running on its own machine. Bot-to-bot DMs across those machines go through the Desktop relay automatically (see *Messaging across connected machines* above).
 
-See [Connecting Desktop to Many Hermes Instances](./multi-connection-desktop.md) for the full multi-connection guide.
+See [Connecting Desktop to Many X19 Instances](./multi-connection-desktop.md) for the full multi-connection guide.
 
 ## Warm Bot Backends (how many bots run at once)
 
-Each local Bot runs in its own backend process, and Desktop keeps at most **Settings → Advanced → Warm Bot Backends** of them alive at once (default 3, ~60 MB each). Idle backends are reaped after the idle timeout next to that setting (default 10 minutes); the `Hermes backend for profile "<name>" exited (1)` line in `desktop.log` that follows an idle-reap message is that cleanup, not a crash. A Bot you open while every slot is busy waits up to 30 seconds for a slot, then fails with *timed out waiting for a free local slot*.
+Each local Bot runs in its own backend process, and Desktop keeps at most **Settings → Advanced → Warm Bot Backends** of them alive at once (default 3, ~60 MB each). Idle backends are reaped after the idle timeout next to that setting (default 10 minutes); the `X19 backend for profile "<name>" exited (1)` line in `desktop.log` that follows an idle-reap message is that cleanup, not a crash. A Bot you open while every slot is busy waits up to 30 seconds for a slot, then fails with *timed out waiting for a free local slot*.
 
 Reads of another Bot's chat history and background transcript refreshes do **not** take a slot — only an interactive open or a running turn does. If you drive a large fleet (group chats with many members, or Kanban dispatch across many profiles), raise Warm Bot Backends toward the number of Bots you expect to be active at the same time and give the machine the memory to match. Setting it higher than the profiles you actually use only adds startup work.
 
@@ -345,9 +345,9 @@ Because Bots are profiles, everything has a terminal equivalent:
 
 | In Bot Mode | From a shell |
 | --- | --- |
-| Chat with a Bot | `hermes -p <bot> chat` |
-| A Bot's files, skills, memory | `~/.hermes/profiles/<bot>/` |
-| Routines | `hermes cron list` (jobs named `[bot:<name>] …`) |
-| Create / inspect profiles | `hermes profile create`, `hermes profile list` |
+| Chat with a Bot | `x19 -p <bot> chat` |
+| A Bot's files, skills, memory | `~/.x19/profiles/<bot>/` |
+| Routines | `x19 cron list` (jobs named `[bot:<name>] …`) |
+| Create / inspect profiles | `x19 profile create`, `x19 profile list` |
 
 See [Profiles](./profiles.md) for the underlying primitive and [Profile Commands](../reference/profile-commands.md) for the full CLI reference.

@@ -86,7 +86,7 @@ def test_catalog_placeholders_match_english(lang: str):
 
 def test_default_when_nothing_set(monkeypatch):
     """With no env var and no config override, falls back to English."""
-    monkeypatch.delenv("HERMES_LANGUAGE", raising=False)
+    monkeypatch.delenv("X19_LANGUAGE", raising=False)
     # Force config lookup to return None -- patch the cached reader.
     i18n.reset_language_cache()
     monkeypatch.setattr(i18n, "_config_language", lambda: None)
@@ -94,7 +94,7 @@ def test_default_when_nothing_set(monkeypatch):
 
 
 def test_language_is_per_profile_under_multiplex(monkeypatch, tmp_path):
-    """HERMES_LANGUAGE in the DEFAULT profile's environ must not leak into a secondary profile's
+    """X19_LANGUAGE in the DEFAULT profile's environ must not leak into a secondary profile's
     turn, and the config-language cache must not freeze one profile's ``display.language`` for all."""
     from agent import secret_scope
 
@@ -102,14 +102,14 @@ def test_language_is_per_profile_under_multiplex(monkeypatch, tmp_path):
     prof_b = tmp_path / "b"; prof_b.mkdir()
     (default_home / "config.yaml").write_text("display:\n  language: fr\n")
     (prof_b / "config.yaml").write_text("display:\n  language: de\n")
-    monkeypatch.setenv("HERMES_LANGUAGE", "zh")  # default profile's .env, bridged into environ
+    monkeypatch.setenv("X19_LANGUAGE", "zh")  # default profile's .env, bridged into environ
     i18n.reset_language_cache()
     secret_scope.set_multiplex_active(True)
     token = secret_scope.set_secret_scope({})
     try:
-        monkeypatch.setenv("HERMES_HOME", str(default_home))
+        monkeypatch.setenv("X19_HOME", str(default_home))
         assert i18n.get_language() == "fr"  # scoped miss: env ignored, this profile's config wins
-        monkeypatch.setenv("HERMES_HOME", str(prof_b))
+        monkeypatch.setenv("X19_HOME", str(prof_b))
         assert i18n.get_language() == "de"  # not the first profile's cached "fr"
     finally:
         secret_scope.reset_secret_scope(token)
@@ -155,9 +155,9 @@ def test_t_missing_key_in_non_english_falls_back_to_english(tmp_path, monkeypatc
 
 
 def test_locales_dir_env_override_ignored_when_missing(tmp_path, monkeypatch):
-    """A bogus HERMES_BUNDLED_LOCALES falls through to source/wheel resolution
+    """A bogus X19_BUNDLED_LOCALES falls through to source/wheel resolution
     instead of returning a path that doesn't exist."""
-    monkeypatch.setenv("HERMES_BUNDLED_LOCALES", str(tmp_path / "does-not-exist"))
+    monkeypatch.setenv("X19_BUNDLED_LOCALES", str(tmp_path / "does-not-exist"))
     result = i18n._locales_dir()
     assert result != tmp_path / "does-not-exist"
     # In a source checkout this is the repo-root locales dir.

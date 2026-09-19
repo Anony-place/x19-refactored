@@ -26,7 +26,7 @@ describe('sidecarErrorMessage', () => {
       'WebSocket connection failed',
       'WebSocket closed',
       'gateway not connected',
-      'Session token not available — page must be served by the Hermes dashboard server'
+      'Session token not available — page must be served by the X19 dashboard server'
     ]) {
       expect(sidecarErrorMessage(raw)).toBe(SIDECAR_DISCONNECTED_MESSAGE)
     }

@@ -11,21 +11,21 @@
     { pkgs, self', ... }:
     let
       packages = builtins.attrValues self'.packages;
-      hermesNpmLib = self'.packages.default.passthru.hermesNpmLib;
+      x19NpmLib = self'.packages.default.passthru.x19NpmLib;
 
       # Collect all packageJsonPath values from npm workspace packages.
       npmPackageJsonPaths = builtins.filter (p: p != null) (
         map (p: p.passthru.packageJsonPath or null) packages
       );
 
-      hermesAgentDevShellHook = self'.packages.default.passthru.devShellHook;
+      x19AgentDevShellHook = self'.packages.default.passthru.devShellHook;
     in
     {
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
-          (pkgs.runCommand "hermes" { } ''
+          (pkgs.runCommand "x19" { } ''
             mkdir -p $out/bin
-            install -Dm755 ${../hermes} $out/bin/hermes
+            install -Dm755 ${../x19} $out/bin/x19
           '')
           self'.packages.sandbox
           uv
@@ -43,21 +43,21 @@
         ]
         ++ self'.packages.default.passthru.devDeps;
         shellHook = ''
-          ${hermesAgentDevShellHook}
-          ${hermesNpmLib.mkNpmDevShellHook npmPackageJsonPaths}
+          ${x19AgentDevShellHook}
+          ${x19NpmLib.mkNpmDevShellHook npmPackageJsonPaths}
 
           # Force Node to use Nix's playwright-test binary instead of node_modules/.bin
           export PATH="${pkgs.playwright-test}/bin:$PATH"
 
           # for the devshell to pick up the src
-          export HERMES_PYTHON_SRC_ROOT=$(git rev-parse --show-toplevel)
+          export X19_PYTHON_SRC_ROOT=$(git rev-parse --show-toplevel)
 
           # Let `uv run --active --no-sync` reuse Nix's provisioned Python
           # environment instead of creating an empty project .venv.
           export VIRTUAL_ENV="$(dirname "$(dirname "$(readlink -f "$(command -v python)")")")"
 
-          echo "Hermes Agent dev shell in $HERMES_PYTHON_SRC_ROOT"
-          echo "Ready. Run 'hermes' or 'sandbox hermes' to start."
+          echo "X19 dev shell in $X19_PYTHON_SRC_ROOT"
+          echo "Ready. Run 'x19' or 'sandbox x19' to start."
         '';
       };
     };

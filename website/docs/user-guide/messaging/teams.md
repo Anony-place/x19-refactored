@@ -1,16 +1,16 @@
 ---
 sidebar_position: 5
 title: "Microsoft Teams"
-description: "Set up Hermes Agent as a Microsoft Teams bot"
+description: "Set up X19 as a Microsoft Teams bot"
 ---
 
 # Microsoft Teams Setup
 
-Connect Hermes Agent to Microsoft Teams as a bot. Unlike Slack's Socket Mode, Teams delivers messages by calling a **public HTTPS webhook**, so your instance needs a publicly reachable endpoint — either a dev tunnel (local dev) or a real domain (production).
+Connect X19 to Microsoft Teams as a bot. Unlike Slack's Socket Mode, Teams delivers messages by calling a **public HTTPS webhook**, so your instance needs a publicly reachable endpoint — either a dev tunnel (local dev) or a real domain (production).
 
 Need meeting summaries from Microsoft Graph events rather than normal bot conversations? Use the dedicated setup page: [Teams Meetings](/user-guide/messaging/teams-meetings).
 
-> Run `hermes gateway setup` and pick **Microsoft Teams** for a guided walk-through.
+> Run `x19 gateway setup` and pick **Microsoft Teams** for a guided walk-through.
 
 ## How the Bot Responds
 
@@ -20,7 +20,7 @@ Need meeting summaries from Microsoft Graph events rather than normal bot conver
 | **Group chat** | Bot only responds when @mentioned. |
 | **Channel** | Bot only responds when @mentioned. |
 
-Teams delivers @mentions as regular messages with `<at>BotName</at>` tags, which Hermes strips automatically before processing.
+Teams delivers @mentions as regular messages with `<at>BotName</at>` tags, which X19 strips automatically before processing.
 
 ---
 
@@ -56,9 +56,9 @@ Teams cannot deliver messages to `localhost`. For local development, use any tun
 
 ```bash
 # devtunnel (Microsoft)
-devtunnel create hermes-bot --allow-anonymous
-devtunnel port create hermes-bot -p 3978 --protocol http  # replace 3978 with TEAMS_PORT if changed
-devtunnel host hermes-bot
+devtunnel create x19-bot --allow-anonymous
+devtunnel port create x19-bot -p 3978 --protocol http  # replace 3978 with TEAMS_PORT if changed
+devtunnel host x19-bot
 
 # ngrok
 ngrok http 3978  # replace 3978 with TEAMS_PORT if changed
@@ -69,7 +69,7 @@ cloudflared tunnel --url http://localhost:3978  # replace 3978 with TEAMS_PORT i
 
 Copy the `https://` URL from the output — you'll use it in the next step. Leave the tunnel running while developing.
 
-The public tunnel URL uses HTTPS, but Hermes' local webhook listener uses plain HTTP. The tunnel terminates TLS and forwards HTTP to port `3978`; do not configure the local tunnel port as HTTPS.
+The public tunnel URL uses HTTPS, but X19' local webhook listener uses plain HTTP. The tunnel terminates TLS and forwards HTTP to port `3978`; do not configure the local tunnel port as HTTPS.
 
 For production, point your bot's endpoint at your server's public domain instead (see [Production Deployment](#production-deployment)).
 
@@ -79,7 +79,7 @@ For production, point your bot's endpoint at your server's public domain instead
 
 ```bash
 teams app create \
-  --name "Hermes" \
+  --name "X19" \
   --endpoint "https://<your-tunnel-url>/api/messages"
 ```
 
@@ -89,7 +89,7 @@ The CLI outputs your `CLIENT_ID`, `CLIENT_SECRET`, and `TENANT_ID`, plus an inst
 
 ## Step 4: Configure Environment Variables
 
-Add to `~/.hermes/.env`:
+Add to `~/.x19/.env`:
 
 ```bash
 # Required
@@ -106,24 +106,24 @@ TEAMS_ALLOWED_USERS=<your-aad-object-id>
 
 ## Step 5: Start the Gateway
 
-**Docker** (must run from the directory that contains `docker-compose.yml` — usually your cloned `hermes-agent` repo, not `~`):
+**Docker** (must run from the directory that contains `docker-compose.yml` — usually your cloned `x19` repo, not `~`):
 
 ```bash
-cd /path/to/hermes-agent
-HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d gateway
+cd /path/to/x19
+X19_UID=$(id -u) X19_GID=$(id -g) docker compose up -d gateway
 ```
 
-**Native / systemd install** (typical `hermes` one-liner installer under `~/.hermes/hermes-agent`):
+**Native / systemd install** (typical `x19` one-liner installer under `~/.x19/x19`):
 
 ```bash
-hermes gateway restart
-# or foreground: hermes gateway run
+x19 gateway restart
+# or foreground: x19 gateway run
 ```
 
-The Teams SDK is optional; when Teams is enabled, the gateway lazy-installs it into Hermes' own venv on first start (do **not** use system `pip install` on Ubuntu 24.04 — that hits PEP 668 `externally-managed-environment`). To install manually into the Hermes venv:
+The Teams SDK is optional; when Teams is enabled, the gateway lazy-installs it into X19' own venv on first start (do **not** use system `pip install` on Ubuntu 24.04 — that hits PEP 668 `externally-managed-environment`). To install manually into the X19 venv:
 
 ```bash
-~/.hermes/hermes-agent/venv/bin/pip install microsoft-teams-apps aiohttp
+~/.x19/x19/venv/bin/pip install microsoft-teams-apps aiohttp
 # or from a clone of the agent: uv sync --extra teams
 ```
 
@@ -132,9 +132,9 @@ The default webhook port is `3978` (override with `TEAMS_PORT`). Check that it's
 ```bash
 curl http://localhost:3978/health   # should return: ok
 # Docker:
-docker logs -f hermes
+docker logs -f x19
 # Native:
-hermes gateway status -l
+x19 gateway status -l
 ```
 
 Look for:
@@ -171,7 +171,7 @@ Open the printed link in your browser — it opens directly in the Teams client.
 
 ### config.yaml
 
-Alternatively, configure via `~/.hermes/config.yaml`:
+Alternatively, configure via `~/.x19/config.yaml`:
 
 ```yaml
 platforms:
@@ -234,11 +234,11 @@ If the `teams_pipeline` plugin is **not** enabled, these settings are inert — 
 
 ## Production Deployment
 
-For a permanent server, terminate TLS at a reverse proxy and forward requests to the plain HTTP Hermes listener, normally `http://127.0.0.1:3978`. Register the proxy's public HTTPS endpoint with Teams:
+For a permanent server, terminate TLS at a reverse proxy and forward requests to the plain HTTP X19 listener, normally `http://127.0.0.1:3978`. Register the proxy's public HTTPS endpoint with Teams:
 
 ```bash
 teams app create \
-  --name "Hermes" \
+  --name "X19" \
   --endpoint "https://your-domain.com/api/messages"
 ```
 
@@ -248,7 +248,7 @@ If you've already created the bot and just need to update the endpoint:
 teams app update --id <teamsAppId> --endpoint "https://your-domain.com/api/messages"
 ```
 
-Make sure the public HTTPS endpoint is reachable from the internet and uses a valid TLS certificate. Teams rejects self-signed certificates. Keep the Hermes listener behind the proxy; port `3978` does not serve HTTPS itself.
+Make sure the public HTTPS endpoint is reachable from the internet and uses a valid TLS certificate. Teams rejects self-signed certificates. Keep the X19 listener behind the proxy; port `3978` does not serve HTTPS itself.
 
 ---
 
@@ -256,16 +256,16 @@ Make sure the public HTTPS endpoint is reachable from the internet and uses a va
 
 | Problem | Solution |
 |---------|----------|
-| `Can't find a suitable configuration file` from `docker compose` | You are not in the repo that has `docker-compose.yml`, or you are on a native install — use `hermes gateway restart` instead, or `cd` into the clone first |
-| `requirements not met` / `Teams SDK missing` / `No adapter available for teams` | Restart gateway so lazy-install can run, or install into the **Hermes venv**: `~/.hermes/hermes-agent/venv/bin/pip install microsoft-teams-apps aiohttp`. System `pip` fails on Ubuntu 24.04 (PEP 668) and would not affect the service anyway |
+| `Can't find a suitable configuration file` from `docker compose` | You are not in the repo that has `docker-compose.yml`, or you are on a native install — use `x19 gateway restart` instead, or `cd` into the clone first |
+| `requirements not met` / `Teams SDK missing` / `No adapter available for teams` | Restart gateway so lazy-install can run, or install into the **X19 venv**: `~/.x19/x19/venv/bin/pip install microsoft-teams-apps aiohttp`. System `pip` fails on Ubuntu 24.04 (PEP 668) and would not affect the service anyway |
 | `health` endpoint works but bot doesn't respond | Check that your tunnel is still running and the bot's messaging endpoint matches the tunnel URL |
-| Logs show `"UNKNOWN / HTTP/1.0" 400` when Teams sends a message | The tunnel or reverse proxy is forwarding HTTPS to Hermes' plain HTTP listener. Terminate TLS at the proxy and forward HTTP to port `3978` |
+| Logs show `"UNKNOWN / HTTP/1.0" 400` when Teams sends a message | The tunnel or reverse proxy is forwarding HTTPS to X19' plain HTTP listener. Terminate TLS at the proxy and forward HTTP to port `3978` |
 | `KeyError: 'teams'` in logs | Restart the container — this is fixed in the current version |
 | Bot responds with auth errors | Verify `TEAMS_CLIENT_ID`, `TEAMS_CLIENT_SECRET`, and `TEAMS_TENANT_ID` are all set correctly |
-| `No inference provider configured` | Check that `ANTHROPIC_API_KEY` (or another provider key) is set in `~/.hermes/.env` |
+| `No inference provider configured` | Check that `ANTHROPIC_API_KEY` (or another provider key) is set in `~/.x19/.env` |
 | Bot receives messages but ignores them | Your AAD object ID may not be in `TEAMS_ALLOWED_USERS`. Run `teams status --verbose` to find it |
-| Tunnel URL changes on restart | devtunnel URLs are persistent if you use a named tunnel (`devtunnel create hermes-bot`). ngrok and cloudflared generate a new URL each run unless you have a paid plan — update the bot endpoint with `teams app update` when it changes |
-| Teams shows "This bot is not responding" | The webhook returned an error. Check `docker logs hermes` / `hermes gateway status -l` for tracebacks |
+| Tunnel URL changes on restart | devtunnel URLs are persistent if you use a named tunnel (`devtunnel create x19-bot`). ngrok and cloudflared generate a new URL each run unless you have a paid plan — update the bot endpoint with `teams app update` when it changes |
+| Teams shows "This bot is not responding" | The webhook returned an error. Check `docker logs x19` / `x19 gateway status -l` for tracebacks |
 | `[teams] Failed to connect` in logs | The SDK failed to authenticate. Double-check your credentials and that the tenant ID matches the account you used in `teams login` |
 
 ---
@@ -278,7 +278,7 @@ Make sure the public HTTPS endpoint is reachable from the internet and uses a va
 Treat `TEAMS_CLIENT_SECRET` like a password — rotate it periodically via the Azure portal or Teams CLI.
 :::
 
-- Store credentials in `~/.hermes/.env` with permissions `600` (`chmod 600 ~/.hermes/.env`)
+- Store credentials in `~/.x19/.env` with permissions `600` (`chmod 600 ~/.x19/.env`)
 - The bot only accepts messages from users in `TEAMS_ALLOWED_USERS`; unauthorized messages are silently dropped
 - Your public endpoint (`/api/messages`) is authenticated by the Teams Bot Framework — requests without valid JWTs are rejected
 

@@ -20,12 +20,12 @@ from gateway.kanban_watchers_common import _list_boards, _to_thread_process_serv
 
 
 def _kbc():
-    from hermes_cli import kanban_db_connect
+    from x19_cli import kanban_db_connect
     return kanban_db_connect
 
 
 def _kbn():
-    from hermes_cli import kanban_db_notify
+    from x19_cli import kanban_db_notify
     return kanban_db_notify
 
 # "status" covers dashboard drag-drop and `_set_status_direct()`.
@@ -120,7 +120,7 @@ def _warn_anchorless_thread_sub_once(sub: dict, platform: str) -> None:
     _ANCHORLESS_WARNED.add(key)
     logger.warning(
         "kanban notifier: subscription for %s on %s thread %s has no parent_chat_id anchor and matched no "
-        "profile route; it will not be delivered. Re-subscribe with `hermes kanban notify-subscribe ... "
+        "profile route; it will not be delivered. Re-subscribe with `x19 kanban notify-subscribe ... "
         "--parent-chat-id <channel id> [--guild-id <guild id>]`.",
         sub.get("task_id"), platform, sub.get("chat_id"),
     )
@@ -206,7 +206,7 @@ class _Collector:
             logger.debug("kanban notifier: no connected adapters; skipping tick")
             return self.deliveries
         # Poll each resolved DB path once: several slugs can map to one DB when
-        # HERMES_KANBAN_DB pins the board path.
+        # X19_KANBAN_DB pins the board path.
         kb = self.kb
         seen_db_paths: set[str] = set()
         for board_meta in _list_boards(kb):
@@ -403,8 +403,8 @@ def _fmt_gave_up(ev, n) -> tuple:
     count = f"it failed {int(failures)} times in a row" if failures else "it kept failing"
     last = _clip(ev, "error", " (last: {})", 160)
     return (
-        f"⛔ {n.head} is now blocked: {count}{last}. Fix the cause, then `hermes kanban unblock "
-        f"{n.task_id}` (or `hermes kanban reassign {n.task_id}`). Logs: `hermes kanban log {n.task_id}`.",
+        f"⛔ {n.head} is now blocked: {count}{last}. Fix the cause, then `x19 kanban unblock "
+        f"{n.task_id}` (or `x19 kanban reassign {n.task_id}`). Logs: `x19 kanban log {n.task_id}`.",
         None, None,
     )
 
@@ -594,7 +594,7 @@ class _KanbanNotification:
         _source._transport_adapter_ref = weakref.ref(self.adapter)
         from gateway.run import _async_profile_runtime_scope
         if self.sub_profile and getattr(getattr(self.runner, "config", None), "multiplex_profiles", False):
-            from hermes_cli.profiles import profile_exists
+            from x19_cli.profiles import profile_exists
             if not profile_exists(self.sub_profile):
                 raise RuntimeError(f"Kanban wake profile {self.sub_profile!r} no longer exists")
         async with _async_profile_runtime_scope(self.runner._resolve_profile_home_for_source(_source)):

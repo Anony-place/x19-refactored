@@ -7,9 +7,9 @@ description: >-
   Issues, stack traces, and error context from Sentry.
 source: https://docs.sentry.io/product/sentry-mcp/
 
-# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
+# Official vendor-hosted remote MCP (URL-only — X19 never spawns a local
 # process for this entry). Native OAuth 2.1 + Dynamic Client Registration;
-# Hermes's MCP client + mcp_oauth_manager handle discovery, PKCE, token
+# X19's MCP client + mcp_oauth_manager handle discovery, PKCE, token
 # exchange, and refresh.
 transport:
   type: http
@@ -28,6 +28,6 @@ suggest:
     - sentry.io
 
 post_install: |
-  On first connection Hermes opens a browser to authorize with
-  Sentry (or run `hermes mcp login sentry`). Approve access,
+  On first connection X19 opens a browser to authorize with
+  Sentry (or run `x19 mcp login sentry`). Approve access,
   then restart the session so tools load.

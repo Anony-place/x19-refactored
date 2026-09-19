@@ -1,7 +1,7 @@
 """Multiplex interactive-auth regressions (#86296, #92840, #72657, #87240 egress).
 
 Real ``GatewayRunner`` methods on an ``object.__new__`` runner, real
-``PairingStore`` files under a temp HERMES_HOME, multiplex active.
+``PairingStore`` files under a temp X19_HOME, multiplex active.
 """
 
 from pathlib import Path
@@ -22,7 +22,7 @@ def mux_home(tmp_path, monkeypatch):
     (home / "profiles" / "secondary").mkdir(parents=True)
     (home / ".env").write_text("")
     (home / "profiles" / "secondary" / ".env").write_text("")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     for key in (
         "TELEGRAM_ALLOWED_USERS",
         "TELEGRAM_ALLOW_BOTS",

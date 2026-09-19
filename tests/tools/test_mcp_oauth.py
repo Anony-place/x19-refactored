@@ -13,7 +13,7 @@ import pytest
 import asyncio
 
 from tools.mcp_oauth import (
-    HermesTokenStorage,
+    X19TokenStorage,
     OAuthNonInteractiveError,
     build_oauth_auth,
     remove_oauth_tokens,
@@ -67,13 +67,13 @@ def _hit_callback_when_ready(url: str, timeout: float = 15.0) -> None:
 
 
 # ---------------------------------------------------------------------------
-# HermesTokenStorage
+# X19TokenStorage
 # ---------------------------------------------------------------------------
 
-class TestHermesTokenStorage:
+class TestX19TokenStorage:
     def test_roundtrip_tokens(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("test-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("test-server")
 
         import asyncio
 
@@ -104,8 +104,8 @@ class TestHermesTokenStorage:
         0o644 = world-readable) before tightening to owner-only. Mirrors
         the fix shipped for ``agent/google_oauth.py`` in #19673.
         """
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("perm-test-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("perm-test-server")
 
         import asyncio
         mock_token = MagicMock()
@@ -129,8 +129,8 @@ class TestHermesTokenStorage:
     def test_client_info_with_secret_uses_client_secret_post(self, tmp_path, monkeypatch):
         from mcp.shared.auth import OAuthClientInformationFull
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("supabase")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("supabase")
         client_info = OAuthClientInformationFull.model_validate({
             "client_id": "client-id",
             "client_secret": "secret",
@@ -146,7 +146,7 @@ class TestHermesTokenStorage:
         assert json.loads(client_path.read_text())["token_endpoint_auth_method"] == "client_secret_post"
 
     def test_client_info_with_secret_and_none_method_is_coerced(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         token_dir = tmp_path / "mcp-tokens"
         token_dir.mkdir(parents=True)
         client_path = token_dir / "supabase.client.json"
@@ -157,7 +157,7 @@ class TestHermesTokenStorage:
             "token_endpoint_auth_method": "none",
         }))
 
-        loaded = asyncio.run(HermesTokenStorage("supabase").get_client_info())
+        loaded = asyncio.run(X19TokenStorage("supabase").get_client_info())
 
         assert loaded is not None
         assert loaded.token_endpoint_auth_method == "client_secret_post"
@@ -169,8 +169,8 @@ class TestHermesTokenStorage:
         from mcp.shared.auth import OAuthMetadata
         from tools.mcp_oauth_device import DeviceOAuthMetadata
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("bad-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("bad-server")
         d = tmp_path / "mcp-tokens"
         d.mkdir(parents=True)
         (d / "bad-server.json").write_text("NOT VALID JSON{{{")
@@ -200,8 +200,8 @@ class TestHermesTokenStorage:
         import asyncio
         import logging
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("bad-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("bad-server")
         d = tmp_path / "mcp-tokens"
         d.mkdir(parents=True)
         secret = "sk-live-QQQQQQQQ"  # short enough that pydantic's input echo does not elide it
@@ -230,7 +230,7 @@ class TestBuildOAuthAuth:
     def test_scope_passed_through(self, tmp_path, monkeypatch):
         pytest.importorskip("mcp.client.auth")
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("scoped", "https://example.com/mcp", {
             "scope": "read write admin",
@@ -243,7 +243,7 @@ class TestBuildOAuthAuth:
         from mcp.shared.auth import OAuthClientInformationFull
         from urllib.parse import parse_qs
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("supabase", "https://mcp.supabase.com/mcp")
         assert provider is not None
@@ -268,7 +268,7 @@ class TestBuildOAuthAuth:
     async def test_token_response_accepts_201_created(self, tmp_path, monkeypatch):
         import httpx
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("supabase", "https://mcp.supabase.com/mcp")
         assert provider is not None
@@ -294,7 +294,7 @@ class TestBuildOAuthAuth:
         import httpx
         from mcp.client.auth.oauth2 import OAuthTokenError
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("supabase", "https://mcp.supabase.com/mcp")
         assert provider is not None
@@ -314,7 +314,7 @@ class TestBuildOAuthAuth:
         import httpx
         from mcp.client.auth.oauth2 import OAuthTokenError
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("supabase", "https://mcp.supabase.com/mcp")
         assert provider is not None
@@ -338,7 +338,7 @@ class TestBuildOAuthAuth:
         import logging
         import httpx
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("supabase", "https://mcp.supabase.com/mcp")
         assert provider is not None
@@ -358,7 +358,7 @@ class TestBuildOAuthAuth:
     async def test_refresh_read_error_clears_tokens(self, tmp_path, monkeypatch):
         import httpx
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         _set_interactive_stdin(monkeypatch)
         provider = build_oauth_auth("supabase", "https://mcp.supabase.com/mcp")
         assert provider is not None
@@ -448,20 +448,20 @@ class TestPathTraversal:
     """Verify server_name is sanitized to prevent path traversal."""
 
     def test_dots_and_slashes_sanitized(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("../../../etc/passwd")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("../../../etc/passwd")
         path = storage._tokens_path()
         resolved = path.resolve()
         assert resolved.is_relative_to((tmp_path / "mcp-tokens").resolve())
 
     def test_normal_name_unchanged(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("my-mcp-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("my-mcp-server")
         assert "my-mcp-server.json" in str(storage._tokens_path())
 
     def test_special_chars_sanitized(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("server@host:8080/path")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("server@host:8080/path")
         path = storage._tokens_path()
         assert "@" not in path.name
         assert ":" not in path.name
@@ -644,7 +644,7 @@ class TestCallbackPortReservation:
     @staticmethod
     def _seed_client_info(tmp_path, payload):
         """Write *payload* verbatim to the real ``mcp-tokens/srv.client.json`` under a temp home."""
-        storage = HermesTokenStorage("srv", hermes_home=tmp_path)
+        storage = X19TokenStorage("srv", x19_home=tmp_path)
         path = storage._client_info_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload), encoding="utf-8")
@@ -719,7 +719,7 @@ class TestCallbackPortReservation:
 
 class TestRemoveOAuthTokens:
     def test_removes_files(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         d = tmp_path / "mcp-tokens"
         d.mkdir()
         (d / "myserver.json").write_text("{}")
@@ -742,8 +742,8 @@ class TestInvalidateTokensOnClientChange:
 
     def _seed(self, tmp_path, monkeypatch, client_id="client-a",
               client_secret=None):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("chg-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("chg-server")
         d = tmp_path / "mcp-tokens"
         d.mkdir(parents=True, exist_ok=True)
         info = {"client_id": client_id, "redirect_uris": ["http://localhost:1455/callback"]}
@@ -786,8 +786,8 @@ class TestInvalidateTokensOnClientChange:
 
     def test_no_prior_client_info_is_noop(self, tmp_path, monkeypatch):
         from tools.mcp_oauth import _invalidate_tokens_on_client_change
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("fresh-server")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("fresh-server")
         d = tmp_path / "mcp-tokens"
         d.mkdir(parents=True, exist_ok=True)
         (d / "fresh-server.json").write_text(json.dumps({
@@ -924,7 +924,7 @@ class TestBuildOAuthAuthNonInteractive:
         """Without cached tokens, non-interactive mode skips browser auth."""
         pytest.importorskip("mcp.client.auth")
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         mock_stdin = MagicMock()
         mock_stdin.isatty.return_value = False
         monkeypatch.setattr("tools.mcp_oauth.sys.stdin", mock_stdin)
@@ -1047,7 +1047,7 @@ def test_build_oauth_auth_preserves_server_url_path():
     breaking RFC 9728 protected-resource validation against servers whose PRM
     advertises a path-scoped resource (Notion). The MCP SDK strips the path
     itself for authorization-server discovery via
-    ``OAuthContext.get_authorization_base_url``; Hermes must not pre-strip.
+    ``OAuthContext.get_authorization_base_url``; X19 must not pre-strip.
     """
     from tools import mcp_oauth
 
@@ -1058,10 +1058,10 @@ def test_build_oauth_auth_preserves_server_url_path():
             captured.update(kwargs)
 
     with patch.object(mcp_oauth, "_OAUTH_AVAILABLE", True), \
-         patch.object(mcp_oauth, "HermesOAuthClientProvider", _FakeProvider), \
+         patch.object(mcp_oauth, "X19OAuthClientProvider", _FakeProvider), \
          patch.object(mcp_oauth, "_is_interactive", return_value=True), \
          patch.object(mcp_oauth, "_maybe_preregister_client"), \
-         patch.object(mcp_oauth, "HermesTokenStorage") as mock_storage_cls:
+         patch.object(mcp_oauth, "X19TokenStorage") as mock_storage_cls:
         mock_storage_cls.return_value = MagicMock(has_cached_tokens=lambda: True)
         build_oauth_auth(
             server_name="notion",
@@ -1188,8 +1188,8 @@ class TestWaitForCallbackSkipIntegration:
 
 class TestPoisonClientRegistration:
     def test_poison_backs_up_and_removes_client_and_meta(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        storage = HermesTokenStorage("srv")
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        storage = X19TokenStorage("srv")
         d = tmp_path / "mcp-tokens"
         d.mkdir(parents=True)
         (d / "srv.json").write_text('{"access_token": "keep-me"}')

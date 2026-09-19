@@ -10,12 +10,12 @@ vi.mock("./dashboard-auth-reload", () => ({
 }));
 
 beforeEach(() => {
-  Object.defineProperty(window, "__HERMES_SESSION_TOKEN__", {
+  Object.defineProperty(window, "__X19_SESSION_TOKEN__", {
     configurable: true,
     value: "tok",
     writable: true,
   });
-  Object.defineProperty(window, "__HERMES_AUTH_REQUIRED__", {
+  Object.defineProperty(window, "__X19_AUTH_REQUIRED__", {
     configurable: true,
     value: false,
     writable: true,
@@ -61,7 +61,7 @@ describe("fetchJSON error contract", () => {
     expect(err.message).toMatch(/internal error/i);
   });
 
-  it("turns a network failure into the 'is hermes dashboard running' sentence", async () => {
+  it("turns a network failure into the 'is x19 dashboard running' sentence", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>(async () => {

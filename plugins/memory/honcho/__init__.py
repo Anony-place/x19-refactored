@@ -2,7 +2,7 @@
 
 Cross-session user modeling with dialectic Q&A, semantic search, peer cards and
 persistent conclusions; five tools (profile, search, reasoning, context, conclude).
-Config chain: $HERMES_HOME/honcho.json -> ~/.honcho/config.json -> env vars.
+Config chain: $X19_HOME/honcho.json -> ~/.honcho/config.json -> env vars.
 """
 
 from __future__ import annotations
@@ -83,7 +83,6 @@ _PROMPT_HEADERS = {
         f"are available. {_TOOL_GUIDE}"
     ),
 }
-
 
 
 _FLAG_WORDS = {"1": True, "true": True, "yes": True, "on": True,
@@ -192,13 +191,13 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
         except Exception:
             return False
 
-    def save_config(self, values, hermes_home):
-        """Merge ``values`` into $HERMES_HOME/honcho.json (Honcho SDK native format); a file that does not parse raises.
+    def save_config(self, values, x19_home):
+        """Merge ``values`` into $X19_HOME/honcho.json (Honcho SDK native format); a file that does not parse raises.
         Holds the token refresh locks so a rotation cannot land between the read and the write."""
         from pathlib import Path
         from utils import atomic_json_write
         from plugins.memory.honcho.oauth import _config_refresh_lock, _read_config_strict, _refresh_lock
-        config_path = Path(hermes_home) / "honcho.json"
+        config_path = Path(x19_home) / "honcho.json"
         with _refresh_lock, _config_refresh_lock(config_path):
             existing = _read_config_strict(config_path)
             atomic_json_write(config_path, {**existing, **values}, mode=0o600)
@@ -209,7 +208,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
             {"key": "baseUrl", "description": "Honcho base URL (for self-hosted)"},
         ]
 
-    def post_setup(self, hermes_home: str, config: dict) -> None:
+    def post_setup(self, x19_home: str, config: dict) -> None:
         """Run the full Honcho setup wizard after provider selection."""
         import types
         from plugins.memory.honcho.cli import cmd_setup
@@ -283,7 +282,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
             session_title=kwargs.get("session_title"), session_id=session_id,
             session_title_source=kwargs.get("session_title_source"),
             gateway_session_key=kwargs.get("gateway_session_key"),
-        ) or session_id or "hermes-default"
+        ) or session_id or "x19-default"
 
     def _can_start_init(self) -> bool:
         return not (self._cron_skipped or self._session_initialized) and bool(self._config) and self._lazy_init_kwargs is not None
@@ -298,7 +297,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
         if init_kwargs is None:  # another init path already consumed the deferred kwargs
             return self._manager is not None
         try:
-            self._do_session_init(self._config, self._lazy_init_session_id or "hermes-default", **dict(init_kwargs))
+            self._do_session_init(self._config, self._lazy_init_session_id or "x19-default", **dict(init_kwargs))
         except Exception as e:
             self._manager = None
             self._session_initialized = False
@@ -374,8 +373,8 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
                          self._session_key)
         elif not session.messages:
             try:
-                from hermes_constants import get_hermes_home
-                self._manager.migrate_memory_files(self._session_key, str(get_hermes_home() / "memories"))
+                from x19_constants import get_x19_home
+                self._manager.migrate_memory_files(self._session_key, str(get_x19_home() / "memories"))
                 logger.debug("Honcho memory file migration attempted for new session: %s", self._session_key)
             except Exception as e:
                 logger.debug("Honcho memory file migration skipped: %s", e)
@@ -612,7 +611,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
             msg = self._init_auth_failure
         return ("[Honcho memory status] Authentication with the Honcho memory backend has expired and automatic "
                 f"token refresh failed, so memory sync and recall are paused. Reason: {msg}\n"
-                "Tell the user (once) that Honcho memory is paused and that running 'hermes honcho setup' "
+                "Tell the user (once) that Honcho memory is paused and that running 'x19 honcho setup' "
                 "to re-authenticate will restore it.")
 
     def _peer_failure_text(self) -> str:
@@ -620,7 +619,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
         user id from the transport, never peerName: a shared peerName would merge every user onto one peer."""
         text = self._init_peer_failure or ""
         if self._init_peer_platform in _LOCAL_PLATFORMS:
-            return f"{text} Set one with 'hermes honcho peer --user <name>'."
+            return f"{text} Set one with 'x19 honcho peer --user <name>'."
         return f"{text} This platform supplied no user id for the chat, so memory stays off here."
 
     def _pop_peer_notice(self) -> str:
@@ -1070,216 +1069,3 @@ def register(ctx) -> None:
     ctx.register_memory_provider(HonchoMemoryProvider(query_rewriter=rewrite_memory_query))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-CONCLUDE_SCHEMA = {
-    "name": "honcho_conclude",
-    "description": (
-        "Write, delete, or list CONCLUSIONS — persistent, derived facts about a peer that "
-        "feeds their long-term profile (card + representation). Use this to record "
-        "something durable you've learned about the peer (a stable preference, a "
-        "correction, a standing constraint) so future sessions carry it forward. "
-        "You MUST pass exactly one of `conclusion` (to create), `delete_id` (to "
-        "delete), or `list` (to list/search); any other combination is an error. "
-        "A deletion ID is an opaque server-generated string: first call with `list=true` "
-        "and optionally `query`, then pass the returned ID as `delete_id`. "
-        "Deletion exists only for "
-        "PII removal — for merely wrong facts, write a corrected conclusion instead; "
-        "Honcho self-heals contradictions over time. This is a WRITE tool: to read "
-        "the profile use honcho_profile / honcho_context, and to search what was "
-        "said use honcho_search."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "conclusion": {
-                "type": "string",
-                "description": "A factual statement to persist. Provide this when creating a conclusion. Do not send it together with delete_id or list.",
-            },
-            "delete_id": {
-                "type": "string",
-                "description": "Conclusion ID to delete for PII removal. Provide this when deleting a conclusion. Do not send it together with conclusion or list. Get this id from a prior `list` call — never guess it.",
-            },
-            "list": {
-                "type": "boolean",
-                "description": "Set to true to list or search stored conclusions (with their ids) instead of creating or deleting one. Do not send together with conclusion or delete_id.",
-            },
-            "query": {
-                "type": "string",
-                "description": "Optional semantic search query, used only when `list` is true. Omit to list the most recent conclusions instead of searching.",
-            },
-            "peer": {
-                "type": "string",
-                "description": "The peer the conclusion is ABOUT. Built-in aliases: 'user' (default), 'ai'. Or pass any peer ID from this workspace.",
-            },
-        },
-        "required": [],
-    },
-}
-
-CONTEXT_SCHEMA = {
-    "name": "honcho_context",
-    "description": (
-        "Retrieve the standing SNAPSHOT Honcho holds for the current session — "
-        "session summary, the peer's representation, the peer card, and the most "
-        "recent messages — in one call. No query, no LLM synthesis (cheaper than "
-        "honcho_reasoning). Use it to orient yourself on what Honcho currently "
-        "knows about this conversation and peer. This is a fixed snapshot, not a "
-        "search: to look up a specific past fact use honcho_search; to ask a "
-        "question and get a synthesized answer use honcho_reasoning; for just the "
-        "compact card use honcho_profile."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "peer": {
-                "type": "string",
-                "description": "Peer to query. Built-in aliases: 'user' (default), 'ai'. Or pass any peer ID from this workspace.",
-            },
-        },
-        "required": [],
-    },
-}
-
-PROFILE_SCHEMA = {
-    "name": "honcho_profile",
-    "description": (
-        "Read or write a peer's CARD — a short, curated list of standing facts "
-        "about that peer (name, role, preferences, communication style, recurring "
-        "patterns). This is the cheapest, fastest Honcho call: no query, no LLM, "
-        "just the current card. Pass `card` to overwrite it; omit `card` to read. "
-        "An empty read returns a `hint` explaining why (observation disabled, fresh "
-        "peer, representation still warming up) — that is NOT an error; the card "
-        "accumulates over time from observed conversation. "
-        "Related tools: honcho_context for the fuller standing snapshot (card + "
-        "representation + summary + recent messages); honcho_search to find "
-        "specific things that were actually said; honcho_reasoning for a "
-        "synthesized answer to a question."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "peer": {
-                "type": "string",
-                "description": "Peer to query. Built-in aliases: 'user' (default), 'ai'. Or pass any peer ID from this workspace.",
-            },
-            "card": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "New peer card as a list of fact strings. Omit to read the current card.",
-            },
-        },
-        "required": [],
-    },
-}
-
-REASONING_SCHEMA = {
-    "name": "honcho_reasoning",
-    "description": (
-        "Ask Honcho's dialectic agent a natural-language question about a peer and "
-        "get back a SYNTHESIZED answer. This is the only Honcho tool that runs an "
-        "LLM: it agentically searches both raw messages and derived conclusions, "
-        "reasons over them, and writes a prose answer — so it is the slowest and "
-        "most expensive call (seconds + tokens). Reach for it for nuanced or "
-        "open-ended questions ('how does this person prefer to receive feedback?', "
-        "'what's their relationship to project X?') where you want Honcho to do the "
-        "synthesis. For a specific fact that was stated, prefer honcho_search "
-        "(cheap, raw excerpts, you synthesize). For standing profile facts, prefer "
-        "honcho_profile / honcho_context (no LLM). "
-        "Pass reasoning_level to control depth: minimal (fast/cheap), low (default), "
-        "medium, high, max (deep/expensive). Omit for the configured default."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "description": "A natural language question.",
-            },
-            "reasoning_level": {
-                "type": "string",
-                "description": (
-                    "Override the default reasoning depth. "
-                    "Omit to use the configured default (typically low).\n"
-                    "reasoning_level parameter guide:\n"
-                    "- minimal: use ONLY for a single quick factual lookup (e.g. "
-                    "'what is the user's name'). Honcho hard-caps this tier's output "
-                    "at 250 tokens combined with the model's own hidden reasoning "
-                    "tokens — a multi-part answer can get cut off mid-thought before "
-                    "it even reaches the final-answer phase, especially on models "
-                    "with reasoning/thinking enabled.\n"
-                    "- low/medium/high/max: use for anything requiring a synthesized, "
-                    "multi-fact, or summary-style answer (e.g. 'summarize known facts "
-                    "about this peer', 'what are their communication preferences'). "
-                    "These tiers have no output-token cap of their own (fall back to "
-                    "Honcho's 8192-token global default), so they don't have "
-                    "minimal's cutoff failure mode.\n"
-                    "  - low: straightforward questions with clear answers\n"
-                    "  - medium: multi-aspect questions requiring synthesis across observations\n"
-                    "  - high: complex behavioral patterns, contradictions, deep analysis\n"
-                    "  - max: thorough audit-level analysis, leave no stone unturned\n"
-                    "Default to at least 'low' unless the query is genuinely a single "
-                    "fact lookup."
-                ),
-                "enum": ["minimal", "low", "medium", "high", "max"],
-            },
-            "peer": {
-                "type": "string",
-                "description": "Peer to query. Built-in aliases: 'user' (default), 'ai'. Or pass any peer ID from this workspace.",
-            },
-        },
-        "required": ["query"],
-    },
-}
-
-SEARCH_SCHEMA = {
-    "name": "honcho_search",
-    "description": (
-        "Hybrid (semantic + keyword) search over a peer's actual message "
-        "history across ALL past sessions they took part in — not just the "
-        "current one. Returns RRF-ranked raw message excerpts (what was "
-        "literally said, including the assistant's own messages about the "
-        "peer), no LLM synthesis. Cheaper and faster than honcho_reasoning. "
-        "Use this to recall specific past facts — 'what did I say about X', "
-        "'what was the regimen/decision/config we settled on' — and reason "
-        "over the excerpts yourself. For nuanced questions needing synthesis, "
-        "use honcho_reasoning instead."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "description": "What to look for — a topic, keyword, name, or natural-language description of the fact you're trying to recall.",
-            },
-            "max_tokens": {
-                "type": "integer",
-                "description": "Approximate budget for returned excerpts (default 800, max 2000). Larger budgets return more/longer ranked snippets.",
-            },
-            "peer": {
-                "type": "string",
-                "description": "Whose history to search. Built-in aliases: 'user' (default), 'ai'. Or pass any peer ID from this workspace. Spans every session that peer took part in.",
-            },
-        },
-        "required": ["query"],
-    },
-}
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'TRIVIAL_PROMPT_RE': ('agent.memory_provider', 'TRIVIAL_PROMPT_RE'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

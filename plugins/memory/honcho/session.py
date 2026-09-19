@@ -57,7 +57,7 @@ class HonchoSession:
 
 
 class HonchoSessionManager(SessionAuthMixin, SessionPeersMixin, SessionContextMixin, SessionMigrationMixin):
-    """Conversation sessions backed by Honcho, alongside hermes' SQLite state and file memory.
+    """Conversation sessions backed by Honcho, alongside x19' SQLite state and file memory.
     Auth retry, peer-ID resolution, recall and memory-file migration live in the mixins."""
 
     def __init__(
@@ -648,12 +648,3 @@ class HonchoSessionManager(SessionAuthMixin, SessionPeersMixin, SessionContextMi
             return self._context_cache.pop(session_key, {})
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Callable  # noqa: F401,E402
-from pathlib import Path  # noqa: F401,E402
-import hashlib  # noqa: F401,E402
-import re  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

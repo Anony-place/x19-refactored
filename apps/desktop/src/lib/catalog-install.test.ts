@@ -1,4 +1,4 @@
-import { pluginCatalogInstallUrl, skillCatalogInstallIdentifier, skillCatalogInstallUrl } from '@hermes/shared'
+import { pluginCatalogInstallUrl, skillCatalogInstallIdentifier, skillCatalogInstallUrl } from '@x19/shared'
 import { describe, expect, it } from 'vitest'
 
 import { resolveDeepLinkAction } from './deeplink-routes'
@@ -15,7 +15,7 @@ describe('public catalog install links', () => {
     [{ name: 'Apple Design', source: 'ClawHub', identifier: 'clawhub/apple-design' }, 'clawhub/apple-design'],
     [{ name: 'pdf', source: 'Anthropic', identifier: 'anthropics/skills/skills/pdf' }, 'anthropics/skills/skills/pdf'],
     [{ name: 'pdf', source: 'optional' }, 'official/pdf'],
-    [{ name: 'pdf', source: 'built-in', installIdentifier: 'NousResearch/hermes-agent/skills/productivity/pdf' }, 'NousResearch/hermes-agent/skills/productivity/pdf'],
+    [{ name: 'pdf', source: 'built-in', installIdentifier: 'Anony-place/x19-refactored/skills/productivity/pdf' }, 'Anony-place/x19-refactored/skills/productivity/pdf'],
     [{ name: 'A name', source: 'future-source', identifier: 'provider/path?mode=one&two#readme' }, 'provider/path?mode=one&two#readme']
   ])('preserves the source-specific target for %o', (entry, identifier) => {
     expect(skillCatalogInstallIdentifier(entry)).toBe(identifier)

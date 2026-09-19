@@ -14,10 +14,10 @@ Yuanbao (元宝) groups: @mention users, query info/members.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/yuanbao/yuanbao` |
+| Source | Optional — install with `x19 skills install official/yuanbao/yuanbao` |
 | Path | `optional-skills/yuanbao` |
 | Version | `1.0.0` |
-| Author | Teknium (teknium1), Hermes Agent |
+| Author | Teknium (teknium1), X19 |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `yuanbao`, `mention`, `at`, `group`, `members`, `元宝`, `派`, `艾特` |
@@ -25,7 +25,7 @@ Yuanbao (元宝) groups: @mention users, query info/members.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Yuanbao Group Interaction

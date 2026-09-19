@@ -9,7 +9,7 @@ import sys
 from pathlib import Path, PurePath
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from hermes_constants import (
+from x19_constants import (
     get_config_path,
     get_skills_dir,
     get_subprocess_home,
@@ -156,7 +156,7 @@ def _detect_kanban() -> bool:
     # Mirror tools/kanban_tools.py: a dispatcher-spawned worker (env vars, but
     # only when this execution OWNS the task — delegate children / in-process
     # cron see the worker's vars) or a profile opted into the kanban toolset.
-    if os.getenv("HERMES_KANBAN_TASK") or os.getenv("HERMES_KANBAN_BOARD"):
+    if os.getenv("X19_KANBAN_TASK") or os.getenv("X19_KANBAN_BOARD"):
         try:
             from agent.delegation_context import is_dispatcher_owned_worker_context
             owned = is_dispatcher_owned_worker_context()
@@ -173,7 +173,7 @@ def _detect_kanban() -> bool:
 
 def _detect_docker() -> bool:
     try:
-        from hermes_constants import is_container
+        from x19_constants import is_container
         return is_container()
     except Exception:
         return False
@@ -226,7 +226,7 @@ def _config_cache_key(config_path: Path) -> Optional[Tuple[str, int, int, int, i
 
 
 def _load_raw_config() -> Dict[str, Any]:
-    """Read config.yaml with an mtime+size keyed cache (no hermes_cli.config import)."""
+    """Read config.yaml with an mtime+size keyed cache (no x19_cli.config import)."""
     config_path = get_config_path()
     if not config_path.exists():
         return {}
@@ -265,24 +265,24 @@ def _expand_path(entry: str) -> Path:
 
 
 def _home_relative(p: Path) -> Path:
-    """Anchor a relative config path at HERMES_HOME; absolute paths pass through."""
-    from hermes_constants import get_hermes_home
-    return p if p.is_absolute() else get_hermes_home() / p
+    """Anchor a relative config path at X19_HOME; absolute paths pass through."""
+    from x19_constants import get_x19_home
+    return p if p.is_absolute() else get_x19_home() / p
 
 
-# Never disableable: `hermes-agent` is the agent's own operating manual and the
+# Never disableable: `x19` is the agent's own operating manual and the
 # system prompt points at it unconditionally.
-ESSENTIAL_SKILLS: frozenset = frozenset({"hermes-agent"})
+ESSENTIAL_SKILLS: frozenset = frozenset({"x19"})
 
 
 def get_disabled_skill_names(platform: str | None = None) -> Set[str]:
     """Disabled skill names from config.yaml: global list ∪ platform list
-    (*platform* defaults to ``HERMES_PLATFORM`` / ``HERMES_SESSION_PLATFORM``)."""
+    (*platform* defaults to ``X19_PLATFORM`` / ``X19_SESSION_PLATFORM``)."""
     skills_cfg = _skills_cfg()
     if skills_cfg is None:
         return set()
     from gateway.session_context import get_session_env
-    resolved_platform = platform or os.getenv("HERMES_PLATFORM") or get_session_env("HERMES_SESSION_PLATFORM")
+    resolved_platform = platform or os.getenv("X19_PLATFORM") or get_session_env("X19_SESSION_PLATFORM")
     disabled = _normalize_string_set(skills_cfg.get("disabled"))
     platform_disabled = (skills_cfg.get("platform_disabled") or {}).get(resolved_platform) if resolved_platform else None
     if platform_disabled is not None:
@@ -292,7 +292,7 @@ def get_disabled_skill_names(platform: str | None = None) -> Set[str]:
 
 def parse_config_string_list(value) -> List[str]:
     """Normalize a config value that may hold a JSON-array string into a list.
-    ``hermes config set`` stores lists as quoted JSON/Python-literal strings;
+    ``x19 config set`` stores lists as quoted JSON/Python-literal strings;
     treating one as a single name would silently filter nothing. A scalar
     string still means one name.
 
@@ -336,7 +336,7 @@ def _config_str_list(raw) -> List[str]:
 
 def get_external_skills_dirs() -> List[Path]:
     """Validated, deduplicated ``skills.external_dirs`` (existing dirs only). Entries
-    are ``~``/``${VAR}`` expanded, relative to HERMES_HOME; the local skills dir is skipped."""
+    are ``~``/``${VAR}`` expanded, relative to X19_HOME; the local skills dir is skipped."""
     config_path = get_config_path()
     if not config_path.exists():
         return []
@@ -365,7 +365,7 @@ def get_external_skills_dirs() -> List[Path]:
 
 def get_skill_create_dir() -> Optional[Path]:
     """Configured ``skills.create_dir`` (need not exist yet), or None when unset;
-    relative to HERMES_HOME; a value equal to the local skills dir counts as unset."""
+    relative to X19_HOME; a value equal to the local skills dir counts as unset."""
     raw = _skills_cfg_get("create_dir")
     entry = str(raw).strip() if raw and isinstance(raw, (str, os.PathLike)) else ""
     if not entry:
@@ -386,17 +386,17 @@ def get_skill_create_dir() -> Optional[Path]:
 def display_skill_create_dir() -> str:
     """User-facing path where new skills are created (``~/`` shorthand when
     possible); tool schema descriptions and prompts follow ``skills.create_dir``."""
-    from hermes_constants import display_hermes_home
+    from x19_constants import display_x19_home
     create_dir = get_skill_create_dir()
     if create_dir is None:
-        return f"{display_hermes_home()}/skills/"
+        return f"{display_x19_home()}/skills/"
     if create_dir.is_relative_to(Path.home()):
         return "~/" + create_dir.relative_to(Path.home()).as_posix() + "/"
     return create_dir.as_posix() + "/"
 
 
 def get_all_skills_dirs() -> List[Path]:
-    """Skill dirs: local ``~/.hermes/skills/`` first, then create_dir, then external.
+    """Skill dirs: local ``~/.x19/skills/`` first, then create_dir, then external.
     Trusted project dirs are NOT included (higher precedence; see get_project_skills_dirs)."""
     dirs = [get_skills_dir()]
     create_dir = get_skill_create_dir()
@@ -406,13 +406,13 @@ def get_all_skills_dirs() -> List[Path]:
     return dirs
 
 
-# Project-local skills (<root>/.hermes/skills, <root>/.agents/skills; root = nearest
+# Project-local skills (<root>/.x19/skills, <root>/.agents/skills; root = nearest
 # .git ancestor) are a prompt-injection vector if auto-sourced from any clone, so
 # they load only when the root is in ``skills.trusted_project_dirs``; then they
 # override same-named profile/bundled skills. cwd + trust list are session-fixed
 # so the skills index stays byte-stable.
 
-PROJECT_SKILLS_SUBDIRS = (os.path.join(".hermes", "skills"), os.path.join(".agents", "skills"))
+PROJECT_SKILLS_SUBDIRS = (os.path.join(".x19", "skills"), os.path.join(".agents", "skills"))
 
 _PROJECT_ROOT_MAX_DEPTH = 64  # walk-up bound for pathological cwds
 
@@ -472,7 +472,7 @@ def is_project_root_trusted(root: Path) -> bool:
 
 def _candidate_project_skills_dirs(root: Path) -> List[Path]:
     """Existing skill dirs under *root*, excluding the profile's own skills dir
-    (HERMES_HOME itself may live inside a git checkout)."""
+    (X19_HOME itself may live inside a git checkout)."""
     local_skills = get_skills_dir().resolve()
     dirs: List[Path] = []
     for cand in (root / sub for sub in PROJECT_SKILLS_SUBDIRS):
@@ -513,10 +513,10 @@ def get_untrusted_project_skills_root() -> Optional[Tuple[Path, int]]:
 # Scan-time injection defense: trust is a repo-level decision made once, but a
 # `git pull` could inject a malicious skill into an already-trusted repo. Every
 # project SKILL.md is scanned with the hub's skills_guard scanner (content-hash
-# cached under HERMES_HOME, never inside the repo); "dangerous" excludes the
+# cached under X19_HOME, never inside the repo); "dangerous" excludes the
 # skill from index, list, view and slash commands ("caution" loads, as on the hub).
 
-# ── Project skill quarantine (scan-time injection defense) ──────────────── Trust (`hermes skills trust`)
+# ── Project skill quarantine (scan-time injection defense) ──────────────── Trust (`x19 skills trust`)
 # is a REPO-level decision made once; the repo's skill content keeps changing underneath it with every pull.
 # The hub install path runs skills_guard on install, but project skills are read straight from a checkout —
 # without this gate a `git pull` could inject a malicious skill into an already-trusted repo with no scan
@@ -524,7 +524,7 @@ def get_untrusted_project_skills_root() -> Optional[Tuple[Path, int]]:
 # hub uses (content-hash cached, so the cost is one scan per skill per content change). A "dangerous"
 # verdict quarantines the skill: it is excluded from the index, skills_list, skill_view, and slash commands.
 # "caution" loads (matches hub behavior for prose-level keyword hits) — the quarantine is for
-# high-confidence findings only. The scan cache lives under HERMES_HOME, never inside the repo (we don't
+# high-confidence findings only. The scan cache lives under X19_HOME, never inside the repo (we don't
 # write artifacts into the user's checkout).
 _PROJECT_SCAN_SOURCE = "project-local"
 _PROJECT_QUARANTINE_CACHE: Dict[str, bool] = {}  # skill_dir -> quarantined
@@ -543,8 +543,8 @@ def is_quarantined_project_skill(skill_md) -> bool:
         return _PROJECT_QUARANTINE_CACHE[key]
     try:
         from tools.skills_guard import scan_skill_cached
-        from hermes_constants import get_hermes_home
-        cache_dir = get_hermes_home() / "cache" / "project_skill_scans"
+        from x19_constants import get_x19_home
+        cache_dir = get_x19_home() / "cache" / "project_skill_scans"
         result, _prov = scan_skill_cached(skill_dir, source=_PROJECT_SCAN_SOURCE, cache_dir=cache_dir)
         quarantined = result.verdict == "dangerous"
         if quarantined:
@@ -574,7 +574,7 @@ def normalize_skill_lookup_name(identifier: str) -> str:
         return raw_identifier.lstrip("/")
     # Resolve the primary root via tools.skills_tool at CALL time: tests patch
     # ``tools.skills_tool.SKILLS_DIR`` and skill_view() enforces ``_skills_dir()``
-    # (which follows the live profile-scoped HERMES_HOME), so normalization
+    # (which follows the live profile-scoped X19_HOME), so normalization
     # must agree with that exact root. Import deferred (cycle).
     try:
         # See #67277.
@@ -589,7 +589,7 @@ def normalize_skill_lookup_name(identifier: str) -> str:
         except Exception:
             pass
     # Prefer the lexical path under a trusted root before resolving symlinks:
-    # ~/.hermes/skills/<name> may be a symlink to a checkout elsewhere, and
+    # ~/.x19/skills/<name> may be a symlink to a checkout elsewhere, and
     # resolving first would turn that trusted path into one skill_view rejects.
     for root in trusted_roots:
         if identifier_path.is_relative_to(root):
@@ -623,11 +623,11 @@ def is_external_skill_path(path) -> bool:
     return any(candidate.is_relative_to(_resolve_for_skill_ownership(root)) for root in roots)
 
 
-def _hermes_metadata(frontmatter: Dict[str, Any]) -> Dict[str, Any]:
-    """``metadata.hermes`` mapping from frontmatter, or ``{}`` when malformed."""
+def _x19_metadata(frontmatter: Dict[str, Any]) -> Dict[str, Any]:
+    """``metadata.x19`` mapping from frontmatter, or ``{}`` when malformed."""
     metadata = frontmatter.get("metadata")
-    hermes = metadata.get("hermes") if isinstance(metadata, dict) else None
-    return hermes if isinstance(hermes, dict) else {}
+    x19 = metadata.get("x19") if isinstance(metadata, dict) else None
+    return x19 if isinstance(x19, dict) else {}
 
 
 # ``session_platforms`` is the gateway-channel gate: session platforms the skill
@@ -637,14 +637,14 @@ _CONDITION_KEYS = ("fallback_for_toolsets", "requires_toolsets", "fallback_for_t
 
 def extract_skill_conditions(frontmatter: Dict[str, Any]) -> Dict[str, List]:
     """Extract conditional activation fields from parsed frontmatter (absent = ``[]``)."""
-    hermes = _hermes_metadata(frontmatter)
-    return {key: hermes.get(key, []) for key in _CONDITION_KEYS}
+    x19 = _x19_metadata(frontmatter)
+    return {key: x19.get(key, []) for key in _CONDITION_KEYS}
 
 
 def extract_skill_config_vars(frontmatter: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Extract ``metadata.hermes.config`` declarations (key/description/default/prompt).
+    """Extract ``metadata.x19.config`` declarations (key/description/default/prompt).
     Entries missing ``key`` or ``description`` are skipped; ``prompt`` defaults to the description."""
-    raw = _hermes_metadata(frontmatter).get("config")
+    raw = _x19_metadata(frontmatter).get("config")
     if isinstance(raw, dict):
         raw = [raw]
     if not raw or not isinstance(raw, list):
@@ -707,10 +707,10 @@ _HOME_VAR_RE = re.compile(r"\$(?:\{HOME\}|HOME)(?=$|[/\\])")
 
 
 def _expand_skill_config_path(value: str) -> str:
-    """Expand ``~`` / ``$HOME`` against the HOME Hermes injects into tool subprocesses.
+    """Expand ``~`` / ``$HOME`` against the HOME X19 injects into tool subprocesses.
 
     Skill config defaults describe paths the agent hands to tools, so in a container where the
-    control process HOME (``/opt/data``) differs from the tool HOME (``{HERMES_HOME}/home``) a
+    control process HOME (``/opt/data``) differs from the tool HOME (``{X19_HOME}/home``) a
     plain ``expanduser`` pointed the prompt at a path no tool would ever read (#12260).
     """
     subprocess_home = get_subprocess_home()
@@ -794,18 +794,3 @@ def is_valid_namespace(candidate: Optional[str]) -> bool:
     return bool(candidate) and bool(_NAMESPACE_RE.match(candidate))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def get_scan_ordered_skills_dirs() -> List[Path]:
-    """All skill dirs in precedence order: project → local → external.
-
-    First-wins name deduplication over this order gives project skills
-    priority over profile-local and external ones.
-    """
-    dirs = list(get_project_skills_dirs())
-    dirs.extend(get_all_skills_dirs())
-    return dirs
-# ---- END PLUGIN-COMPAT ----

@@ -1,9 +1,9 @@
 """Auto-installation of LSP server binaries.
 
-Installs go to a Hermes-owned staging dir, ``<HERMES_HOME>/lsp/bin/``, so the
+Installs go to a X19-owned staging dir, ``<X19_HOME>/lsp/bin/``, so the
 user's global toolchain stays untouched.  Strategies: ``auto`` (install with
 the best available package manager), ``manual`` / ``off`` (probe only; a
-missing binary skips the server and ``hermes lsp status`` reports it).
+missing binary skips the server and ``x19 lsp status`` reports it).
 Installs run synchronously the first time a server is needed, serialized
 per-package; every failure path returns ``None`` so the tool layer falls
 back to its in-process syntax checker.
@@ -18,8 +18,8 @@ import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from hermes_cli._subprocess_compat import windows_hide_flags
-from hermes_constants import find_node_executable
+from x19_cli._subprocess_compat import windows_hide_flags
+from x19_constants import find_node_executable
 
 logger = logging.getLogger("agent.lsp.install")
 
@@ -37,7 +37,7 @@ def _manual(bin_name: str) -> Dict[str, Any]:
 
 
 # Recipe key → {strategy, pkg, bin[, extra_pkgs]}.  After install we look for
-# ``bin`` in ``<HERMES_HOME>/lsp/bin/`` first, then on PATH.  ``extra_pkgs``
+# ``bin`` in ``<X19_HOME>/lsp/bin/`` first, then on PATH.  ``extra_pkgs``
 # are sibling npm packages a server needs in the same node_modules tree.
 INSTALL_RECIPES: Dict[str, Dict[str, Any]] = {
     "pyright": _npm("pyright", "pyright-langserver"),
@@ -58,7 +58,7 @@ INSTALL_RECIPES: Dict[str, Dict[str, Any]] = {
     "clangd": _manual("clangd"),
     "lua-language-server": _manual("lua-language-server"),
     # PowerShellEditorServices is a release-zip bundle driven by pwsh; we probe
-    # the host so `hermes lsp status` reports its presence.
+    # the host so `x19 lsp status` reports its presence.
     "powershell": _manual("pwsh"),
 }
 
@@ -72,11 +72,11 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
-def hermes_lsp_bin_dir() -> Path:
-    """Return the Hermes-owned bin staging dir for LSP servers."""
-    from hermes_constants import get_hermes_home
+def x19_lsp_bin_dir() -> Path:
+    """Return the X19-owned bin staging dir for LSP servers."""
+    from x19_constants import get_x19_home
 
-    p = get_hermes_home() / "lsp" / "bin"
+    p = get_x19_home() / "lsp" / "bin"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -98,7 +98,7 @@ def _first_existing(*bases: Path) -> Optional[Path]:
 
 def _existing_binary(name: str) -> Optional[str]:
     """Probe the staging dir + PATH for a binary named ``name``."""
-    for staged in _native_binary_candidates(hermes_lsp_bin_dir() / name):
+    for staged in _native_binary_candidates(x19_lsp_bin_dir() / name):
         if staged.exists() and os.access(staged, os.X_OK):
             return str(staged)
     suffixes = ("", *_WINDOWS_WRAPPER_SUFFIXES) if _is_windows() else ("",)
@@ -159,7 +159,7 @@ def _run_installer(tool: str, pkg: str, cmd: list, *, timeout: int, env: Optiona
 
 def _link_into_bin(target: Path) -> str:
     """Symlink (or copy, where symlinks fail) ``target`` into ``lsp/bin/`` and return the path to use."""
-    link = hermes_lsp_bin_dir() / target.name
+    link = x19_lsp_bin_dir() / target.name
     if not link.exists():
         try:
             link.symlink_to(target)
@@ -174,13 +174,13 @@ def _link_into_bin(target: Path) -> str:
 
 def _install_npm(pkg: str, bin_name: str, extra_pkgs: Optional[list] = None) -> Optional[str]:
     """``npm install --prefix <staging>`` then link ``node_modules/.bin/<bin_name>`` into ``lsp/bin/``."""
-    # Managed npm first: $HERMES_HOME/node isn't on an arbitrary process's
-    # PATH, so a bare which() would miss the Node that Hermes installed.
+    # Managed npm first: $X19_HOME/node isn't on an arbitrary process's
+    # PATH, so a bare which() would miss the Node that X19 installed.
     npm = find_node_executable("npm")
     if npm is None:
         logger.info("[install] cannot install %s: no usable npm found", pkg)
         return None
-    staging = hermes_lsp_bin_dir().parent  # <HERMES_HOME>/lsp/
+    staging = x19_lsp_bin_dir().parent  # <X19_HOME>/lsp/
     install_targets = [pkg] + list(extra_pkgs or [])
     logger.info("[install] npm install --prefix %s %s", staging, " ".join(install_targets))
     cmd = [npm, "install", "--prefix", str(staging), "--silent", "--no-fund", "--no-audit", *install_targets]
@@ -199,7 +199,7 @@ def _install_go(pkg: str, bin_name: str) -> Optional[str]:
     if go is None:
         logger.info("[install] cannot install %s: go not on PATH", pkg)
         return None
-    staging = hermes_lsp_bin_dir()
+    staging = x19_lsp_bin_dir()
     logger.info("[install] go install %s (GOBIN=%s)", pkg, staging)
     if not _run_installer("go", pkg, [go, "install", pkg], timeout=600, env={**os.environ, "GOBIN": str(staging)}):
         return None
@@ -212,11 +212,11 @@ def _install_go(pkg: str, bin_name: str) -> Optional[str]:
 
 def _install_pip(pkg: str, bin_name: str) -> Optional[str]:
     """``pip install --target <staging>/python-packages`` then link the console script into ``lsp/bin/``."""
-    pip_target = hermes_lsp_bin_dir().parent / "python-packages"
+    pip_target = x19_lsp_bin_dir().parent / "python-packages"
     pip_target.mkdir(parents=True, exist_ok=True)
     try:
         logger.info("[install] pip install --target %s %s", pip_target, pkg)
-        from hermes_cli.tools_config import _pip_install
+        from x19_cli.tools_config import _pip_install
 
         proc = _pip_install(["--target", str(pip_target), "--quiet", pkg], timeout=300)
         if proc.returncode != 0:
@@ -240,11 +240,11 @@ _INSTALLERS: Dict[str, Callable[[Dict[str, Any], str], Optional[str]]] = {
 
 
 def detect_status(pkg: str) -> str:
-    """Return ``installed``, ``missing``, or ``manual-only`` (for ``hermes lsp status``; spawns nothing)."""
+    """Return ``installed``, ``missing``, or ``manual-only`` (for ``x19 lsp status``; spawns nothing)."""
     recipe = INSTALL_RECIPES.get(pkg)
     if _existing_binary(recipe.get("bin", pkg) if recipe else pkg):
         return "installed"
     return "manual-only" if recipe and recipe.get("strategy") == "manual" else "missing"
 
 
-__all__ = ["INSTALL_RECIPES", "try_install", "detect_status", "hermes_lsp_bin_dir"]
+__all__ = ["INSTALL_RECIPES", "try_install", "detect_status", "x19_lsp_bin_dir"]

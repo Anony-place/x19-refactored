@@ -1,13 +1,13 @@
 ---
 sidebar_position: 11
 title: "ACP Host Integration"
-description: "Use Hermes Agent inside ACP-compatible editors and collaboration platforms"
+description: "Use X19 inside ACP-compatible editors and collaboration platforms"
 ---
 
 # ACP Host Integration
 
-Hermes Agent can run as an ACP server, letting ACP-compatible hosts talk to
-Hermes over stdio. Editors can render:
+X19 can run as an ACP server, letting ACP-compatible hosts talk to
+X19 over stdio. Editors can render:
 
 - chat messages
 - tool activity
@@ -17,13 +17,13 @@ Hermes over stdio. Editors can render:
 - streamed thinking / response chunks
 
 Other hosts can use the same protocol to route collaboration events into
-Hermes. ACP is a good fit when you want Hermes to keep its existing identity,
+X19. ACP is a good fit when you want X19 to keep its existing identity,
 provider setup, memory, skills, and tools while another application owns the
 conversation transport.
 
-## What Hermes exposes in ACP mode
+## What X19 exposes in ACP mode
 
-Hermes runs with a curated `hermes-acp` toolset designed for editor workflows. It includes:
+X19 runs with a curated `x19-acp` toolset designed for editor workflows. It includes:
 
 - file tools: `read_file`, `write_file`, `patch`, `search_files`
 - terminal tools: `terminal`, `process`
@@ -37,41 +37,41 @@ It intentionally excludes things that do not fit typical editor UX, such as mess
 
 ## Installation
 
-Install Hermes normally, then add the ACP extra from the install checkout:
+Install X19 normally, then add the ACP extra from the install checkout:
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e '.[acp]'
+cd ~/.x19/x19 && uv pip install -e '.[acp]'
 ```
 
 This installs the `agent-client-protocol` dependency and enables:
 
-- `hermes acp`
-- `hermes-acp`
+- `x19 acp`
+- `x19-acp`
 - `python -m acp_adapter`
 
 ## Launching the ACP server
 
-Any of the following starts Hermes in ACP mode:
+Any of the following starts X19 in ACP mode:
 
 ```bash
-hermes acp
+x19 acp
 ```
 
 ```bash
-hermes-acp
+x19-acp
 ```
 
 ```bash
 python -m acp_adapter
 ```
 
-Hermes logs to stderr so stdout remains reserved for ACP JSON-RPC traffic.
+X19 logs to stderr so stdout remains reserved for ACP JSON-RPC traffic.
 
 For non-interactive checks:
 
 ```bash
-hermes acp --version
-hermes acp --check
+x19 acp --version
+x19 acp --check
 ```
 
 ### Browser tools (optional)
@@ -81,16 +81,16 @@ Browser tools (`browser_navigate`, `browser_click`, etc.) depend on the
 wheel. Install them with:
 
 ```bash
-hermes acp --setup-browser           # interactive (prompts before ~400 MB download)
-hermes acp --setup-browser --yes     # accept the download non-interactively
+x19 acp --setup-browser           # interactive (prompts before ~400 MB download)
+x19 acp --setup-browser --yes     # accept the download non-interactively
 ```
 
-This is the standalone command. The terminal-auth flow (`hermes acp --setup`) also offers the browser bootstrap as a follow-up question after model selection, so most users never need to run `--setup-browser` directly.
+This is the standalone command. The terminal-auth flow (`x19 acp --setup`) also offers the browser bootstrap as a follow-up question after model selection, so most users never need to run `--setup-browser` directly.
 
 What it does:
 
-- Installs Node.js 26 into `~/.hermes/node/` if missing
-- `npm install -g agent-browser @askjo/camofox-browser` into that prefix (no sudo needed — `npm`'s `--prefix` points at the user-writable Hermes-managed Node)
+- Installs Node.js 26 into `~/.x19/node/` if missing
+- `npm install -g agent-browser @askjo/camofox-browser` into that prefix (no sudo needed — `npm`'s `--prefix` points at the user-writable X19-managed Node)
 - Installs Playwright Chromium, or uses a detected system Chrome/Chromium when available
 
 The bootstrap is idempotent — re-running it is fast and skips work that's already done.
@@ -104,24 +104,24 @@ for people and agents. Its `buzz-acp` harness connects Buzz channels to any ACP
 agent over stdio:
 
 ```text
-Buzz relay <-- WebSocket --> buzz-acp <-- ACP over stdio --> Hermes Agent
+Buzz relay <-- WebSocket --> buzz-acp <-- ACP over stdio --> X19
 ```
 
-This is a transport integration, not a second Hermes installation. The
-subprocess launched by `buzz-acp` uses the same Hermes configuration,
-credentials, memory, skills, and state as `hermes` on that host.
+This is a transport integration, not a second X19 installation. The
+subprocess launched by `buzz-acp` uses the same X19 configuration,
+credentials, memory, skills, and state as `x19` on that host.
 
 (This is distinct from [Buzz Desktop's managed runtime](#buzz-desktop), which
-spawns Hermes locally as a preset harness. The relay bridge is for joining Buzz
+spawns X19 locally as a preset harness. The relay bridge is for joining Buzz
 *channels* as an agent identity, typically on a server.)
 
 Prerequisites:
 
-- Complete the ACP installation and `hermes acp --check` above.
+- Complete the ACP installation and `x19 acp --check` above.
 - Build `buzz-acp` and the `buzz` CLI from the
   [Buzz repository](https://github.com/block/buzz)
   (`cargo build --release -p buzz-acp`).
-- Mint a dedicated Nostr keypair for Hermes (`buzz-admin generate-key`) and
+- Mint a dedicated Nostr keypair for X19 (`buzz-admin generate-key`) and
   register it as a relay member (`buzz-admin add-member`). Every agent needs
   its own identity — do not reuse a human keypair.
 - Add that identity to the intended Buzz channels.
@@ -132,7 +132,7 @@ Start a bridge with:
 export BUZZ_RELAY_URL="wss://community.example.com"
 export BUZZ_PRIVATE_KEY="..."
 export BUZZ_API_TOKEN="..."
-export BUZZ_ACP_AGENT_COMMAND="hermes"
+export BUZZ_ACP_AGENT_COMMAND="x19"
 export BUZZ_ACP_AGENT_ARGS="acp"
 
 buzz-acp
@@ -142,16 +142,16 @@ buzz-acp
 Do not commit or paste the private key or API token.
 
 For a persistent server deployment, run `buzz-acp` under a service manager as
-the same operating-system user that owns the intended Hermes home. Setup,
+the same operating-system user that owns the intended X19 home. Setup,
 key generation, channel discovery, and per-agent options are documented in the
 [buzz-acp README](https://github.com/block/buzz/tree/main/crates/buzz-acp).
 
-The bridge discovers every Buzz channel where the Hermes identity is a member
+The bridge discovers every Buzz channel where the X19 identity is a member
 and automatically subscribes when it is added to another channel. Buzz channel
-membership therefore remains the access boundary; Hermes does not need a
+membership therefore remains the access boundary; X19 does not need a
 separate channel list in its own configuration.
 
-To expose Hermes ACP activity in the owner's Buzz Desktop, add:
+To expose X19 ACP activity in the owner's Buzz Desktop, add:
 
 ```bash
 export BUZZ_ACP_RELAY_OBSERVER="true"
@@ -169,7 +169,7 @@ is present to show approval dialogs — see
 as privileged automation: use a dedicated operating-system account, restrict
 which Buzz users can prompt the agent (`buzz-acp` supports an owner-only
 respond gate via `BUZZ_ACP_AGENT_OWNER`), and grant membership only in channels
-where Hermes is expected to work.
+where X19 is expected to work.
 
 ### VS Code
 
@@ -178,16 +178,16 @@ Install the [ACP Client](https://marketplace.visualstudio.com/items?itemName=for
 To connect:
 
 1. Open the ACP Client panel from the Activity Bar.
-2. Select **Hermes Agent** from the built-in agent list.
+2. Select **X19** from the built-in agent list.
 3. Connect and start chatting.
 
-If you want to define Hermes manually, add it through VS Code settings under `acp.agents`:
+If you want to define X19 manually, add it through VS Code settings under `acp.agents`:
 
 ```json
 {
   "acp.agents": {
-    "Hermes Agent": {
-      "command": "hermes",
+    "X19": {
+      "command": "x19",
       "args": ["acp"]
     }
   }
@@ -196,7 +196,7 @@ If you want to define Hermes manually, add it through VS Code settings under `ac
 
 ### Zed
 
-Configure Hermes as a custom agent server in Zed settings:
+Configure X19 as a custom agent server in Zed settings:
 
 1. Open the Agent Panel.
 2. Add a custom agent server with the following configuration:
@@ -204,64 +204,64 @@ Configure Hermes as a custom agent server in Zed settings:
 ```json
 {
   "agent_servers": {
-    "hermes-agent": {
+    "x19": {
       "type": "custom",
-      "command": "hermes",
+      "command": "x19",
       "args": ["acp"]
     }
   }
 }
 ```
 
-3. Start a new Hermes external-agent thread.
+3. Start a new X19 external-agent thread.
 
 Prerequisites:
 
-- Configure Hermes provider credentials first with `hermes model`, or set them in `~/.hermes/.env` / `~/.hermes/config.yaml`.
+- Configure X19 provider credentials first with `x19 model`, or set them in `~/.x19/.env` / `~/.x19/config.yaml`.
 
 ### JetBrains
 
-Use an ACP-compatible plugin and point it at `hermes acp` or `hermes-acp`.
+Use an ACP-compatible plugin and point it at `x19 acp` or `x19-acp`.
 
 ### Buzz Desktop
 
-[Buzz](https://github.com/block/buzz) ships Hermes Agent as a preset runtime.
-With Hermes installed the normal way, Buzz discovers it automatically —
-open **Settings → Runtimes** and Hermes appears under your runtimes.
+[Buzz](https://github.com/block/buzz) ships X19 as a preset runtime.
+With X19 installed the normal way, Buzz discovers it automatically —
+open **Settings → Runtimes** and X19 appears under your runtimes.
 
 If discovery fails (older installs), make sure the ACP launcher resolves on a
 login-shell PATH:
 
 ```bash
-command -v hermes-acp || command -v hermes
+command -v x19-acp || command -v x19
 ```
 
-Recent installs write both `hermes` and `hermes-acp` launchers into
-`~/.local/bin`; running `hermes update` adds the `hermes-acp` launcher to
+Recent installs write both `x19` and `x19-acp` launchers into
+`~/.local/bin`; running `x19 update` adds the `x19-acp` launcher to
 older installs. As a manual fallback, configure Buzz's agent command as
-`hermes` with args `["acp"]`.
+`x19` with args `["acp"]`.
 
 #### Model picker
 
-Buzz Desktop (v0.5.1+) renders Hermes' full model menu in the agent's runtime
-settings. The list comes from Hermes itself over ACP: it shows every model
-from providers you have authenticated in Hermes (the same inventory behind
-`hermes model` and the `/model` command), so a model missing from the menu
-means its provider has no credentials configured on the Hermes side.
+Buzz Desktop (v0.5.1+) renders X19' full model menu in the agent's runtime
+settings. The list comes from X19 itself over ACP: it shows every model
+from providers you have authenticated in X19 (the same inventory behind
+`x19 model` and the `/model` command), so a model missing from the menu
+means its provider has no credentials configured on the X19 side.
 
 Entry IDs take the form `provider:model` (e.g. `openrouter:z-ai/glm-5.1`), or
 `custom:<name>:<model>` for custom OpenAI-compatible endpoints defined in
 `config.yaml`. Picking a model applies to that agent's session; it does not
-change your Hermes-wide default — use `hermes model` for that.
+change your X19-wide default — use `x19 model` for that.
 
 #### Keep Buzz agents owner-only
 
 Buzz creates every agent with **Who can talk to this agent** set to `Owner only`.
-Leave it there when the runtime is Hermes.
+Leave it there when the runtime is X19.
 
-Two behaviors combine on this path. The `hermes-acp` toolset includes `terminal`
-and `execute_code`, and Buzz's ACP bridge answers Hermes' permission requests
-itself with `allow_once` rather than surfacing them. A Hermes agent in Buzz
+Two behaviors combine on this path. The `x19-acp` toolset includes `terminal`
+and `execute_code`, and Buzz's ACP bridge answers X19' permission requests
+itself with `allow_once` rather than surfacing them. A X19 in Buzz
 therefore runs shell commands on the host without prompting. I asked one to run
 `rm -rf` against a scratch directory and it deleted it, no prompt anywhere.
 
@@ -270,7 +270,7 @@ the channel. Buzz does not warn when you pick it.
 
 Neither of the obvious mitigations works today:
 
-- `approvals.mode: manual` does make Hermes raise the permission request, but
+- `approvals.mode: manual` does make X19 raise the permission request, but
   Buzz auto-approves it and the command still runs.
 - `platform_toolsets.acp` does not narrow the ACP toolset, so it cannot be used
   to drop `terminal`.
@@ -280,26 +280,26 @@ command from everyone else.
 
 ## Configuration and credentials
 
-ACP mode uses the same Hermes configuration as the CLI:
+ACP mode uses the same X19 configuration as the CLI:
 
-- `~/.hermes/.env`
-- `~/.hermes/config.yaml`
-- `~/.hermes/skills/`
-- `~/.hermes/state.db`
+- `~/.x19/.env`
+- `~/.x19/config.yaml`
+- `~/.x19/skills/`
+- `~/.x19/state.db`
 
-Provider resolution uses Hermes' normal runtime resolver, so ACP inherits the currently configured provider and credentials. Hermes also advertises a terminal auth method (`--setup`) for first-run ACP clients; this opens Hermes' interactive model/provider setup.
+Provider resolution uses X19' normal runtime resolver, so ACP inherits the currently configured provider and credentials. X19 also advertises a terminal auth method (`--setup`) for first-run ACP clients; this opens X19' interactive model/provider setup.
 
 ## Host integration
 
 These variables are set by an **ACP host process** (an editor or another agent
-harness) on the Hermes subprocess it spawns. They are not user configuration —
+harness) on the X19 subprocess it spawns. They are not user configuration —
 do not set them by hand in `.env` or `config.yaml`.
 
 | Variable | Value | Effect |
 |----------|-------|--------|
-| `HERMES_ACP_SKIP_CONFIGURED_MCP` | `1` | Skip starting the **globally configured** MCP servers from `config.yaml` before the ACP JSON-RPC loop begins. |
+| `X19_ACP_SKIP_CONFIGURED_MCP` | `1` | Skip starting the **globally configured** MCP servers from `config.yaml` before the ACP JSON-RPC loop begins. |
 
-Hermes normally starts every MCP server configured in `config.yaml` before it
+X19 normally starts every MCP server configured in `config.yaml` before it
 enters the ACP JSON-RPC loop. A host that owns MCP itself — passing the
 session's servers explicitly through `session/new` — does not need that global
 startup, and an unrelated slow or interactive MCP server would otherwise delay
@@ -323,7 +323,7 @@ Each session stores:
 - current conversation history
 - cancel event
 
-Conversations are persisted to Hermes' session database and can be listed, loaded,
+Conversations are persisted to X19' session database and can be listed, loaded,
 resumed, or forked after the ACP server restarts. Opening a new session without a
 prompt keeps it in memory only: model-discovery probes do not create empty history
 rows. A nonempty fork is persisted immediately, and existing session metadata can
@@ -331,12 +331,12 @@ still be updated even when its current history is empty.
 
 Existing empty rows from older versions are not automatically deleted. An open ACP
 row does not prove its client has disconnected. After closing the relevant editor
-sessions, inspect unwanted rows with `hermes sessions show <id>` and remove only
-confirmed unwanted sessions with `hermes sessions delete <id>`.
+sessions, inspect unwanted rows with `x19 sessions show <id>` and remove only
+confirmed unwanted sessions with `x19 sessions delete <id>`.
 
 ## Working directory behavior
 
-ACP sessions bind the editor's cwd to the Hermes task ID so file and terminal tools run relative to the editor workspace, not the server process cwd.
+ACP sessions bind the editor's cwd to the X19 task ID so file and terminal tools run relative to the editor workspace, not the server process cwd.
 
 ## Approvals
 
@@ -361,12 +361,12 @@ ACP exposes a third tier between *allow once* and *allow always*: **Allow for se
 |---|---|---|---|
 | `allow_once` | Allow once | This one tool call | No |
 | `allow_session` | Allow for session | All matching calls in this ACP session | No — cleared when the session ends |
-| `allow_always` | Allow always | All future sessions | Yes (written to the Hermes permanent allowlist) |
+| `allow_always` | Allow always | All future sessions | Yes (written to the X19 permanent allowlist) |
 | `deny` | Deny | This one tool call | No |
 
 `allow_session` is the right default for an editor workflow where you trust an agent for the duration of a task but don't want to grant a long-lived allowlist entry. The safety trade-off is straightforward: the broader the scope, the less the editor will interrupt you, and the more damage a misbehaving agent (or prompt injection) can do before you notice. Start with `allow_once` for unfamiliar commands; promote to `allow_session` once you've seen the agent run the same pattern correctly a few times; reserve `allow_always` for truly idempotent commands you trust forever (e.g. `git status`).
 
-The ACP bridge maps these options onto Hermes' internal approval semantics — `allow_always` writes a permanent allowlist entry the same way the CLI does, while `allow_session` only affects the in-process approval cache for the current ACP session.
+The ACP bridge maps these options onto X19' internal approval semantics — `allow_always` writes a permanent allowlist entry the same way the CLI does, while `allow_session` only affects the in-process approval cache for the current ACP session.
 
 ## Troubleshooting
 
@@ -374,30 +374,30 @@ The ACP bridge maps these options onto Hermes' internal approval semantics — `
 
 Check:
 
-- For manual/local development, verify the host command points to `hermes acp`.
-- Hermes is installed and on your PATH.
-- The ACP extra is installed (`cd ~/.hermes/hermes-agent && uv pip install -e '.[acp]'`).
+- For manual/local development, verify the host command points to `x19 acp`.
+- X19 is installed and on your PATH.
+- The ACP extra is installed (`cd ~/.x19/x19 && uv pip install -e '.[acp]'`).
 
 ### ACP starts but immediately errors
 
 Try these checks:
 
 ```bash
-hermes acp --version
-hermes acp --check
-hermes doctor
-hermes status
+x19 acp --version
+x19 acp --check
+x19 doctor
+x19 status
 ```
 
 ### Missing credentials
 
-ACP mode uses Hermes' existing provider setup. Configure credentials with:
+ACP mode uses X19' existing provider setup. Configure credentials with:
 
 ```bash
-hermes model
+x19 model
 ```
 
-or by editing `~/.hermes/.env`. The terminal auth flow (`hermes acp --setup`) can also trigger the interactive provider/model setup.
+or by editing `~/.x19/.env`. The terminal auth flow (`x19 acp --setup`) can also trigger the interactive provider/model setup.
 
 ## See also
 

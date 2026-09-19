@@ -11,12 +11,12 @@ import type {
   WebhookCreateResponse,
   WebhookEnableResponse,
   WebhooksResponse
-} from '@/types/hermes'
+} from '@/types/x19'
 
-import { hermesApi, profileScoped } from './client'
+import { x19Api, profileScoped } from './client'
 
 export function getMessagingPlatforms(profile?: null | string): Promise<MessagingPlatformsResponse> {
-  return hermesApi<MessagingPlatformsResponse>({
+  return x19Api<MessagingPlatformsResponse>({
     ...profileScoped(profile),
     path: '/api/messaging/platforms'
   })
@@ -35,7 +35,7 @@ export function updateMessagingPlatform(
   body: MessagingPlatformUpdate,
   profile?: null | string
 ): Promise<MessagingPlatformUpdateResponse> {
-  return hermesApi<MessagingPlatformUpdateResponse>({
+  return x19Api<MessagingPlatformUpdateResponse>({
     ...profileScoped(profile),
     path: `/api/messaging/platforms/${encodeURIComponent(platformId)}`,
     method: 'PUT',
@@ -47,7 +47,7 @@ export function testMessagingPlatform(
   platformId: string,
   profile?: null | string
 ): Promise<MessagingPlatformTestResponse> {
-  return hermesApi<MessagingPlatformTestResponse>({
+  return x19Api<MessagingPlatformTestResponse>({
     ...profileScoped(profile),
     path: `/api/messaging/platforms/${encodeURIComponent(platformId)}/test`,
     method: 'POST'
@@ -63,7 +63,7 @@ export function startTelegramOnboarding(
   botName?: string,
   profile?: null | string
 ): Promise<TelegramOnboardingStartResponse> {
-  return hermesApi<TelegramOnboardingStartResponse>({
+  return x19Api<TelegramOnboardingStartResponse>({
     ...profileScoped(profile),
     path: '/api/messaging/telegram/onboarding/start',
     method: 'POST',
@@ -75,7 +75,7 @@ export function getTelegramOnboardingStatus(
   pairingId: string,
   profile?: null | string
 ): Promise<TelegramOnboardingStatusResponse> {
-  return hermesApi<TelegramOnboardingStatusResponse>({
+  return x19Api<TelegramOnboardingStatusResponse>({
     ...profileScoped(profile),
     path: `/api/messaging/telegram/onboarding/${encodeURIComponent(pairingId)}`
   })
@@ -88,7 +88,7 @@ export function applyTelegramOnboarding(
 ): Promise<TelegramOnboardingApplyResponse> {
   const scope = profileScoped(profile)
 
-  return hermesApi<TelegramOnboardingApplyResponse>({
+  return x19Api<TelegramOnboardingApplyResponse>({
     ...scope,
     path: `/api/messaging/telegram/onboarding/${encodeURIComponent(pairingId)}/apply`,
     method: 'POST',
@@ -97,7 +97,7 @@ export function applyTelegramOnboarding(
 }
 
 export function cancelTelegramOnboarding(pairingId: string, profile?: null | string): Promise<{ ok: boolean }> {
-  return hermesApi<{ ok: boolean }>({
+  return x19Api<{ ok: boolean }>({
     ...profileScoped(profile),
     path: `/api/messaging/telegram/onboarding/${encodeURIComponent(pairingId)}`,
     method: 'DELETE'
@@ -112,7 +112,7 @@ export function cancelTelegramOnboarding(pairingId: string, profile?: null | str
 // a row they can already see.
 
 export function getPairing(profile?: null | string): Promise<PairingResponse> {
-  return hermesApi<PairingResponse>({
+  return x19Api<PairingResponse>({
     ...profileScoped(profile),
     path: '/api/pairing'
   })
@@ -125,7 +125,7 @@ export function approvePairing(
 ): Promise<{ ok: boolean; user: PairingUser }> {
   const scope = profileScoped(profile)
 
-  return hermesApi<{ ok: boolean; user: PairingUser }>({
+  return x19Api<{ ok: boolean; user: PairingUser }>({
     ...scope,
     path: '/api/pairing/approve',
     method: 'POST',
@@ -138,7 +138,7 @@ export function approvePairing(
 export function revokePairing(platform: string, userId: string, profile?: null | string): Promise<{ ok: boolean }> {
   const scope = profileScoped(profile)
 
-  return hermesApi<{ ok: boolean }>({
+  return x19Api<{ ok: boolean }>({
     ...scope,
     path: '/api/pairing/revoke',
     method: 'POST',
@@ -152,14 +152,14 @@ export function revokePairing(platform: string, userId: string, profile?: null |
 // best-effort restarts the gateway; subscription changes hot-reload.
 
 export function getWebhooks(): Promise<WebhooksResponse> {
-  return hermesApi<WebhooksResponse>({
+  return x19Api<WebhooksResponse>({
     ...profileScoped(),
     path: '/api/webhooks'
   })
 }
 
 export function enableWebhooks(): Promise<WebhookEnableResponse> {
-  return hermesApi<WebhookEnableResponse>({
+  return x19Api<WebhookEnableResponse>({
     ...profileScoped(),
     path: '/api/webhooks/enable',
     method: 'POST'
@@ -167,7 +167,7 @@ export function enableWebhooks(): Promise<WebhookEnableResponse> {
 }
 
 export function createWebhook(body: WebhookCreatePayload): Promise<WebhookCreateResponse> {
-  return hermesApi<WebhookCreateResponse>({
+  return x19Api<WebhookCreateResponse>({
     ...profileScoped(),
     path: '/api/webhooks',
     method: 'POST',
@@ -176,7 +176,7 @@ export function createWebhook(body: WebhookCreatePayload): Promise<WebhookCreate
 }
 
 export function deleteWebhook(name: string): Promise<{ ok: boolean }> {
-  return hermesApi<{ ok: boolean }>({
+  return x19Api<{ ok: boolean }>({
     ...profileScoped(),
     path: `/api/webhooks/${encodeURIComponent(name)}`,
     method: 'DELETE'
@@ -187,7 +187,7 @@ export function setWebhookEnabled(
   name: string,
   enabled: boolean
 ): Promise<{ enabled: boolean; name: string; ok: boolean }> {
-  return hermesApi<{ enabled: boolean; name: string; ok: boolean }>({
+  return x19Api<{ enabled: boolean; name: string; ok: boolean }>({
     ...profileScoped(),
     path: `/api/webhooks/${encodeURIComponent(name)}/enabled`,
     method: 'PUT',

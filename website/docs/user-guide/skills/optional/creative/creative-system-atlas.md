@@ -14,7 +14,7 @@ Build explorable isometric architecture atlases as HTML.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/creative/system-atlas` |
+| Source | Optional — install with `x19 skills install official/creative/system-atlas` |
 | Path | `optional-skills/creative/system-atlas` |
 | Version | `1.0.0` |
 | Author | Harshyt Goel (adapted by Nous Research) |
@@ -26,7 +26,7 @@ Build explorable isometric architecture atlases as HTML.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # System Atlas Skill

@@ -1,24 +1,24 @@
-"""CLI entry point for the hermes-agent ACP adapter.
+"""CLI entry point for the x19 ACP adapter.
 
-Loads ``~/.hermes/.env``, routes logging to stderr (stdout is reserved for ACP
+Loads ``~/.x19/.env``, routes logging to stderr (stdout is reserved for ACP
 JSON-RPC), and starts the ACP agent server.
 
 Usage::
 
-    python -m acp_adapter.entry   # or: hermes acp / hermes-acp
+    python -m acp_adapter.entry   # or: x19 acp / x19-acp
 """
 
-# IMPORTANT: hermes_bootstrap must be the very first import — UTF-8 stdio
-# on Windows.  No-op on POSIX.  See hermes_bootstrap.py for full rationale.
+# IMPORTANT: x19_bootstrap must be the very first import — UTF-8 stdio
+# on Windows.  No-op on POSIX.  See x19_bootstrap.py for full rationale.
 try:
-    import hermes_bootstrap  # noqa: F401
+    import x19_bootstrap  # noqa: F401
 except ModuleNotFoundError:
-    # Partial ``hermes update`` (git-reset landed, ``uv pip install -e .`` did not):
+    # Partial ``x19 update`` (git-reset landed, ``uv pip install -e .`` did not):
     # UTF-8 stdio setup is skipped on Windows; POSIX is unaffected.
     pass
 else:
-    # Stop a ``utils/``/``proxy/``/``ui/`` package in the launch cwd from shadowing Hermes modules.
-    hermes_bootstrap.harden_import_path()
+    # Stop a ``utils/``/``proxy/``/``ui/`` package in the launch cwd from shadowing X19 modules.
+    x19_bootstrap.harden_import_path()
 
 import argparse
 import asyncio
@@ -26,7 +26,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 
 
 # Liveness-probe methods outside the ACP schema. The router correctly answers JSON-RPC -32601
@@ -72,26 +72,26 @@ def _setup_logging() -> None:
 
 
 def _load_env() -> None:
-    """Load .env from HERMES_HOME (default ``~/.hermes``)."""
-    from hermes_cli.env_loader import load_hermes_dotenv
+    """Load .env from X19_HOME (default ``~/.x19``)."""
+    from x19_cli.env_loader import load_x19_dotenv
 
-    hermes_home = get_hermes_home()
-    loaded = load_hermes_dotenv(hermes_home=hermes_home)
+    x19_home = get_x19_home()
+    loaded = load_x19_dotenv(x19_home=x19_home)
     log = logging.getLogger(__name__)
     for env_file in loaded or ():
         log.info("Loaded env from %s", env_file)
     if not loaded:
-        log.info("No .env found at %s, using system env", hermes_home / ".env")
+        log.info("No .env found at %s, using system env", x19_home / ".env")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="hermes-acp", description="Run Hermes Agent as an ACP stdio server.")
-    parser.add_argument("--version", action="store_true", help="Print Hermes version and exit")
+    parser = argparse.ArgumentParser(prog="x19-acp", description="Run X19 as an ACP stdio server.")
+    parser.add_argument("--version", action="store_true", help="Print X19 version and exit")
     parser.add_argument("--check", action="store_true", help="Verify ACP dependencies and adapter imports, then exit")
     parser.add_argument("--setup", action="store_true",
-                        help="Run interactive Hermes provider/model setup for ACP terminal auth")
+                        help="Run interactive X19 provider/model setup for ACP terminal auth")
     parser.add_argument("--setup-browser", action="store_true",
-                        help="Install agent-browser + Playwright Chromium into ~/.hermes/node/ "
+                        help="Install agent-browser + Playwright Chromium into ~/.x19/node/ "
                              "for browser tool support. Idempotent.")
     parser.add_argument("--yes", "-y", action="store_true", dest="assume_yes",
                         help="Accept all prompts (currently used by --setup-browser to skip the "
@@ -100,25 +100,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _print_version() -> None:
-    from hermes_cli import __version__ as hermes_version
+    from x19_cli import __version__ as x19_version
 
-    print(hermes_version)
+    print(x19_version)
 
 
 def _run_check() -> None:
     import acp  # noqa: F401
-    from acp_adapter.server import HermesACPAgent  # noqa: F401
+    from acp_adapter.server import X19ACPAgent  # noqa: F401
 
-    print("Hermes ACP check OK")
+    print("X19 ACP check OK")
 
 
 def _run_setup() -> None:
-    from hermes_cli.main import main as hermes_main
+    from x19_cli.main import main as x19_main
 
     old_argv = sys.argv[:]
     try:
-        sys.argv = [old_argv[0] if old_argv else "hermes", "model"]
-        hermes_main()
+        sys.argv = [old_argv[0] if old_argv else "x19", "model"]
+        x19_main()
     finally:
         sys.argv = old_argv
 
@@ -144,7 +144,7 @@ _SETUP_BROWSER_STEPS = (
 def _run_setup_browser(assume_yes: bool = False) -> int:
     """Bootstrap agent-browser + Chromium via dep_ensure -> install.{sh,ps1}
     --ensure (shared with the runtime lazy installer). Returns 0 on success, 1 on failure."""
-    from hermes_cli.dep_ensure import ensure_dependency
+    from x19_cli.dep_ensure import ensure_dependency
 
     try:
         for dep, failure_msg in _SETUP_BROWSER_STEPS:
@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> None:
     _load_env()
 
     logger = logging.getLogger(__name__)
-    logger.info("Starting hermes-agent ACP adapter")
+    logger.info("Starting x19 ACP adapter")
 
     # Ensure the project root is on sys.path so ``from run_agent import AIAgent`` works
     project_root = str(Path(__file__).resolve().parent.parent)
@@ -180,7 +180,7 @@ def main(argv: list[str] | None = None) -> None:
         sys.path.insert(0, project_root)
 
     import acp
-    from .server import HermesACPAgent
+    from .server import X19ACPAgent
 
     # MCP discovery from config.yaml runs in a background daemon thread so the ACP server is
     # responsive immediately (blocking here cost 2-5 s); per-session MCP servers registered via
@@ -188,15 +188,15 @@ def main(argv: list[str] | None = None) -> None:
     # Previously this blocked asyncio.run() for 2-5 s. (ACP also registers per-session MCP servers
     # dynamically via asyncio.to_thread inside the event loop; that path is unaffected.)  Moved from
     # model_tools.py module scope to avoid freezing the gateway's loop on lazy import (#16856).
-    if os.environ.get("HERMES_ACP_SKIP_CONFIGURED_MCP", "").strip() != "1":
+    if os.environ.get("X19_ACP_SKIP_CONFIGURED_MCP", "").strip() != "1":
         try:
-            from hermes_cli.mcp_startup import start_background_mcp_discovery
+            from x19_cli.mcp_startup import start_background_mcp_discovery
 
             start_background_mcp_discovery(logger=logger, thread_name="acp-mcp-discovery")
         except Exception:
             logger.debug("MCP tool discovery failed at ACP startup", exc_info=True)
 
-    agent = HermesACPAgent()
+    agent = X19ACPAgent()
     try:
         asyncio.run(acp.run_agent(agent, use_unstable_protocol=True))
     except KeyboardInterrupt:

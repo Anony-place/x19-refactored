@@ -8,7 +8,7 @@ import { buildChatOnboardingSeedMessages } from '@/store/onboarding-script'
 const api = vi.fn()
 
 it('carries fresh catalog evidence into the guide and the exact working-profile handoff seed', async () => {
-  vi.stubGlobal('window', { hermesDesktop: { api } })
+  vi.stubGlobal('window', { x19Desktop: { api } })
 
   const entry = {
     name: 'future-studio', auth_type: 'none', installed: false, enabled: false,
@@ -37,8 +37,8 @@ afterEach(() => {
 })
 
 it('reads only the pinned backend and degrades safely on old or unavailable discovery', async () => {
-  vi.stubGlobal('window', { hermesDesktop: { api } })
-  const scope = { connectionId: 'remote-studio', profile: 'hermes-setup' }
+  vi.stubGlobal('window', { x19Desktop: { api } })
+  const scope = { connectionId: 'remote-studio', profile: 'x19-setup' }
   api.mockResolvedValueOnce({ entries: [], diagnostics: [] })
   expect(await readOnboardingCapabilities(scope)).toBe('')
   expect(api).toHaveBeenCalledWith(expect.objectContaining({

@@ -78,7 +78,7 @@ test.beforeEach(async () => {
       replyForPrompt: prompt => (prompt.includes('CODE_BLOCK_REPRO') ? codeReply() : 'ok')
     }
   })
-  mediaPath = path.join(fixture.sandbox.hermesHome, 'group-media.png')
+  mediaPath = path.join(fixture.sandbox.x19Home, 'group-media.png')
   fs.writeFileSync(mediaPath, Buffer.from(PNG_BASE64, 'base64'))
   fs.mkdirSync(SHOT_DIR, { recursive: true })
   await waitForAppReady(fixture, 120_000)

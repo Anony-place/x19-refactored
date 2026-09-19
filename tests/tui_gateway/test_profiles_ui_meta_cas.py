@@ -18,10 +18,10 @@ import tui_gateway.server as srv
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    return hermes_home
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
+    monkeypatch.setenv("X19_HOME", str(x19_home))
+    return x19_home
 
 
 def _configure(ui_meta, expected=None):
@@ -86,13 +86,13 @@ def test_profiles_list_normalizes_yaml_timestamps_in_ui_meta(home):
     """#92506: an unquoted ISO timestamp under ui_meta is parsed by YAML as datetime; the
     profiles.list row must still be JSON-serializable (the value becomes its ISO string)."""
     (home / "profile.yaml").write_text(
-        "ui_meta:\n  hermes-bots:\n    created: 2026-08-22T00:00:00Z\n",
+        "ui_meta:\n  x19-bots:\n    created: 2026-08-22T00:00:00Z\n",
         encoding="utf-8",
     )
 
     row = _default_profile()
 
-    assert row["ui_meta"]["hermes-bots"]["created"] == "2026-08-22T00:00:00+00:00"
+    assert row["ui_meta"]["x19-bots"]["created"] == "2026-08-22T00:00:00+00:00"
     json.dumps(row)
 
 

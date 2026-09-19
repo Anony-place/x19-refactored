@@ -24,7 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover — runtime import is lazy (see below)
 
 from utils import atomic_json_write, atomic_yaml_write, base_url_host_matches, base_url_hostname
 
-from hermes_constants import OPENROUTER_MODELS_URL, openrouter_variant_base
+from x19_constants import OPENROUTER_MODELS_URL, openrouter_variant_base
 from agent.message_metadata import PERSISTENCE_ONLY_MESSAGE_FIELDS
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def _resolve_requests_verify(base_url: str = "") -> bool | str:
     spurious CERTIFICATE_VERIFY_FAILED while the httpx chat path succeeds) -> CA env vars -> certifi."""
     if base_url:
         try:
-            from hermes_cli.config import get_custom_provider_tls_settings
+            from x19_cli.config import get_custom_provider_tls_settings
             tls = get_custom_provider_tls_settings(base_url)
             if tls.get("ssl_verify") is False:
                 return False
@@ -61,7 +61,7 @@ def _resolve_requests_verify(base_url: str = "") -> bool | str:
                 return ca
         except Exception:
             pass  # fall through to env vars — never break a probe on config lookup
-    for env_var in ("HERMES_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
+    for env_var in ("X19_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
         val = os.getenv(env_var)
         if val and os.path.isfile(val):
             return val
@@ -191,8 +191,8 @@ _LOCAL_PROBE_DISK_TTL_SECONDS = 300.0
 
 
 def _cache_file(name: str) -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / name
+    from x19_constants import get_x19_home
+    return get_x19_home() / "cache" / name
 
 
 def _load_json_dict(path: Path) -> Dict[str, Any]:
@@ -282,7 +282,7 @@ def _get_endpoint_metadata_cache_path() -> Path:
 
 def _endpoint_disk_cache_get(normalized: str) -> Optional[Dict[str, Dict[str, Any]]]:
     """Fresh cross-process memo of a remote ``/models`` probe (same TTL as in-memory): one-shot
-    runs (``hermes -q``, cron) start cold and Nous bypasses the persistent context cache, so
+    runs (``x19 -q``, cron) start cold and Nous bypasses the persistent context cache, so
     without this every launch paid the live probe. Local endpoints are never memoized."""
     models = _ttl_memo_get(_get_endpoint_metadata_cache_path(), normalized, _ENDPOINT_MODEL_CACHE_TTL, ts_key="at", value_key="models")
     return models if isinstance(models, dict) else None
@@ -504,7 +504,7 @@ def _strip_openrouter_routing_variant(
 
     Only the id used for LOOKUP is rewritten. The suffixed id the caller holds
     stays on the wire, so the routing opt-in is preserved — the same rule
-    :func:`hermes_cli.models.validate_requested_model` applies. Sharing the
+    :func:`x19_cli.models.validate_requested_model` applies. Sharing the
     base's cache key is intentional: the window is identical, so a variant and
     its base must never disagree.
 
@@ -1093,8 +1093,8 @@ def _resolve_endpoint_context_length(model: str, base_url: str, api_key: str = "
 
 def _get_context_cache_path() -> Path:
     """Path to the persistent context length cache file."""
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "context_length_cache.yaml"
+    from x19_constants import get_x19_home
+    return get_x19_home() / "context_length_cache.yaml"
 
 
 def _load_context_cache_document() -> dict:
@@ -1208,9 +1208,9 @@ def _invalidate_cached_context_length(model: str, base_url: str) -> None:
     _LOCAL_CTX_PROBE_CACHE.pop(("ollama_show", bare, stripped), None)
     # Same for a memoised Bedrock probe failure (keyed by region, which the caller does not know):
     # the entry being dropped is the reason to ask the probe again, not to wait out its TTL.
-    from hermes_constants import hermes_home_key
+    from x19_constants import x19_home_key
     for memo_key in list(_BEDROCK_PROBE_FAILURE_CACHE):  # snapshot: another thread may be memoising
-        if memo_key[:2] == (hermes_home_key(), stripped) and memo_key[2] in (model, bare):
+        if memo_key[:2] == (x19_home_key(), stripped) and memo_key[2] in (model, bare):
             _BEDROCK_PROBE_FAILURE_CACHE.pop(memo_key, None)
     # Every key shape get_cached_context_length consults.
     stale_keys = {key, f"{model}@{base_url}", f"{key}/"}
@@ -1785,7 +1785,7 @@ def _resolve_codex_oauth_context_length_with_source(model: str, access_token: st
             return bumped, source
         return ctx, source
     # The Codex catalog only knows the base slug (no -900k, no vendor/).
-    # ``-900k`` variants are Hermes picker aliases — the Codex catalog only knows the base slug, so resolve
+    # ``-900k`` variants are X19 picker aliases — the Codex catalog only knows the base slug, so resolve
     # against the stripped id. Also drop any ``vendor/`` namespace (``openai/gpt-5.6-sol-900k``): the
     # main-agent path normalizes it away before reaching here, but display/auxiliary callers pass it through
     # (#92797 review).
@@ -1908,8 +1908,8 @@ def _resolve_bedrock_context_length(model: str, base_url: str) -> Optional[int]:
     if not region:
         with contextlib.suppress(Exception):
             region = resolve_bedrock_region()
-    from hermes_constants import hermes_home_key
-    memo_key = (hermes_home_key(), cache_key_url.rstrip('/'), model, region)
+    from x19_constants import x19_home_key
+    memo_key = (x19_home_key(), cache_key_url.rstrip('/'), model, region)
     if region and not _bedrock_probe_failed_recently(memo_key):
         probed = probe_bedrock_context_length(model, region)
         if probed:
@@ -1959,9 +1959,9 @@ def _resolve_moa_context_length(model: str, custom_providers: list | None) -> Op
     """Step 0a: MoA virtual provider — ``model`` is a preset name, so every probe would miss. Resolve
     the aggregator's real provider+model (references are advisory). None on any failure."""
     try:
-        from hermes_cli.config import get_compatible_custom_providers, load_config
-        from hermes_cli.moa_config import resolve_moa_preset
-        from hermes_cli.runtime_provider import resolve_runtime_provider
+        from x19_cli.config import get_compatible_custom_providers, load_config
+        from x19_cli.moa_config import resolve_moa_preset
+        from x19_cli.runtime_provider import resolve_runtime_provider
         config = load_config()
         if custom_providers is None:
             custom_providers = get_compatible_custom_providers(config)
@@ -1996,7 +1996,7 @@ def _config_override_context_length(model: str, base_url: str, provider: str, cu
     # set. See #15779.
     if custom_providers and base_url and model:
         with contextlib.suppress(Exception):  # fall through to probing
-            from hermes_cli.config import get_custom_provider_context_length
+            from x19_cli.config import get_custom_provider_context_length
             cp_ctx = get_custom_provider_context_length(model=model, base_url=base_url, custom_providers=custom_providers)
             if cp_ctx:
                 return cp_ctx
@@ -2009,7 +2009,7 @@ def _resolve_provider_aware_context_length(model: str, base_url: str, api_key: s
     # models.dev, and the provider-enforced limit for the rest.
     if effective_provider in {"copilot", "copilot-acp", "github-copilot"}:
         with contextlib.suppress(Exception):  # fall through to models.dev
-            from hermes_cli.models import get_copilot_model_context
+            from x19_cli.models import get_copilot_model_context
             ctx = get_copilot_model_context(model, api_key=api_key)
             if ctx:
                 return ctx
@@ -2099,7 +2099,7 @@ def get_model_context_length(
     # a user who pinned the fully-suffixed id keeps winning, and BEFORE every
     # cache/catalog lookup below so the base's real window is found instead of
     # a generic family default. Mirrors the validation path's base/suffix split
-    # in hermes_cli.models.validate_requested_model.
+    # in x19_cli.models.validate_requested_model.
     model = _strip_openrouter_routing_variant(model, base_url=base_url, provider=provider)
     # Endpoint-scoped metadata goes AHEAD of the persistent cache so a value learned on a
     # multiplexed provider's other endpoint cannot override it.

@@ -1,4 +1,4 @@
-"""Tests for _setup_feishu() in hermes_cli/gateway.py.
+"""Tests for _setup_feishu() in x19_cli/gateway.py.
 
 Verifies that the interactive setup writes env vars that correctly drive the
 Feishu adapter: credentials, connection mode, DM policy, and group policy.
@@ -50,17 +50,17 @@ def _run_setup_feishu(
             return True
         return False
 
-    with patch("hermes_cli.config.save_env_value", side_effect=mock_save), \
-         patch("hermes_cli.config.get_env_value", side_effect=mock_get), \
-         patch("hermes_cli.config.remove_env_value", side_effect=mock_remove), \
-         patch("hermes_cli.cli_output.prompt_yes_no", side_effect=prompt_yes_no_responses), \
-         patch("hermes_cli.setup.prompt_choice", side_effect=prompt_choice_responses), \
-         patch("hermes_cli.cli_output.prompt", side_effect=prompt_responses), \
-         patch("hermes_cli.cli_output.print_header"), \
-         patch("hermes_cli.cli_output.print_info"), \
-         patch("hermes_cli.cli_output.print_success"), \
-         patch("hermes_cli.cli_output.print_warning"), \
-         patch("hermes_cli.cli_output.print_error"), \
+    with patch("x19_cli.config.save_env_value", side_effect=mock_save), \
+         patch("x19_cli.config.get_env_value", side_effect=mock_get), \
+         patch("x19_cli.config.remove_env_value", side_effect=mock_remove), \
+         patch("x19_cli.cli_output.prompt_yes_no", side_effect=prompt_yes_no_responses), \
+         patch("x19_cli.setup.prompt_choice", side_effect=prompt_choice_responses), \
+         patch("x19_cli.cli_output.prompt", side_effect=prompt_responses), \
+         patch("x19_cli.cli_output.print_header"), \
+         patch("x19_cli.cli_output.print_info"), \
+         patch("x19_cli.cli_output.print_success"), \
+         patch("x19_cli.cli_output.print_warning"), \
+         patch("x19_cli.cli_output.print_error"), \
          patch("plugins.platforms.feishu.adapter.qr_register", return_value=qr_result):
 
         from plugins.platforms.feishu.adapter import interactive_setup

@@ -38,8 +38,8 @@ def _b64_png() -> str:
 
 
 @pytest.fixture(autouse=True)
-def _tmp_hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+def _tmp_x19_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     monkeypatch.delenv("OPENAI_IMAGE_MODEL", raising=False)
     yield tmp_path
 
@@ -98,7 +98,7 @@ class TestMetadata:
     def test_setup_schema_has_no_required_env_vars(self, provider):
         schema = provider.get_setup_schema()
         assert schema["env_vars"] == []
-        assert "hermes auth codex" in schema["post_setup_hint"]
+        assert "x19 auth codex" in schema["post_setup_hint"]
 
 
 # ── Availability ────────────────────────────────────────────────────────────

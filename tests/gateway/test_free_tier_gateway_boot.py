@@ -1,8 +1,8 @@
 """The messaging gateway is a boot owner of the Nous free tier.
 
 Rung 5 made every demand-time site a read (provider resolution, ``/login``, the connector token), so a
-process that never runs the bootstrap can never have an identity. `cmd_chat` and `hermes serve` run it;
-this file pins that `hermes gateway run` does too, and does it BEFORE any adapter connects, so a fast
+process that never runs the bootstrap can never have an identity. `cmd_chat` and `x19 serve` run it;
+this file pins that `x19 gateway run` does too, and does it BEFORE any adapter connects, so a fast
 first DM cannot arrive with nothing to resolve.
 """
 
@@ -15,7 +15,7 @@ import gateway.run_startup as run_startup
 
 @pytest.mark.asyncio
 async def test_gateway_boot_runs_the_free_tier_bootstrap_before_any_adapter_connects(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     order: list[str] = []
 
     def fake_bootstrap() -> None:
@@ -43,7 +43,7 @@ async def test_gateway_boot_runs_the_free_tier_bootstrap_before_any_adapter_conn
 
 def test_gateway_bootstrap_seam_calls_the_one_creator(monkeypatch):
     """The seam delegates to `free_tier_bootstrap.run_bootstrap`; nothing else in the gateway may mint."""
-    import hermes_cli.free_tier_bootstrap as ftb
+    import x19_cli.free_tier_bootstrap as ftb
     calls: list[dict] = []
     monkeypatch.setattr(ftb, "run_bootstrap", lambda **kw: calls.append(kw))
 

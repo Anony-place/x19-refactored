@@ -11,7 +11,7 @@ let scratch: string
 let url: string
 
 test.beforeAll(async () => {
-  scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'hermes-glass-'))
+  scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'x19-glass-'))
   // Match the existing component-browser fixtures without sharing Vite's cache.
   Object.assign(globalThis, { __dirname: desktop })
   server = await createServer({
@@ -131,11 +131,11 @@ test('glass tabs fade the label beneath the close button without repainting the 
   // Glass scope and tint do not affect the fade. Solid mode still honors each
   // tab's surface token instead of becoming unconditionally transparent.
   await page.evaluate(() => {
-    document.documentElement.setAttribute('data-hermes-glass-scope', 'sidebar')
+    document.documentElement.setAttribute('data-x19-glass-scope', 'sidebar')
     document.documentElement.style.setProperty('--translucency-glass-keep', '85%')
   })
   expect(await tab.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
-  await page.evaluate(() => document.documentElement.removeAttribute('data-hermes-glass'))
+  await page.evaluate(() => document.documentElement.removeAttribute('data-x19-glass'))
   expect(await tab.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
   await tab.hover()
   expect(await tab.locator('.pane-tab-content').evaluate(el => getComputedStyle(el).maskImage)).toContain(

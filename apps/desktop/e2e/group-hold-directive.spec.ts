@@ -19,7 +19,7 @@ let fixture: MockBackendFixture | null = null
 
 async function roomHolds(page: MockBackendFixture['page']) {
   return page.evaluate(name => {
-    const rooms = JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.group-chats') || '{}')
+    const rooms = JSON.parse(localStorage.getItem('x19.plugin.x19-bots.group-chats') || '{}')
 
     return Object.keys(rooms[name]?.holds || {})
   }, ROOM)

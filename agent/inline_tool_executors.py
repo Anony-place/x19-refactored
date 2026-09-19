@@ -96,7 +96,7 @@ def _callback_tool(module: str, func: str, callback_attr: str, *arg_specs: _ArgS
 def _session_search(agent, args: dict, ctx: InlineToolContext) -> Any:
     session_db = agent._get_session_db_for_recall()
     if not session_db:
-        from hermes_state import format_session_db_unavailable
+        from x19_state import format_session_db_unavailable
 
         return json.dumps({"success": False, "error": format_session_db_unavailable()})
     return _call_tool(
@@ -173,6 +173,15 @@ def _setup_mcp_shim(agent, args: dict, ctx: InlineToolContext) -> Any:
 
 
 # Order is the historical if/elif order of ``execute_tool_calls_sequential``.
+def _x19_org(agent, args: dict, ctx) -> Any:
+    """Organization control needs the calling agent: ``action=dispatch`` hands work
+    to the real delegation engine, which spawns children under this agent's
+    context. Read actions ignore it."""
+    from tools.x19_org_tool import x19_org_tool
+
+    return x19_org_tool(args, parent_agent=agent)
+
+
 INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "todo_list": _tool(
         "tools.todo_tool", "todo_tool", ("todos", "todos"), ("merge", "merge", False),
@@ -217,6 +226,7 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "manage_connections": _manage_connections,
     "setup_mcp": _setup_mcp_shim,
     "delegate_task": lambda agent, args, ctx: agent._dispatch_delegate_task(args),
+    "x19_org": _x19_org,
 }
 
 # ``invoke_tool`` (concurrent path) consults the memory manager right after these three

@@ -44,7 +44,7 @@ describe('public catalog data', () => {
   it('keeps catalog identity separate from the source-qualified skill install target', () => {
     const [entry] = parseCatalog('skills', [{
       name: 'Apple Design', identifier: 'apple-design', source: 'ClawHub',
-      installCmd: 'hermes skills install clawhub/apple-design'
+      installCmd: 'x19 skills install clawhub/apple-design'
     }])
 
     expect(entry.identifier).toBe('apple-design')
@@ -61,7 +61,7 @@ describe('public catalog data', () => {
       maintainer: `${tier} maintainer`,
       overview: `Overview for ${tier}`,
       version: '1.2.3',
-      requiresHermes: '>=0.17',
+      requiresX19: '>=0.17',
       platforms: ['macos', 'linux'],
       docsUrl: `https://example.com/${tier}/docs`,
       capabilities: {
@@ -85,7 +85,7 @@ describe('public catalog data', () => {
         author: row.maintainer,
         overview: row.overview,
         version: row.version,
-        requiresHermes: row.requiresHermes,
+        requiresX19: row.requiresX19,
         platforms: row.platforms,
         docsUrl: row.docsUrl,
         sourceUrl: row.repo,
@@ -111,7 +111,7 @@ describe('public catalog data', () => {
 
     expect(await fetchCatalog(kind)).toEqual(parseCatalog(kind, rows))
     expect(fetch).toHaveBeenCalledExactlyOnceWith(
-      `https://nousresearch.github.io/hermes-agent/docs/api/${kind}.json`,
+      `https://nousresearch.github.io/x19/docs/api/${kind}.json`,
       expect.objectContaining({ credentials: 'omit', signal: expect.any(AbortSignal) })
     )
   })

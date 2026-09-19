@@ -12,7 +12,7 @@ def test_dangerous_reason_counts_and_names_blocking_findings():
         verdict="dangerous",
         findings=[
             Finding(
-                "hermes_config_mod_shell", "critical", "persistence",
+                "x19_config_mod_shell", "critical", "persistence",
                 "runtime/setup.sh", 4, "echo x > config.yaml", "writes config",
             ),
             Finding(
@@ -30,5 +30,5 @@ def test_dangerous_reason_counts_and_names_blocking_findings():
 
     assert allowed is False
     assert "1 critical of 3 findings" in reason
-    assert "hermes_config_mod_shell" in reason
+    assert "x19_config_mod_shell" in reason
     assert "unpinned_pip_install" not in reason

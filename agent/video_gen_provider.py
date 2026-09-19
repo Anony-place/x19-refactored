@@ -2,7 +2,7 @@
 
 Providers register via ``PluginContext.register_video_gen_provider()`` and live
 in ``<repo>/plugins/video_gen/<name>/`` (built-in) or
-``~/.hermes/plugins/video_gen/<name>/``; mirrors ``agent/image_gen_provider.py``.
+``~/.x19/plugins/video_gen/<name>/``; mirrors ``agent/image_gen_provider.py``.
 One tool covers text-to-video and image-to-video: ``image_url`` present routes to
 the provider's image-to-video endpoint. Video edit/extend are deliberately NOT
 exposed — backends are too inconsistent for one unified tool.
@@ -70,7 +70,7 @@ class VideoGenProvider(CatalogProviderBase):
 
 
 def save_b64_video(b64_data: str,*, prefix: str="video", extension: str="mp4") -> Path:
-    """Decode base64 video data into ``$HERMES_HOME/cache/videos/``; return the path."""
+    """Decode base64 video data into ``$X19_HOME/cache/videos/``; return the path."""
     return provider_media.save_b64("videos", b64_data, prefix=prefix, extension=extension)
 
 
@@ -93,7 +93,7 @@ def save_url_video(
     headers: Optional[Dict[str, str]] = None,
     require_video_content_type: bool = False,
 ) -> Path:
-    """Download an (often ephemeral) video URL into ``$HERMES_HOME/cache/videos/``;
+    """Download an (often ephemeral) video URL into ``$X19_HOME/cache/videos/``;
     raises on network / HTTP / oversize / empty errors so callers can fall back to the URL."""
     return provider_media.save_url(
         "videos", url, prefix=prefix, timeout=timeout, max_bytes=max_bytes,
@@ -273,11 +273,3 @@ class OpenAICompatibleVideoGenProvider(VideoGenProvider):
                 close()
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import base64  # noqa: F401,E402
-import datetime  # noqa: F401,E402
-import uuid  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

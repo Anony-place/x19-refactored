@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli.nous_account import NousPortalAccountInfo
+from x19_cli.nous_account import NousPortalAccountInfo
 
 
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
@@ -51,7 +51,7 @@ def _enable_managed_nous_tools(monkeypatch):
     """Patch the source modules so managed_nous_tools_enabled() returns True
     even after tool modules are dynamically reloaded."""
     monkeypatch.setattr(
-        "hermes_cli.nous_account.get_nous_portal_account_info",
+        "x19_cli.nous_account.get_nous_portal_account_info",
         lambda: NousPortalAccountInfo(
             logged_in=True,
             source="jwt",
@@ -253,7 +253,7 @@ def test_transcription_uses_model_specific_response_formats(monkeypatch, tmp_pat
     whisper_capture = {}
     _install_fake_tools_package()
     _install_fake_openai_module(whisper_capture, transcription_response="hello from whisper")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     # The managed audio route is the stored "nous" selection (strict model);
     # a stored "openai" selection now means direct credentials only.
     (tmp_path / "config.yaml").write_text("stt:\n  provider: nous\n")

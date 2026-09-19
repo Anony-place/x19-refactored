@@ -34,7 +34,7 @@ function render(
         refreshActiveTranscript: noop,
         refreshCronJobs: noop,
         refreshCurrentModel: noop,
-        refreshHermesConfig: noop,
+        refreshX19Config: noop,
         refreshMessagingSessions: noop,
         refreshSessions,
         requestGateway: gatewayRequest

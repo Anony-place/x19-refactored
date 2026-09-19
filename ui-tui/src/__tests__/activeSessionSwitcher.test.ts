@@ -1,4 +1,4 @@
-import type { SessionListRow } from '@hermes/shared/gateway-events'
+import type { SessionListRow } from '@x19/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
 import {

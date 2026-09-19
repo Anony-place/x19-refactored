@@ -1,6 +1,6 @@
 """Honcho 2.2 SDK/local HTTP lifecycle probe; no hosted service or model inference.
 
-Run with isolated HOME/HERMES_HOME and honcho-ai==2.2.0 installed (or on PYTHONPATH):
+Run with isolated HOME/X19_HOME and honcho-ai==2.2.0 installed (or on PYTHONPATH):
   .venv/bin/python evals/memory/honcho_current_query.py --out /tmp/honcho-proof.json
 Prepared ongoing sessions bypass startup/migration. Message writes are disabled.
 The fixture proves query routing, ownership and caller waiting, not memory quality.
@@ -102,8 +102,8 @@ def prepared(sync):
         p.save_config({"baseUrl": f"http://127.0.0.1:{server.server_port}", "workspace": "probe",
                        "timeout": 2, "contextTokens": 1200, "saveMessages": False,
                        "queryRewrite": False, "recallSync": True,
-                       "hosts": {"hermes": {"recallSync": sync}}}, home)
-        cfg = HonchoClientConfig.from_global_config(host="hermes", config_path=Path(home) / "honcho.json")
+                       "hosts": {"x19": {"recallSync": sync}}}, home)
+        cfg = HonchoClientConfig.from_global_config(host="x19", config_path=Path(home) / "honcho.json")
     assert cfg.recall_sync is sync
     manager = HonchoSessionManager(config=cfg, context_tokens=1200)
     manager._cache["ongoing"] = HonchoSession("ongoing", "user", "assistant", "ongoing")

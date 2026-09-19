@@ -1,5 +1,5 @@
 {
-  "name": "@hermes/shared",
+  "name": "@x19/shared",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,6 +12,7 @@
     "./color": "./src/color.ts",
     "./format": "./src/format.ts",
     "./fuzzy": "./src/fuzzy.ts",
+    "./gateway-contract": "./src/gateway-contract.generated.ts",
     "./gateway-events": "./src/gateway-events.ts",
     "./i18n": "./src/i18n.ts",
     "./json-rpc-channel": "./src/json-rpc-channel.ts",

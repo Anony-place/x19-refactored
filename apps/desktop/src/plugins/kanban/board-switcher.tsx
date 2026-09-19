@@ -30,7 +30,7 @@ import {
   useQuery,
   useQueryClient,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@x19/plugin-sdk'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import {
@@ -52,7 +52,7 @@ const NO_PROJECT = '__none__'
 /** Mirrors `kanban_db.DEFAULT_BOARD` — the board that always exists. */
 const DEFAULT_BOARD = 'default'
 
-/** Board scope = a first-class Hermes project. Its primary repo becomes the
+/** Board scope = a first-class X19 project. Its primary repo becomes the
  *  board's default workspace root; new tasks inherit it as a worktree with a
  *  deterministic branch. "No project" falls back to scratch sandboxes. */
 function ProjectPicker({ onChange, value }: { onChange: (id: string) => void; value: string }) {

@@ -22,8 +22,8 @@ import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<void> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -40,21 +40,21 @@ async function seedBot(hermesHome: string, mockUrl: string, name: string): Promi
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-infra-dirs')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  await seedBot(sandbox.hermesHome, mock.url, 'alpha')
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  await seedBot(sandbox.x19Home, mock.url, 'alpha')
 
   // Marker-less infrastructure dirs, exactly the shells a cron tick / log rotation leaves behind.
   for (const stray of ['sessions', 'logs']) {
-    fs.mkdirSync(path.join(sandbox.hermesHome, 'profiles', stray, 'cron'), { recursive: true })
+    fs.mkdirSync(path.join(sandbox.x19Home, 'profiles', stray, 'cron'), { recursive: true })
   }
 
   // A deleted profile: identity file present, tombstone in profiles/.deleted/<name>.
-  const ghost = path.join(sandbox.hermesHome, 'profiles', 'ghost')
+  const ghost = path.join(sandbox.x19Home, 'profiles', 'ghost')
   fs.mkdirSync(ghost, { recursive: true })
-  fs.writeFileSync(path.join(ghost, 'profile.yaml'), 'ui_meta:\n  hermes-bots: {}\n')
-  fs.mkdirSync(path.join(sandbox.hermesHome, 'profiles', '.deleted'), { recursive: true })
-  fs.writeFileSync(path.join(sandbox.hermesHome, 'profiles', '.deleted', 'ghost'), '')
+  fs.writeFileSync(path.join(ghost, 'profile.yaml'), 'ui_meta:\n  x19-bots: {}\n')
+  fs.mkdirSync(path.join(sandbox.x19Home, 'profiles', '.deleted'), { recursive: true })
+  fs.writeFileSync(path.join(sandbox.x19Home, 'profiles', '.deleted', 'ghost'), '')
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
 

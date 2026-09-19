@@ -7,7 +7,7 @@ plugin-registered backends. Handles background processes, sandbox lifecycle
 (per-task cache, idle reaper, atexit teardown) and sudo password plumbing.
 Cloud-sandbox persistent filesystems preserve working state across sandbox
 recreation but do NOT guarantee the same live sandbox or long-running
-processes survive cleanup, idle reaping, or Hermes exit.
+processes survive cleanup, idle reaping, or X19 exit.
 
 Companion modules (re-exported here, so ``tools.terminal_tool.<name>`` stays the
 import/patch target): ``terminal_tool_config`` (TERMINAL_* reads, ``_quiet``),
@@ -51,7 +51,7 @@ from tools.terminal_tool_backends import (
     _REQUIREMENT_CHECKERS, _VERCEL_SANDBOX_DEFAULT_CWD, _check_plugin_requirements,
     _record_unavailable_reason, terminal_backend_unavailable_reason,  # noqa: F401 — re-exported
 )
-# display_hermes_home imported lazily at call site (stale-module safety during hermes update)
+# display_x19_home imported lazily at call site (stale-module safety during x19 update)
 from tools.tool_backend_helpers import coerce_modal_mode, managed_nous_tools_enabled
 
 
@@ -108,15 +108,15 @@ def _current_session_key() -> str:
     the ``get_session_env`` os.environ fallback for CLI/cron/tests)."""
     from gateway.session_context import get_session_env
 
-    return get_session_env("HERMES_SESSION_KEY", "")
+    return get_session_env("X19_SESSION_KEY", "")
 
 
 def _current_session_profile() -> str:
-    """Active session's Hermes profile name, or "" (same lookup discipline as
+    """Active session's X19 profile name, or "" (same lookup discipline as
     :func:`_current_session_key`)."""
     from gateway.session_context import get_session_env
 
-    return get_session_env("HERMES_SESSION_PROFILE", "")
+    return get_session_env("X19_SESSION_PROFILE", "")
 
 
 from tools.approval import (
@@ -184,12 +184,12 @@ _docker_orphan_reaper_lock = threading.Lock()
 def _maybe_reap_docker_orphans(container_config: Dict[str, Any]) -> None:
     """Run the docker orphan reaper once per process, if enabled.
 
-    Sweeps Exited containers labeled ``hermes-agent=1`` for the current
-    profile — leftovers of Hermes processes that died without firing
+    Sweeps Exited containers labeled ``x19=1`` for the current
+    profile — leftovers of X19 processes that died without firing
     ``atexit`` (SIGKILL, OOM, closed terminal). Conservative: only containers
     older than ``2 × lifetime_seconds``, profile-scoped. Gates:
     ``terminal.docker_orphan_reaper: false`` (operator opt-out, e.g. several
-    Hermes processes sharing a profile) and the once-per-interpreter flag so
+    X19 processes sharing a profile) and the once-per-interpreter flag so
     parallel subagent / RL-rollout calls don't re-sweep.
     """
     global _docker_orphan_reaper_ran
@@ -531,18 +531,18 @@ def _ensure_terminal_env_bridged() -> None:
     """Backfill TERMINAL_* env vars from config.yaml when no launcher did.
 
     CLI, gateway and TUI/dashboard PTY launches bridge ``terminal.*`` into env vars
-    at startup; processes that skip those paths (``hermes serve``, Desktop
+    at startup; processes that skip those paths (``x19 serve``, Desktop
     in-process agents, desktop cron ticker, ACP) would otherwise fall back to the
     local backend even when config selects docker — running on the host the user
     meant to sandbox. Explicit keys in the ``terminal`` section override matching
-    env values (possibly stale from ``hermes setup``); env values for omitted keys
+    env values (possibly stale from ``x19 setup``); env values for omitted keys
     are preserved. Without a terminal section an existing TERMINAL_ENV is kept and
     defaults are backfilled only when none is set. A per-turn terminal scope
     suppresses the bridge entirely: writing scope values into the process-global
     env would re-create the first-writer-wins cross-profile leak the scope fixes.
 
     Ambient ``os.environ`` is the *launch* profile's authority only. Under a
-    context-local ``HERMES_HOME`` override (multiplexed dashboard / gateway
+    context-local ``X19_HOME`` override (multiplexed dashboard / gateway
     secondary profile), this bridge is a no-op — otherwise the first unscoped
     call under that override would latch the secondary profile's ``terminal.*``
     into process-global env and poison later unscoped launch-profile turns
@@ -556,9 +556,9 @@ def _ensure_terminal_env_bridged() -> None:
     if get_terminal_scope() is not None:
         return
     # Never write a secondary profile's terminal.* into process-global env.
-    from hermes_constants import get_hermes_home_override
+    from x19_constants import get_x19_home_override
 
-    if get_hermes_home_override() is not None:
+    if get_x19_home_override() is not None:
         return
     global _terminal_config_bridge_attempted
     if _terminal_config_bridge_attempted:
@@ -566,7 +566,7 @@ def _ensure_terminal_env_bridged() -> None:
     _terminal_config_bridge_attempted = True
     # Never let a config problem take the terminal tool down.
     with _quiet("terminal config → env fallback bridge failed"):
-        from hermes_cli.config import apply_terminal_config_to_env, read_raw_config
+        from x19_cli.config import apply_terminal_config_to_env, read_raw_config
 
         raw_config = read_raw_config()
         if isinstance(raw_config.get("terminal"), dict):
@@ -588,7 +588,7 @@ def _resolve_config_cwd(env_type: str, mount_docker_cwd: bool) -> tuple:
     """
     default_cwd = _safe_getcwd() if env_type == "local" else _DEFAULT_CWD_BY_BACKEND.get(env_type, "/root")
     cwd = _tenv("TERMINAL_CWD", default_cwd)
-    from hermes_cli.config import _is_ssh_remote_tilde_cwd
+    from x19_cli.config import _is_ssh_remote_tilde_cwd
     if cwd and not _is_ssh_remote_tilde_cwd(env_type, cwd):
         cwd = os.path.expanduser(cwd)
     host_cwd = None
@@ -1211,7 +1211,7 @@ def terminal_tool(
     is hard rate-limited (1 notification / 15s / process) and auto-disabled
     after repeated strikes or a lifetime cap, promoting to notify_on_complete —
     use it only for rare one-shot signals on long-lived processes.
-    ``_host_local`` forces the local backend for Hermes-owned control-plane
+    ``_host_local`` forces the local backend for X19-owned control-plane
     children (kept in a separate env cache from the configured backend).
     """
     try:
@@ -1420,41 +1420,3 @@ registry.register(
 )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from pathlib import Path  # noqa: F401,E402
-import importlib.util  # noqa: F401,E402
-import platform  # noqa: F401,E402
-import re  # noqa: F401,E402
-import shlex  # noqa: F401,E402
-import shutil  # noqa: F401,E402
-import stat  # noqa: F401,E402
-import subprocess  # noqa: F401,E402
-import sys  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'cleanup_vm': ('tools.terminal_tool_lifecycle', 'cleanup_vm'),
-    'env_var_enabled': ('utils', 'env_var_enabled'),
-    'get_active_env': ('tools.terminal_tool_lifecycle', 'get_active_env'),
-    'has_direct_modal_credentials': ('tools.tool_backend_helpers', 'has_direct_modal_credentials'),
-    'is_interrupted': ('tools.interrupt', 'is_interrupted'),
-    'is_managed_tool_gateway_ready': ('tools.managed_tool_gateway', 'is_managed_tool_gateway_ready'),
-    'is_persistent_env': ('tools.terminal_tool_lifecycle', 'is_persistent_env'),
-    'nous_tool_gateway_unavailable_message': ('tools.tool_backend_helpers', 'nous_tool_gateway_unavailable_message'),
-    'resolve_modal_backend_state': ('tools.tool_backend_helpers', 'resolve_modal_backend_state'),
-    'strip_inert_heredoc_bodies': ('tools.shell_heredoc', 'strip_inert_heredoc_bodies'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

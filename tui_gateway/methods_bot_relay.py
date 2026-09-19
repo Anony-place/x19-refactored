@@ -22,9 +22,9 @@ method = _registry.method
 def _relay_root() -> Path:
     """Install root shared by every profile (relay state is install-wide). Same formula as the
     writers (``tools/bot_relay``, ``tools/bot_mode_dm``): both ends of the mailbox must agree for
-    every HERMES_HOME, including non-``profiles/`` subdirs of ``~/.hermes``."""
-    from tools.bot_mode_probe import _default_home, _hermes_root
-    return _hermes_root(Path(_default_home()))
+    every X19_HOME, including non-``profiles/`` subdirs of ``~/.x19``."""
+    from tools.bot_mode_probe import _default_home, _x19_root
+    return _x19_root(Path(_default_home()))
 
 
 def _run_delivery(profile: str, tmp: str, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -59,7 +59,7 @@ def _(rid, params: dict, _root=_relay_root) -> dict:
 @method("bot_relay.deliver")
 def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
     """Deliver a relayed DM (``profile``, attribution-prefixed ``message``) into a Bot Chat ON THIS
-    GATEWAY via the one-turn ``hermes -p <profile> chat -c "Bot Chat"`` transport local DMs use →
+    GATEWAY via the one-turn ``x19 -p <profile> chat -c "Bot Chat"`` transport local DMs use →
     ``{reply}``. Blocking by design (Desktop relay worker; the RPC pool keeps it off the reader)."""
     import tempfile
     profile = str(params.get("profile") or "").strip()
@@ -74,7 +74,7 @@ def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
         root = _root()
         from tools.bot_mode_probe import _roster
         known = {name for name, _ in _roster(root)}
-        resolved = "default" if profile.lower() == "hermes" else profile
+        resolved = "default" if profile.lower() == "x19" else profile
         if resolved not in known:
             return _err(rid, 4092, f"no profile '{profile}' on this gateway")
 
@@ -119,7 +119,7 @@ def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
         # lease (#113753). Hand the DM to the live owner through the same mailbox local DMs use
         # (tools/bot_mode_dm.py::_run_delivery); its poller admits it at the next idle boundary.
         from tools.bot_live_delivery import deliver_to_live_owner, find_canonical_live_owner
-        owner_home = live_home if live_home is not None else Path(_hermes_home)
+        owner_home = live_home if live_home is not None else Path(_x19_home)
         owner = find_canonical_live_owner(owner_home)
         if owner is not None:
             deliver_to_live_owner(owner_home, owner, message, author=author)
@@ -134,7 +134,7 @@ def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
 
         turn_env = delivery_env(author, live_home)
 
-        fd, tmp = tempfile.mkstemp(prefix="hermes-relay-dm-", suffix=".txt", text=True)
+        fd, tmp = tempfile.mkstemp(prefix="x19-relay-dm-", suffix=".txt", text=True)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(message)

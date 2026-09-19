@@ -284,7 +284,7 @@ registry.registerMany([
     get: () => $layoutEditMode.get(),
     set: enabled => $layoutEditMode.set(enabled)
   }),
-  // The agent's write -> see loop: rescan <hermes home>/desktop-plugins
+  // The agent's write -> see loop: rescan <x19 home>/desktop-plugins
   // without relaunching (same-id reloads dispose the previous incarnation).
   {
     id: 'plugins.reload',
@@ -382,7 +382,7 @@ registry.registerMany([
       id: 'keybinds.panel',
       label: 'Keyboard shortcuts',
       keywords: ['keybinds', 'shortcuts', 'hotkeys', 'keyboard'],
-      run: () => window.dispatchEvent(new CustomEvent('hermes:open-keybinds'))
+      run: () => window.dispatchEvent(new CustomEvent('x19:open-keybinds'))
     } satisfies PaletteContribution
   },
   // Profile sharing: bundle the active profile (config, skills, theme, layout)
@@ -806,7 +806,7 @@ export function ContribController() {
           className="flex h-screen min-h-0 w-screen flex-col bg-(--ui-bg-chrome) text-(--ui-text-primary)"
           // Window-glass hook: this div and the sidebar-wrapper above it are
           // the app shell's two full-window opaque painters; the
-          // [data-hermes-glass] rules in styles.css clear them so the tint
+          // [data-x19-glass] rules in styles.css clear them so the tint
           // painted by <body> is the only thing between the page and the
           // vibrancy material.
           data-contrib-shell=""

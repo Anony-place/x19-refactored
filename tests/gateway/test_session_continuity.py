@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 @pytest.fixture

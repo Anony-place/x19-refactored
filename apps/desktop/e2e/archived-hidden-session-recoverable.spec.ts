@@ -35,16 +35,16 @@ const RUNTIME_PYTHON = path.join(REPO_ROOT, 'venv', 'bin', 'python')
  * Seed two durable rows through the real SessionDB (the same code the desktop
  * backend reads): one archived+hidden (the recovery case) and one plain
  * archived control. Direct SessionDB writes keep the seed deterministic under
- * host load; the desktop still reads them through the real `hermes serve`.
+ * host load; the desktop still reads them through the real `x19 serve`.
  */
-function seedArchivedRows(hermesHome: string, hiddenId: string, controlId: string): void {
+function seedArchivedRows(x19Home: string, hiddenId: string, controlId: string): void {
   execFileSync(
     RUNTIME_PYTHON,
     [
       '-c',
       [
         'import sys',
-        'from hermes_state import SessionDB',
+        'from x19_state import SessionDB',
         'hidden_id, control_id, hidden_text, control_text = sys.argv[1:5]',
         'db = SessionDB()',
         'for sid, text in ((hidden_id, hidden_text), (control_id, control_text)):',
@@ -63,20 +63,20 @@ function seedArchivedRows(hermesHome: string, hiddenId: string, controlId: strin
       HIDDEN_ARCHIVED_TEXT,
       CONTROL_TEXT,
     ],
-    { cwd: REPO_ROOT, env: { ...process.env, HERMES_HOME: hermesHome }, stdio: 'pipe' },
+    { cwd: REPO_ROOT, env: { ...process.env, X19_HOME: x19Home }, stdio: 'pipe' },
   )
-  expect(fs.existsSync(path.join(hermesHome, 'state.db'))).toBe(true)
+  expect(fs.existsSync(path.join(x19Home, 'state.db'))).toBe(true)
 }
 
 async function setupSeededMockBackend(): Promise<MockBackendFixture & { controlId: string; hiddenId: string }> {
   const mock = await startMockServer()
   const sandbox = createSandbox('archived-hidden')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
 
   const hiddenId = '20260916_000001_e2ehid'
   const controlId = '20260916_000002_e2ectl'
-  seedArchivedRows(sandbox.hermesHome, hiddenId, controlId)
+  seedArchivedRows(sandbox.x19Home, hiddenId, controlId)
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
 

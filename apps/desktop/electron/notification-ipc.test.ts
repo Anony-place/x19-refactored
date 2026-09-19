@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import { beforeEach, expect, it, vi } from 'vitest'
 
-import type { HermesNotification } from './notification-types'
+import type { X19Notification } from './notification-types'
 
 const host = vi.hoisted(() => ({
   handle: vi.fn(),
@@ -46,7 +46,7 @@ it('returns native clicks and approval actions to the emitting window, not the p
   host.fromWebContents.mockReturnValue(source)
   const focusWindow = vi.fn()
   registerNativeNotifications({ getMainWindow: () => primary as unknown as BrowserWindow, focusWindow })
-  const notify = host.handle.mock.calls[0][1] as (event: IpcMainInvokeEvent, payload: HermesNotification) => boolean
+  const notify = host.handle.mock.calls[0][1] as (event: IpcMainInvokeEvent, payload: X19Notification) => boolean
 
   const payload = {
     kind: 'approval',
@@ -64,9 +64,9 @@ it('returns native clicks and approval actions to the emitting window, not the p
   expect(primary.webContents.send).not.toHaveBeenCalled()
   host.shown[0].emit('click')
   expect(focusWindow).toHaveBeenCalledWith(source)
-  expect(source.webContents.send).toHaveBeenCalledWith('hermes:focus-session', payload.focusSessionId)
+  expect(source.webContents.send).toHaveBeenCalledWith('x19:focus-session', payload.focusSessionId)
   host.shown[0].emit('action', { actionIndex: 1 }, undefined)
-  expect(source.webContents.send).toHaveBeenCalledWith('hermes:notification-action', {
+  expect(source.webContents.send).toHaveBeenCalledWith('x19:notification-action', {
     sessionId: payload.sessionId,
     actionId: 'reject'
   })
@@ -77,7 +77,7 @@ it('returns native clicks and approval actions to the emitting window, not the p
   host.shown[0].emit('action', { actionIndex: 0 }, undefined)
   expect(primary.webContents.send).not.toHaveBeenCalled()
   host.shown[0].emit('click')
-  expect(primary.webContents.send).toHaveBeenCalledWith('hermes:focus-session', payload.focusSessionId)
+  expect(primary.webContents.send).toHaveBeenCalledWith('x19:focus-session', payload.focusSessionId)
 })
 
 it('delivers plugin callbacks to their source and falls back only for navigation after it closes', () => {
@@ -86,7 +86,7 @@ it('delivers plugin callbacks to their source and falls back only for navigation
   host.fromWebContents.mockReturnValue(source)
   const focusWindow = vi.fn()
   registerNativeNotifications({ getMainWindow: () => primary as unknown as BrowserWindow, focusWindow })
-  const notify = host.handle.mock.calls[0][1] as (event: IpcMainInvokeEvent, payload: HermesNotification) => boolean
+  const notify = host.handle.mock.calls[0][1] as (event: IpcMainInvokeEvent, payload: X19Notification) => boolean
   notify({ sender: source.webContents } as unknown as IpcMainInvokeEvent, {
     kind: 'plugin',
     notifyId: 'source-callback',
@@ -95,7 +95,7 @@ it('delivers plugin callbacks to their source and falls back only for navigation
   })
   host.shown[0].emit('action', { actionIndex: 0 }, undefined)
   expect(source.webContents.send).toHaveBeenCalledWith(
-    'hermes:notification-activate',
+    'x19:notification-activate',
     expect.objectContaining({
       actionId: 'open',
       notifyId: 'source-callback',
@@ -106,7 +106,7 @@ it('delivers plugin callbacks to their source and falls back only for navigation
   source.isDestroyed.mockReturnValue(true)
   host.shown[0].emit('click')
   expect(primary.webContents.send).toHaveBeenCalledWith(
-    'hermes:notification-activate',
+    'x19:notification-activate',
     expect.objectContaining({
       activate: '/plugin',
       notifyId: undefined

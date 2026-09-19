@@ -113,7 +113,7 @@ async def test_compress_command_surfaces_aux_model_failure_even_when_recovered(t
     needs to fix."""
     import gateway.run as gateway_run
     (tmp_path / "config.yaml").write_text(f"display: {{warning_notifications: {str(warning_notifications).lower()}}}")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     history = _make_history()
     # Compressed transcript — normal successful compression, no placeholder.
     compressed = [

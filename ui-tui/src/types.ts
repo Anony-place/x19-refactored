@@ -1,4 +1,4 @@
-import type { ProjectInfo, SessionLiveInfo, SubagentStatus } from '@hermes/shared/gateway-events'
+import type { ProjectInfo, SessionLiveInfo, SubagentStatus } from '@x19/shared/gateway-events'
 
 export interface ActiveTool {
   context?: string

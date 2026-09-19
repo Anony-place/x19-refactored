@@ -1,4 +1,4 @@
-"""NousResearch/hermes-agent#7718 — actionable message when local_embedded
+"""Anony-place/x19-refactored#7718 — actionable message when local_embedded
 runtime (`hindsight-all`) is missing.
 
 `local_embedded` imports `from hindsight import HindsightEmbedded`, provided
@@ -16,7 +16,7 @@ from plugins.memory.hindsight import HindsightMemoryProvider, _local_runtime_hin
 def test_hint_for_missing_hindsight_all():
     hint = _local_runtime_hint("No module named 'hindsight'")
     assert "hindsight-all" in hint
-    assert "hermes memory setup" in hint
+    assert "x19 memory setup" in hint
     assert sys.executable in hint
 
 

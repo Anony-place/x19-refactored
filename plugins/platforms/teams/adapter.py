@@ -2,7 +2,7 @@
 webhook server for inbound, ``App.send()`` for proactive sends.
 
 Requires the ``teams`` extra (auto-installed by the gateway on first start, or
-``<hermes-venv>/bin/pip install microsoft-teams-apps aiohttp``) and credentials via env
+``<x19-venv>/bin/pip install microsoft-teams-apps aiohttp``) and credentials via env
 (TEAMS_CLIENT_ID / TEAMS_CLIENT_SECRET / TEAMS_TENANT_ID, optional TEAMS_PORT) or
 ``platforms.teams.extra`` in config.yaml (``client_id`` / ``client_secret`` / ``tenant_id`` / ``port``).
 """
@@ -183,14 +183,13 @@ def _env_enablement() -> dict | None:
     return seed
 
 
-
 async def _standalone_send(
     pconfig, chat_id: str, message: str, *,
     thread_id: Optional[str] = None, media_files: Optional[list] = None, force_document: bool = False,
 ) -> Dict[str, Any]:
     """Acquire a Bot Framework bearer token and POST a single message activity; used by
     ``send_message_tool._send_via_adapter`` when the gateway runner is not in this process
-    (``hermes cron``). ``TEAMS_SERVICE_URL`` is allowlisted and ``chat_id`` charset-checked
+    (``x19 cron``). ``TEAMS_SERVICE_URL`` is allowlisted and ``chat_id`` charset-checked
     (SSRF/path traversal). ``media_files`` / ``force_document`` are signature parity only — text-only."""
     extra = getattr(pconfig, "extra", {}) or {}
     client_id, client_secret, tenant_id = _credentials(pconfig)
@@ -263,7 +262,7 @@ _SDK_IMPORTS = {
 @contextmanager
 def _suppress_third_party_dotenv() -> Iterator[None]:
     """No-op ``dotenv.load_dotenv`` while importing the Teams SDK: ``microsoft_teams.apps.app`` loads a
-    cwd-discovered ``.env`` at import, mutating process-global ``os.environ``. Hermes owns dotenv loading.
+    cwd-discovered ``.env`` at import, mutating process-global ``os.environ``. X19 owns dotenv loading.
 
     See #62935.
     """
@@ -383,7 +382,7 @@ class TeamsAdapter(BasePlatformAdapter):
             self._app = App(
                 client_id=self._client_id, client_secret=self._client_secret, tenant_id=self._tenant_id,
                 http_server_adapter=_AiohttpBridgeAdapter(aiohttp_app),
-                client=ClientOptions(headers={"User-Agent": "Hermes"}))
+                client=ClientOptions(headers={"User-Agent": "X19"}))
             # Handlers (ours, then plugin on_* decorators) must be wired before initialize(),
             # which registers POST /api/messages on aiohttp_app via the bridge's register_route().
             @self._app.on_message
@@ -451,7 +450,7 @@ class TeamsAdapter(BasePlatformAdapter):
         from gateway.platforms.base import _ssrf_redirect_guard, _read_httpx_body_with_limit
         if not is_safe_url(url):
             raise ValueError("Blocked unsafe attachment URL (SSRF protection)")
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; HermesAgent/1.0)"}
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; X19Agent/1.0)"}
         if _is_botframework_attachment_url(url):
             try:
                 headers["Authorization"] = f"Bearer {await self._get_botframework_token()}"
@@ -581,14 +580,14 @@ class TeamsAdapter(BasePlatformAdapter):
         from tools.approval import resolve_gateway_approval, has_blocking_approval
 
         data = ctx.activity.value.action.data or {}
-        hermes_action = data.get("hermes_action", "")
+        x19_action = data.get("x19_action", "")
         session_key = data.get("session_key", "")
-        if not hermes_action or not session_key:
+        if not x19_action or not session_key:
             return self._invoke_message("Unknown action.")
         denied = self._card_action_denied(ctx.activity.from_)
         if denied:
             return self._invoke_message(denied)
-        choice = _APPROVAL_CHOICES.get(hermes_action)
+        choice = _APPROVAL_CHOICES.get(x19_action)
         if not choice:
             return self._invoke_message("Unknown action.")
         if not has_blocking_approval(session_key):
@@ -633,8 +632,8 @@ class TeamsAdapter(BasePlatformAdapter):
         for label, choice, style in prompt.actions:
             kw = {"style": self._EA_CARD_STYLES[style]} if style else {}
             actions.append(ExecuteAction(
-                title=label, verb="hermes_approve",
-                data={**btn_data_base, "hermes_action": self._EA_CARD_ACTIONS[choice]}, **kw))
+                title=label, verb="x19_approve",
+                data={**btn_data_base, "x19_action": self._EA_CARD_ACTIONS[choice]}, **kw))
         body = _approval_body(self._truncate_preview(prompt.command, self._EA_CMD_BUDGET), prompt.description, always=True)
         body.append(TextBlock(text=format_approval_deadline_line(approval_timeout_seconds()), wrap=True))
         if prompt.smart_denied:
@@ -736,14 +735,14 @@ _SETUP_CREDENTIALS = (
 _SETUP_INTRO = (  # "" → blank line
     "You'll need the Teams CLI. If you haven't already:", "  npm install -g @microsoft/teams.cli@preview",
     "  teams login", "", "Then expose port 3978 publicly (devtunnel / ngrok / cloudflared),", "and create your bot:",
-    '  teams app create --name "Hermes" --endpoint "https://<tunnel>/api/messages"', "",
+    '  teams app create --name "X19" --endpoint "https://<tunnel>/api/messages"', "",
     "The CLI will print CLIENT_ID, CLIENT_SECRET, and TENANT_ID. Paste them below.", "")
 
 
 def interactive_setup() -> None:
-    from hermes_cli.config import get_env_value, save_env_value
-    from hermes_cli.cli_output import prompt, prompt_yes_no, print_info, print_success, print_warning
-    from hermes_cli.setup_platforms import declines_reconfigure
+    from x19_cli.config import get_env_value, save_env_value
+    from x19_cli.cli_output import prompt, prompt_yes_no, print_info, print_success, print_warning
+    from x19_cli.setup_platforms import declines_reconfigure
     if declines_reconfigure("Teams", "Reconfigure Teams?", "TEAMS_CLIENT_ID"):
         return
     for line in _SETUP_INTRO:
@@ -767,14 +766,14 @@ def interactive_setup() -> None:
         save_env_value("TEAMS_ALLOW_ALL_USERS", "true")
         print_warning("⚠️  Open access — anyone who can message the bot can command it.")
     print()
-    print_success("Teams configuration saved to ~/.hermes/.env")
+    print_success("Teams configuration saved to ~/.x19/.env")
     print_info("Install the app in Teams:  teams app install --id <teamsAppId>")
-    print_info("Restart the gateway:       hermes gateway restart")
+    print_info("Restart the gateway:       x19 gateway restart")
 
 
 def _install_hint() -> str:
     """Install hint derived from the LAZY_DEPS pins (aiohttp is CVE-pinned, so bumps happen);
-    ``venv_pip=True`` targets the real Hermes venv, sidestepping PEP 668 on Ubuntu 24.04."""
+    ``venv_pip=True`` targets the real X19 venv, sidestepping PEP 668 on Ubuntu 24.04."""
     try:
         from tools.lazy_deps import feature_install_command
         cmd = feature_install_command("platform.teams", venv_pip=True)
@@ -806,25 +805,3 @@ def register(ctx) -> None:
             "responses clear and professional."))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import html  # noqa: F401,E402
-from urllib.parse import quote  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'TeamsSummaryWriter': ('plugins.platforms.teams.summary_writer', 'TeamsSummaryWriter'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

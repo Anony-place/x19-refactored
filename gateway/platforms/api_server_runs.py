@@ -28,8 +28,8 @@ from gateway.platforms.api_server_run_idempotency import TERMINAL_STATUSES
 
 logger = logging.getLogger("gateway.platforms.api_server")
 _ROOM_RETENTION_REQUEST_KEY = (
-    RequestKey("hermes.room_run_retention_until", float) if RequestKey is not None
-    else "hermes.room_run_retention_until")
+    RequestKey("x19.room_run_retention_until", float) if RequestKey is not None
+    else "x19.room_run_retention_until")
 # Forwarded subagent lifecycle fields; free-text ones are secret-redacted.
 _SUBAGENT_EVENT_KEYS = (
     "goal", "task_count", "task_index", "subagent_id", "child_session_id", "delegation_id", "parent_id",
@@ -66,14 +66,14 @@ def _remember_room_retention(request: "web.Request", claims: dict[str, Any]) -> 
     try:
         request[_ROOM_RETENTION_REQUEST_KEY] = value
     except (AttributeError, TypeError):
-        setattr(request, "_hermes_room_run_retention_until", value)
+        setattr(request, "_x19_room_run_retention_until", value)
 
 
 def _room_retention_until(request: "web.Request") -> float:
     try:
         value = request.get(_ROOM_RETENTION_REQUEST_KEY, 0)
     except AttributeError:
-        value = getattr(request, "_hermes_room_run_retention_until", 0)
+        value = getattr(request, "_x19_room_run_retention_until", 0)
     return max(0.0, float(value or 0))
 
 
@@ -164,7 +164,7 @@ def _set_run_status(self, run_id: str, status: str, **fields: Any) -> Dict[str, 
     current = self._run_statuses.get(run_id, {})
     previous_status = str(current.get("status") or "")
     field_names = set(fields)
-    current.update({"object": "hermes.run", "run_id": run_id, "status": status, "updated_at": now})
+    current.update({"object": "x19.run", "run_id": run_id, "status": status, "updated_at": now})
     current.setdefault("created_at", fields.pop("created_at", now))
     current.update(fields)
     if status != "waiting_for_approval":
@@ -331,7 +331,7 @@ def _accepted_response(run_id: str, status: str, gateway_session_key, *, replaye
     """202 admission response; replays are flagged via ``Idempotency-Replayed``."""
     headers = {"Idempotency-Replayed": "true"} if replayed else {}
     if gateway_session_key:
-        headers["X-Hermes-Session-Key"] = gateway_session_key
+        headers["X-X19-Session-Key"] = gateway_session_key
     return web.json_response(
         {"run_id": run_id, "status": status, "replayed": replayed}, status=202, headers=headers)
 
@@ -487,7 +487,7 @@ async def _handle_runs(self, request: "web.Request", *, _api_server) -> "web.Res
         return limited
     run_id = f"run_{uuid.uuid4().hex}"
     self._run_owners[run_id] = self._run_idempotency_scope(request)
-    # Same precedence as /v1/responses: body session_id > response chain > X-Hermes-Session-Key
+    # Same precedence as /v1/responses: body session_id > response chain > X-X19-Session-Key
     # conversation > run_id (which would otherwise re-key every affinity surface per run).
     # An explicit or chained session owns its routing key and is never rebound to the header.
     _declared_selected = not session_id and bool(gateway_session_key)
@@ -500,7 +500,7 @@ async def _handle_runs(self, request: "web.Request", *, _api_server) -> "web.Res
         selected_session_id = await _resolve_live_session_id(self, str(selected_session_id))
     session_id = selected_session_id or run_id
     # History loads for the session the request actually selected — including one resolved from
-    # a declared X-Hermes-Session-Key, whose persisted delivery rows must reach the next
+    # a declared X-X19-Session-Key, whose persisted delivery rows must reach the next
     # same-key run's context (#98619).  previous_response_id continuations keep their
     # ResponseStore snapshot as history (they cannot consume a SessionDB delivery row and are
     # accordingly denied wake capability in _run_agent_sync); the fresh run_id fallback has
@@ -568,7 +568,7 @@ def _run_agent_sync(self, run: _RunLaunch, agent, approval_notify, *, _api_serve
             # Contextvars, not process env: concurrent runs must not share identity.
             resets.append((set_current_session_key(run.approval_session_key), reset_current_session_key))
             # chat_id carries the raw session id like _run_agent() does; without it
-            # tools.async_delegation sees no HERMES_SESSION_CHAT_ID and forces delegations sync.
+            # tools.async_delegation sees no X19_SESSION_CHAT_ID and forces delegations sync.
             session_tokens = self._bind_api_server_session(
                 chat_id=session_id or "", session_key=run.approval_session_key, session_id=session_id or "",
                 profile=run.request_profile or "",
@@ -576,7 +576,7 @@ def _run_agent_sync(self, run: _RunLaunch, agent, approval_notify, *, _api_serve
                 browser_control_transport_family=run.browser_control_transport_family,
                 # #98619 audited opt-in: the /v1/runs session id is wake-capable only when its
                 # own continuation path reloads session history — an explicit body/chained
-                # session id or a declared X-Hermes-Session-Key conversation (both load
+                # session id or a declared X-X19-Session-Key conversation (both load
                 # SessionDB in _handle_runs), or the run_id fallback the client can post back
                 # as body.session_id.  A previous_response_id continuation consumes its
                 # ResponseStore snapshot instead and can never see a SessionDB delivery row,
@@ -859,7 +859,7 @@ async def _handle_run_approval(self, request: "web.Request", *, _api_server) -> 
     request_id_field = {"request_id": request_id} if request_id else {}
     _mark_run_event(self, run_id, "approval.responded", choice=choice, **request_id_field, resolved=resolved)
     return web.json_response({
-        "object": "hermes.run.approval_response", "run_id": run_id, "choice": choice, **request_id_field,
+        "object": "x19.run.approval_response", "run_id": run_id, "choice": choice, **request_id_field,
         "resolved": resolved})
 
 
@@ -894,7 +894,7 @@ async def _handle_steer_run(self, request: "web.Request", *, _api_server) -> "we
         return _json_error(
             _openai_error, f"Run did not accept steer text: {run_id}", code="steer_not_accepted", status=409)
     _mark_run_event(self, run_id, "run.steered", accepted=True)
-    return web.json_response({"object": "hermes.run.steer", "run_id": run_id, "accepted": True})
+    return web.json_response({"object": "x19.run.steer", "run_id": run_id, "accepted": True})
 
 
 async def _handle_stop_run(self, request: "web.Request", *, _api_server) -> "web.Response":

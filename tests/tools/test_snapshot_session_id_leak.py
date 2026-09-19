@@ -1,20 +1,20 @@
-"""Cross-session HERMES_SESSION_ID leak via the shared bash snapshot.
+"""Cross-session X19_SESSION_ID leak via the shared bash snapshot.
 
 Regression coverage for the bug where a single long-lived backend serves many
 sessions through ONE ``_active_environments["default"]`` LocalEnvironment (the
 messaging gateway, TUI, and desktop/web dashboard all collapse the terminal to
 "default"). That environment persists a bash *session snapshot* file and
 ``source``s it before every command. ``export -p`` dumped the FIRST session's
-``HERMES_SESSION_ID`` into the snapshot, so every LATER session ``source``d that
-stale value and its ``echo $HERMES_SESSION_ID`` reported a FOREIGN session's id
+``X19_SESSION_ID`` into the snapshot, so every LATER session ``source``d that
+stale value and its ``echo $X19_SESSION_ID`` reported a FOREIGN session's id
 — overriding the correct per-command Popen env injected by
 ``_inject_session_context_env``.
 
-The fix strips the per-session bridged vars (HERMES_SESSION_* / UI /
+The fix strips the per-session bridged vars (X19_SESSION_* / UI /
 CRON_AUTO_DELIVER_) from the snapshot at both dump sites in
 ``tools/environments/base_session_env.py``; they are re-injected fresh on every
 command. The same dump must drop the scope markers a delegate_task child / cron
-run stamps per command (HERMES_DELEGATED_CHILD_CONTEXT, HERMES_CRON_SESSION), or
+run stamps per command (X19_DELEGATED_CHILD_CONTEXT, X19_CRON_SESSION), or
 the parent's next command is misread as that child (#90782, #71941).
 """
 
@@ -47,17 +47,17 @@ def test_regex_matches_bridged_session_vars():
 
 
 def test_export_snippet_shape():
-    snippet = _export_dump_excluding_session_vars('"$__hermes_snap_tmp"')
+    snippet = _export_dump_excluding_session_vars('"$__x19_snap_tmp"')
     assert "export -p" in snippet
     # Unset-by-name (not line-grep): multi-line declare values must not leave
     # continuation lines in the snapshot (issue #71296).
     assert "unset" in snippet
-    assert "${!HERMES_SESSION_*}" in snippet
-    assert "${!HERMES_CRON_AUTO_DELIVER_*}" in snippet
-    assert "${!HERMES_BROWSER_CONTROL_*}" in snippet
-    assert "HERMES_UI_SESSION_ID" in snippet
+    assert "${!X19_SESSION_*}" in snippet
+    assert "${!X19_CRON_AUTO_DELIVER_*}" in snippet
+    assert "${!X19_BROWSER_CONTROL_*}" in snippet
+    assert "X19_UI_SESSION_ID" in snippet
     assert "grep -vE" not in snippet
-    assert '"$__hermes_snap_tmp"' in snippet
+    assert '"$__x19_snap_tmp"' in snippet
     # The redirection must be attached to a brace group wrapping the dump,
     # NOT to a pipeline segment: a redirect on a pipeline segment expands the
     # temp-path variable inside that segment's subshell (potentially
@@ -66,7 +66,7 @@ def test_export_snippet_shape():
     # persistence entirely.
     assert snippet.lstrip().startswith("{ ")
     assert "|| true; }" in snippet
-    assert snippet.rstrip().endswith('> "$__hermes_snap_tmp"')
+    assert snippet.rstrip().endswith('> "$__x19_snap_tmp"')
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ def test_shared_snapshot_no_cross_session_leak(tmp_path):
                 for v in _VAR_MAP.values():
                     v.set(_UNSET)
                 set_session_vars(session_key="k" + sid, session_id=sid, source="desktop")
-                out["r"] = env.execute('echo "[$HERMES_SESSION_ID]"')
+                out["r"] = env.execute('echo "[$X19_SESSION_ID]"')
 
             t = threading.Thread(target=worker)
             t.start()
@@ -109,7 +109,7 @@ def test_shared_snapshot_no_cross_session_leak(tmp_path):
         snap = env._snapshot_path
         if os.path.exists(snap):
             with open(snap) as f:
-                assert "HERMES_SESSION_ID" not in f.read()
+                assert "X19_SESSION_ID" not in f.read()
     finally:
         env.cleanup()
 
@@ -127,13 +127,13 @@ def test_export_dump_drops_every_bridged_var_and_the_delegation_marker():
     from gateway.session_context import _VAR_MAP
 
     scoped = [*_VAR_MAP, DELEGATED_CHILD_ENV_MARKER]
-    exports = "; ".join([f'export {n}="x"' for n in scoped] + ['export HERMES_HOME="/h"', 'export MYVAR="keep"'])
+    exports = "; ".join([f'export {n}="x"' for n in scoped] + ['export X19_HOME="/h"', 'export MYVAR="keep"'])
     out = subprocess.run(
         ["bash", "-c", f"{exports}; {_export_dump_excluding_session_vars('/dev/stdout')}"],
         capture_output=True, text=True, check=True).stdout
     leaked = [n for n in scoped if f"declare -x {n}=" in out]
     assert not leaked, f"persisted into the snapshot: {leaked}"
-    assert 'declare -x HERMES_HOME="/h"' in out
+    assert 'declare -x X19_HOME="/h"' in out
     assert 'declare -x MYVAR="keep"' in out
 
 

@@ -10,11 +10,11 @@ import pytest
 
 @pytest.fixture()
 def _zen_free_default_home(monkeypatch, tmp_path):
-    home = tmp_path / "hermes"
+    home = tmp_path / "x19"
     home.mkdir()
     (home / "config.yaml").write_text(
         "model:\n  default: mimo-v2.5-free\n  provider: opencode\n  base_url: https://opencode.ai/zen/v1\n")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setenv("OPENCODE_GO_API_KEY", "sk-test-go")
 
 

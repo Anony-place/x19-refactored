@@ -21,7 +21,7 @@ import {
   searchHFModels,
   setLocalServer,
   sideloadLocalModel
-} from '@/hermes'
+} from '@/x19'
 import { useI18n } from '@/i18n'
 import {
   Check,
@@ -48,7 +48,7 @@ import {
   watchLocalRuntimeJobs
 } from '@/store/local-runtime-jobs'
 import { notify, notifyError } from '@/store/notifications'
-import type { LocalCatalogModel, LocalHardware, LocalModelsStatus } from '@/types/hermes'
+import type { LocalCatalogModel, LocalHardware, LocalModelsStatus } from '@/types/x19'
 
 import { ListRow, Pill, SettingsContent, SettingsSection, SettingsSkeleton } from './primitives'
 
@@ -967,7 +967,7 @@ function BrowseSection({ onChanged }: { onChanged: () => void }) {
   )
 
   const sideload = useCallback(() => {
-    window.hermesDesktop
+    window.x19Desktop
       .selectPaths({ filters: [{ extensions: ['gguf'], name: 'GGUF models' }], title: copy.sideloadTitle })
       .then(paths => {
         if (!paths.length) {

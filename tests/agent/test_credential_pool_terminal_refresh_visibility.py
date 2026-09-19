@@ -2,8 +2,8 @@
 
 The pool quarantines a dead ``openai-codex`` / ``xai-oauth`` / ``nous`` / ``anthropic`` refresh
 token — for the user this is the moment the login is lost, and a debug-only line made it look like
-"I signed in once and Hermes keeps failing" (#113023). Two invariants: the WARNING carries the
-``hermes auth add <provider>`` hint, and a row the quarantine does not drop (an independent
+"I signed in once and X19 keeps failing" (#113023). Two invariants: the WARNING carries the
+``x19 auth add <provider>`` hint, and a row the quarantine does not drop (an independent
 ``manual:*`` login) is marked DEAD so it leaves rotation instead of re-firing the WARNING on every
 later refresh attempt.
 """
@@ -40,9 +40,9 @@ def _entry(provider: str, source: str = "device_code") -> PooledCredential:
     ("provider", "terminal_predicate", "sync_name", "clear_name", "expected_hint"),
     [
         ("openai-codex", "_is_terminal_codex_oauth_refresh_error", "_sync_entry_from_auth_store",
-         "_clear_terminal_tokens_state", "hermes auth add openai-codex"),
+         "_clear_terminal_tokens_state", "x19 auth add openai-codex"),
         ("nous", "_is_terminal_nous_refresh_error", "_sync_nous_entry_from_auth_store",
-         "_clear_terminal_nous_state", "hermes auth add nous"),
+         "_clear_terminal_nous_state", "x19 auth add nous"),
     ],
 )
 def test_terminal_refresh_quarantine_warns_with_reauth_hint(
@@ -70,7 +70,7 @@ def test_terminal_refresh_quarantine_warns_with_reauth_hint(
 def test_anthropic_dead_grant_warns_and_marks_dead(monkeypatch, caplog):
     """A dead Anthropic grant is not a transient 'exhausted': WARNING with the re-auth hint, row DEAD."""
     pool = _pool("anthropic")
-    entry = _entry("anthropic", source="manual:hermes_pkce")
+    entry = _entry("anthropic", source="manual:x19_pkce")
     pool._entries = [entry]
     monkeypatch.setattr(pool, "_sync_entry_from_pool_store", lambda e: e)
     monkeypatch.setattr(pool, "_persist", lambda *a, **k: None)
@@ -83,13 +83,13 @@ def test_anthropic_dead_grant_warns_and_marks_dead(monkeypatch, caplog):
     row = pool._entries[0]
     assert row.last_status == STATUS_DEAD and row.last_error_reason == "invalid_grant"
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "terminally invalid" in r.getMessage()]
-    assert len(warnings) == 1 and "hermes auth add anthropic" in warnings[0].getMessage()
+    assert len(warnings) == 1 and "x19 auth add anthropic" in warnings[0].getMessage()
 
 
 def test_anthropic_transient_refresh_failure_stays_exhausted(monkeypatch, caplog):
     """Control: a network-shaped failure is still benched as transient, silently."""
     pool = _pool("anthropic")
-    entry = _entry("anthropic", source="manual:hermes_pkce")
+    entry = _entry("anthropic", source="manual:x19_pkce")
     pool._entries = [entry]
     monkeypatch.setattr(pool, "_sync_entry_from_pool_store", lambda e: e)
     monkeypatch.setattr(pool, "_persist", lambda *a, **k: None)

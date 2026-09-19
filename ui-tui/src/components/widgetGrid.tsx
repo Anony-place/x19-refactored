@@ -1,4 +1,4 @@
-import { Box } from '@hermes/ink'
+import { Box } from '@x19/ink'
 import { Fragment, memo, type ReactNode, useMemo } from 'react'
 
 import {

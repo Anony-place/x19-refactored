@@ -2,11 +2,11 @@
 name: sdlc-review
 description: Review Kanban handoffs and route verified outcomes.
 version: 1.1.0
-author: Jakub Wolniewicz (@frizikk) + Hermes Agent
+author: Jakub Wolniewicz (@frizikk) + X19
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
+  x19:
     tags: [kanban, review, quality, verification]
     category: devops
     requires_toolsets: [kanban]

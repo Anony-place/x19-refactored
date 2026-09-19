@@ -21,7 +21,7 @@ interface CatalogPlugin {
   category: string;
   maintainer: string;
   subdir?: string;
-  requiresHermes?: string;
+  requiresX19?: string;
   platforms?: string[];
   capabilities?: PluginCapabilities;
   docsUrl?: string;
@@ -51,7 +51,7 @@ const PLUGINS_URL = "/docs/api/plugins.json";
 const META_URL = "/docs/api/plugins-meta.json";
 
 const CATALOG_README_URL =
-  "https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog";
+  "https://github.com/Anony-place/x19-refactored/tree/main/plugin-catalog";
 
 const TIER_CONFIG: Record<
   string,
@@ -77,9 +77,9 @@ const TIER_ORDER = ["all", "official", "community"];
 
 // Browse taxonomy. Order here is the order of the filter pills and of the
 // grouped sections; keep it in sync with CATALOG_CATEGORIES in
-// hermes_cli/plugin_catalog.py and website/scripts/extract-plugins.py.
+// x19_cli/plugin_catalog.py and website/scripts/extract-plugins.py.
 const CATEGORY_CONFIG: Record<string, { label: string; icon: string; blurb: string }> = {
-  desktop: { label: "Desktop", icon: "\u{1F5A5}\u{FE0F}", blurb: "Panes, tabs and views for Hermes Desktop" },
+  desktop: { label: "Desktop", icon: "\u{1F5A5}\u{FE0F}", blurb: "Panes, tabs and views for X19 Desktop" },
   memory: { label: "Memory", icon: "\u{1F9E0}", blurb: "Memory providers and context engines" },
   platform: { label: "Platforms", icon: "\u{1F4AC}", blurb: "Messaging and channel adapters" },
   web: { label: "Web & Browser", icon: "\u{1F310}", blurb: "Search backends, extraction and browser control" },
@@ -306,7 +306,7 @@ function PluginCard({
             href={installUrl}
             onClick={(e) => e.stopPropagation()}
           >
-            Install in Hermes
+            Install in X19
           </a>
         )}
 
@@ -318,11 +318,11 @@ function PluginCard({
                 <span className={styles.metaValue}>{plugin.maintainer}</span>
               </div>
             )}
-            {plugin.requiresHermes && (
+            {plugin.requiresX19 && (
               <div className={styles.metaRow}>
                 <span className={styles.metaLabel}>Requires</span>
                 <span className={styles.metaValue}>
-                  <code>hermes {plugin.requiresHermes}</code>
+                  <code>x19 {plugin.requiresX19}</code>
                 </span>
               </div>
             )}
@@ -416,10 +416,10 @@ function buildSearchHaystack(p: CatalogPlugin): string {
 
 export default function PluginCatalogPage() {
   // Picker embed mode (?embed=picker): the page is iframed by a host app
-  // (Hermes desktop's Capabilities > Plugins tab) as a one-click catalog
+  // (X19 desktop's Capabilities > Plugins tab) as a one-click catalog
   // picker. Site chrome is hidden via CSS and every card gains an
   // "+ Add to this Agent" button that posts
-  //   { type: 'hermes-plugin-pick', name, repo, sha, subdir, tier,
+  //   { type: 'x19-plugin-pick', name, repo, sha, subdir, tier,
   //     installCmd }
   // to the parent window. The HOST performs the actual install through its
   // own gateway (plugins.manage, catalog_name=<name>) — this page never
@@ -432,13 +432,13 @@ export default function PluginCatalogPage() {
     if (typeof window === "undefined" || window.parent === window) return;
     window.parent.postMessage(
       {
-        type: "hermes-plugin-pick",
+        type: "x19-plugin-pick",
         name: plugin.name,
         repo: plugin.repo,
         sha: plugin.sha,
         subdir: plugin.subdir || "",
         tier: plugin.tier,
-        installCmd: plugin.installCommand || `hermes plugins install ${plugin.name}`,
+        installCmd: plugin.installCommand || `x19 plugins install ${plugin.name}`,
       },
       "*"
     );
@@ -567,13 +567,13 @@ export default function PluginCatalogPage() {
   return (
     <Layout
       title="Plugin Catalog"
-      description="Browse reviewed, SHA-pinned plugins for Hermes Agent"
+      description="Browse reviewed, SHA-pinned plugins for X19"
     >
       <div className={`${styles.page} ${pickerMode ? styles.pickerMode : ""}`}>
         <header className={styles.hero}>
           <div className={styles.heroGlow} />
           <div className={styles.heroContent}>
-            <p className={styles.heroEyebrow}>Hermes Agent</p>
+            <p className={styles.heroEyebrow}>X19</p>
             <h1 className={styles.heroTitle}>Plugin Catalog</h1>
             <nav className={styles.crossNav} aria-label="Catalog pages">
               <Link className={styles.crossNavLink} to="/skills">
@@ -584,7 +584,7 @@ export default function PluginCatalogPage() {
               </span>
             </nav>
             <p className={styles.heroSub}>
-              Reviewed, SHA-pinned plugins. Open in Hermes Desktop to review and install, or copy the CLI command.
+              Reviewed, SHA-pinned plugins. Open in X19 Desktop to review and install, or copy the CLI command.
               {loadError && (
                 <span style={{ color: "#f87171", marginLeft: 8 }}>
                   · failed to load catalog ({loadError})
@@ -739,7 +739,7 @@ export default function PluginCatalogPage() {
               <div className={styles.emptyIcon}>{"\u{1F331}"}</div>
               <h3 className={styles.emptyTitle}>The catalog is just getting started</h3>
               <p className={styles.emptyDesc}>
-                The plugin catalog is a curated, human-reviewed list of Hermes
+                The plugin catalog is a curated, human-reviewed list of X19
                 plugins — each entry pinned to an exact commit. Want yours listed?
                 Submissions are open.
               </p>

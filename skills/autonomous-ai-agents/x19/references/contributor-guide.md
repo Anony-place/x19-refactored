@@ -1,6 +1,6 @@
 # Contributor Quick Reference
 
-For occasional contributors and PR authors. Full developer docs: https://x19.nousresearch.com/docs/developer-guide/
+For occasional contributors and PR authors. Full developer docs: https://anony-place.github.io/x19-refactored/docs/developer-guide/
 
 ### Project Layout
 
@@ -10,9 +10,9 @@ x19/
 ├── model_tools.py        # Tool discovery and dispatch
 ├── toolsets.py           # Toolset definitions
 ├── cli.py                # Interactive CLI (X19CLI)
-├── hermes_state.py       # SQLite session store
+├── x19_state.py       # SQLite session store
 ├── agent/                # Prompt builder, context compression, memory, model routing, credential pooling, skill dispatch
-├── hermes_cli/           # CLI subcommands, config, setup, commands
+├── x19_cli/           # CLI subcommands, config, setup, commands
 │   ├── commands.py       # Slash command registry (CommandDef)
 │   ├── config.py         # DEFAULT_CONFIG, env var definitions
 │   └── main.py           # CLI entry point and argparse
@@ -56,9 +56,9 @@ registry.register(
 ```
 
 **2. Wire it into a toolset in `toolsets.py`** — add the name to
-`_HERMES_CORE_TOOLS` (every platform) or to a specific toolset.
+`_X19_CORE_TOOLS` (every platform) or to a specific toolset.
 
-All handlers must return JSON strings. Use `get_hermes_home()` for paths,
+All handlers must return JSON strings. Use `get_x19_home()` for paths,
 never hardcode `~/.x19`. For custom/local-only tools, write a plugin in
 `~/.x19/plugins/` instead of editing core — see the developer docs.
 
@@ -102,7 +102,7 @@ scripts/run_tests.sh -v --tb=long             # pass-through pytest flags
 
 **Cross-platform test guards:** tests using POSIX-only syscalls need a skip marker. Common ones already in the codebase:
 - Symlink creation → `@pytest.mark.skipif(sys.platform == "win32", reason="Symlinks require elevated privileges on Windows")` (see `tests/cron/test_cron_script.py`)
-- POSIX file modes (0o600, etc.) → `@pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX mode bits not enforced on Windows")` (see `tests/hermes_cli/test_auth_toctou_file_modes.py`)
+- POSIX file modes (0o600, etc.) → `@pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX mode bits not enforced on Windows")` (see `tests/x19_cli/test_auth_toctou_file_modes.py`)
 - `signal.SIGALRM` → Unix-only (per-test timeouts no longer use it directly; see the win32 timeout-method shim in `tests/conftest.py::pytest_configure`)
 - Live Winsock / Windows-specific regression tests → `@pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific regression")`
 
@@ -139,6 +139,6 @@ Types: `fix:`, `feat:`, `refactor:`, `docs:`, `chore:`
 
 - **Never break prompt caching** — don't change context, tools, or system prompt mid-conversation
 - **Message role alternation** — never two assistant or two user messages in a row
-- Use `get_hermes_home()` from `x19_constants` for all paths (profile-safe)
+- Use `get_x19_home()` from `x19_constants` for all paths (profile-safe)
 - Config values go in `config.yaml`, secrets go in `.env`
 - New tools need a `check_fn` so they only appear when requirements are met

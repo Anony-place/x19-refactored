@@ -37,7 +37,7 @@ _TEXT_EXTS = (".txt", ".md", ".json", ".csv", ".yaml", ".yml", ".xml", ".html")
 def _load_retaindb_config() -> dict[str, Any]:
     """``memory.retaindb`` block from config.yaml (empty on error): Dashboard-persisted base_url/project; api_key stays in scoped secrets."""
     try:
-        from hermes_cli.config import load_config_readonly
+        from x19_cli.config import load_config_readonly
         block = load_config_readonly().get("memory", {}).get("retaindb", {})
     except Exception:
         block = None
@@ -99,7 +99,7 @@ class _Client:
 
     def _headers(self, path: str, json_body: bool = True) -> dict:
         token = self.api_key.replace("Bearer ", "").strip()
-        return {"Authorization": f"Bearer {token}", "x-sdk-runtime": "hermes-plugin",
+        return {"Authorization": f"Bearer {token}", "x-sdk-runtime": "x19-plugin",
                 **({"Content-Type": "application/json"} if json_body else {}),
                 **({"X-API-Key": token} if path.startswith(("/v1/memory", "/v1/context")) else {})}  # memory/context also accept X-API-Key
 
@@ -307,7 +307,7 @@ class RetainDBMemoryProvider(MemoryProvider):
     def __init__(self):
         self._client: _Client | None = None
         self._queue: _WriteQueue | None = None
-        self._user_id, self._session_id, self._agent_id = "default", "", "hermes"
+        self._user_id, self._session_id, self._agent_id = "default", "", "x19"
         self._lock = threading.Lock()  # guards the prefetch caches below
         self._context_result, self._dialectic_result, self._agent_model = "", "", {}
         self._prefetch_threads: list[threading.Thread] = []  # tracked so rapid turns don't pile up threads
@@ -330,18 +330,18 @@ class RetainDBMemoryProvider(MemoryProvider):
         # Non-secret fields resolve env (profile-scoped) -> config.yaml (written by the Dashboard) -> default.
         cfg = {k: v.strip() for k, v in _load_retaindb_config().items() if isinstance(v, str)}
         base_url = re.sub(r"/+$", "", get_secret("RETAINDB_BASE_URL", "") or cfg.get("base_url") or _DEFAULT_BASE_URL)
-        # Project: RETAINDB_PROJECT > config.yaml > hermes-<profile> > "default" (API auto-creates "default").
+        # Project: RETAINDB_PROJECT > config.yaml > x19-<profile> > "default" (API auto-creates "default").
         # The project is the data partition: read through the secret scope so a multiplexed secondary's
         # memories never land in the default profile's project.
         project = get_secret("RETAINDB_PROJECT", "") or cfg.get("project")
         if not project:
-            profile_name = os.path.basename(str(kwargs.get("hermes_home", "")))
-            project = f"hermes-{profile_name}" if profile_name not in {"", ".hermes"} else "default"
+            profile_name = os.path.basename(str(kwargs.get("x19_home", "")))
+            project = f"x19-{profile_name}" if profile_name not in {"", ".x19"} else "default"
         self._client = _Client(get_secret("RETAINDB_API_KEY", "") or "", base_url, project)
         self._session_id, self._user_id = session_id, kwargs.get("user_id", "default") or "default"
-        self._agent_id = kwargs.get("agent_id", "hermes") or "hermes"
-        from hermes_constants import get_hermes_home
-        home = get_hermes_home()
+        self._agent_id = kwargs.get("agent_id", "x19") or "x19"
+        from x19_constants import get_x19_home
+        home = get_x19_home()
         self._queue = _WriteQueue(self._client, home / "retaindb_queue.db")
         soul = (home / "SOUL.md").read_text(encoding="utf-8", errors="replace").strip() if (home / "SOUL.md").exists() else ""
         if soul:  # seed agent identity from SOUL.md in background
@@ -492,135 +492,3 @@ def register(ctx) -> None:
     ctx.register_memory_provider(RetainDBMemoryProvider())
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Dict  # noqa: F401,E402
-from typing import List  # noqa: F401,E402
-
-CONTEXT_SCHEMA = {
-    "name": "retaindb_context",
-    "description": "Synthesized context block — what matters most for the current task, pulled from long-term memory.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "query": {"type": "string", "description": "Current task or question."},
-        },
-        "required": ["query"],
-    },
-}
-
-FILE_DELETE_SCHEMA = {
-    "name": "retaindb_delete_file",
-    "description": "Delete a stored file.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "file_id": {"type": "string", "description": "File ID to delete."},
-        },
-        "required": ["file_id"],
-    },
-}
-
-FILE_INGEST_SCHEMA = {
-    "name": "retaindb_ingest_file",
-    "description": "Chunk, embed, and extract memories from a stored file. Makes its contents searchable.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "file_id": {"type": "string", "description": "File ID to ingest."},
-        },
-        "required": ["file_id"],
-    },
-}
-
-FILE_LIST_SCHEMA = {
-    "name": "retaindb_list_files",
-    "description": "List files in the shared file store.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "prefix": {"type": "string", "description": "Path prefix to filter by, e.g. /reports/"},
-            "limit": {"type": "integer", "description": "Max results (default: 50)."},
-        },
-        "required": [],
-    },
-}
-
-FILE_READ_SCHEMA = {
-    "name": "retaindb_read_file",
-    "description": "Read the text content of a stored file by its file ID.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "file_id": {"type": "string", "description": "File ID returned from upload or list."},
-        },
-        "required": ["file_id"],
-    },
-}
-
-FILE_UPLOAD_SCHEMA = {
-    "name": "retaindb_upload_file",
-    "description": "Upload a file to the shared RetainDB file store. Returns an rdb:// URI any agent can reference.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "local_path": {"type": "string", "description": "Local file path to upload."},
-            "remote_path": {"type": "string", "description": "Destination path, e.g. /reports/q1.pdf"},
-            "scope": {"type": "string", "enum": ["USER", "PROJECT", "ORG"], "description": "Access scope (default: PROJECT)."},
-            "ingest": {"type": "boolean", "description": "Also extract memories from file after upload (default: false)."},
-        },
-        "required": ["local_path"],
-    },
-}
-
-FORGET_SCHEMA = {
-    "name": "retaindb_forget",
-    "description": "Delete a specific memory by ID.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "memory_id": {"type": "string", "description": "Memory ID to delete."},
-        },
-        "required": ["memory_id"],
-    },
-}
-
-PROFILE_SCHEMA = {
-    "name": "retaindb_profile",
-    "description": "Get the user's stable profile — preferences, facts, and patterns recalled from long-term memory.",
-    "parameters": {"type": "object", "properties": {}, "required": []},
-}
-
-REMEMBER_SCHEMA = {
-    "name": "retaindb_remember",
-    "description": "Persist an explicit fact, preference, or decision to long-term memory.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "content": {"type": "string", "description": "The fact to remember."},
-            "memory_type": {
-                "type": "string",
-                "enum": ["factual", "preference", "goal", "instruction", "event", "opinion"],
-                "description": "Category (default: factual).",
-            },
-            "importance": {"type": "number", "description": "Importance 0-1 (default: 0.7)."},
-        },
-        "required": ["content"],
-    },
-}
-
-SEARCH_SCHEMA = {
-    "name": "retaindb_search",
-    "description": "Semantic search across stored memories. Returns ranked results with relevance scores.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "query": {"type": "string", "description": "What to search for."},
-            "top_k": {"type": "integer", "description": "Max results (default: 8, max: 20)."},
-        },
-        "required": ["query"],
-    },
-}
-# ---- END PLUGIN-COMPAT ----

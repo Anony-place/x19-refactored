@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 import { createServer } from 'vite'
 
 const app = fileURLToPath(new URL('../', import.meta.url))
-const scratch = await mkdtemp(path.join(tmpdir(), 'hermes-task-scroll-'))
+const scratch = await mkdtemp(path.join(tmpdir(), 'x19-task-scroll-'))
 const output = process.env.TASK_SCROLL_OUTPUT ?? scratch
 let server
 let browser

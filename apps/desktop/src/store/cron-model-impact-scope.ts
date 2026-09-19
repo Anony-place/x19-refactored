@@ -1,4 +1,4 @@
-import type { HermesConnection } from '@/global'
+import type { X19Connection } from '@/global'
 
 let generation = 0
 let connectionIdentity = ''
@@ -30,7 +30,7 @@ export function onCronModelImpactScopeInvalidated(listener: () => void): () => v
   return () => invalidationListeners.delete(listener)
 }
 
-function identityForConnection(connection: HermesConnection | null): string {
+function identityForConnection(connection: X19Connection | null): string {
   if (!connection) {
     return ''
   }
@@ -45,7 +45,7 @@ function identityForConnection(connection: HermesConnection | null): string {
 
 /** Keep pending responses and action closures bound to the backend that issued
  * them without storing or comparing connection secrets. */
-export function syncCronModelImpactConnection(connection: HermesConnection | null): void {
+export function syncCronModelImpactConnection(connection: X19Connection | null): void {
   // A null descriptor is an ordinary reconnect state, not evidence that the
   // user selected another backend. Retain the last durable identity so the
   // reconnect can prove whether the backend actually changed.

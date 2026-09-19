@@ -2,22 +2,22 @@
 sidebar_position: 13
 sidebar_label: "Plugin Catalog"
 title: "Plugin Catalog"
-description: "Browse and install reviewed, SHA-pinned Hermes plugins from the curated catalog"
+description: "Browse and install reviewed, SHA-pinned X19 plugins from the curated catalog"
 ---
 
 # Plugin Catalog
 
-The plugin catalog is a curated, human-reviewed directory of Hermes plugins you
+The plugin catalog is a curated, human-reviewed directory of X19 plugins you
 can install by name with a single command:
 
 ```bash
-hermes plugins install <name>
+x19 plugins install <name>
 ```
 
 Browse it visually at **[/docs/plugins](/plugins)** — entries are shelved by
 category (Memory, Desktop, Platforms, Web & Browser, Tools, Voice, Automation,
 Models), with search, tier filters (Official / Community), capability chips, and
-**Install in Hermes** buttons and copyable CLI commands for every entry.
+**Install in X19** buttons and copyable CLI commands for every entry.
 
 In Desktop, open **Capabilities → Plugins → Browse** for the native catalog
 view. It is not an embedded website. **Installed** is a separate tab backed
@@ -36,9 +36,9 @@ layer on top.
 ### Published browse data
 
 The website and Desktop read the same generated CDN snapshot:
-[`https://hermes-agent.nousresearch.com/docs/api/plugins.json`](https://hermes-agent.nousresearch.com/docs/api/plugins.json).
+[`https://anony-place.github.io/x19-refactored/docs/api/plugins.json`](https://anony-place.github.io/x19-refactored/docs/api/plugins.json).
 Desktop fetches it through
-`https://nousresearch.github.io/hermes-agent/docs/api/plugins.json`; the public
+`https://nousresearch.github.io/x19/docs/api/plugins.json`; the public
 docs alias serves the same data. The docs build reads `plugin-catalog/*.yaml`
 and adds cached repository star counts. It also publishes the installer's
 removed-entry list. Neither
@@ -50,19 +50,19 @@ This browse snapshot is distinct from the installer's
 ## What's in an entry
 
 Each catalog entry is a small YAML file in the
-[`plugin-catalog/`](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog)
-directory of the hermes-agent repository, declaring:
+[`plugin-catalog/`](https://github.com/Anony-place/x19-refactored/tree/main/plugin-catalog)
+directory of the x19 repository, declaring:
 
 | Field | Meaning |
 |---|---|
-| `name` | The catalog key you pass to `hermes plugins install` |
+| `name` | The catalog key you pass to `x19 plugins install` |
 | `repo` | The plugin's public git repository |
 | `sha` | The **exact 40-hex commit** that was reviewed — installs check out this pin, not a branch tip |
 | `tier` | `official` (maintained by NousResearch) or `community` |
 | `category` | Browse shelf: `desktop` (default), `memory`, `platform`, `web`, `tools`, `voice`, `automation`, `models` or `general` |
 | `maintainer` | Who owns the plugin |
 | `capabilities` | Declared tools, hooks, middleware, and required env vars |
-| `requires_hermes` | Minimum Hermes version, e.g. `>=0.19` (optional) |
+| `requires_x19` | Minimum X19 version, e.g. `>=0.19` (optional) |
 | `platforms` | OS restrictions, empty = all (optional) |
 | `docs_url` | External documentation link (optional) |
 | `version` | Human-readable label for the pinned sha, e.g. `"1.4.0"`; shown as `1.4.0 @ abcd1234` in the CLI, on the catalog card and on the Desktop **Update to** button (optional, cosmetic) |
@@ -79,7 +79,7 @@ The catalog is designed so you know exactly what you're installing:
   author pushing new code to their repo does **not** change what the catalog
   installs — updating the pin requires another reviewed PR.
 - **Scanned at admission, trusted at install.** Admission CI runs the same
-  security scanner the installer runs (`hermes plugins validate` includes a
+  security scanner the installer runs (`x19 plugins validate` includes a
   `security scan` check): a `dangerous` verdict fails the entry, `caution`
   findings are listed for the reviewer. Because the reviewer saw them, a
   catalog install checked out at exactly the pinned SHA does not stop to ask
@@ -104,10 +104,10 @@ repository. Review the code of anything you give credentials to.
 
 ## Installing from the catalog
 
-On the website, **Install in Hermes** opens a protocol link of this form:
+On the website, **Install in X19** opens a protocol link of this form:
 
 ```text
-hermes://plugin/install?repo=owner%2Frepo&catalog_name=example-plugin&sha=0123456789abcdef0123456789abcdef01234567
+x19://plugin/install?repo=owner%2Frepo&catalog_name=example-plugin&sha=0123456789abcdef0123456789abcdef01234567
 ```
 
 `repo` is URL-encoded, including any `#subdir`. Desktop asks you to review the
@@ -118,22 +118,22 @@ only**, not authority to choose or override a commit, and it is not a pin
 guarantee for a standalone desktop plugin.
 
 Use an updated Desktop build for the catalog parameters (and for the public
-Skills Hub's new `hermes://skill/install?identifier=...` route). Older builds
+Skills Hub's new `x19://skill/install?identifier=...` route). Older builds
 may only understand repository-only plugin links. The expanded cards retain
 CLI commands, so you can install by catalog name without Desktop:
 
 ```bash
 # Install a reviewed catalog entry by name (checks out the pinned SHA)
-hermes plugins install <name>
+x19 plugins install <name>
 
 # Then enable it, as with any plugin
-hermes plugins enable <name>
+x19 plugins enable <name>
 ```
 
 The install prompt shows the entry's capability summary — declared tools,
 hooks, and required env vars — before anything is cloned.
 
-The catalog name and the plugin's own manifest name can differ; `hermes
+The catalog name and the plugin's own manifest name can differ; `x19
 plugins install` prints the installed name, and `enable` takes that one. For
 example the `touchdesigner` entry (a portable Agent Plugins v1 package that
 bundles the twozero MCP server with the `touchdesigner-mcp` skill) installs as
@@ -141,26 +141,26 @@ bundles the twozero MCP server with the `touchdesigner-mcp` skill) installs as
 function-name limits:
 
 ```bash
-hermes plugins install touchdesigner
-hermes plugins enable td
+x19 plugins install touchdesigner
+x19 plugins enable td
 ```
 
 Portable packages can also carry a stdio MCP server. The `snyk` entry pins the
 Snyk CLI (`npx -y snyk@<version> mcp`) and bundles the `snyk-security-scan`
-skill, so one install gives Hermes code, dependency, container and IaC scanning
+skill, so one install gives X19 code, dependency, container and IaC scanning
 plus the workflow for using it; the catalog name and manifest name match:
 
 ```bash
-hermes plugins install snyk
-hermes plugins enable snyk
+x19 plugins install snyk
+x19 plugins enable snyk
 ```
 
 ### Updating a catalog install
 
-`hermes plugins update <name>` never runs `git pull` for catalog installs —
+`x19 plugins update <name>` never runs `git pull` for catalog installs —
 it compares your installed pin against the current catalog pin and, when the
 catalog moved (via a reviewed PR), force-reinstalls at the new SHA. Your
-enabled/disabled state is preserved. `hermes plugins list` shows catalog
+enabled/disabled state is preserved. `x19 plugins list` shows catalog
 installs as `catalog:<tier>@<sha>` so you can see provenance at a glance.
 
 ### Names not in the catalog
@@ -172,15 +172,15 @@ unreviewed name index. Install such plugins by `owner/repo` or Git URL instead
 ### Live refresh
 
 The docs build publishes the catalog as one JSON document
-(`https://hermes-agent.nousresearch.com/docs/api/plugin-catalog.json`).
+(`https://anony-place.github.io/x19-refactored/docs/api/plugin-catalog.json`).
 `search`/`install`/`update` fetch it at most every six hours and cache it under
-`~/.hermes/cache/`, so new entries and removals reach installed clients without
-updating Hermes. Offline, the copy shipped with your checkout is used. Removals
+`~/.x19/cache/`, so new entries and removals reach installed clients without
+updating X19. Offline, the copy shipped with your checkout is used. Removals
 from the in-tree list and the live list are always both enforced.
 
 ### Custom git URLs are different
 
-`hermes plugins install <git-url>` still works for any repository, but it
+`x19 plugins install <git-url>` still works for any repository, but it
 bypasses the catalog entirely:
 
 - **No review** — you get whatever is at the branch tip, not a reviewed pin.
@@ -194,7 +194,7 @@ catalog for discovery.
 
 Submissions are pull requests that add one `plugin-catalog/<name>.yaml` file.
 The full checklist lives in the
-[plugin-catalog README](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog);
+[plugin-catalog README](https://github.com/Anony-place/x19-refactored/tree/main/plugin-catalog);
 in short, an entry must be:
 
 1. **Owner-submitted** — the PR author owns or maintains the plugin repo.
@@ -207,19 +207,19 @@ in short, an entry must be:
    the PR (schema, SHA format, reachability).
 5. **Not self-updating** — the catalog build must not download and replace
    its own files; the pinned SHA is the only update path (a SHA-bump PR plus
-   `hermes plugins update <name>`).
+   `x19 plugins update <name>`).
 
 Pin updates (bumping `sha` to a newer commit) follow the same PR + review
 process; bump `version` in the same PR so the label users see matches the
 code. Installed plugins compare their recorded sha against the live pin:
-`hermes plugins list --json` reports `update_available`, the Desktop Plugins
-tab shows an **Update to 1.4.0** button, and `hermes plugins update <name>`
+`x19 plugins list --json` reports `update_available`, the Desktop Plugins
+tab shows an **Update to 1.4.0** button, and `x19 plugins update <name>`
 checks out exactly the new pin.
 
 ## See also
 
 - [Plugins](plugins.md) — the plugin system itself: manifest format, enabling,
   configuration
-- [Built-in Plugins](built-in-plugins.md) — plugins that ship with Hermes
-- [Build a Hermes Plugin](/developer-guide/plugins) — write your own
+- [Built-in Plugins](built-in-plugins.md) — plugins that ship with X19
+- [Build a X19 Plugin](/developer-guide/plugins) — write your own
 - [Plugin Catalog page](/plugins) — the browsable catalog

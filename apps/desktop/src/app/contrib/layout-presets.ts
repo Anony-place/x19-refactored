@@ -42,7 +42,7 @@ export const DEFAULT_TREE = split(
 const FOCUS_TREE = split('row', [group(['sessions']), group(['workspace', 'files', 'review', 'terminal'])], [1, 4.6])
 
 // Basic starts with sessions and chat so first-run users need not learn
-// terminal, files or review panes before using Hermes.
+// terminal, files or review panes before using X19.
 const BASIC_TREE = split('row', [group(['sessions']), group(['workspace'])], [1, 4.6])
 
 const TERMINAL_TREE = split(

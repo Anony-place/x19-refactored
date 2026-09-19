@@ -144,7 +144,7 @@ class TestApprovalTextFallbackContract:
 
         monkeypatch.setattr("gateway.platforms.base_exec_approval.approval_timeout_seconds", lambda: 300)
         text = _format_exec_approval_fallback("rm -rf /", "recursive delete", "/")
-        assert "Hermes wants to run a command that needs your OK" in text
+        assert "X19 wants to run a command that needs your OK" in text
         assert "Why it was flagged: recursive delete" in text
         assert "If you don't answer within 5 minutes it will NOT run." in text
         for step in ("`/approve`", "`/approve session`", "`/approve always`", "`/deny`"):

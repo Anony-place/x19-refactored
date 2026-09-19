@@ -11,7 +11,7 @@ for the value of the NewName parameter, unless the path is identical to the
 path specified in the Path parameter").
 
 The swap in ``Test-Node`` relies on exactly that carve-out: it renames
-between ``$HermesHome\node`` and sibling ``node.new-*`` / ``node.old-*``
+between ``$X19Home\node`` and sibling ``node.new-*`` / ``node.old-*``
 paths (same directory, same volume -- atomic rename). This test pins the
 invariant so a future refactor cannot silently introduce a cross-directory
 rename, which would throw on every Windows install and read as a false
@@ -41,17 +41,17 @@ def test_managed_node_swap_defines_staged_and_backup_as_siblings() -> None:
     swap = _swap_block()
     # $staged / $backup must be siblings of the live tree -- that is what
     # makes every Rename-Item -NewName below a same-directory path.
-    assert re.search(r'\$staged\s*=\s*"\$HermesHome\\node\.new-\$stamp"', swap), (
+    assert re.search(r'\$staged\s*=\s*"\$X19Home\\node\.new-\$stamp"', swap), (
         "$staged must be defined as a sibling of the live tree "
-        '("$HermesHome\\node.new-$stamp")'
+        '("$X19Home\\node.new-$stamp")'
     )
-    assert re.search(r'\$backup\s*=\s*"\$HermesHome\\node\.old-\$stamp"', swap), (
+    assert re.search(r'\$backup\s*=\s*"\$X19Home\\node\.old-\$stamp"', swap), (
         "$backup must be defined as a sibling of the live tree "
-        '("$HermesHome\\node.old-$stamp")'
+        '("$X19Home\\node.old-$stamp")'
     )
 
 
-def test_managed_node_swap_renames_stay_within_hermes_home() -> None:
+def test_managed_node_swap_renames_stay_within_x19_home() -> None:
     swap = _swap_block()
 
     renames = re.findall(
@@ -65,11 +65,11 @@ def test_managed_node_swap_renames_stay_within_hermes_home() -> None:
     # above, so every call is a same-directory rename. Pin the actual swap
     # state machine too: live tree aside to $backup, staged tree into
     # place, and $backup restored on the rollback path. A cross-directory
-    # path (e.g. "$HermesHome\sub\node") or a swapped direction must fail.
+    # path (e.g. "$X19Home\sub\node") or a swapped direction must fail.
     allowed_pairs = {
-        ('"$HermesHome\\node"', "$backup"),  # live tree aside
-        ("$staged", '"$HermesHome\\node"'),  # staged into place (existing + fresh)
-        ("$backup", '"$HermesHome\\node"'),  # rollback restore
+        ('"$X19Home\\node"', "$backup"),  # live tree aside
+        ("$staged", '"$X19Home\\node"'),  # staged into place (existing + fresh)
+        ("$backup", '"$X19Home\\node"'),  # rollback restore
     }
     for src, dst in renames:
         assert (src, dst) in allowed_pairs, (

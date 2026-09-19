@@ -56,7 +56,7 @@ export function ConnectionSwitcher({ compact = false, onConnect }: { compact?: b
 
     // Registry events are local IPC notifications, not remote polling. They
     // keep a second Settings window or a removal/edit reflected here.
-    const off = window.hermesDesktop?.connections?.onChanged?.(() => {
+    const off = window.x19Desktop?.connections?.onChanged?.(() => {
       void refreshConnectionsRegistry().catch(() => undefined)
     })
 

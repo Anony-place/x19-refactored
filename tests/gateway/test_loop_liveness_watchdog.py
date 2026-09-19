@@ -269,7 +269,7 @@ def test_load_gateway_config_bridges_loop_watchdog_keys(tmp_path, monkeypatch):
         "  loop_watchdog_max_strikes: 12\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr("gateway.config.get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr("gateway.config.get_x19_home", lambda: tmp_path)
 
     cfg = load_gateway_config()
     assert cfg.loop_watchdog is False
@@ -451,7 +451,7 @@ def test_windows_tcp_witness_arms_and_publishes_port():
             # Probe from a worker thread so the blocking connect/recv never
             # stalls the very loop we are witnessing (an external process
             # probes from its own loop/thread — reproduce that shape).
-            from hermes_cli.gateway import _probe_loop_tick_tcp
+            from x19_cli.gateway import _probe_loop_tick_tcp
 
             result_box: dict[str, object] = {}
 

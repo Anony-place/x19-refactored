@@ -19,13 +19,13 @@ import pytest
 
 
 @pytest.fixture()
-def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+def x19_home(tmp_path, monkeypatch):
+    home = tmp_path / ".x19"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
 
-    from hermes_cli import goals
+    from x19_cli import goals
 
     goals._DB_CACHE.clear()
     yield home
@@ -33,12 +33,12 @@ def hermes_home(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def server(hermes_home):
+def server(x19_home):
     with patch.dict(
         "sys.modules",
         {
-            "hermes_cli.env_loader": MagicMock(),
-            "hermes_cli.banner": MagicMock(),
+            "x19_cli.env_loader": MagicMock(),
+            "x19_cli.banner": MagicMock(),
         },
     ):
         mod = importlib.import_module("tui_gateway.server")
@@ -86,7 +86,7 @@ def test_loop_set_persists(server, session):
     assert result["type"] == "exec"
     assert "Loop set" in result["output"]
 
-    from hermes_cli.loops import LoopManager
+    from x19_cli.loops import LoopManager
 
     mgr = LoopManager(session_key)
     assert mgr.state is not None
@@ -114,7 +114,7 @@ def test_loop_pause_resume_stop(server, session):
     r = _call(server, "command.dispatch", name="loop", arg="stop", session_id=sid)
     assert "stopped" in r["result"]["output"].lower()
 
-    from hermes_cli.loops import LoopManager
+    from x19_cli.loops import LoopManager
 
     assert not LoopManager(session_key).has_loop()
 
@@ -130,7 +130,7 @@ def test_loop_requires_session(server):
 
 def test_tui_tick_fires_when_idle_and_due(server, session):
     sid, session_key, s = session
-    from hermes_cli.loops import LoopManager, save_loop
+    from x19_cli.loops import LoopManager, save_loop
 
     mgr = LoopManager(session_key)
     mgr.set("poll the build", interval_seconds=60)
@@ -154,7 +154,7 @@ def test_tui_tick_fires_when_idle_and_due(server, session):
 
 def test_tui_tick_defers_when_running(server, session):
     sid, session_key, s = session
-    from hermes_cli.loops import LoopManager, save_loop
+    from x19_cli.loops import LoopManager, save_loop
 
     mgr = LoopManager(session_key)
     mgr.set("poll", interval_seconds=60)
@@ -175,7 +175,7 @@ def test_tui_tick_leaves_gateway_routed_loop_for_gateway(server, session):
     """A /loop set from a messaging chat (route pinned by the gateway) must not be consumed by a TUI/Desktop
     viewer of the same session: the gateway's wakeup scanner owns delivery back to that chat (#111841)."""
     sid, session_key, s = session
-    from hermes_cli.loops import LoopManager, save_loop
+    from x19_cli.loops import LoopManager, save_loop
 
     mgr = LoopManager(session_key)
     mgr.set("poll", interval_seconds=60, route={"platform": "telegram", "chat_id": "42"})
@@ -194,8 +194,8 @@ def test_tui_tick_leaves_gateway_routed_loop_for_gateway(server, session):
 
 def test_tui_tick_defers_to_active_goal(server, session):
     sid, session_key, s = session
-    from hermes_cli.goals import GoalManager
-    from hermes_cli.loops import LoopManager, save_loop
+    from x19_cli.goals import GoalManager
+    from x19_cli.loops import LoopManager, save_loop
 
     GoalManager(session_id=session_key).set("finish the feature")
     mgr = LoopManager(session_key)
@@ -213,12 +213,12 @@ def test_tui_tick_defers_to_active_goal(server, session):
 
 def test_tui_tick_noop_when_not_due(server, session):
     sid, session_key, s = session
-    from hermes_cli.loops import LoopManager
+    from x19_cli.loops import LoopManager
 
     mgr = LoopManager(session_key)
     mgr.set("poll", interval_seconds=300)
     # New loops are due immediately; push the wakeup out to model "not due".
-    from hermes_cli.loops import save_loop
+    from x19_cli.loops import save_loop
     mgr.state.next_due_at = time.time() + 300
     save_loop(session_key, mgr.state)
 

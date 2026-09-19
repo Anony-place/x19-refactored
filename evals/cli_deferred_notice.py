@@ -21,8 +21,8 @@ import fcntl
 
 
 def run_case(root, output, name, behind, early=False, cancel=False):
-    with tempfile.TemporaryDirectory(prefix="hermes_test_notice_") as home:
-        hh = Path(home) / ".hermes"
+    with tempfile.TemporaryDirectory(prefix="x19_test_notice_") as home:
+        hh = Path(home) / ".x19"
         hh.mkdir()
         (hh / "config.yaml").write_text(
             "model:\n  default: test-model\n  provider: custom\n"
@@ -31,20 +31,20 @@ def run_case(root, output, name, behind, early=False, cancel=False):
             "memory:\n  provider: ''\n", encoding="utf-8")
         cache = hh / ".update_check"
         # The version comes from the checkout, not an invented cache identity.
-        from hermes_cli.banner import VERSION
+        from x19_cli.banner import VERSION
         payload = json.dumps({"ts": time.time(), "behind": behind,
                               "rev": None, "ver": VERSION}).encode()
         if early:
             cache.write_bytes(payload)
         else:
             os.mkfifo(cache)
-        env = {"PATH": os.environ["PATH"], "HOME": home, "HERMES_HOME": str(hh),
+        env = {"PATH": os.environ["PATH"], "HOME": home, "X19_HOME": str(hh),
                "PYTHONPATH": str(root), "PYTHONUNBUFFERED": "1",
                "TERM": "xterm-256color", "LANG": "C.UTF-8",
                "OPENAI_API_KEY": "local-not-used", "PROMPT_TOOLKIT_NO_CPR": "1"}
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-        bootstrap = ("import hermes_cli.main as m; import hermes_cli.banner as b; "
+        bootstrap = ("import x19_cli.main as m; import x19_cli.banner as b; "
                      "print('LOADED', m.__file__, b.__file__, flush=True); m.main()")
         proc = subprocess.Popen([sys.executable, "-c", bootstrap, "chat"], cwd=root,
                                 env=env, stdin=slave, stdout=slave, stderr=slave,
@@ -92,7 +92,7 @@ def run_case(root, output, name, behind, early=False, cancel=False):
             result = {"case": name, "ready": ready, "exited": exited,
                       "returncode": proc.returncode, "garbled": "?[1;33m" in text,
                       "notice": "commits behind" in text or "update available" in text,
-                      "loaded_worktree": str(root / "hermes_cli/banner.py") in text,
+                      "loaded_worktree": str(root / "x19_cli/banner.py") in text,
                       "raw_path": str(output / f"{name}.pty")}
             assert result["loaded_worktree"] and proc.returncode == 0, result
             return result

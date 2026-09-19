@@ -1,5 +1,5 @@
 /**
- * Unit + live-transport tests for the Electron main process's Hermes REST
+ * Unit + live-transport tests for the Electron main process's X19 REST
  * retry policy (#92976 / PR #92977 salvage).
  *
  * The live tests run REAL node http servers that misbehave the way the
@@ -428,7 +428,7 @@ describe('htmlResponseError', () => {
     for (const [url, location] of [
       ['http://gateway.example.com/api/profiles', 'https://gateway.example.com/api/profiles'],
       ['https://gateway.example.com/api/profiles', '/api/profiles/'],
-      ['https://gateway.example.com/hermes/api/health', 'https://gateway.example.com/hermes/api/health/']
+      ['https://gateway.example.com/x19/api/health', 'https://gateway.example.com/x19/api/health/']
     ]) {
       const message = htmlResponseError(url, 301, location).message
 

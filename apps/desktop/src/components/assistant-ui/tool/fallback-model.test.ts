@@ -191,16 +191,16 @@ describe('buildToolView web-search query', () => {
   it('keeps the query separate from structured search results', () => {
     const view = buildToolView(
       part({
-        args: { query: 'Hermes Agent Desktop tool calls' },
-        result: { web: [{ snippet: 'Desktop docs', title: 'Hermes docs', url: 'https://example.com/docs' }] },
+        args: { query: 'X19 Desktop tool calls' },
+        result: { web: [{ snippet: 'Desktop docs', title: 'X19 docs', url: 'https://example.com/docs' }] },
         toolName: 'web_search'
       }),
       ''
     )
 
-    expect(view.searchQuery).toBe('Hermes Agent Desktop tool calls')
+    expect(view.searchQuery).toBe('X19 Desktop tool calls')
     expect(view.searchHits).toEqual([
-      { snippet: 'Desktop docs', title: 'Hermes docs', url: 'https://example.com/docs' }
+      { snippet: 'Desktop docs', title: 'X19 docs', url: 'https://example.com/docs' }
     ])
   })
 })
@@ -210,28 +210,28 @@ describe('buildToolView browser_navigate title', () => {
     const view = buildToolView(
       part({
         toolName: 'browser_navigate',
-        args: { url: 'https://hermes-agent.nousresearch.com/docs' },
+        args: { url: 'https://anony-place.github.io/x19-refactored/docs' },
         result: { success: false, error: 'Command timed out after 60 seconds' }
       }),
       ''
     )
 
     expect(view.status).toBe('error')
-    expect(view.title).toBe('Failed to open hermes-agent.nousresearch.com/docs')
+    expect(view.title).toBe('Failed to open anony-place.github.io/x19-refactored/docs')
   })
 
   it('shows opened title on success', () => {
     const view = buildToolView(
       part({
         toolName: 'browser_navigate',
-        args: { url: 'https://hermes-agent.nousresearch.com/docs' },
-        result: { success: true, url: 'https://hermes-agent.nousresearch.com/docs', title: 'Docs' }
+        args: { url: 'https://anony-place.github.io/x19-refactored/docs' },
+        result: { success: true, url: 'https://anony-place.github.io/x19-refactored/docs', title: 'Docs' }
       }),
       ''
     )
 
     expect(view.status).toBe('success')
-    expect(view.title).toBe('Opened hermes-agent.nousresearch.com/docs')
+    expect(view.title).toBe('Opened anony-place.github.io/x19-refactored/docs')
   })
 })
 

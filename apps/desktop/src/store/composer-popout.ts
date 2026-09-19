@@ -3,11 +3,11 @@ import { atom } from 'nanostores'
 import { chatSurfaceRoot } from '@/app/chat/surface-vars'
 import { persistBoolean, persistString, storedBoolean, storedString } from '@/lib/storage'
 
-const POPOUT_STORAGE_KEY = 'hermes.desktop.composerPopout.window.v1'
-const POPOUT_GESTURES_ENABLED_STORAGE_KEY = 'hermes.desktop.composerPopout.gesturesEnabled'
-const ZONES_STORAGE_KEY = 'hermes.desktop.composerPopout.zones.v1'
-const LEGACY_ENABLED_KEY = 'hermes.desktop.composerPopout.enabled'
-const LEGACY_POSITION_KEY = 'hermes.desktop.composerPopout.position'
+const POPOUT_STORAGE_KEY = 'x19.desktop.composerPopout.window.v1'
+const POPOUT_GESTURES_ENABLED_STORAGE_KEY = 'x19.desktop.composerPopout.gesturesEnabled'
+const ZONES_STORAGE_KEY = 'x19.desktop.composerPopout.zones.v1'
+const LEGACY_ENABLED_KEY = 'x19.desktop.composerPopout.enabled'
+const LEGACY_POSITION_KEY = 'x19.desktop.composerPopout.position'
 
 /** Viewport-relative bottom/right insets keep the resting corner stable as a draft grows. */
 export interface PopoutPosition {

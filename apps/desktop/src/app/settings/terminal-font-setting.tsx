@@ -8,12 +8,12 @@ import {
 } from '@/app/right-sidebar/terminal/terminal-font'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { saveHermesConfig } from '@/hermes'
+import { saveX19Config } from '@/x19'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/store/notifications'
-import type { HermesConfigRecord } from '@/types/hermes'
+import type { X19ConfigRecord } from '@/types/x19'
 
-import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
+import { setX19ConfigCache, useX19ConfigRecord } from '../hooks/use-config-record'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { useProfileSwitchLatch } from '../hooks/use-profile-switch-latch'
 
@@ -22,14 +22,14 @@ import { ListRow } from './primitives'
 
 const AUTOSAVE_DELAY_MS = 550
 
-function fontFamilyFromConfig(config: HermesConfigRecord): string {
+function fontFamilyFromConfig(config: X19ConfigRecord): string {
   return normalizeTerminalFontFamily(getNested(config, 'terminal.font_family'))
 }
 
 export function TerminalFontSetting() {
   const { t } = useI18n()
   const copy = t.settings.appearance
-  const { data: loadedConfig, dataUpdatedAt } = useHermesConfigRecord()
+  const { data: loadedConfig, dataUpdatedAt } = useX19ConfigRecord()
   // draft === null ⇔ unseeded: nothing painted yet for this profile. The
   // profile-switch handler keeps it unseeded until a config refetch completes;
   // the timestamp is the freshness proof because React Query can reuse the
@@ -82,7 +82,7 @@ export function TerminalFontSetting() {
     }
 
     // The last successfully saved value IS what the shared config cache
-    // holds — successful saves write it back via setHermesConfigCache, so
+    // holds — successful saves write it back via setX19ConfigCache, so
     // rollback re-derives from there instead of mirroring into a ref.
     const rollback = fontFamilyFromConfig(loadedConfig)
 
@@ -91,7 +91,7 @@ export function TerminalFontSetting() {
 
       // Sparse patch: PUT /api/config deep-merges, and echoing the cached
       // snapshot would overwrite keys other surfaces changed since it loaded.
-      void saveHermesConfig(setNested({}, 'terminal.font_family', value))
+      void saveX19Config(setNested({}, 'terminal.font_family', value))
         .then(result => {
           if (!result.ok) {
             throw new Error(t.settings.config.autosaveFailed)
@@ -101,7 +101,7 @@ export function TerminalFontSetting() {
             return
           }
 
-          setHermesConfigCache(next)
+          setX19ConfigCache(next)
         })
         .catch(error => {
           if (saveVersionRef.current !== version) {
@@ -138,7 +138,7 @@ export function TerminalFontSetting() {
               aria-label={copy.terminalFontTitle}
               className="flex-1"
               disabled={draft === null}
-              list="hermes-terminal-font-families"
+              list="x19-terminal-font-families"
               onChange={event => update(event.target.value)}
               placeholder={copy.terminalFontPlaceholder}
               value={value}
@@ -147,7 +147,7 @@ export function TerminalFontSetting() {
               {copy.terminalFontReset}
             </Button>
           </div>
-          <datalist id="hermes-terminal-font-families">
+          <datalist id="x19-terminal-font-families">
             {TERMINAL_FONT_SUGGESTIONS.map(font => (
               <option key={font} value={font} />
             ))}

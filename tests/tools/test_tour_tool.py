@@ -13,7 +13,7 @@ def _run(**kwargs):
 
 def test_lives_in_the_gui_surface_toolset(monkeypatch):
     """Scoped by toolset, not by the backend's env — see AGENTS.md."""
-    monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+    monkeypatch.delenv("X19_DESKTOP", raising=False)
     entry = registry.get_entry("gui_tour")
 
     assert entry is not None

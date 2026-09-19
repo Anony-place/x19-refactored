@@ -6,7 +6,7 @@
  * listens.
  */
 
-import type { GatewayEvent } from '@hermes/shared'
+import type { GatewayEvent } from '@x19/shared'
 
 export type GatewayEventListener = (event: GatewayEvent) => void
 

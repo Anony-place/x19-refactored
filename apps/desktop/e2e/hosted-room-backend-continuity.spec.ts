@@ -14,7 +14,7 @@ import {
 import { startMockServer } from '../../../tests-js/scripts/mock-server'
 import { expect, test } from './test'
 
-// Hosted Group Chat rooms live in the gateway, and the Desktop's own `hermes serve` backend runs
+// Hosted Group Chat rooms live in the gateway, and the Desktop's own `x19 serve` backend runs
 // a room worker. A member turn used to keep the profile's `bot_room` active-session slot for the
 // life of the backend process, so a second room worker on the same home (the messaging gateway
 // beside Desktop serve) was refused every turn once the driver lease flipped (#106847). Asserted
@@ -27,15 +27,15 @@ type Page = MockBackendFixture['page']
 let fixture: MockBackendFixture | null = null
 let rpc: Rpc | null = null
 
-function seedProfile(hermesHome: string, mockUrl: string, name: string): void {
-  const dir = path.join(hermesHome, 'profiles', name)
+function seedProfile(x19Home: string, mockUrl: string, name: string): void {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
 }
 
-/** Locate the Electron-spawned `hermes serve` backend for this sandbox: its port and session token. */
-function findBackend(hermesHome: string): { port: number; token: string; pid: number } {
+/** Locate the Electron-spawned `x19 serve` backend for this sandbox: its port and session token. */
+function findBackend(x19Home: string): { port: number; token: string; pid: number } {
   const pids = execSync(`pgrep -f "serve --host 127.0.0.1 --port 0" || true`, { encoding: 'utf8' })
     .split('\n')
     .map(s => s.trim())
@@ -49,19 +49,19 @@ function findBackend(hermesHome: string): { port: number; token: string; pid: nu
       continue
     }
     const vars = new Map(environ.split('\0').map(kv => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]))
-    if (vars.get('HERMES_HOME') !== hermesHome) {
+    if (vars.get('X19_HOME') !== x19Home) {
       continue
     }
-    const token = vars.get('HERMES_DASHBOARD_SESSION_TOKEN') ?? ''
+    const token = vars.get('X19_DASHBOARD_SESSION_TOKEN') ?? ''
     // The backend inherits Electron's remote-debugging socket fd too; the serve port is the listener
-    // that only the hermes process holds.
+    // that only the x19 process holds.
     const listen = execSync(`ss -ltnp | grep "pid=${pid}," | grep -v electron || true`, { encoding: 'utf8' })
     const port = Number(/127\.0\.0\.1:(\d+)/.exec(listen)?.[1] ?? 0)
     if (token && port) {
       return { port, token, pid }
     }
   }
-  throw new Error(`no hermes serve backend found for ${hermesHome} (pids: ${pids.join(',')})`)
+  throw new Error(`no x19 serve backend found for ${x19Home} (pids: ${pids.join(',')})`)
 }
 
 /** Minimal JSON-RPC client over the backend's /api/ws (Node's global WebSocket; no Origin header is sent,
@@ -113,10 +113,10 @@ async function openBots(page: Page): Promise<void> {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('hosted-rooms-backend')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  seedProfile(sandbox.hermesHome, mock.url, 'sentinel')
-  seedProfile(sandbox.hermesHome, mock.url, 'friday')
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  seedProfile(sandbox.x19Home, mock.url, 'sentinel')
+  seedProfile(sandbox.x19Home, mock.url, 'friday')
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
   fixture = {
@@ -133,7 +133,7 @@ test.beforeAll(async () => {
     }
   }
   await waitForAppReady(fixture, 120_000)
-  const backend = findBackend(sandbox.hermesHome)
+  const backend = findBackend(sandbox.x19Home)
   rpc = new Rpc(backend.port, backend.token)
 })
 
@@ -170,7 +170,7 @@ test("a hosted room turn driven by the Desktop backend releases the member's bot
     .poll(kinds, { timeout: 60_000, intervals: [1_000] })
     .toContain('room.activity')
 
-  const slotsPath = path.join(fixture!.sandbox.hermesHome, 'profiles', 'sentinel', 'runtime', 'active_sessions.json')
+  const slotsPath = path.join(fixture!.sandbox.x19Home, 'profiles', 'sentinel', 'runtime', 'active_sessions.json')
   const botRoomSlots = () => {
     if (!fs.existsSync(slotsPath)) {
       return []

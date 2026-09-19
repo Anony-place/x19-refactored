@@ -27,7 +27,7 @@ import {
 import { $activeSessionId, $connection, $selectedStoredSessionId } from '@/store/session'
 import { isPeerInstanceWindow, windowProfileOverride } from '@/store/windows'
 
-const LAST_PROFILE_STORAGE_KEY = 'hermes.desktop.lastProfileByConnection'
+const LAST_PROFILE_STORAGE_KEY = 'x19.desktop.lastProfileByConnection'
 
 // Every await of a source switch is bounded. A wedged spawn, ticket mint,
 // handshake or IPC (the #93454 class) must surface as a failed click — not a
@@ -110,7 +110,7 @@ export function setConnectionsRegistry(registry: DesktopConnectionsRegistry): vo
 
 /** Refresh the renderer cache from Electron's local registry. No backend is contacted. */
 export async function refreshConnectionsRegistry(): Promise<DesktopConnectionsRegistry | null> {
-  const bridge = window.hermesDesktop?.connections
+  const bridge = window.x19Desktop?.connections
 
   if (!bridge) {
     return null
@@ -123,7 +123,7 @@ export async function refreshConnectionsRegistry(): Promise<DesktopConnectionsRe
 }
 
 async function rememberConnection(connectionId: string): Promise<void> {
-  const setLastUsed = window.hermesDesktop?.connections?.setLastUsed
+  const setLastUsed = window.x19Desktop?.connections?.setLastUsed
 
   if (!setLastUsed) {
     return
@@ -329,7 +329,7 @@ export async function selectConnection(connectionId: string, options: SelectConn
 
   const targetKey = `${connectionId}::${targetProfile}`
 
-  // The primary local descriptor (startHermes) historically publishes without
+  // The primary local descriptor (startX19) historically publishes without
   // a profile of its own; a profile-less descriptor on the source we are
   // landing must not strand the switch — the activation already published the
   // route we asked for, so trust it for the same source instead of comparing

@@ -15,9 +15,9 @@ const gatewayMocks = vi.hoisted(() => ({
   setGatewayState: vi.fn()
 }))
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   setApiRequestConnection: vi.fn(),
-  HermesGateway: class {
+  X19Gateway: class {
     connectionState = 'closed'
     connect = async (wsUrl: string): Promise<void> => {
       await gatewayMocks.connect(wsUrl)
@@ -54,7 +54,7 @@ interface DesktopStub {
 }
 
 function installDesktop(stub: DesktopStub): void {
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
+  ;(window as unknown as { x19Desktop: unknown }).x19Desktop = stub
 }
 
 function makePrimary(): { connectionState: string } {
@@ -88,7 +88,7 @@ beforeEach(() => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
 })
 
 describe('registry-agent scope eviction (activeGateway must never silently hit the primary)', () => {

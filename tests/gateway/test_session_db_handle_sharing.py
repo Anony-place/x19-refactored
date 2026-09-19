@@ -27,7 +27,7 @@ from gateway.session_db_recovery import RecoverableHandleCache
 
 def _live_count(path) -> int:
     """Live-connection count the tracking registry holds for *path*."""
-    import hermes_cli.sqlite_safe_read as mod
+    import x19_cli.sqlite_safe_read as mod
 
     with mod._live_lock:
         return mod._live_connections.get(mod._key(path), 0)
@@ -36,19 +36,19 @@ def _live_count(path) -> int:
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     """A gateway home under tmp_path, with path resolution going through it."""
-    import hermes_state
+    import x19_state
 
-    root = tmp_path / "hermes"
+    root = tmp_path / "x19"
     root.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("X19_HOME", str(root))
     # The suite-wide fixture re-points DEFAULT_DB_PATH, which trips the
     # deliberate escape hatch in _default_db_path() and would pin every lookup
     # to one fixed path. Restore the import-time snapshot so resolution runs
-    # through get_hermes_home() the way production does; HERMES_HOME above
+    # through get_x19_home() the way production does; X19_HOME above
     # keeps it inside tmp_path. Same reasoning as
     # test_multiplex_session_db_profile_scope.py.
     monkeypatch.setattr(
-        hermes_state, "DEFAULT_DB_PATH", hermes_state._IMPORT_DEFAULT_DB_PATH
+        x19_state, "DEFAULT_DB_PATH", x19_state._IMPORT_DEFAULT_DB_PATH
     )
     return root
 

@@ -66,8 +66,8 @@ async function openUntil(action: () => Promise<void>, expected: () => Promise<vo
   }
 }
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<string> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<string> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -95,7 +95,7 @@ function seedRoutine(profileHome: string, title: string): void {
 
   execFileSync(python, ['-c', script], {
     cwd: repoRoot,
-    env: { ...process.env, HERMES_HOME: profileHome },
+    env: { ...process.env, X19_HOME: profileHome },
     stdio: 'pipe'
   })
 }
@@ -125,7 +125,7 @@ async function openAlphaChat(page: Page): Promise<void> {
 }
 
 function routinesTab(page: Page) {
-  return page.locator('[data-tree-tab="hermes-bots:routines"]').filter({ visible: true }).first()
+  return page.locator('[data-tree-tab="x19-bots:routines"]').filter({ visible: true }).first()
 }
 
 /** Expand the collapsed right-edge Scheduled jobs tab (a no-op when the pane is already open); resolve the row. */
@@ -151,9 +151,9 @@ async function expandRoutines(page: Page) {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-routines')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  alphaHome = await seedBot(sandbox.hermesHome, mock.url, 'alpha')
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  alphaHome = await seedBot(sandbox.x19Home, mock.url, 'alpha')
   seedRoutine(alphaHome, LONG_TITLE)
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
@@ -237,7 +237,7 @@ test('a long routine title never pushes the Switch, delete control or next-run l
   })
 
   await test.step('closing Scheduled jobs with ✕ is recoverable — leaving and re-entering Bot Mode brings the pane back (#102224)', async () => {
-    const tab = page.locator('[data-tree-tab="hermes-bots:routines"]').first()
+    const tab = page.locator('[data-tree-tab="x19-bots:routines"]').first()
     await expect(tab).toBeVisible({ timeout: 30_000 })
     await tab.hover()
     const closer = tab.getByRole('button', { name: /^close$/i }).first()
@@ -252,6 +252,6 @@ test('a long routine title never pushes the Switch, delete control or next-run l
     await page.waitForTimeout(2_000)
     await page.screenshot({ path: testInfo.outputPath('routines-restored.png') })
 
-    await expect(page.locator('[data-tree-tab="hermes-bots:routines"]').first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('[data-tree-tab="x19-bots:routines"]').first()).toBeVisible({ timeout: 30_000 })
   })
 })

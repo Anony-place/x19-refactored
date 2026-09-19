@@ -9,11 +9,42 @@ past that); see the **routing table** at the end and read the area file before e
 
 ## What X19 Is
 
-X19 is a personal AI agent that runs the same agent core across a CLI, a messaging
-gateway (Telegram, Discord, Slack, ~20 platforms), a TUI, and an Electron desktop app. It
-learns across sessions (memory + skills), delegates to subagents, runs scheduled jobs, and
-drives a real terminal and browser. It is extended primarily through **plugins and skills**,
-not by growing the core.
+X19 is a hierarchical multi-agent orchestrator that runs the same agent core across a CLI, a
+messaging gateway (Telegram, Discord, Slack, ~20 platforms), a TUI, and an Electron desktop
+app. It learns across sessions (memory + skills), runs scheduled jobs, and drives a real
+terminal and browser. It is extended primarily through **plugins and skills**, not by growing
+the core.
+
+The hierarchy is a real runtime, not a labeling convention — `x19/org/` owns it:
+
+```
+USER → X19 BOSS → X22 MANAGER → SPECIALIZED WORKERS → TOOLS/EXECUTION
+```
+
+- **X19 (Boss)** accepts the objective, opens a run, delegates, monitors, resolves blockers,
+  reviews results, audits the graph and reports to the user. `x19/org/boss.py`.
+- **X22 (Manager)** turns objectives into a task graph with dependencies, assigns workers,
+  tracks progress, validates output and escalates. `x19/org/manager.py`.
+- **Workers** are specialized execution roles (research, coding, security, testing,
+  documentation, analysis, devops, debugging, tool execution) that run with real tools.
+
+Three rules govern this area, and reviewers should hold changes to them:
+
+- **Tasks have an enforced lifecycle.** QUEUED → PLANNED → ASSIGNED → RUNNING →
+  (WAITING_DEPENDENCY | BLOCKED | WAITING_APPROVAL) → IN_REVIEW → COMPLETED | FAILED |
+  CANCELLED. Illegal transitions raise `InvalidTransition` rather than being absorbed
+  (`x19/org/tasks.py::_ALLOWED`). A task waiting on a dependency is *waiting*, never blocked.
+- **Nothing fabricates state.** Status, audits, the TUI console and every answer to "what is
+  happening?" are read from the runtime — the task graph, the agent registry and the
+  append-only event bus. There are no mock agents, no invented progress percentages and no
+  simulated completions anywhere in the product runtime.
+- **The org chart is dynamic.** Roles are registered at runtime (`x19/org/roles.py`) and the
+  roster is overlaid with live subagents from the delegation engine. Frontends must fetch it
+  (`org.agents`, `org.roles`); hardcoding a team in a UI is a bug.
+
+The surfaces that read it: the `x19_org` tool (22 actions over Boss/Manager/runtime, in
+`_X19_CORE_TOOLS`, blocked for leaf children), the `org.*` JSON-RPC methods in
+`tui_gateway/methods_org.py`, and the terminal console in `ui-tui/src/components/orgPanel.tsx`.
 
 Two invariants shape almost every design decision and are the lens for reviewing any change:
 
@@ -77,7 +108,7 @@ grow: expansive at the edges, conservative at the waist.
 - **Speculative infrastructure.** Hooks/callbacks/extension points with no concrete consumer.
   Adding a hook is easy; removing one after plugins depend on it is hard. A hook with a real,
   stated use case is NOT speculative even if the consumer ships separately.
-- **New `HERMES_*` env vars for non-secret config.** `.env` is for secrets only. Behavioral
+- **New `X19_*` env vars for non-secret config.** `.env` is for secrets only. Behavioral
   settings (timeouts, thresholds, flags, display prefs) go in `config.yaml`; bridge to an
   internal env var in code if the mechanism needs one. Reject "set X in your .env" docs
   unless X is a credential.
@@ -157,17 +188,17 @@ A tool that works only because of *who is on the other end* (desktop panes, in-a
 message reactions, Projects) must resolve availability from the **session's own source**, not
 from an env var on the backend. Client and backend are separate machines: the desktop app may
 drive a locally spawned backend, one over SSH, one behind URL + token, or X19 Cloud, and
-only the first two carry `HERMES_DESKTOP=1`. An env-keyed gate is a silent no-op on the other
+only the first two carry `X19_DESKTOP=1`. An env-keyed gate is a silent no-op on the other
 topologies — the tool is stripped from the schema while the platform hint tells the model it
 is "inside the X19 desktop app". The pattern:
 
-- **The toolset is the surface gate.** Keep such tools off `_HERMES_CORE_TOOLS` and in a named
+- **The toolset is the surface gate.** Keep such tools off `_X19_CORE_TOOLS` and in a named
   toolset (`desktop_ui`, `project`); the GUI gateway's `_load_enabled_toolsets(platform)`
   folds it in when the session's platform says GUI. One resolver, every topology.
 - **`check_fn` answers reachability or opt-in, not surface.** "Is the bridge wired?" — fine.
   "Was I spawned by Electron?" — not. `check_fn` results are TTL-cached process-wide
   (`tools/registry.py`); a per-session answer does not belong there.
-- **Ask which identity you mean.** `HERMES_DESKTOP=1` legitimately means "this backend was
+- **Ask which identity you mean.** `X19_DESKTOP=1` legitimately means "this backend was
   spawned by the app" (cron ticker, web-dist handling). It does NOT mean "a GUI is watching";
   the embedded terminal pane (`x19 --tui` against that backend) is the counterexample.
 
@@ -190,13 +221,15 @@ Counts shift constantly; the filesystem is canonical. Load-bearing entry points:
 x19/
 ├── run_agent.py          # AIAgent facade; the turn loop lives in agent/turn_*.py
 ├── model_tools.py        # Tool orchestration, discover_builtin_tools(), handle_function_call()
-├── toolsets.py           # TOOLSETS dict, _HERMES_CORE_TOOLS
+├── toolsets.py           # TOOLSETS dict, _X19_CORE_TOOLS
 ├── cli.py                # X19CLI (REPL, slash dispatch) + x19_cli/cli_*_mixin.py
 ├── x19_state.py       # SessionDB facade; x19_state_*.py siblings
 ├── x19_constants.py   # get_x19_home(), display_x19_home() — profile-aware paths
 ├── x19_logging.py     # agent.log / errors.log / gateway.log (profile-aware)
 ├── batch_runner.py       # Parallel batch processing
 ├── agent/                # turn_*.py loop phases, providers, memory, compression, prompt builder
+├── x19/                  # The organization itself: org/ (runtime, boss, manager, tasks, registry,
+                          #   roles, events, status, audit, delegation, safety, config) + identity/
 ├── x19_cli/           # CLI subcommands, setup, config, plugins loader, skins, updater
 │   └── web_routers/      # Dashboard FastAPI routers (one per surface); web_server.py mounts them
 ├── tools/                # Tool implementations, auto-discovered via tools/registry.py
@@ -212,7 +245,7 @@ x19/
 ├── acp_adapter/          # ACP server (VS Code / Zed / JetBrains)
 ├── cron/                 # jobs.py + scheduler.py (+ scheduler_*.py)
 ├── evals/                # Offline benchmarks (codebase_navigability/, compaction/, ...)
-├── scripts/              # run_tests.sh, release.py, check_compat_pointers.py, ci/
+├── scripts/              # run_tests.sh, release.py, ci/
 ├── website/              # Docusaurus docs (developer-guide/ holds the long-form area docs)
 └── tests/                # Pytest suite (~39k tests / ~3.7k files, Sep 2026)
 ```
@@ -241,18 +274,13 @@ families: `x19_state.py` (21), `gateway/run.py` (15), `tools/mcp_tool.py` (15),
   function so `monkeypatch.setattr(facade, "name", ...)` is the seam; a patch on the defining
   module passes silently. Check the call site's binding before writing a patch target
   (blind repointing to defining modules broke 130+ tests).
-- **Compat pointers are OFF LIMITS in-tree.** Old import paths kept alive for external plugins
-  (`PLUGIN-COMPAT` blocks, `COMPAT_MANIFEST.md`, `compat_manifest.json`) must not be used by
-  in-tree code or tests; `scripts/check_compat_pointers.py` runs in CI, and
-  `-W error::x19_cli.plugin_compat.X19PluginCompatWarning` catches them in the suite.
-  They are removed 2026-09-14 by reverting one commit. Import from the defining module.
+- **Import from the defining module.** No re-export shims, no "keep the old name importable"
+  aliases for internal moves. Internal import paths are not a stable API.
 - **Don't recreate god files.** A file passing ~2,000 lines or a function passing ~300 lines /
   cyclomatic complexity 30 is the signal to split along `<stem>_<topic>` FIRST, in its own
   commit. New behaviour goes in a new or topical sibling — never appended to a facade.
 - **No `if/elif` ladders ≥ 4 branches keyed on a name/kind** — use a dict/table → handler
   (`_SLASH_DISPATCH` in `cli.py`, `_command_handler_table` in the gateway are the shape).
-- **No re-export shims for internal moves** ("keep the old name importable"). Internal paths
-  are not API; external compat is handled ONCE by the compat layer, not per PR.
 - **Moving a symbol means fixing its docs in the same PR:** grep `website/docs`,
   `skills/`, and every `AGENTS.md` for the old `path.py` + symbol (23 doc files went stale
   after the refactor). `evals/codebase_navigability/static_metrics.py <tree> <label>` measures
@@ -340,7 +368,7 @@ scripts/run_tests.sh -v --tb=long                       # pytest flags pass thro
 ```
 
 - **Flake policy:** a failing FILE is retried once in a fresh subprocess (`--file-retries`;
-  `HERMES_TEST_FILE_RETRIES=0` disables). Pass-on-retry is green but printed under `⚠ FLAKY`
+  `X19_TEST_FILE_RETRIES=0` disables). Pass-on-retry is green but printed under `⚠ FLAKY`
   with both outputs — a bug to fix, not noise. Timing tests must not assume a quiet runner:
   wall-clock bounds ≥ 2s, event-based sync, no `assert not _wait_until(...)` races.
 - **Placement mirrors the source tree.** A test lives in `tests/<top-level source dir>/` (`tests/x19_cli/`,
@@ -431,7 +459,7 @@ extract, not to regex around it.
 | `cli.py`, `x19_cli/`, `main.py` | `x19_cli/AGENTS.md` | CLI mixins, `_SLASH_DISPATCH`, slash registry, config system + loaders, skins, `x19 update` pipeline, profiles / multiplex |
 | `gateway/` | `gateway/AGENTS.md` | Adapters, two message guards, streaming contract, background notifications, gateway vs desktop lifecycle, token locks, scoped secrets |
 | `tools/`, `toolsets.py`, `model_tools.py` | `tools/AGENTS.md` | Adding tools, registry, toolsets, delegation, cross-tool references, backends |
-| `plugins/`, `x19_cli/plugins*.py` | `plugins/AGENTS.md` | Plugin kinds, native compat contract, in-tree policy, Sep-2026 compat window |
+| `plugins/`, `x19_cli/plugins*.py` | `plugins/AGENTS.md` | Plugin kinds, native compatibility contract, in-tree policy |
 | `tui_gateway/`, `ui-tui/` | `tui_gateway/AGENTS.md` | Process model, JSON-RPC transport, key surfaces, slash flow, dev commands |
 | `web/`, `x19_cli/web_routers/` | `web/AGENTS.md` | Dashboard embeds the real TUI; what React may and may not rebuild |
 | `apps/desktop/` | `apps/desktop/AGENTS.md`, `apps/desktop/src/AGENTS.md` | Desktop judgment guide; `serve` backend, slash palette curation, Bot Mode canonical chat |

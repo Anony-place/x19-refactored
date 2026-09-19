@@ -50,7 +50,7 @@ def _get_max_read_chars() -> int:
     cache: ``load_config_readonly`` is already mtime+path cached, and a process-lifetime slot
     would pin the launch profile's value under the multiplexed gateway."""
     try:
-        from hermes_cli.config import load_config_readonly
+        from x19_cli.config import load_config_readonly
         val = load_config_readonly().get("file_read_max_chars")
     except Exception:
         val = None
@@ -65,7 +65,7 @@ def _truncate_to_char_budget(content: str, max_chars: int) -> tuple[str, int, bo
     ``next_offset`` instead of rejecting the read. If not even the first line
     fits it is clamped mid-line so the read is never empty and the cursor advances.
 
-    Ported in spirit from nearai/ironclaw#5029 (dual line/byte cap on ``read_file``). Where hermes
+    Ported in spirit from nearai/ironclaw#5029 (dual line/byte cap on ``read_file``). Where x19
     previously hard-rejected an oversized read (forcing the model to guess a smaller ``limit`` and burn a
     round-trip returning nothing), this trims the content to the last *complete line* that fits within
     ``max_chars`` and reports how many lines were kept so the caller can offer a ``next_offset``
@@ -573,7 +573,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
 
     Guard order: NT/device-namespace prefix (raw string, no resolution) →
     device-path blocklist (no I/O) → stat-based special-file guard (host only)
-    → document extraction → binary-extension guard → Hermes internal denylist
+    → document extraction → binary-extension guard → X19 internal denylist
     → negative-result cache → dedup stub → real read.
     """
     try:
@@ -618,7 +618,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
                 f"Cannot read binary file '{path}' ({_resolved.suffix.lower()}). "
                 "Use vision_analyze for images, or terminal to inspect binary files.")
 
-        # Hermes internal denylist (prompt injection via catalog metadata,
+        # X19 internal denylist (prompt injection via catalog metadata,
         # credential stores). Pass the RESOLVED path: the denylist's own
         # resolve() uses the process cwd and would miss a relative "auth.json".
         block_error = get_read_block_error(str(_resolved))
@@ -1260,7 +1260,7 @@ def _handle_write_file(args, **kw):
             "write_file: missing required field 'content'. The tool call included a "
             "path but no content argument — this is almost always a dropped-arg bug "
             "under context pressure. Re-emit the tool call with the full content "
-            "payload, or use execute_code with hermes_tools.write_file() for very "
+            "payload, or use execute_code with x19_tools.write_file() for very "
             "large files."
         )
     if not isinstance(args["content"], str):
@@ -1352,29 +1352,3 @@ registry.register(name="patch", toolset="file", schema=PATCH_SCHEMA, handler=_ha
 registry.register(name="search_files", toolset="file", schema=SEARCH_FILES_SCHEMA, handler=_handle_search_files, check_fn=_check_file_reqs, emoji="🔎", max_result_size_chars=100_000)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from pathlib import PurePosixPath  # noqa: F401,E402
-import posixpath  # noqa: F401,E402
-import sys  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'has_opaque_document_extension': ('tools.binary_extensions', 'has_opaque_document_extension'),
-    'is_pdf_path': ('tools.binary_extensions', 'is_pdf_path'),
-    'notify_other_tool_call': ('tools.file_tools_read_tracking', 'notify_other_tool_call'),
-    'reset_file_dedup': ('tools.file_tools_read_tracking', 'reset_file_dedup'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

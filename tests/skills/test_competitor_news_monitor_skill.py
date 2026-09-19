@@ -40,13 +40,13 @@ def test_description_hardline():
 
 def test_author_credits_human_first():
     fm, _ = _frontmatter_and_body()
-    assert not fm["author"].startswith("Hermes Agent")
+    assert not fm["author"].startswith("X19")
     assert "benbarclay" in fm["author"]
 
 
 def test_related_skills_resolve_in_repo():
     fm, _ = _frontmatter_and_body()
-    for name in fm["metadata"]["hermes"]["related_skills"]:
+    for name in fm["metadata"]["x19"]["related_skills"]:
         hits = (
             list(REPO_ROOT.glob(f"skills/*/{name}/SKILL.md"))
             + list(REPO_ROOT.glob(f"optional-skills/*/{name}/SKILL.md"))

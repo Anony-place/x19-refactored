@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Relative, not `@hermes/shared`: the electron bundle is built by esbuild with
+// Relative, not `@x19/shared`: the electron bundle is built by esbuild with
 // no tsconfig path resolution (see scripts/bundle-electron-main.mjs), so a bare
 // specifier would typecheck and then fail to bundle.
 import {
@@ -182,10 +182,10 @@ function encryptDesktopSecret(value, safeStorageApi, options: { allowPlainText?:
     }
 
     throw new Error(
-      'Secure token storage is unavailable (no OS keyring service was found), so Hermes Desktop cannot save remote gateway tokens. ' +
+      'Secure token storage is unavailable (no OS keyring service was found), so X19 Desktop cannot save remote gateway tokens. ' +
         'Either enable an OS keyring (e.g. GNOME Keyring or KWallet providing org.freedesktop.secrets) and try again, ' +
         'confirm the plain-text storage option when prompted in Settings → Gateway, ' +
-        'or set HERMES_DESKTOP_REMOTE_URL and HERMES_DESKTOP_REMOTE_TOKEN in your environment.'
+        'or set X19_DESKTOP_REMOTE_URL and X19_DESKTOP_REMOTE_TOKEN in your environment.'
     )
   }
 
@@ -198,7 +198,7 @@ function encryptDesktopSecret(value, safeStorageApi, options: { allowPlainText?:
     const detail = error instanceof Error && error.message ? ` (${error.message})` : ''
     throw new Error(
       `Failed to encrypt the remote gateway token for secure storage${detail}. ` +
-        'Set HERMES_DESKTOP_REMOTE_URL and HERMES_DESKTOP_REMOTE_TOKEN in your environment as a fallback.'
+        'Set X19_DESKTOP_REMOTE_URL and X19_DESKTOP_REMOTE_TOKEN in your environment as a fallback.'
     )
   }
 }
@@ -216,7 +216,7 @@ function encryptDesktopSecret(value, safeStorageApi, options: { allowPlainText?:
 // so the caller (and tests) can distinguish "enabled" from "left untouched".
 // Never throws: a failure here is non-fatal — encryption simply stays
 // unavailable and the user can fall back to the plain-text opt-in or the
-// HERMES_DESKTOP_REMOTE_* env vars.
+// X19_DESKTOP_REMOTE_* env vars.
 function enableBasicPasswordStoreEncryption({ platform, passwordStoreSwitch, safeStorageApi }: any = {}) {
   if (platform !== 'linux' || passwordStoreSwitch !== 'basic') {
     return false

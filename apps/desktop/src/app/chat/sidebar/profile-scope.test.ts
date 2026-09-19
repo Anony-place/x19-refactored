@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { ALL_PROFILES } from '@/store/profile'
-import type { SessionInfo } from '@/types/hermes'
+import type { SessionInfo } from '@/types/x19'
 
 import { filterSessionsByProfileScope } from './profile-scope'
 

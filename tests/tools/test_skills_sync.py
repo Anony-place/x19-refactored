@@ -148,14 +148,14 @@ class TestComputeRelativeDest:
 
 class TestRmtreeWritableScopeGuard:
     """``_rmtree_writable`` must refuse to remove anything outside
-    ``HERMES_HOME/skills/``.
+    ``X19_HOME/skills/``.
 
     The previous implementation called ``shutil.rmtree(path)`` on whatever
     argument the caller passed. If any of the five call sites in
     ``tools/skills_sync.py`` ever computes a path outside the skills
     root — through a bad join, a missing default, a malicious
     bundled-manifest entry, or a stale path in scope after an
-    exception — the result is a silent ``shutil.rmtree(~/.hermes/)``
+    exception — the result is a silent ``shutil.rmtree(~/.x19/)``
     that destroys the user's ``.env``, ``MEMORY.md``, ``kanban.db``,
     custom skills, scripts, and the rest of the install in one go
     (#48200).
@@ -166,20 +166,20 @@ class TestRmtreeWritableScopeGuard:
     """
 
     def test_refuses_anything_that_is_not_a_strict_child_of_skills(self, tmp_path):
-        """``/``, ``~/.hermes`` itself, a sibling dir, and the skills root
+        """``/``, ``~/.x19`` itself, a sibling dir, and the skills root
         are all rejected — the root because a ``dest`` that collapses to it
         would wipe every installed skill (the degenerate #48200 path)."""
         from tools.skills_sync import _rmtree_writable
 
-        hermes = tmp_path / "home"
-        hermes.mkdir()
-        skills = hermes / "skills"
+        x19 = tmp_path / "home"
+        x19.mkdir()
+        skills = x19 / "skills"
         (skills / "keep").mkdir(parents=True)
-        sibling = hermes / "kanban.db"  # any non-skills path
+        sibling = x19 / "kanban.db"  # any non-skills path
         sibling.mkdir()
 
         with patch("tools.skills_sync.SKILLS_DIR", skills):
-            for target in (Path("/"), hermes, sibling, skills):
+            for target in (Path("/"), x19, sibling, skills):
                 with pytest.raises(ValueError, match="refusing to rmtree"):
                     _rmtree_writable(target)
 
@@ -526,13 +526,13 @@ class TestGetBundledDir:
     def test_env_var_override_with_default_fallback(self, tmp_path, monkeypatch):
         custom_dir = tmp_path / "custom_skills"
         custom_dir.mkdir()
-        monkeypatch.setenv("HERMES_BUNDLED_SKILLS", str(custom_dir))
+        monkeypatch.setenv("X19_BUNDLED_SKILLS", str(custom_dir))
         assert _get_bundled_dir() == custom_dir
 
         # Empty or unset falls back to the relative path from __file__.
-        monkeypatch.setenv("HERMES_BUNDLED_SKILLS", "")
+        monkeypatch.setenv("X19_BUNDLED_SKILLS", "")
         assert _get_bundled_dir().name == "skills"
-        monkeypatch.delenv("HERMES_BUNDLED_SKILLS", raising=False)
+        monkeypatch.delenv("X19_BUNDLED_SKILLS", raising=False)
         assert _get_bundled_dir().name == "skills"
 
 
@@ -706,9 +706,9 @@ class TestResetBundledSkill:
 class TestNoBundledSkillsOptOut:
     """The .no-bundled-skills marker makes sync_skills() a no-op.
 
-    This is what `hermes profile create --no-skills` (named profiles) and the
-    installer's `--no-skills` flag (default ~/.hermes) rely on so bundled
-    skills are never seeded at install time NOR re-injected by `hermes update`.
+    This is what `x19 profile create --no-skills` (named profiles) and the
+    installer's `--no-skills` flag (default ~/.x19) rely on so bundled
+    skills are never seeded at install time NOR re-injected by `x19 update`.
     """
 
     def test_marker_skips_sync_and_removal_seeds_normally(self, tmp_path):
@@ -719,9 +719,9 @@ class TestNoBundledSkillsOptOut:
 
         skills_dir = tmp_path / "user_skills"
         manifest_file = skills_dir / ".bundled_manifest"
-        hermes_home = tmp_path / "home"
-        hermes_home.mkdir()
-        marker = hermes_home / ".no-bundled-skills"
+        x19_home = tmp_path / "home"
+        x19_home.mkdir()
+        marker = x19_home / ".no-bundled-skills"
         marker.write_text("opted out\n")
 
         from contextlib import ExitStack
@@ -732,7 +732,7 @@ class TestNoBundledSkillsOptOut:
             stack.enter_context(patch("tools.skills_sync._get_optional_dir", return_value=bundled.parent / "optional-skills"))
             stack.enter_context(patch("tools.skills_sync.SKILLS_DIR", skills_dir))
             stack.enter_context(patch("tools.skills_sync.MANIFEST_FILE", manifest_file))
-            stack.enter_context(patch("tools.skills_sync.HERMES_HOME", hermes_home))
+            stack.enter_context(patch("tools.skills_sync.X19_HOME", x19_home))
             return stack
 
         with _patches():
@@ -754,7 +754,7 @@ class TestNoBundledSkillsOptOut:
 
 
 class TestOptOutToggleAndRemove:
-    """`hermes skills opt-out/opt-in` core: marker toggle + safe removal."""
+    """`x19 skills opt-out/opt-in` core: marker toggle + safe removal."""
 
     def _setup_bundled(self, tmp_path):
         bundled = tmp_path / "bundled"
@@ -769,7 +769,7 @@ class TestOptOutToggleAndRemove:
         home = tmp_path / "home"
         home.mkdir()
         marker = home / ".no-bundled-skills"
-        with patch("tools.skills_sync.HERMES_HOME", home):
+        with patch("tools.skills_sync.X19_HOME", home):
             assert not marker.exists()
             r = set_bundled_skills_opt_out(True)
             assert r["ok"] and r["changed"]
@@ -794,7 +794,7 @@ class TestOptOutToggleAndRemove:
              patch("tools.skills_sync._get_optional_dir", return_value=bundled.parent / "optional-skills"), \
              patch("tools.skills_sync.SKILLS_DIR", skills_dir), \
              patch("tools.skills_sync.MANIFEST_FILE", manifest_file), \
-             patch("tools.skills_sync.HERMES_HOME", home):
+             patch("tools.skills_sync.X19_HOME", home):
             sync_skills(quiet=True)
             # User edits 'beta'
             (skills_dir / "beta" / "SKILL.md").write_text("---\nname: beta\n---\nEDITED\n")
@@ -938,40 +938,40 @@ class TestUpdateBackupRecovery:
 
 class TestCallTimeDirResolution:
     """Regression for #65828: skills_sync bound SKILLS_DIR/MANIFEST_FILE/
-    HERMES_HOME at import, so a long-lived dashboard/TUI process serving a
+    X19_HOME at import, so a long-lived dashboard/TUI process serving a
     console skills command for another profile resolved (and for
     reset_bundled_skill DELETED) against whichever home was live at import.
-    The accessors must follow set_hermes_home_override() at call time, while
+    The accessors must follow set_x19_home_override() at call time, while
     an explicitly patched module global (tests, _profile_scope retargeting)
     still wins.
     """
 
-    def test_accessors_follow_hermes_home_override(self, tmp_path):
-        from hermes_constants import set_hermes_home_override, reset_hermes_home_override
+    def test_accessors_follow_x19_home_override(self, tmp_path):
+        from x19_constants import set_x19_home_override, reset_x19_home_override
         import tools.skills_sync as ss
 
         profile_home = tmp_path / "profiles" / "research"
-        token = set_hermes_home_override(str(profile_home))
+        token = set_x19_home_override(str(profile_home))
         try:
-            assert ss._hermes_home() == profile_home
+            assert ss._x19_home() == profile_home
             assert ss._skills_dir() == profile_home / "skills"
             assert ss._manifest_file() == profile_home / "skills" / ".bundled_manifest"
         finally:
-            reset_hermes_home_override(token)
+            reset_x19_home_override(token)
 
     def test_explicit_module_patch_wins_over_override(self, tmp_path):
-        from hermes_constants import set_hermes_home_override, reset_hermes_home_override
+        from x19_constants import set_x19_home_override, reset_x19_home_override
         import tools.skills_sync as ss
 
         patched = tmp_path / "patched-skills"
-        token = set_hermes_home_override(str(tmp_path / "other-profile"))
+        token = set_x19_home_override(str(tmp_path / "other-profile"))
         try:
             with patch("tools.skills_sync.SKILLS_DIR", patched):
                 assert ss._skills_dir() == patched
                 # MANIFEST_FILE unpatched -> derives from the patched skills dir.
                 assert ss._manifest_file() == patched / ".bundled_manifest"
         finally:
-            reset_hermes_home_override(token)
+            reset_x19_home_override(token)
 
     def test_rmtree_guard_anchors_on_overridden_profile(self, tmp_path):
         """The #48200 strict-child rmtree guard must anchor on the OVERRIDDEN
@@ -979,7 +979,7 @@ class TestCallTimeDirResolution:
         was computed against the wrong home (#65828's sharpest edge): a
         legitimate delete in the scoped profile would be refused, and a stale
         path under the import-time home would pass the guard."""
-        from hermes_constants import set_hermes_home_override, reset_hermes_home_override
+        from x19_constants import set_x19_home_override, reset_x19_home_override
         import tools.skills_sync as ss
 
         profile_home = tmp_path / "profiles" / "worker"
@@ -987,7 +987,7 @@ class TestCallTimeDirResolution:
         victim.mkdir(parents=True)
         (victim / "SKILL.md").write_text("---\nname: doomed-skill\n---\n", encoding="utf-8")
 
-        token = set_hermes_home_override(str(profile_home))
+        token = set_x19_home_override(str(profile_home))
         try:
             # Allowed: strict child of the overridden profile's skills root.
             ss._rmtree_writable(victim)
@@ -999,4 +999,4 @@ class TestCallTimeDirResolution:
             with pytest.raises(ValueError):
                 ss._rmtree_writable(foreign)
         finally:
-            reset_hermes_home_override(token)
+            reset_x19_home_override(token)

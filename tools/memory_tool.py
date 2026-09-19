@@ -9,7 +9,7 @@ import json
 import logging
 from contextvars import ContextVar
 from pathlib import Path
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 from typing import Dict, Any, List, Optional, Tuple
 
 from utils import is_truthy_value
@@ -36,8 +36,8 @@ _memory_surface_flags: ContextVar[Optional[Tuple[bool, bool]]] = ContextVar("mem
 
 
 def get_memory_dir() -> Path:
-    """Profile-scoped memories dir, resolved per call (HERMES_HOME may switch after import)."""
-    return get_hermes_home() / "memories"
+    """Profile-scoped memories dir, resolved per call (X19_HOME may switch after import)."""
+    return get_x19_home() / "memories"
 
 
 from tools.memory_tool_store import (  # noqa: E402,F401  (re-exports)
@@ -49,7 +49,7 @@ def load_on_disk_store() -> "MemoryStore":
     agent (gateway, Desktop, ``/memory``) so approvals enforce the SAME caps as
     ``agent_init``. Falls back to defaults if config can't load; never raises."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         config = load_config() or {}
         mem_cfg = get_builtin_memory_config(config)
         memory_enabled, user_profile_enabled = get_builtin_memory_store_flags(config)
@@ -210,7 +210,7 @@ def get_builtin_memory_config(config: Optional[Dict[str, Any]] = None) -> Dict[s
     enabled). ``agent_init`` reads the same section so availability and store cannot diverge."""
     if config is None:
         try:
-            from hermes_cli.config import load_config_readonly
+            from x19_cli.config import load_config_readonly
             config = load_config_readonly()
         except Exception:
             logger.debug("Could not read memory config for availability", exc_info=True)
@@ -373,25 +373,3 @@ registry.register(
     dynamic_schema_overrides=_build_memory_schema_overrides)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from contextlib import contextmanager  # noqa: F401,E402
-import time  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'atomic_write_text': ('utils', 'atomic_write_text'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

@@ -16,7 +16,7 @@ import {
   type PluginStorage,
   type PluginTranslate,
   queryClient
-} from '@hermes/plugin-sdk'
+} from '@x19/plugin-sdk'
 
 // Native completion notification.
 import { bindCompletionNotify, type CompletionEvent, onKanbanEventsFrame } from './completion-notify'
@@ -181,7 +181,7 @@ export const fetchBoards = () => call<BoardsResponse>('/boards')
 
 export const fetchProfiles = () => call<{ profiles: KanbanProfile[] }>('/profiles')
 
-/** First-class Hermes projects, for scoping a board's default workspace. */
+/** First-class X19 projects, for scoping a board's default workspace. */
 export const fetchProjects = () => call<{ projects: KanbanProject[] }>('/projects')
 
 export const fetchOrchestration = () => call<OrchestrationSettings>('/orchestration')

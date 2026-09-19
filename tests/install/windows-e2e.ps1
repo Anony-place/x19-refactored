@@ -1,32 +1,32 @@
 # ============================================================================
 # Windows Desktop GUI install + update E2E driver (the REAL user flow)
 # ============================================================================
-# Proves, on a real Windows machine, that a user who installs Hermes the way
+# Proves, on a real Windows machine, that a user who installs X19 the way
 # the website tells them to can then update to the commit under test through
 # a real update surface -- with every leg driven through the GUI a user
 # actually touches:
 #
-#   INSTALL   - downloads the production Hermes-Setup.exe from the website,
+#   INSTALL   - downloads the production X19-Setup.exe from the website,
 #               launches it HEADED, and AutoHotkey clicks Install, waits,
-#               then clicks Launch. The real Electron Hermes.exe must appear.
+#               then clicks Launch. The real Electron X19.exe must appear.
 #               The exe runs EXACTLY as shipped against serve.git, whose
 #               `main` is parked at OLD (-InstallRef, default: the newest
 #               release tag) -- so the install lands on OLD the same way a
 #               user's install landed on whatever main served that day.
 #   UPDATE    - OLD -> HEAD through the route selected by -Route:
-#                 desktop    (implemented) launch the installed Hermes.exe
+#                 desktop    (implemented) launch the installed X19.exe
 #                            under Playwright's Electron driver and CLICK
 #                            Settings -> About -> "Update now". The
 #                            production hand-off chain runs untouched:
-#                            marker, app quit, detached updater, `hermes
+#                            marker, app quit, detached updater, `x19
 #                            update`, desktop rebuild, RELAUNCH. Asserts
 #                            target sha, marker cleanup, result JSON (when
-#                            the script path wrote one), working hermes,
+#                            the script path wrote one), working x19,
 #                            and the relaunched app window.
-#                 update     run `hermes update` from the installed venv
+#                 update     run `x19 update` from the installed venv
 #                            (the CLI route a GUI user might take).
 #                 installer  re-run the bootstrap installer over the
-#                            existing install (download Hermes-Setup.exe
+#                            existing install (download X19-Setup.exe
 #                            again, AHK clicks Install; lands on HEAD).
 #
 # HOW THE STAGING WORKS (no MITM proxy, no network fakery):
@@ -35,7 +35,7 @@
 #   canonical repo URLs, via a driver-owned gitconfig selected with
 #   GIT_CONFIG_GLOBAL. (NOT GIT_CONFIG_COUNT/KEY_n/VALUE_n env config --
 #   install.ps1 sets those itself and silently clobbers them.) The
-#   installer's `git clone` and `hermes update`'s `git fetch origin`
+#   installer's `git clone` and `x19 update`'s `git fetch origin`
 #   transparently hit OUR bare repo. Its `main` serves OLD for the install
 #   phase; the update phase advances it to HEAD -- an update becomes
 #   available exactly the way it does for a real user. Installer and
@@ -81,15 +81,15 @@ param(
     [string]$InstallMethod = "desktop-installer@latest",
 
     # Update method to exercise in the update phase, same id namespace.
-    # open-app-update (from a desktop-installer install) and hermes-update /
+    # open-app-update (from a desktop-installer install) and x19-update /
     # installer-script / installer-script+desktop (from script installs) are
     # implemented; the rest are declared arms so the surface is stable when
     # they land.
-    [ValidateSet("open-app-update", "hermes-desktop-app-update", "hermes-update", "desktop-installer@latest", "installer-script", "installer-script+desktop")]
+    [ValidateSet("open-app-update", "x19-desktop-app-update", "x19-update", "desktop-installer@latest", "installer-script", "installer-script+desktop")]
     [string]$Route = "open-app-update",
 
     # The OLD version: the ref served as `main` while the installer runs,
-    # i.e. what the user starts on. The published Hermes-Setup.exe carries
+    # i.e. what the user starts on. The published X19-Setup.exe carries
     # no commit pin (Pin { commit: None, branch: "main" }) -- it installs
     # whatever `main` points at, so staging OLD means serving it there.
     # Empty or "auto" = newest release tag in the checkout (the "user on
@@ -102,9 +102,9 @@ param(
     # Repo checkout whose HEAD is the update target.
     [string]$RepoRoot = "",
 
-    [string]$WorkRoot = $(if ($env:HERMES_E2E_WORKROOT) { $env:HERMES_E2E_WORKROOT } else { Join-Path $env:TEMP "hermes-desktop-gui-e2e" }),
+    [string]$WorkRoot = $(if ($env:X19_E2E_WORKROOT) { $env:X19_E2E_WORKROOT } else { Join-Path $env:TEMP "x19-desktop-gui-e2e" }),
 
-    [string]$SetupExeUrl = "https://hermes-assets.nousresearch.com/Hermes-Setup.exe",
+    [string]$SetupExeUrl = "https://x19-assets.nousresearch.com/X19-Setup.exe",
 
     # Pinned @playwright/test for the update-gui driver. Installed fresh
     # into a scratch dir every run -- never resolved from the installed
@@ -126,15 +126,15 @@ if (-not $RepoRoot) {
 }
 
 $ServeRepo   = Join-Path $WorkRoot "serve.git"
-$HermesHome  = Join-Path $WorkRoot "hermes-home"
-$InstallDir  = Join-Path $HermesHome "hermes-agent"
+$X19Home  = Join-Path $WorkRoot "x19-home"
+$InstallDir  = Join-Path $X19Home "x19"
 $StatePath   = Join-Path $WorkRoot "shas.json"
 $ProofRoot   = Join-Path $WorkRoot "proof"
 $AhkDir      = Join-Path $WorkRoot "ahk"
 $AssetsDir   = Join-Path $PSScriptRoot "e2e-assets"
 
-$RepoUrlHttps = "https://github.com/NousResearch/hermes-agent.git"
-$RepoUrlSsh   = "git@github.com:NousResearch/hermes-agent.git"
+$RepoUrlHttps = "https://github.com/Anony-place/x19-refactored.git"
+$RepoUrlSsh   = "git@github.com:Anony-place/x19-refactored.git"
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -159,7 +159,7 @@ function Invoke-Git([string[]]$GitArgs) {
     #
     # ALWAYS the real git.exe, never the shim we ship.
     # annoying bug where .bat files eat ^ args.
-    # if hermes ever adds a git command that calls something with ^ this will break, lol.
+    # if x19 ever adds a git command that calls something with ^ this will break, lol.
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -174,7 +174,7 @@ function Invoke-Git([string[]]$GitArgs) {
 }
 
 function Set-GitRedirect {
-    # we redirect to our own repo so we can play around with what commit hermes thinks we're on.
+    # we redirect to our own repo so we can play around with what commit x19 thinks we're on.
     # MECHANISM: a driver-owned global gitconfig selected via
     # GIT_CONFIG_GLOBAL. Do NOT use GIT_CONFIG_COUNT/KEY_n/VALUE_n env
     # config here -- install.ps1 SETS those itself (GIT_CONFIG_COUNT=1,
@@ -278,15 +278,15 @@ function Get-InstalledHead {
 
 function Get-DesktopExe {
     foreach ($c in @(
-        (Join-Path $InstallDir "apps\desktop\release\win-unpacked\Hermes.exe"),
-        (Join-Path $InstallDir "apps\desktop\release\win-arm64-unpacked\Hermes.exe")
+        (Join-Path $InstallDir "apps\desktop\release\win-unpacked\X19.exe"),
+        (Join-Path $InstallDir "apps\desktop\release\win-arm64-unpacked\X19.exe")
     )) {
         if (Test-Path -LiteralPath $c) { return $c }
     }
     return $null
 }
 
-# Install-side state snapshot, taken BEFORE Test-HermesRuns can throw: on
+# Install-side state snapshot, taken BEFORE Test-X19Runs can throw: on
 # app-update legs the updater runs detached and its transcript lands in the
 # product logs and hand-off files, not in this driver. Copy those plus the
 # venv entry-point dir while the install is still there to inspect, so a
@@ -294,11 +294,11 @@ function Get-DesktopExe {
 function Save-InstallSideState([string]$Label) {
     $dest = Join-Path $ProofRoot "install-side-$Label"
     New-Item -ItemType Directory -Path $dest -Force | Out-Null
-    $logsDir = Join-Path $HermesHome "logs"
+    $logsDir = Join-Path $X19Home "logs"
     if (Test-Path -LiteralPath $logsDir) {
-        Copy-Item $logsDir (Join-Path $dest "hermes-logs") -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item $logsDir (Join-Path $dest "x19-logs") -Recurse -Force -ErrorAction SilentlyContinue
     }
-    $resultFile = Join-Path $HermesHome ".hermes-update-result.json"
+    $resultFile = Join-Path $X19Home ".x19-update-result.json"
     if (Test-Path -LiteralPath $resultFile) {
         Copy-Item $resultFile $dest -Force -ErrorAction SilentlyContinue
     }
@@ -309,18 +309,18 @@ function Save-InstallSideState([string]$Label) {
             Format-Table -AutoSize | Out-String |
             Set-Content (Join-Path $dest "venv-scripts-ls.txt")
     }
-    Get-ChildItem -LiteralPath $HermesHome -ErrorAction SilentlyContinue |
+    Get-ChildItem -LiteralPath $X19Home -ErrorAction SilentlyContinue |
         Select-Object Name, Length, LastWriteTime |
         Format-Table -AutoSize | Out-String |
-        Set-Content (Join-Path $dest "hermes-home-ls.txt")
+        Set-Content (Join-Path $dest "x19-home-ls.txt")
 }
 
-function Test-HermesRuns([string]$Label) {
+function Test-X19Runs([string]$Label) {
     Save-InstallSideState $Label
-    $hermesExe = Join-Path $InstallDir "venv\Scripts\hermes.exe"
-    Assert-True (Test-Path -LiteralPath $hermesExe) "$Label -- venv\Scripts\hermes.exe exists"
-    & $hermesExe --version 2>&1 | ForEach-Object { Write-Host "    hermes --version| $_" }
-    Assert-True ($LASTEXITCODE -eq 0) "$Label -- hermes --version exits 0"
+    $x19Exe = Join-Path $InstallDir "venv\Scripts\x19.exe"
+    Assert-True (Test-Path -LiteralPath $x19Exe) "$Label -- venv\Scripts\x19.exe exists"
+    & $x19Exe --version 2>&1 | ForEach-Object { Write-Host "    x19 --version| $_" }
+    Assert-True ($LASTEXITCODE -eq 0) "$Label -- x19 --version exits 0"
 }
 
 # ----------------------------------------------------------------------------
@@ -342,7 +342,7 @@ function Invoke-RefInstaller {
     $script = Join-Path $WorkRoot "install-$Label.ps1"
     (Invoke-Git @("-C", $RepoRoot, "show", "$Ref`:scripts/install.ps1")) -join "`n" |
         Set-Content -LiteralPath $script -Encoding UTF8
-    $flags = @("-SkipSetup", "-HermesHome", $HermesHome, "-InstallDir", $InstallDir)
+    $flags = @("-SkipSetup", "-X19Home", $X19Home, "-InstallDir", $InstallDir)
     $text = Get-Content -LiteralPath $script -Raw
     if ($text -match '\$NonInteractive') { $flags += "-NonInteractive" }
     if ($IncludeDesktop) {
@@ -367,56 +367,56 @@ function Assert-DesktopArtifact([string]$Label) {
     Assert-True ($null -ne (Get-DesktopExe)) "$Label -- desktop app built by installer under apps\desktop\release"
 }
 
-function Invoke-HermesUpdate {
+function Invoke-X19Update {
     # The venv updater. --yes reaches the update subcommand only in later
     # releases; ask the installed binary, never parse its source.
-    $hermesExe = Join-Path $InstallDir "venv\Scripts\hermes.exe"
+    $x19Exe = Join-Path $InstallDir "venv\Scripts\x19.exe"
     $updateArgs = @("update")
     $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    $helpText = & $hermesExe update --help 2>&1 | Out-String
+    $helpText = & $x19Exe update --help 2>&1 | Out-String
     if ($helpText -match '--yes') { $updateArgs += "--yes" }
     New-Item -ItemType Directory -Path (Join-Path $WorkRoot "logs") -Force | Out-Null
     $log = Join-Path $WorkRoot "logs\update.log"
     Push-Location $InstallDir
     try {
-        & $hermesExe @updateArgs 2>&1 | Add-TsPrefix | Out-File -Encoding UTF8 $log
+        & $x19Exe @updateArgs 2>&1 | Add-TsPrefix | Out-File -Encoding UTF8 $log
         $updateExit = $LASTEXITCODE
     } finally {
         Pop-Location
         $ErrorActionPreference = $prevEap
     }
-    Write-LogGroup "hermes update transcript" $log
-    Assert-True ($updateExit -eq 0) "hermes update exited $updateExit (expected 0)"
+    Write-LogGroup "x19 update transcript" $log
+    Assert-True ($updateExit -eq 0) "x19 update exited $updateExit (expected 0)"
 }
 
-function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
-    # The hermes-desktop launch surface: `hermes desktop` runs its whole
+function Invoke-X19DesktopAppUpdate([string]$TargetSha) {
+    # The x19-desktop launch surface: `x19 desktop` runs its whole
     # real pipeline; the driver intercepts the product's final spawn
     # (argv/cwd/env captured by e2e-assets/launch-capture/sitecustomize.py)
     # and re-executes it under Playwright, which clicks Update now.
-    $hermesExe = Join-Path $InstallDir "venv\Scripts\hermes.exe"
+    $x19Exe = Join-Path $InstallDir "venv\Scripts\x19.exe"
     $spec = Join-Path $WorkRoot "launch-spec.json"
     New-Item -ItemType Directory -Path (Join-Path $WorkRoot "logs") -Force | Out-Null
     $log = Join-Path $WorkRoot "logs\desktop-launch-capture.log"
 
     $capDir = Join-Path $AssetsDir "launch-capture"
     $prevPy = $env:PYTHONPATH
-    $prevCap = $env:HERMES_E2E_CAPTURE_LAUNCH
+    $prevCap = $env:X19_E2E_CAPTURE_LAUNCH
     $env:PYTHONPATH = if ($prevPy) { "$capDir;$prevPy" } else { $capDir }
-    $env:HERMES_E2E_CAPTURE_LAUNCH = $spec
+    $env:X19_E2E_CAPTURE_LAUNCH = $spec
     $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     Push-Location $InstallDir
     try {
-        & $hermesExe desktop 2>&1 | Add-TsPrefix | Out-File -Encoding UTF8 $log
+        & $x19Exe desktop 2>&1 | Add-TsPrefix | Out-File -Encoding UTF8 $log
         $capExit = $LASTEXITCODE
     } finally {
         Pop-Location
         $ErrorActionPreference = $prevEap
         $env:PYTHONPATH = $prevPy
-        $env:HERMES_E2E_CAPTURE_LAUNCH = $prevCap
+        $env:X19_E2E_CAPTURE_LAUNCH = $prevCap
     }
-    Write-LogGroup "hermes desktop (launch capture) transcript" $log
-    Assert-True ($capExit -eq 0) "hermes desktop exited 0 during launch capture"
+    Write-LogGroup "x19 desktop (launch capture) transcript" $log
+    Assert-True ($capExit -eq 0) "x19 desktop exited 0 during launch capture"
     Assert-True (Test-Path -LiteralPath "$spec.captured") "a launch was actually captured (exit 0 without a launch must not pass)"
 
     $node = Get-ManagedNode
@@ -440,7 +440,7 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
     Push-Location $driverDir
     try {
         & $node "launch-from-spec.mjs" --spec $spec `
-            --result (Join-Path $HermesHome ".hermes-update-result.json") `
+            --result (Join-Path $X19Home ".x19-update-result.json") `
             --expect-sha $TargetSha --repo-dir $InstallDir 2>&1 |
             ForEach-Object { Write-Host "  pw| $_" }
         $driveExit = $LASTEXITCODE
@@ -448,7 +448,7 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         Pop-Location
         $ErrorActionPreference = $prevEap
     }
-    Assert-True ($driveExit -eq 0) "app driven via captured hermes desktop spec; update completed"
+    Assert-True ($driveExit -eq 0) "app driven via captured x19 desktop spec; update completed"
 }
 
 function Save-DesktopScreenshot([string]$OutFile) {
@@ -503,25 +503,25 @@ function Stop-DesktopRecorder($proc, [string]$OutDir) {
     }
 }
 
-function Stop-HermesAppProcesses([string]$Label) {
+function Stop-X19AppProcesses([string]$Label) {
     # Close the desktop app the blunt way between phases (a user quitting).
-    # Only Hermes.exe (Electron) -- never hermes.exe (the venv CLI shim).
-    $procs = @(Get-Process -Name "Hermes" -ErrorAction SilentlyContinue)
+    # Only X19.exe (Electron) -- never x19.exe (the venv CLI shim).
+    $procs = @(Get-Process -Name "X19" -ErrorAction SilentlyContinue)
     foreach ($p in $procs) {
         try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch {}
     }
     if ($procs.Count -gt 0) {
-        Write-Host "  [$Label] stopped $($procs.Count) Hermes.exe process(es)"
+        Write-Host "  [$Label] stopped $($procs.Count) X19.exe process(es)"
         Start-Sleep -Seconds 3
     }
 }
 
 function Get-ManagedNode {
-    # `hermes update`/desktop builds use the Hermes-managed Node; use the same
+    # `x19 update`/desktop builds use the X19-managed Node; use the same
     # one to run the Playwright driver so no system Node is required.
     $candidates = @(
-        (Join-Path $HermesHome "node\node.exe"),
-        (Join-Path $HermesHome "bin\node\node.exe"),
+        (Join-Path $X19Home "node\node.exe"),
+        (Join-Path $X19Home "bin\node\node.exe"),
         (Join-Path $InstallDir "node\node.exe")
     )
     foreach ($c in $candidates) {
@@ -587,7 +587,7 @@ function Invoke-PhaseStage {
 }
 
 # ----------------------------------------------------------------------------
-# Phase: install-gui -- website Hermes-Setup.exe, headed, AHK-driven
+# Phase: install-gui -- website X19-Setup.exe, headed, AHK-driven
 # ----------------------------------------------------------------------------
 function Invoke-PhaseInstallGui {
     param(
@@ -602,7 +602,7 @@ function Invoke-PhaseInstallGui {
         $ExpectedSha = $state.old
         $ExpectedLabel = "OLD ($($state.old_ref))"
     }
-    Write-Step "$($Mode.ToUpper()) (GUI): Hermes-Setup.exe from the website, headed, AHK clicks"
+    Write-Step "$($Mode.ToUpper()) (GUI): X19-Setup.exe from the website, headed, AHK clicks"
     $proof = Join-Path $ProofRoot $(if ($Mode -eq "install") { "install-gui" } else { "update-gui-installer" })
     New-Item -ItemType Directory -Path $proof -Force | Out-Null
 
@@ -610,12 +610,12 @@ function Invoke-PhaseInstallGui {
     # double-click, run EXACTLY as shipped: its own pinned install.ps1, its
     # own baked BUILD_PIN_COMMIT. The only environmental difference is the
     # git URL redirect to serve.git.
-    $setupExe = Join-Path $WorkRoot "Hermes-Setup.exe"
+    $setupExe = Join-Path $WorkRoot "X19-Setup.exe"
     if (-not (Test-Path -LiteralPath $setupExe)) {
         Write-Host "  downloading $SetupExeUrl"
         Invoke-WebRequest -Uri $SetupExeUrl -OutFile $setupExe
     }
-    Assert-True ((Get-Item $setupExe).Length -gt 1MB) "Hermes-Setup.exe downloaded ($([math]::Round((Get-Item $setupExe).Length / 1MB, 1)) MB)"
+    Assert-True ((Get-Item $setupExe).Length -gt 1MB) "X19-Setup.exe downloaded ($([math]::Round((Get-Item $setupExe).Length / 1MB, 1)) MB)"
 
     # AutoHotkey v2, portable zip (no installer, no winget flakes).
     $ahkExe = Join-Path $AhkDir "AutoHotkey64.exe"
@@ -630,11 +630,11 @@ function Invoke-PhaseInstallGui {
     # relative to the script dir).
     Copy-Item -Path (Join-Path $AssetsDir "install-and-launch.ahk"), (Join-Path $AssetsDir "install-button.png"), (Join-Path $AssetsDir "launch-button.png") -Destination $AhkDir -Force
 
-    $env:HERMES_HOME = $HermesHome
+    $env:X19_HOME = $X19Home
     # As shipped: NO dev-root override, no pin override. Ensure a stray
     # local dev checkout can't hijack resolution.
-    Remove-Item Env:HERMES_SETUP_DEV_REPO_ROOT -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Path $HermesHome -Force | Out-Null
+    Remove-Item Env:X19_SETUP_DEV_REPO_ROOT -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $X19Home -Force | Out-Null
 
     $recorder = Start-DesktopRecorder (Join-Path $proof "desktop-frames")
     $ahkLog = Join-Path $proof "ahk.log"
@@ -643,13 +643,13 @@ function Invoke-PhaseInstallGui {
 
         # Launch the REAL installer, headed -- exactly a double-click.
         $installer = Start-Process -FilePath $setupExe -PassThru
-        Write-Host "  Hermes-Setup.exe launched (pid $($installer.Id))"
+        Write-Host "  X19-Setup.exe launched (pid $($installer.Id))"
 
-        # Drive it: Install click -> wait -> Launch click -> Hermes.exe window.
+        # Drive it: Install click -> wait -> Launch click -> X19.exe window.
         # Arg 3 lets the AHK script use the installer's own log as the
         # install-finished fallback signal.
         $ahk = Start-Process -FilePath $ahkExe `
-            -ArgumentList (Join-Path $AhkDir "install-and-launch.ahk"), $ahkLog, "Hermes-Setup.exe", (Join-Path $HermesHome "logs\bootstrap-installer.log") `
+            -ArgumentList (Join-Path $AhkDir "install-and-launch.ahk"), $ahkLog, "X19-Setup.exe", (Join-Path $X19Home "logs\bootstrap-installer.log") `
             -PassThru
         # Install on a cold runner takes a while; the AHK script's own inner
         # timeout (45 min on the Launch wait) is the effective budget.
@@ -666,18 +666,18 @@ function Invoke-PhaseInstallGui {
 
         # The Launch hand-off under test: the app the installer spawned must
         # actually be running.
-        Assert-True ($null -ne (Get-Process -Name "Hermes" -ErrorAction SilentlyContinue)) "Hermes.exe process is running (installer Launch hand-off worked)"
+        Assert-True ($null -ne (Get-Process -Name "X19" -ErrorAction SilentlyContinue)) "X19.exe process is running (installer Launch hand-off worked)"
 
         # Installer should have exited after Launch.
         if (-not $installer.HasExited) {
             Start-Sleep -Seconds 10
         }
-        Assert-True $installer.HasExited "Hermes-Setup.exe exited after Launch"
+        Assert-True $installer.HasExited "X19-Setup.exe exited after Launch"
     }
     finally {
         Stop-DesktopRecorder $recorder (Join-Path $proof "desktop-frames")
         # Surface the installer's own log win or lose, full and folded.
-        $bootLog = Join-Path $HermesHome "logs\bootstrap-installer.log"
+        $bootLog = Join-Path $X19Home "logs\bootstrap-installer.log"
         if (Test-Path -LiteralPath $bootLog) {
             Write-Host "::group::bootstrap-installer.log"
             Get-Content -LiteralPath $bootLog | Write-Host
@@ -687,7 +687,7 @@ function Invoke-PhaseInstallGui {
     }
 
     # Close the freshly launched app (user quits after first look).
-    Stop-HermesAppProcesses "post-install"
+    Stop-X19AppProcesses "post-install"
 
     # The installer cloned/updated from serve.git's `main`; the phase's
     # expected sha says where that must land (install: OLD; update: HEAD).
@@ -697,12 +697,12 @@ function Invoke-PhaseInstallGui {
     if ($Mode -eq "install") {
         Assert-True ($installedSha -ne $state.current) "installed checkout differs from HEAD (an update is genuinely available)"
     }
-    Test-HermesRuns "post-$Mode-gui"
-    Assert-True ($null -ne (Get-DesktopExe)) "packaged Desktop Hermes.exe exists"
+    Test-X19Runs "post-$Mode-gui"
+    Assert-True ($null -ne (Get-DesktopExe)) "packaged Desktop X19.exe exists"
 
     # Seed a provider so the update leg meets the ready app shell, not the
     # onboarding overlay (an updating user has a configured provider).
-    $envFile = Join-Path $HermesHome ".env"
+    $envFile = Join-Path $X19Home ".env"
     if (-not (Test-Path -LiteralPath $envFile) -or -not ((Get-Content $envFile -Raw -ErrorAction SilentlyContinue) -match "OPENROUTER_API_KEY")) {
         Add-Content -LiteralPath $envFile -Value "OPENROUTER_API_KEY=sk-or-...-key"
     }
@@ -717,7 +717,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     $proof = Join-Path $ProofRoot "update-gui"
     New-Item -ItemType Directory -Path $proof -Force | Out-Null
 
-    $env:HERMES_HOME = $HermesHome
+    $env:X19_HOME = $X19Home
 
     # The update becomes available the way it does for a real user: the
     # remote's main moves forward. (Install ran against main = OLD.)
@@ -725,10 +725,10 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     Write-Host "  serve.git main advanced to $TargetSha"
 
     $desktopExe = Get-DesktopExe
-    Assert-True ($null -ne $desktopExe) "packaged Hermes.exe present before update"
+    Assert-True ($null -ne $desktopExe) "packaged X19.exe present before update"
 
-    $resultPath = Join-Path $HermesHome ".hermes-update-result.json"
-    $markerPath = Join-Path $HermesHome ".hermes-update-in-progress"
+    $resultPath = Join-Path $X19Home ".x19-update-result.json"
+    $markerPath = Join-Path $X19Home ".x19-update-in-progress"
     Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
 
     $node = Get-ManagedNode
@@ -779,14 +779,14 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         Assert-True ($driveExit -eq 0) "GUI driver clicked Update now and the app quit for hand-off"
 
         # The detached updater (spawned by the app, NOT by us) now runs
-        # `hermes update` + desktop rebuild + relaunch. Which updater depends
+        # `x19 update` + desktop rebuild + relaunch. Which updater depends
         # on the installed checkout, and BOTH are production paths:
         #   * checkouts shipping scripts/desktop-update.ps1 -> that script,
-        #     which writes .hermes-update-result.json on every exit;
-        #   * older checkouts -> the staged hermes-setup.exe --update flow,
+        #     which writes .x19-update-result.json on every exit;
+        #   * older checkouts -> the staged x19-setup.exe --update flow,
         #     which does NOT write the result JSON.
         # So: poll for COMPLETION = (result JSON) OR (checkout reached the
-        # target sha AND the marker is gone). The sha/marker/hermes/relaunch
+        # target sha AND the marker is gone). The sha/marker/x19/relaunch
         # asserts below are the hard gate either way; the JSON is asserted
         # only when the script path produced it.
         #
@@ -798,7 +798,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         # The desktop-build output goes to logs/update.log (not the streamed
         # handoff log), so we tail update.log here to show progress.
         Write-Host "  waiting for the detached updater to finish (up to 35 min) ..."
-        $updateLog = Join-Path $HermesHome "logs\update.log"
+        $updateLog = Join-Path $X19Home "logs\update.log"
         $updateLogPos = 0
         $deadline = (Get-Date).AddMinutes(35)
         while ((Get-Date) -lt $deadline) {
@@ -833,26 +833,26 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         Assert-True (-not (Test-Path -LiteralPath $markerPath)) "update marker cleaned up"
 
         Assert-True ((Get-InstalledHead) -eq $TargetSha) "checkout landed on target commit"
-        Test-HermesRuns "post-update"
-        Assert-True ($null -ne (Get-DesktopExe)) "Hermes.exe still present after update"
+        Test-X19Runs "post-update"
+        Assert-True ($null -ne (Get-DesktopExe)) "X19.exe still present after update"
 
         # The production hand-off relaunches the desktop (RelaunchExe).
         # A relaunched window is the user-visible proof the update loop closed.
-        Write-Host "  waiting for the relaunched Hermes.exe ..."
+        Write-Host "  waiting for the relaunched X19.exe ..."
         $rDeadline = (Get-Date).AddMinutes(5)
         $relaunched = $null
         while ((Get-Date) -lt $rDeadline) {
-            $relaunched = Get-Process -Name "Hermes" -ErrorAction SilentlyContinue
+            $relaunched = Get-Process -Name "X19" -ErrorAction SilentlyContinue
             if ($relaunched) { break }
             Start-Sleep -Seconds 5
         }
         Assert-True ($null -ne $relaunched) "updater relaunched the desktop app"
         Start-Sleep -Seconds 12   # let the window paint for the screenshot
-        # Foreground the relaunched Hermes window so the proof screenshot
+        # Foreground the relaunched X19 window so the proof screenshot
         # captures IT, not whatever else is on top (the full-desktop grab is
         # otherwise at the mercy of z-order -- an earlier run caught VS Code).
         try {
-            $mainProc = Get-Process -Name "Hermes" -ErrorAction SilentlyContinue |
+            $mainProc = Get-Process -Name "X19" -ErrorAction SilentlyContinue |
                 Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
             if ($mainProc) {
                 Add-Type -Namespace HdE2E -Name Win -MemberDefinition @'
@@ -868,7 +868,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     }
     finally {
         Stop-DesktopRecorder $recorder (Join-Path $proof "desktop-frames")
-        $handoffLog = Join-Path $HermesHome "logs\desktop-update-handoff.log"
+        $handoffLog = Join-Path $X19Home "logs\desktop-update-handoff.log"
         if (Test-Path -LiteralPath $handoffLog) {
             Write-Host "::group::desktop-update-handoff.log"
             Get-Content -LiteralPath $handoffLog | Write-Host
@@ -877,21 +877,21 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         }
 
         # Quit the relaunched app so job teardown is clean.
-        Stop-HermesAppProcesses "post-update"
+        Stop-X19AppProcesses "post-update"
     }
 }
 
 function Invoke-PhaseInstall {
     # Dispatch on the install axis. Each arm ends with the same contract:
-    # checkout at OLD, hermes runs, and state carries how OLD landed so any
+    # checkout at OLD, x19 runs, and state carries how OLD landed so any
     # update arm can follow any install arm.
     $state = Read-State
     # Isolated install target for every arm; serve.git's file:// origin
     # looks like a fork to the updater, whose "add the official repo as
     # upstream?" prompt would hang a headless run - the marker is the
     # product's own suppression mechanism.
-    $env:HERMES_HOME = $HermesHome
-    New-Item -ItemType Directory -Path $HermesHome -Force | Out-Null
+    $env:X19_HOME = $X19Home
+    New-Item -ItemType Directory -Path $X19Home -Force | Out-Null
     switch ($InstallMethod) {
         "desktop-installer@latest" {
             Invoke-PhaseInstallGui
@@ -900,13 +900,13 @@ function Invoke-PhaseInstall {
             Write-Step "INSTALL (script): OLD's own install.ps1, headless"
             Invoke-RefInstaller $state.old "old"
             Assert-True ((Get-InstalledHead) -eq $state.old) "installed checkout is at OLD"
-            Test-HermesRuns "post-install-script"
+            Test-X19Runs "post-install-script"
         }
         "installer-script+desktop" {
             Write-Step "INSTALL (script+desktop): OLD's own install.ps1 -IncludeDesktop, headless"
             Invoke-RefInstaller $state.old "old" -IncludeDesktop
             Assert-True ((Get-InstalledHead) -eq $state.old) "installed checkout is at OLD"
-            Test-HermesRuns "post-install-script-desktop"
+            Test-X19Runs "post-install-script-desktop"
             Assert-DesktopArtifact "OLD"
         }
     }
@@ -914,10 +914,10 @@ function Invoke-PhaseInstall {
 
 function Invoke-PhaseUpdate {
     $state = Read-State
-    $env:HERMES_HOME = $HermesHome
+    $env:X19_HOME = $X19Home
     # Match the POSIX driver's explicit opt-out when a detached updater bypasses
     # the PATH shim and sees our local transport as a fork.
-    New-Item -ItemType File -Path (Join-Path $HermesHome ".skip_upstream_prompt") -Force | Out-Null
+    New-Item -ItemType File -Path (Join-Path $X19Home ".skip_upstream_prompt") -Force | Out-Null
 
     # The update becomes available the way it does for a real user: the
     # remote's main moves forward. The GUI route re-advances harmlessly
@@ -934,11 +934,11 @@ function Invoke-PhaseUpdate {
             # pairs are dispatched.
             Invoke-GuiUpdateDesktopRoute $state.current
         }
-        "hermes-desktop-app-update" {
-            Invoke-HermesDesktopAppUpdate $state.current
+        "x19-desktop-app-update" {
+            Invoke-X19DesktopAppUpdate $state.current
         }
-        "hermes-update" {
-            Invoke-HermesUpdate
+        "x19-update" {
+            Invoke-X19Update
         }
         "installer-script" {
             # A user re-running the one-liner today gets the CURRENT script.
@@ -949,7 +949,7 @@ function Invoke-PhaseUpdate {
             Assert-DesktopArtifact "HEAD"
         }
         "desktop-installer@latest" {
-            # A user re-downloading Hermes-Setup.exe and clicking Install over
+            # A user re-downloading X19-Setup.exe and clicking Install over
             # the existing install (the GUI twin of re-running the one-liner).
             # Windows has no already-installed fast path, so the full installer
             # UI shows and the same AHK drive applies; install.ps1's repository
@@ -957,7 +957,7 @@ function Invoke-PhaseUpdate {
             # Rotate the bootstrap log first: it appends across runs, and the
             # AHK's "bootstrap complete" fallback must not match the install
             # phase's completion line.
-            $bootLog = Join-Path $HermesHome "logs\bootstrap-installer.log"
+            $bootLog = Join-Path $X19Home "logs\bootstrap-installer.log"
             if (Test-Path -LiteralPath $bootLog) {
                 Move-Item -LiteralPath $bootLog -Destination "$bootLog.install-phase" -Force
             }
@@ -967,13 +967,13 @@ function Invoke-PhaseUpdate {
     }
 
     Assert-True ((Get-InstalledHead) -eq $state.current) "checkout landed on HEAD"
-    Test-HermesRuns "post-update"
+    Test-X19Runs "post-update"
 }
 
 function Invoke-CheckedPhaseUpdate {
     Remove-Item -LiteralPath (Join-Path $WorkRoot "known-failure.json") -Force -ErrorAction SilentlyContinue
     # Only evidence produced by this update attempt can match an exception.
-    foreach ($oldLog in @((Join-Path $WorkRoot "logs\update.log"), (Join-Path $HermesHome "logs\desktop.log"))) {
+    foreach ($oldLog in @((Join-Path $WorkRoot "logs\update.log"), (Join-Path $X19Home "logs\desktop.log"))) {
         if (Test-Path -LiteralPath $oldLog) { Move-Item -LiteralPath $oldLog -Destination "$oldLog.before-update" -Force }
     }
     try {

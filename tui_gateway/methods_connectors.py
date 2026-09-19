@@ -69,7 +69,7 @@ def _connector_rpc(rid, params, action):
     runtime_token = _current_runtime_session_record.set(owner)
     try:
         # Bind the launch profile to prevent ambient sibling-profile leakage.
-        scope = {"profile_home": profile_home or str(_hermes_home)}
+        scope = {"profile_home": profile_home or str(_x19_home)}
         with _session_profile_runtime_scope(scope):
             tokens = _set_session_context(owner["session_key"], cwd=_session_cwd(owner), ui_session_id=sid)
             try:

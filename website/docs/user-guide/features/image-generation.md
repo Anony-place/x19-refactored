@@ -1,13 +1,13 @@
 ---
 title: Image Generation
-description: Generate images via FAL.ai — 11 models including FLUX 2, GPT Image (1.5 & 2), Nano Banana Pro, Ideogram, Recraft V4 Pro, Krea 2, and more, selectable via `hermes tools`.
+description: Generate images via FAL.ai — 11 models including FLUX 2, GPT Image (1.5 & 2), Nano Banana Pro, Ideogram, Recraft V4 Pro, Krea 2, and more, selectable via `x19 tools`.
 sidebar_label: Image Generation
 sidebar_position: 6
 ---
 
 # Image Generation
 
-Hermes Agent generates images from text prompts via FAL.ai. Eleven models are supported out of the box, each with different speed, quality, and cost tradeoffs. The active model is user-configurable via `hermes tools` and persists in `config.yaml`.
+X19 generates images from text prompts via FAL.ai. Eleven models are supported out of the box, each with different speed, quality, and cost tradeoffs. The active model is user-configurable via `x19 tools` and persists in `config.yaml`.
 
 ## Supported Models
 
@@ -30,11 +30,11 @@ Prices are FAL's pricing at time of writing; check [fal.ai](https://fal.ai/) for
 ## Setup
 
 :::tip Nous Subscribers
-If you have a paid [Nous Portal](https://portal.nousresearch.com) subscription, you can use image generation through the **[Tool Gateway](tool-gateway.md)** without a FAL API key. Your model selection persists across both paths. New installs can run `hermes setup --portal` to log in and turn on every gateway tool at once; existing installs can pick **Nous Subscription** as the image-gen backend via `hermes tools`.
+If you have a paid [Nous Portal](https://portal.nousresearch.com) subscription, you can use image generation through the **[Tool Gateway](tool-gateway.md)** without a FAL API key. Your model selection persists across both paths. New installs can run `x19 setup --portal` to log in and turn on every gateway tool at once; existing installs can pick **Nous Subscription** as the image-gen backend via `x19 tools`.
 
 The **Nous Subscription** row is the only managed row. Its model picker spans every gateway the subscription runs — the FAL catalog above, native **Krea 2** (`krea-2-medium`, `krea-2-large`, `krea-2-medium-turbo`) and any Nous Portal image models — each model listed once, and the model you pick decides which gateway serves the request. Free tool-pool accounts see the FAL models only; Krea and Portal models are paid-subscription.
 
-If the managed gateway returns `HTTP 4xx` for a specific model, that model isn't yet proxied on the portal side — the agent will tell you so, with remediation steps (switch to FAL.ai in `hermes tools` with your own `FAL_KEY` for direct access, or pick a different model).
+If the managed gateway returns `HTTP 4xx` for a specific model, that model isn't yet proxied on the portal side — the agent will tell you so, with remediation steps (switch to FAL.ai in `x19 tools` with your own `FAL_KEY` for direct access, or pick a different model).
 :::
 
 ### Get a FAL API Key
@@ -47,7 +47,7 @@ If the managed gateway returns `HTTP 4xx` for a specific model, that model isn't
 Run the tools command:
 
 ```bash
-hermes tools
+x19 tools
 ```
 
 Navigate to **🎨 Image Generation**, pick your backend (Nous Subscription or FAL.ai), then the picker shows all supported models in a column-aligned table — arrow keys to navigate, Enter to select:
@@ -69,9 +69,9 @@ image_gen:
   max_parallel_requests: 4      # concurrent images in one tool-call batch
 ```
 
-`image_gen.provider` is the single selection key: `nous` routes through the managed Tool Gateway; a vendor name (`fal`, `openai`, `xai`, `krea`, ...) goes direct with your own key. The runtime always follows this stored selection — a `FAL_KEY` in `.env` is ignored while `provider: nous`, and `provider: fal` without `FAL_KEY` errors with `image_gen is configured to use fal (set via hermes tools), but FAL_KEY is not set. Run 'hermes tools' to change it.` rather than silently rerouting. Change providers via `hermes tools`, not by adding/removing keys. (The old `use_gateway` boolean is legacy — still read as `nous` when `true`, but never written anymore.)
+`image_gen.provider` is the single selection key: `nous` routes through the managed Tool Gateway; a vendor name (`fal`, `openai`, `xai`, `krea`, ...) goes direct with your own key. The runtime always follows this stored selection — a `FAL_KEY` in `.env` is ignored while `provider: nous`, and `provider: fal` without `FAL_KEY` errors with `image_gen is configured to use fal (set via x19 tools), but FAL_KEY is not set. Run 'x19 tools' to change it.` rather than silently rerouting. Change providers via `x19 tools`, not by adding/removing keys. (The old `use_gateway` boolean is legacy — still read as `nous` when `true`, but never written anymore.)
 
-`max_parallel_requests` defaults to `4`. Hermes clamps it to at least one and
+`max_parallel_requests` defaults to `4`. X19 clamps it to at least one and
 to the global tool-worker limit, so image providers receive bounded parallel
 requests without allowing an image batch to bypass the agent's concurrency cap.
 
@@ -83,7 +83,7 @@ entire live image catalog — the dedicated
 models (Seedream, FLUX.2, Recraft, Qwen Image, MAI, Krea, Riverflow, Grok
 Imagine, and more — 40+ ids) merged with the chat-completions image models.
 The catalog is fetched live from `GET /images/models` and `GET /models`, so
-new models appear in the picker as soon as OpenRouter serves them; no Hermes
+new models appear in the picker as soon as OpenRouter serves them; no X19
 update needed. Generation routes each model to the surface that serves it
 (dedicated `POST /images/generations` vs chat-completions) automatically.
 Nous Portal proxies the chat-completions protocol only, so its picker offers
@@ -126,12 +126,12 @@ image_gen:
 Auth reuses the same env vars as the Meta chat provider — `MODEL_API_KEY`
 (Meta's documented name), with `META_API_KEY` / `META_MODEL_API_KEY` accepted
 as aliases. Set `META_BASE_URL` to point at a proxy or alternate host. Text-to-image
-only for now; responses are saved to `$HERMES_HOME/cache/images/`.
+only for now; responses are saved to `$X19_HOME/cache/images/`.
 
 ## FAL: GPT Image 2.5
 
 Select **GPT Image 2.5 Flare** or **GPT Image 2.5 Sunburst** under
-`hermes tools` → Image Generation → FAL.ai. The model IDs are:
+`x19 tools` → Image Generation → FAL.ai. The model IDs are:
 
 - `openai/gpt-image-2.5/flare/text-to-image`
 - `openai/gpt-image-2.5/sunburst/text-to-image`
@@ -139,13 +139,13 @@ Select **GPT Image 2.5 Flare** or **GPT Image 2.5 Sunburst** under
 For example:
 
 ```bash
-hermes config set image_gen.provider fal
-hermes config set image_gen.model openai/gpt-image-2.5/flare/text-to-image
+x19 config set image_gen.provider fal
+x19 config set image_gen.model openai/gpt-image-2.5/flare/text-to-image
 ```
 
 Providing `image_url` or reference images automatically selects the corresponding
 `openai/gpt-image-2.5/flare/edit` or `openai/gpt-image-2.5/sunburst/edit` endpoint.
-Both accept up to 16 source images. Hermes pins quality to `medium`, matching its
+Both accept up to 16 source images. X19 pins quality to `medium`, matching its
 existing FAL GPT Image policy rather than FAL's higher-cost `high` default.
 Landscape and portrait use 4:3 presets to satisfy the minimum pixel count;
 square uses `square_hd`. Upscaling remains off unless requested.
@@ -163,11 +163,11 @@ Existing provider and model defaults are unchanged.
 
 The **OpenAI** provider supports GPT Image 2.5 Flare (fast everyday creation)
 and Sunburst (precision generation and editing), using `OPENAI_API_KEY`.
-Select them through `hermes tools` → Image Generation → OpenAI, or set:
+Select them through `x19 tools` → Image Generation → OpenAI, or set:
 
 ```bash
-hermes config set image_gen.provider openai
-hermes config set image_gen.openai.model gpt-image-2.5-flare
+x19 config set image_gen.provider openai
+x19 config set image_gen.openai.model gpt-image-2.5-flare
 ```
 
 `gpt-image-2.5-flare` and `gpt-image-2.5-sunburst` use automatic quality.
@@ -244,7 +244,7 @@ edit-capable model.
 
 :::note OpenAI (Codex auth): the backend decides quality and size
 
-Hermes posts straight to the Codex backend's native
+X19 posts straight to the Codex backend's native
 `images/generations` / `images/edits` endpoints (the same route the official
 Codex client uses), so no chat model is involved and the call does not depend
 on which chat models your ChatGPT plan currently has. The backend, however,
@@ -345,5 +345,5 @@ Debug logs go to `./logs/image_tools_debug_<session_id>.json` with per-call deta
 
 - **Requires credentials** for the active backend (FAL `FAL_KEY` / Nous Subscription, `OPENAI_API_KEY`, xAI OAuth, `KREA_API_KEY`)
 - **Editing is model-dependent** — image-to-image works only on edit-capable models (see the table above); text-to-image-only models reject image inputs with a clear error
-- **Temporary URLs** — backends return hosted URLs that expire after hours/days; Hermes materializes them to the local cache so delivery still works after expiry
+- **Temporary URLs** — backends return hosted URLs that expire after hours/days; X19 materializes them to the local cache so delivery still works after expiry
 - **Per-model constraints** — some models don't support `seed`, `num_inference_steps`, etc. The `supports` / `edit_supports` filter silently drops unsupported params; this is expected behavior

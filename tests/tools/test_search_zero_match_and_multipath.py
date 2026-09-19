@@ -10,7 +10,7 @@ from tools.file_tools import search_tool
 
 @pytest.fixture
 def proj(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     d = tmp_path / "proj"
     d.mkdir()
     (d / "a.py").write_text("TOKEN_ALPHA = 'find_me_value'\nother = 1\n")
@@ -74,7 +74,7 @@ class TestZeroMatchProbe:
         # zero-match probe actually executes. The real rg calls still run. This
         # observes shell command text, so pin the shell lane (native rg runs
         # argv directly and never passes through ``_exec``).
-        monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+        monkeypatch.setenv("X19_NATIVE_FILE_READ", "0")
         from tools.file_tools import _get_file_ops
 
         task_id = "t-zm-pruned-hidden"
@@ -112,7 +112,7 @@ class TestZeroMatchProbe:
         (dependency / "dependency.js").write_text("EXPLICIT_ROOT_TOKEN = true\n")
         (d / ".gitignore").write_text("node_modules/\n")
 
-        monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")  # shell-observer test
+        monkeypatch.setenv("X19_NATIVE_FILE_READ", "0")  # shell-observer test
         from tools.file_tools import _get_file_ops
 
         task_id = "t-zm-explicit-pruned-root"

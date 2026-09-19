@@ -31,7 +31,7 @@ def test_ticker_survives_a_corrupt_ledger_at_startup(tmp_path, monkeypatch):
     ``start()`` before the guarded loop and end the thread: gateway up, no job ever fires."""
     from cron.scheduler_provider import InProcessCronScheduler
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     (tmp_path / "cron").mkdir()
     (tmp_path / "cron" / "executions.db").write_bytes(b"not a sqlite database" * 64)
     ticks = []

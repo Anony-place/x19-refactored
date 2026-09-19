@@ -19,7 +19,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.api_server import APIServerAdapter
 from gateway.run import _INTERRUPT_REASON_GATEWAY_SHUTDOWN
-from hermes_state import SessionDB
+from x19_state import SessionDB
 from tests.gateway.restart_test_helpers import make_restart_runner
 from tools import browser_tool_lifecycle as bt_lifecycle
 
@@ -267,7 +267,7 @@ def _parked_agent(loop, started: asyncio.Event, release: threading.Event) -> Mag
     agent.session_completion_tokens = 0
     agent.session_total_tokens = 0
     agent._last_compaction_in_place = False
-    agent._hermes_api_runtime = {}
+    agent._x19_api_runtime = {}
 
     def _park(user_message=None, conversation_history=None, task_id=None):
         loop.call_soon_threadsafe(started.set)

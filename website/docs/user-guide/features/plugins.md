@@ -2,39 +2,39 @@
 sidebar_position: 11
 sidebar_label: "Plugins"
 title: "Plugins"
-description: "Extend Hermes with custom tools, hooks, and integrations via the plugin system"
+description: "Extend X19 with custom tools, hooks, and integrations via the plugin system"
 ---
 
 # Plugins
 
-Hermes has a plugin system for adding custom tools, hooks, and integrations without modifying core code.
+X19 has a plugin system for adding custom tools, hooks, and integrations without modifying core code.
 
 If you want to create a custom tool for yourself, your team, or one project,
 this is usually the right path. The developer guide's
-[Adding Tools](/developer-guide/adding-tools) page is for built-in Hermes
+[Adding Tools](/developer-guide/adding-tools) page is for built-in X19
 core tools that live in `tools/` and `toolsets.py`.
 
-**→ [Build a Hermes Plugin](/developer-guide/plugins)** — step-by-step guide with a complete working example.
+**→ [Build a X19 Plugin](/developer-guide/plugins)** — step-by-step guide with a complete working example.
 
 ## Quick overview
 
-Drop a directory into `~/.hermes/plugins/` with a `plugin.yaml` and Python code:
+Drop a directory into `~/.x19/plugins/` with a `plugin.yaml` and Python code:
 
 ```
-~/.hermes/plugins/my-plugin/
+~/.x19/plugins/my-plugin/
 ├── plugin.yaml      # manifest
 ├── __init__.py      # register() — wires schemas to handlers
 ├── schemas.py       # tool schemas (what the LLM sees)
 └── tools.py         # tool handlers (what runs when called)
 ```
 
-Start Hermes — your tools appear alongside built-in tools. The model can call them immediately.
+Start X19 — your tools appear alongside built-in tools. The model can call them immediately.
 
 ### Minimal working example
 
 Here is a complete plugin that adds a `hello_world` tool and logs every tool call via a hook.
 
-**`~/.hermes/plugins/hello-world/plugin.yaml`**
+**`~/.x19/plugins/hello-world/plugin.yaml`**
 
 ```yaml
 name: hello-world
@@ -42,10 +42,10 @@ version: "1.0"
 description: A minimal example plugin
 ```
 
-**`~/.hermes/plugins/hello-world/__init__.py`**
+**`~/.x19/plugins/hello-world/__init__.py`**
 
 ```python
-"""Minimal Hermes plugin — registers a tool and a hook."""
+"""Minimal X19 plugin — registers a tool and a hook."""
 
 import json
 
@@ -86,11 +86,11 @@ def register(ctx):
     ctx.register_hook("post_tool_call", on_tool_call)
 ```
 
-Drop both files into `~/.hermes/plugins/hello-world/`, restart Hermes, and the model can immediately call `hello_world`. The hook prints a log line after every tool invocation.
+Drop both files into `~/.x19/plugins/hello-world/`, restart X19, and the model can immediately call `hello_world`. The hook prints a log line after every tool invocation.
 
-The model-facing tool description belongs in `schema["description"]`. The optional `ctx.register_tool(description=...)` value is separate `ToolEntry` registry metadata: when omitted, it defaults to the schema description, but Hermes does not copy it back into a schema that lacks `description`. Prefer defining the text once in the schema. If you provide both values, keep them synchronized; the model sees the schema value.
+The model-facing tool description belongs in `schema["description"]`. The optional `ctx.register_tool(description=...)` value is separate `ToolEntry` registry metadata: when omitted, it defaults to the schema description, but X19 does not copy it back into a schema that lacks `description`. Prefer defining the text once in the schema. If you provide both values, keep them synchronized; the model sees the schema value.
 
-Project-local plugins under `./.hermes/plugins/` are disabled by default. Enable them only for trusted repositories by setting `HERMES_ENABLE_PROJECT_PLUGINS=true` before starting Hermes.
+Project-local plugins under `./.x19/plugins/` are disabled by default. Enable them only for trusted repositories by setting `X19_ENABLE_PROJECT_PLUGINS=true` before starting X19.
 
 ## What plugins can do
 
@@ -102,12 +102,12 @@ Every `ctx.*` API below is available inside a plugin's `register(ctx)` function.
 | Add hooks | `ctx.register_hook("post_tool_call", callback)` |
 | Add slash commands | `ctx.register_command(name, handler, description)` — adds `/name` in CLI and gateway sessions |
 | Dispatch tools from commands | `ctx.dispatch_tool(name, args)` — invokes a registered tool with parent-agent context auto-wired |
-| Add CLI commands | `ctx.register_cli_command(name, help, setup_fn, handler_fn)` — adds `hermes <plugin> <subcommand>` |
+| Add CLI commands | `ctx.register_cli_command(name, help, setup_fn, handler_fn)` — adds `x19 <plugin> <subcommand>` |
 | Inject messages | `ctx.inject_message(content, role="user", session_key=...)` - see [Injecting Messages](#injecting-messages) |
 | Ship data files | `Path(__file__).parent / "data" / "file.yaml"` |
 | Bundle skills | `ctx.register_skill(name, path)` — namespaced as `plugin:skill`, loaded via `skill_view("plugin:skill")` |
-| Gate on env vars | `requires_env: [API_KEY]` in plugin.yaml — prompted during `hermes plugins install` |
-| Distribute via pip | `[project.entry-points."hermes_agent.plugins"]` |
+| Gate on env vars | `requires_env: [API_KEY]` in plugin.yaml — prompted during `x19 plugins install` |
+| Distribute via pip | `[project.entry-points."x19_agent.plugins"]` |
 | Register a gateway platform (Discord, Telegram, IRC, …) | `ctx.register_platform(name, label, adapter_factory, check_fn, ...)` — see [Adding Platform Adapters](/developer-guide/adding-platform-adapters) |
 | Register an image-generation backend | `ctx.register_image_gen_provider(provider)` — see [Image Generation Provider Plugins](/developer-guide/image-gen-provider-plugin) |
 | Register a video-generation backend | `ctx.register_video_gen_provider(provider)` — see [Video Generation Provider Plugins](/developer-guide/video-gen-provider-plugin) |
@@ -123,17 +123,17 @@ Every `ctx.*` API below is available inside a plugin's `register(ctx)` function.
 
 | Source | Path | Use case |
 |--------|------|----------|
-| Bundled | `<repo>/plugins/` | Ships with Hermes — see [Built-in Plugins](/user-guide/features/built-in-plugins) |
-| User | `~/.hermes/plugins/` | Personal plugins |
-| Project | `.hermes/plugins/` | Project-specific plugins (requires `HERMES_ENABLE_PROJECT_PLUGINS=true`) |
-| pip | `hermes_agent.plugins` entry_points | Distributed packages |
-| Nix | `services.hermes-agent.extraPlugins` / `extraPythonPackages` | NixOS declarative installs — see [Nix Setup](/getting-started/nix-setup#plugins) |
+| Bundled | `<repo>/plugins/` | Ships with X19 — see [Built-in Plugins](/user-guide/features/built-in-plugins) |
+| User | `~/.x19/plugins/` | Personal plugins |
+| Project | `.x19/plugins/` | Project-specific plugins (requires `X19_ENABLE_PROJECT_PLUGINS=true`) |
+| pip | `x19_agent.plugins` entry_points | Distributed packages |
+| Nix | `services.x19.extraPlugins` / `extraPythonPackages` | NixOS declarative installs — see [Nix Setup](/getting-started/nix-setup#plugins) |
 
 Later sources override earlier ones on name collision, so a user plugin with the same name as a bundled plugin replaces it.
 
 ### Plugin sub-categories
 
-Within each source, Hermes also recognizes sub-category directories that route plugins to specialized discovery systems:
+Within each source, X19 also recognizes sub-category directories that route plugins to specialized discovery systems:
 
 | Sub-directory | What it holds | Discovery system |
 |---|---|---|
@@ -144,11 +144,11 @@ Within each source, Hermes also recognizes sub-category directories that route p
 | `plugins/context_engine/<name>/` | Context-compression engines (`ctx.register_context_engine()`) | **Own loader** in `plugins/context_engine/__init__.py` (one active at a time) |
 | `plugins/model-providers/<name>/` | LLM provider profiles (`register_provider(ProviderProfile(...))`) | **Own loader** in `providers/__init__.py` (lazily scanned on first `get_provider_profile()` call) |
 
-User plugins at `~/.hermes/plugins/model-providers/<name>/` override bundled model providers of the same name (last-writer-wins in `register_provider()`), so you can replace a built-in provider profile without any repo edits. Memory providers resolve the other way round: for `~/.hermes/plugins/memory/<name>/` the **bundled** provider wins on a name collision (bundled, then user, then project, then entry points; first seen wins), so a user memory provider needs its own unique name.
+User plugins at `~/.x19/plugins/model-providers/<name>/` override bundled model providers of the same name (last-writer-wins in `register_provider()`), so you can replace a built-in provider profile without any repo edits. Memory providers resolve the other way round: for `~/.x19/plugins/memory/<name>/` the **bundled** provider wins on a name collision (bundled, then user, then project, then entry points; first seen wins), so a user memory provider needs its own unique name.
 
 ## Plugins are opt-in (with a few exceptions)
 
-**General plugins and user-installed backends are disabled by default** — discovery finds them (so they show up in `hermes plugins` and `/plugins`), but nothing with hooks or tools loads until you add the plugin's name to `plugins.enabled` in `~/.hermes/config.yaml`. This stops third-party code from running without your explicit consent.
+**General plugins and user-installed backends are disabled by default** — discovery finds them (so they show up in `x19 plugins` and `/plugins`), but nothing with hooks or tools loads until you add the plugin's name to `plugins.enabled` in `~/.x19/config.yaml`. This stops third-party code from running without your explicit consent.
 
 ```yaml
 plugins:
@@ -169,40 +169,40 @@ plugins:
 Three ways to flip state:
 
 ```bash
-hermes plugins                    # interactive toggle (space to check/uncheck)
-hermes plugins enable <name>      # add to allow-list
-hermes plugins disable <name>     # remove from allow-list + add to disabled
+x19 plugins                    # interactive toggle (space to check/uncheck)
+x19 plugins enable <name>      # add to allow-list
+x19 plugins disable <name>     # remove from allow-list + add to disabled
 ```
 
-After `hermes plugins install owner/repo`, you're asked `Enable 'name' now? [y/N]` — defaults to no. Skip the prompt for scripted installs with `--enable` or `--no-enable`.
+After `x19 plugins install owner/repo`, you're asked `Enable 'name' now? [y/N]` — defaults to no. Skip the prompt for scripted installs with `--enable` or `--no-enable`.
 
 For a reproducible install, pin a full immutable commit (tags, branches, and
 abbreviated SHAs are not accepted):
 
 ```bash
-hermes plugins install owner/repo --ref 0123456789abcdef0123456789abcdef01234567
+x19 plugins install owner/repo --ref 0123456789abcdef0123456789abcdef01234567
 ```
 
-Hermes checks out the commit detached, verifies that `HEAD` exactly matches the
+X19 checks out the commit detached, verifies that `HEAD` exactly matches the
 requested SHA, and records the canonical source, installed revision, and pin
-status in the current profile. `hermes plugins update` refuses to move a pinned
+status in the current profile. `x19 plugins update` refuses to move a pinned
 plugin; choose a new exact commit explicitly with
-`hermes plugins install <source> --force --ref <new-commit>`. The
+`x19 plugins install <source> --force --ref <new-commit>`. The
 profile-local install metadata contains no config values, environment values,
 secrets, or capability grants.
 
-The same agent-plugin pin is available in Hermes Desktop: **Capabilities →
+The same agent-plugin pin is available in X19 Desktop: **Capabilities →
 Plugins → Install from Git** has a *Pin to commit* field that takes the full
 40-character SHA, and **Installed** shows a `pinned @ <sha8>` badge on pinned
 agent plugins. This does not guarantee a pinned standalone desktop-plugin
-install. `hermes plugins list` prints
+install. `x19 plugins list` prints
 the pin in its Source column (`git pinned@<sha8>`). Pins work for private
 repositories too, through the same stored credentials described below.
 
 ### Installing from a private repository
 
-`hermes plugins install` clones non-interactively (it never prompts for a
-username or password), so a private repo needs a credential Hermes can find on
+`x19 plugins install` clones non-interactively (it never prompts for a
+username or password), so a private repo needs a credential X19 can find on
 its own. For an `https://` source it tries, in order:
 
 1. `GITHUB_TOKEN` or `GH_TOKEN` from your `.env` (GitHub hosts only).
@@ -213,12 +213,12 @@ its own. For an `https://` source it tries, in order:
 The credential is sent as a one-shot HTTP header for that install or update;
 it is never written into the plugin's `.git/config` or the install metadata.
 SSH sources (`git@host:owner/repo.git`) authenticate through your ssh-agent as
-before. The same resolution applies to `hermes plugins update`, catalog MCP
+before. The same resolution applies to `x19 plugins update`, catalog MCP
 installs from git, and profile distributions fetched from a git URL.
 
 ### What the allow-list does NOT gate
 
-Several categories of plugin bypass `plugins.enabled` — they're part of Hermes' built-in surface and would break basic functionality if gated off by default:
+Several categories of plugin bypass `plugins.enabled` — they're part of X19' built-in surface and would break basic functionality if gated off by default:
 
 | Plugin kind | How it's activated instead |
 |---|---|
@@ -228,14 +228,14 @@ Several categories of plugin bypass `plugins.enabled` — they're part of Hermes
 | **Context engines** (`plugins/context_engine/`) | All discovered; one is active, chosen by `context.engine` in `config.yaml`. |
 | **Model providers** (`plugins/model-providers/`) | All bundled providers under `plugins/model-providers/` discover and register at the first `get_provider_profile()` call. The user picks one at a time via `--provider` or `config.yaml`. |
 | **Pip-installed `backend` plugins** | Opt-in via `plugins.enabled` (same as general plugins). |
-| **User-installed platforms** (under `~/.hermes/plugins/platforms/`) | Opt-in via `plugins.enabled` — third-party gateway adapters need explicit consent. |
+| **User-installed platforms** (under `~/.x19/plugins/platforms/`) | Opt-in via `plugins.enabled` — third-party gateway adapters need explicit consent. |
 
-In short: **bundled "always-works" infrastructure loads automatically; third-party general plugins are opt-in.** The `plugins.enabled` allow-list is the gate specifically for arbitrary code a user drops into `~/.hermes/plugins/`.
+In short: **bundled "always-works" infrastructure loads automatically; third-party general plugins are opt-in.** The `plugins.enabled` allow-list is the gate specifically for arbitrary code a user drops into `~/.x19/plugins/`.
 
 ### Approval transports
 
 An approval transport changes **where a human sees and answers** an existing
-Hermes tool-approval request. It does not decide whether a command needs
+X19 tool-approval request. It does not decide whether a command needs
 approval and it is not an authorization-policy API.
 
 ```python
@@ -250,7 +250,7 @@ def register(ctx):
     ctx.register_approval_transport("my-ui", present)
 ```
 
-`present` may be synchronous or async. Hermes runs it on a bounded worker and
+`present` may be synchronous or async. X19 runs it on a bounded worker and
 enforces the canonical `approvals.timeout` even if the plugin does not. The
 request is immutable and contains redacted display text, its host presentation
 class (`cli` or `gateway`), the host timeout, allowed choices, and an opaque
@@ -276,10 +276,10 @@ security:
 Transport exceptions, timeouts, unavailable registrations, invalid choices,
 and stale responses deny by default. To deliberately show the prompt on the
 ordinary CLI/TUI/gateway/ACP surface when the selected transport fails, set
-`transport_fallback: builtin`. Without that exact opt-in, Hermes never
+`transport_fallback: builtin`. Without that exact opt-in, X19 never
 materializes the prompt on another surface.
 
-Hermes still owns hardline blocks, sudo-stdin protection, user deny rules,
+X19 still owns hardline blocks, sudo-stdin protection, user deny rules,
 request binding, allowed scopes, persistence, hooks, and final authorization.
 Hardline commands are blocked before any transport callback. There is
 intentionally **no plugin approval policy, auto-allow callback, or required
@@ -289,11 +289,11 @@ grant it.
 
 ### Migration for existing users
 
-When you upgrade to a version of Hermes that has opt-in plugins (config schema v21+), any user plugins already installed under `~/.hermes/plugins/` that weren't already in `plugins.disabled` are **automatically grandfathered** into `plugins.enabled`. Your existing setup keeps working. Bundled standalone plugins are NOT grandfathered — even existing users have to opt in explicitly. (Bundled platform/backend plugins never needed grandfathering because they were never gated.)
+When you upgrade to a version of X19 that has opt-in plugins (config schema v21+), any user plugins already installed under `~/.x19/plugins/` that weren't already in `plugins.disabled` are **automatically grandfathered** into `plugins.enabled`. Your existing setup keeps working. Bundled standalone plugins are NOT grandfathered — even existing users have to opt in explicitly. (Bundled platform/backend plugins never needed grandfathering because they were never gated.)
 
 ## Available hooks
 
-Plugins can register the 27 lifecycle events currently accepted by `hermes_cli.plugins.VALID_HOOKS`. The **[Event Hooks catalog](/user-guide/features/hooks#shipped-plugin-hook-catalog)** is canonical for exact timing, return handling, payload fields, and privacy notes.
+Plugins can register the 27 lifecycle events currently accepted by `x19_cli.plugins.VALID_HOOKS`. The **[Event Hooks catalog](/user-guide/features/hooks#shipped-plugin-hook-catalog)** is canonical for exact timing, return handling, payload fields, and privacy notes.
 
 | Descriptive category | Shipped hooks |
 |---|---|
@@ -304,11 +304,11 @@ Plugins can register the 27 lifecycle events currently accepted by `hermes_cli.p
 These categories describe current behavior rather than defining future naming rules. Plugin middleware remains a separate registry/surface.
 ## Plugin types
 
-Hermes has four kinds of plugins:
+X19 has four kinds of plugins:
 
 | Type | What it does | Selection | Location |
 |------|-------------|-----------|----------|
-| **General plugins** | Add tools, hooks, slash commands, CLI commands | Multi-select (enable/disable) | `~/.hermes/plugins/` |
+| **General plugins** | Add tools, hooks, slash commands, CLI commands | Multi-select (enable/disable) | `~/.x19/plugins/` |
 | **Memory providers** | Replace or augment built-in memory | Single-select (one active) | `plugins/memory/` |
 | **Context engines** | Replace the built-in context compressor | Single-select (one active) | `plugins/context_engine/` |
 | **Model providers** | Declare an inference backend (OpenRouter, Anthropic, …) | Multi-register, picked by `--provider` / `config.yaml` | `plugins/model-providers/` |
@@ -317,14 +317,14 @@ Memory providers and context engines are **provider plugins** — only one of ea
 
 ## Pluggable interfaces — where to go for each
 
-The table above shows the four plugin categories, but within "General plugins" the `PluginContext` exposes several distinct extension points — and Hermes also accepts extensions outside the Python plugin system (config-driven backends, shell-hooked commands, external servers, etc.). Use this table to find the right doc for what you want to build:
+The table above shows the four plugin categories, but within "General plugins" the `PluginContext` exposes several distinct extension points — and X19 also accepts extensions outside the Python plugin system (config-driven backends, shell-hooked commands, external servers, etc.). Use this table to find the right doc for what you want to build:
 
 | Want to add… | How | Authoring guide |
 |---|---|---|
-| A **tool** the LLM can call | Python plugin — `ctx.register_tool()` | [Build a Hermes Plugin](/developer-guide/plugins) · [Adding Tools](/developer-guide/adding-tools) |
-| A **lifecycle hook** (pre/post LLM, session start/end, tool filter) | Python plugin — `ctx.register_hook()` | [Hooks reference](/user-guide/features/hooks) · [Build a Hermes Plugin](/developer-guide/plugins) |
-| A **slash command** for the CLI / gateway | Python plugin — `ctx.register_command()` | [Build a Hermes Plugin](/developer-guide/plugins) · [Extending the CLI](/developer-guide/extending-the-cli) |
-| A **subcommand** for `hermes <thing>` | Python plugin — `ctx.register_cli_command()` | [Extending the CLI](/developer-guide/extending-the-cli) |
+| A **tool** the LLM can call | Python plugin — `ctx.register_tool()` | [Build a X19 Plugin](/developer-guide/plugins) · [Adding Tools](/developer-guide/adding-tools) |
+| A **lifecycle hook** (pre/post LLM, session start/end, tool filter) | Python plugin — `ctx.register_hook()` | [Hooks reference](/user-guide/features/hooks) · [Build a X19 Plugin](/developer-guide/plugins) |
+| A **slash command** for the CLI / gateway | Python plugin — `ctx.register_command()` | [Build a X19 Plugin](/developer-guide/plugins) · [Extending the CLI](/developer-guide/extending-the-cli) |
+| A **subcommand** for `x19 <thing>` | Python plugin — `ctx.register_cli_command()` | [Extending the CLI](/developer-guide/extending-the-cli) |
 | A bundled **skill** that your plugin ships | Python plugin — `ctx.register_skill()` | [Creating Skills](/developer-guide/creating-skills) |
 | An **inference backend** (LLM provider: OpenAI-compat, Codex, Anthropic-Messages, Bedrock) | Provider plugin — `register_provider(ProviderProfile(...))` in `plugins/model-providers/<name>/` | **[Model Provider Plugins](/developer-guide/model-provider-plugin)** · [Adding Providers](/developer-guide/adding-providers) |
 | A **gateway channel** (Discord / Telegram / IRC / Teams / etc.) | Platform plugin — `ctx.register_platform()` in `plugins/platforms/<name>/` | [Adding Platform Adapters](/developer-guide/adding-platform-adapters) |
@@ -333,10 +333,10 @@ The table above shows the four plugin categories, but within "General plugins" t
 | An **image-generation backend** (DALL·E, SDXL, …) | Backend plugin — `ctx.register_image_gen_provider()` | [Image Generation Provider Plugins](/developer-guide/image-gen-provider-plugin) |
 | A **video-generation backend** (Veo, Kling, Pixverse, Grok-Imagine, Runway, …) | Backend plugin — `ctx.register_video_gen_provider()` | [Video Generation Provider Plugins](/developer-guide/video-gen-provider-plugin) |
 | A **TTS backend** (any CLI — Piper, VoxCPM, Kokoro, xtts, voice-cloning scripts, …) | Config-driven (recommended) — declare under `tts.providers.<name>` with `type: command` in `config.yaml`. OR Python backend plugin — `ctx.register_tts_provider()` for Python-SDK / streaming engines that need more than a shell template. | [TTS Setup](/user-guide/features/tts#custom-command-providers) · [Python plugin guide](/user-guide/features/tts#python-plugin-providers) |
-| An **STT backend** (any CLI — whisper.cpp, custom whisper binary, local ASR CLI) | Config-driven (recommended) — declare under `stt.providers.<name>` with `type: command` in `config.yaml`, or set `HERMES_LOCAL_STT_COMMAND` for the legacy single-command escape hatch. OR Python backend plugin — `ctx.register_transcription_provider()` for Python-SDK engines (OpenRouter, SenseAudio, Gemini-STT, etc.). | [STT Setup](/user-guide/features/tts#stt-custom-command-providers) · [Python plugin guide](/user-guide/features/tts#python-plugin-providers-stt) |
-| **External tools via MCP** (filesystem, GitHub, Linear, Notion, any MCP server) | Config-driven — declare `mcp_servers.<name>` with `command:` / `url:` in `config.yaml`. Hermes auto-discovers the server's tools and registers them alongside built-ins. | [MCP](/user-guide/features/mcp) |
-| **Additional skill sources** (custom GitHub repos, private skill indexes) | CLI — `hermes skills tap add <repo>` | [Skills Hub](/user-guide/features/skills#skills-hub) · [Publishing a custom tap](/user-guide/features/skills#publishing-a-custom-skill-tap) |
-| **Gateway event hooks** (fire on `gateway:startup`, `session:start`, `agent:end`, `command:*`) | Drop `HOOK.yaml` + `handler.py` into `~/.hermes/hooks/<name>/` | [Event Hooks](/user-guide/features/hooks#gateway-event-hooks) |
+| An **STT backend** (any CLI — whisper.cpp, custom whisper binary, local ASR CLI) | Config-driven (recommended) — declare under `stt.providers.<name>` with `type: command` in `config.yaml`, or set `X19_LOCAL_STT_COMMAND` for the legacy single-command escape hatch. OR Python backend plugin — `ctx.register_transcription_provider()` for Python-SDK engines (OpenRouter, SenseAudio, Gemini-STT, etc.). | [STT Setup](/user-guide/features/tts#stt-custom-command-providers) · [Python plugin guide](/user-guide/features/tts#python-plugin-providers-stt) |
+| **External tools via MCP** (filesystem, GitHub, Linear, Notion, any MCP server) | Config-driven — declare `mcp_servers.<name>` with `command:` / `url:` in `config.yaml`. X19 auto-discovers the server's tools and registers them alongside built-ins. | [MCP](/user-guide/features/mcp) |
+| **Additional skill sources** (custom GitHub repos, private skill indexes) | CLI — `x19 skills tap add <repo>` | [Skills Hub](/user-guide/features/skills#skills-hub) · [Publishing a custom tap](/user-guide/features/skills#publishing-a-custom-skill-tap) |
+| **Gateway event hooks** (fire on `gateway:startup`, `session:start`, `agent:end`, `command:*`) | Drop `HOOK.yaml` + `handler.py` into `~/.x19/hooks/<name>/` | [Event Hooks](/user-guide/features/hooks#gateway-event-hooks) |
 | **Shell hooks** (run a shell command on events — notifications, audit logs, desktop alerts) | Config-driven — declare under `hooks:` in `config.yaml` | [Shell Hooks](/user-guide/features/hooks#shell-hooks) |
 
 :::note
@@ -345,10 +345,10 @@ Not everything is a Python plugin. Some extension surfaces intentionally use **c
 
 ## NixOS declarative plugins
 
-On NixOS, plugins can be installed declaratively via the module options — no `hermes plugins install` needed. See the **[Nix Setup guide](/getting-started/nix-setup#plugins)** for full details.
+On NixOS, plugins can be installed declaratively via the module options — no `x19 plugins install` needed. See the **[Nix Setup guide](/getting-started/nix-setup#plugins)** for full details.
 
 ```nix
-services.hermes-agent = {
+services.x19 = {
   # Directory plugin (source tree with plugin.yaml)
   extraPlugins = [ (pkgs.fetchFromGitHub { ... }) ];
   # Entry-point plugin (pip package)
@@ -363,18 +363,18 @@ Declarative plugins are symlinked with a `nix-managed-` prefix — they coexist 
 ## Managing plugins
 
 ```bash
-hermes plugins                               # unified interactive UI
-hermes plugins list                          # table: enabled / disabled / not enabled
-hermes plugins search <term>                 # search the Hermes plugin catalog
-hermes plugins install <name>                # install a catalog entry (repo @ reviewed pinned SHA)
-hermes plugins install user/repo             # install from Git, then prompt Enable? [y/N]
-hermes plugins install user/repo --enable    # install AND enable (no prompt)
-hermes plugins install user/repo --no-enable # install but leave disabled (no prompt)
-hermes plugins update my-plugin              # pull latest (local edits are autostashed and re-applied)
-hermes plugins remove my-plugin              # uninstall
-hermes plugins enable my-plugin              # add to allow-list
-hermes plugins disable my-plugin             # remove from allow-list + add to disabled
-hermes plugins capabilities [my-plugin]      # declared vs granted capabilities
+x19 plugins                               # unified interactive UI
+x19 plugins list                          # table: enabled / disabled / not enabled
+x19 plugins search <term>                 # search the X19 plugin catalog
+x19 plugins install <name>                # install a catalog entry (repo @ reviewed pinned SHA)
+x19 plugins install user/repo             # install from Git, then prompt Enable? [y/N]
+x19 plugins install user/repo --enable    # install AND enable (no prompt)
+x19 plugins install user/repo --no-enable # install but leave disabled (no prompt)
+x19 plugins update my-plugin              # pull latest (local edits are autostashed and re-applied)
+x19 plugins remove my-plugin              # uninstall
+x19 plugins enable my-plugin              # add to allow-list
+x19 plugins disable my-plugin             # remove from allow-list + add to disabled
+x19 plugins capabilities [my-plugin]      # declared vs granted capabilities
 ```
 
 ### Installed and Browse in Desktop
@@ -390,9 +390,9 @@ with Skills and remembered. Click a card to read its details; Install opens the
 existing review-then-install dialog.
 
 Desktop and the public [Plugin Catalog](/plugins) consume the same CDN
-snapshot, [`/docs/api/plugins.json`](https://hermes-agent.nousresearch.com/docs/api/plugins.json).
+snapshot, [`/docs/api/plugins.json`](https://anony-place.github.io/x19-refactored/docs/api/plugins.json).
 The public alias serves the same data as Desktop's fetch URL,
-`https://nousresearch.github.io/hermes-agent/docs/api/plugins.json`. The docs
+`https://nousresearch.github.io/x19/docs/api/plugins.json`. The docs
 build generates it from `plugin-catalog/*.yaml` and cached star counts. The
 same publish also supplies the removed-entry list used by the installer.
 Browsing does not query GitHub live or fetch source repos;
@@ -400,36 +400,36 @@ the installer retrieves code only as part of the separate install flow.
 
 ### One-click install links (Desktop)
 
-Hermes Desktop registers the `hermes://` URL scheme, so a website, README, or
+X19 Desktop registers the `x19://` URL scheme, so a website, README, or
 chat message can link straight to a plugin install:
 
 ```
-hermes://plugin/install?repo=owner/repo            # main install link
-hermes://plugin/install?repo=owner/repo&enable=1   # enable the agent plugin after install
-hermes://plugin/install?repo=owner/repo&force=1    # replace an existing install
+x19://plugin/install?repo=owner/repo            # main install link
+x19://plugin/install?repo=owner/repo&enable=1   # enable the agent plugin after install
+x19://plugin/install?repo=owner/repo&force=1    # replace an existing install
 ```
 
-Clicking one opens Hermes and shows a **confirmation dialog** — the repo id,
+Clicking one opens X19 and shows a **confirmation dialog** — the repo id,
 a "Before you install" note, and GitHub browse + clone links — then
 shallow-clones the repo to detect what it ships (an **agent plugin** —
 backend Python, a **desktop plugin** — app UI, or both). You pick the
 components with checkboxes and confirm. Nothing is installed until you do;
 deep links never auto-install, and agent-plugin installs go through the same
 [install-time security scanning](#install-time-security-scanning) as
-`hermes plugins install`.
+`x19 plugins install`.
 
 Hybrid repos (agent + desktop halves in one repo) use one link and one
 dialog. The same modal is reachable without a link via **Capabilities →
-Plugins → Install from Git**. Legacy `hermes://plugin-agent/…` and
-`hermes://plugin-desktop/…` URLs route into the same dialog. In dev builds
-(`npm run dev`) the scheme is `hermes-dev://`.
+Plugins → Install from Git**. Legacy `x19://plugin-agent/…` and
+`x19://plugin-desktop/…` URLs route into the same dialog. In dev builds
+(`npm run dev`) the scheme is `x19-dev://`.
 
-The public [Plugin Catalog](/plugins) includes **Install in Hermes** on every
+The public [Plugin Catalog](/plugins) includes **Install in X19** on every
 card. Catalog links carry `catalog_name`, a URL-encoded `repo` (including
 `#subdir` when present), and `sha`:
 
 ```text
-hermes://plugin/install?repo=owner%2Frepo&catalog_name=example-plugin&sha=0123456789abcdef0123456789abcdef01234567
+x19://plugin/install?repo=owner%2Frepo&catalog_name=example-plugin&sha=0123456789abcdef0123456789abcdef01234567
 ```
 
 The SHA parameter is display metadata only. For the agent-plugin install,
@@ -438,17 +438,17 @@ the link cannot override that pin. Do not treat the displayed SHA as a pin
 guarantee for a standalone desktop plugin. These catalog parameters require
 an updated Desktop build; older builds may only understand the repository
 link. If the app is missing or too old, update Desktop or use the copyable
-`hermes plugins install <catalog-name>` command in the expanded card to retain
+`x19 plugins install <catalog-name>` command in the expanded card to retain
 catalog resolution.
 
 Websites need no SDK — a normal anchor works:
 
 ```html
-<a href="hermes://plugin/install?repo=owner/repo&enable=1">Install in Hermes</a>
+<a href="x19://plugin/install?repo=owner/repo&enable=1">Install in X19</a>
 ```
 
 MCP servers have the equivalent link form — see
-[Add to Hermes link](/reference/mcp-config-reference#add-to-hermes-link).
+[Add to X19 link](/reference/mcp-config-reference#add-to-x19-link).
 
 ### Plugin capabilities and consent
 
@@ -462,8 +462,8 @@ capabilities:
   - llm.model_override    # pick the model for host-owned LLM calls
 ```
 
-When a plugin declares capabilities, `hermes plugins install` (and
-`hermes plugins enable`) shows the list with one-line risk descriptions and
+When a plugin declares capabilities, `x19 plugins install` (and
+`x19 plugins enable`) shows the list with one-line risk descriptions and
 asks once. Consenting records the grant under
 `plugins.entries.<id>.granted_capabilities` together with a consent hash and
 timestamp. Declining leaves the plugin enabled with those capabilities off —
@@ -471,19 +471,19 @@ a well-behaved plugin probes with `ctx.has_capability()` and degrades
 gracefully.
 
 **Update re-consent:** if a plugin update declares capabilities you haven't
-granted, `hermes plugins update` surfaces the additions and asks again. New
+granted, `x19 plugins update` surfaces the additions and asks again. New
 capabilities stay off until you consent — a plugin update can never silently
 widen its access.
 
 **Non-interactive sessions fail closed:** installing or updating without a
 TTY completes the install, but declared capabilities are *not* granted. Run
-`hermes plugins enable <id>` interactively to grant them later.
+`x19 plugins enable <id>` interactively to grant them later.
 
 Inspect the state at any time:
 
 ```bash
-hermes plugins capabilities             # all plugins with declared/granted capabilities
-hermes plugins capabilities my-plugin   # one plugin, declared vs granted
+x19 plugins capabilities             # all plugins with declared/granted capabilities
+x19 plugins capabilities my-plugin   # one plugin, declared vs granted
 ```
 
 Capability ids map 1:1 to the older per-feature config gates, which keep
@@ -506,7 +506,7 @@ set — existing configs keep working unchanged.
 Capabilities are a **consent and audit layer**, not isolation. Plugins run as
 regular in-process Python: a malicious plugin can ignore every gate here.
 Granting a capability is a statement of trust in the plugin author — it is
-not a code audit, and Hermes has not reviewed the plugin's code. Only install
+not a code audit, and X19 has not reviewed the plugin's code. Only install
 plugins from sources you trust.
 :::
 
@@ -557,25 +557,25 @@ capability (`gateway.raw_events`) with a "no stability guarantee" label and a
 separate design, and has not shipped.
 :::
 
-### Discovering plugins — the Hermes plugin catalog
+### Discovering plugins — the X19 plugin catalog
 
-`hermes plugins search <term>` searches the **Hermes plugin catalog** — the
-curated, SHA-pinned catalog maintained in the hermes-agent repository
+`x19 plugins search <term>` searches the **X19 plugin catalog** — the
+curated, SHA-pinned catalog maintained in the x19 repository
 (`plugin-catalog/`). Matching covers entry names, descriptions, and declared
 tools:
 
 ```bash
-hermes plugins search telegram    # search the catalog
-hermes plugins browse             # browse every entry
-hermes plugins info <name>        # full details for one entry
+x19 plugins search telegram    # search the catalog
+x19 plugins browse             # browse every entry
+x19 plugins info <name>        # full details for one entry
 ```
 
 Once you've found a plugin, install it by bare name — the name resolves to
 the entry's repository at its **pinned commit SHA**, and catalog provenance is
-recorded so `hermes plugins update` can re-pin when the catalog moves:
+recorded so `x19 plugins update` can re-pin when the catalog moves:
 
 ```bash
-hermes plugins install <catalog-name>
+x19 plugins install <catalog-name>
 ```
 
 Explicit `owner/repo` or Git-URL identifiers never touch the catalog and are
@@ -595,7 +595,7 @@ grant). Review a plugin's source before enabling it.
 
 ### Plugin packs
 
-A **plugin pack** is a declarative, shareable YAML file (`hermes-pack.yaml`)
+A **plugin pack** is a declarative, shareable YAML file (`x19-pack.yaml`)
 that pins a set of plugins — like sharing a modpack. Installing a pack fans
 out to ordinary pinned installs; nothing new exists at runtime.
 
@@ -605,28 +605,28 @@ description: STT + streaming TTS + approval relay
 author: hyper
 version: 1.0.0
 plugins:
-  - name: hermes-telegram-business       # bare plugin-catalog name…
+  - name: x19-telegram-business       # bare plugin-catalog name…
     ref: e905f3bc5eeaa5a9dab9bc5155601b3ebec75757
   - repo: owner/approval-relay           # …or explicit owner/repo (or git URL)
     ref: 8f3c2d1a9b4e5f6071829304a5b6c7d8e9f00112
     subdir: plugins/relay                # optional monorepo path
 config:                                  # optional, non-secret seeds only
-  hermes-media-studio:
+  x19-media-studio:
     default_model: flux-3
 skills: []                               # declared list only (not auto-installed yet)
 ```
 
 ```bash
-hermes plugins pack show ./hermes-pack.yaml     # dry-run review
-hermes plugins pack install ./hermes-pack.yaml  # review → confirm → install
-hermes plugins pack export > hermes-pack.yaml   # snapshot the current install
-hermes plugins pack export --enabled-only       # only plugins.enabled
+x19 plugins pack show ./x19-pack.yaml     # dry-run review
+x19 plugins pack install ./x19-pack.yaml  # review → confirm → install
+x19 plugins pack export > x19-pack.yaml   # snapshot the current install
+x19 plugins pack export --enabled-only       # only plugins.enabled
 ```
 
 **Supply-chain posture.** Every entry's `ref` must be an exact 40-character
 commit SHA — tags and branch names are rejected with an error naming the
 entry, the same rule as the plugin catalog. Pack installs ride the exact
-same pinned install path as `hermes plugins install --ref <sha>` and record
+same pinned install path as `x19 plugins install --ref <sha>` and record
 the same provenance in `plugins/.install-metadata.json`, so two installs of
 the same pack resolve identically. Packs build on the
 [manifest v2 fields](/developer-guide/plugins) (`manifest_version`,
@@ -637,7 +637,7 @@ validates through the normal install path.
 screen (every plugin, source, pinned ref, and the capabilities it declares),
 then asks **one** confirmation for the pack contents. After that, each
 plugin's declared capabilities go through the standard per-plugin
-capability-consent prompt — identical to a single `hermes plugins install`.
+capability-consent prompt — identical to a single `x19 plugins install`.
 There is no `--yes`, and non-interactive sessions cannot install packs.
 
 **Secrets never travel in packs.** `config:` seeds are limited to
@@ -653,16 +653,16 @@ reported per plugin, the rest continue, and the command exits non-zero if
 any plugin failed.
 
 **Export caveats.** `pack export` only includes plugins with known Git
-provenance (installed via `hermes plugins install`). Local-only plugins are
+provenance (installed via `x19 plugins install`). Local-only plugins are
 listed as warning comments in the emitted YAML, not as installable entries.
 
 The `skills:` list is parsed and displayed at install time but not yet
-auto-installed — install those manually for now (`hermes skills`). Wiring
+auto-installed — install those manually for now (`x19 skills`). Wiring
 skill-hub ids into pack install is a documented follow-up seam.
 
 ### Install-time security scanning
 
-Every `hermes plugins install` and `hermes plugins update` runs a static
+Every `x19 plugins install` and `x19 plugins update` runs a static
 security scan over the plugin tree before it is activated (inspired by
 Claude Cowork's skill & plugin security scanning). The scanner reuses the
 same threat-pattern engine as the [Skills Hub guard](/user-guide/features/skills)
@@ -680,7 +680,7 @@ Three verdicts, matching Cowork's pass/warn/fail:
 | **caution** | Findings are shown; you confirm `Install anyway? [y/N]` (or pass `--force`) |
 | **dangerous** | Blocked. `--force` does **not** override |
 
-On `hermes plugins update`, a dangerous verdict on the updated tree
+On `x19 plugins update`, a dangerous verdict on the updated tree
 disables the plugin until you review the findings and re-enable it. A
 dangerous block names the critical findings that caused it (e.g.
 `1 critical of 42 findings (destructive_root_rm)`), so a single blocking
@@ -708,7 +708,7 @@ plugins:
 
 ### Interactive UI
 
-Running `hermes plugins` with no arguments opens a composite interactive screen:
+Running `x19 plugins` with no arguments opens a composite interactive screen:
 
 ```
 Plugins
@@ -748,7 +748,7 @@ Plugins occupy one of three states:
 | `disabled` | Explicitly off — won't load even if also in `enabled` | (irrelevant) | Yes |
 | `not enabled` | Discovered but never opted in | No | No |
 
-The default for a newly-installed or bundled plugin is `not enabled`. `hermes plugins list` shows all three distinct states so you can tell what's been explicitly turned off vs. what's just waiting to be enabled.
+The default for a newly-installed or bundled plugin is `not enabled`. `x19 plugins list` shows all three distinct states so you can tell what's been explicitly turned off vs. what's just waiting to be enabled.
 
 In a running session, `/plugins` shows which plugins are currently loaded.
 
@@ -780,11 +780,11 @@ In CLI mode:
 In gateway mode:
 
 - `session_key` is required and must identify an existing gateway session. It is the stable routing key, not the CLI session ID.
-- Hermes reuses that session's stored platform, chat, thread, profile, and conversation history. Plugins cannot supply a new chat route through this API.
-- Hermes rechecks the stored route against the gateway's current authorisation rules before dispatch.
-- Routes that relied only on an adapter-time or upstream authorisation decision are rejected unless Hermes can revalidate them from current core allowlists, pairing, or explicit allow-all configuration.
+- X19 reuses that session's stored platform, chat, thread, profile, and conversation history. Plugins cannot supply a new chat route through this API.
+- X19 rechecks the stored route against the gateway's current authorisation rules before dispatch.
+- Routes that relied only on an adapter-time or upstream authorisation decision are rejected unless X19 can revalidate them from current core allowlists, pairing, or explicit allow-all configuration.
 - Injected text is always conversational input. It cannot invoke slash commands, approve tools, or resolve pending confirmation and clarification prompts.
-- The route and conversation are pinned while dispatch is pending. Hermes drops the request if topic recovery changes the route or the session rotates before handling starts.
+- The route and conversation are pinned while dispatch is pending. X19 drops the request if topic recovery changes the route or the session rotates before handling starts.
 - The request enters the platform adapter's normal message path. Active sessions use the existing busy-session queue rather than starting a competing turn.
 - Returns `True` when the live gateway accepts the request for asynchronous dispatch. This does not confirm that the agent turn or platform delivery has completed.
 - Returns `False` when `session_key` is omitted, the permission is not granted, or no live gateway can accept the request. Unknown or unroutable session keys discovered after asynchronous acceptance are written to the gateway log.
@@ -801,7 +801,7 @@ plugins:
 ```
 
 :::warning
-Only grant gateway injection to plugins you trust. Hermes checks this host API permission and restricts it to existing session routes, but Python plugins run in-process and this setting is not a sandbox.
+Only grant gateway injection to plugins you trust. X19 checks this host API permission and restricts it to existing session routes, but Python plugins run in-process and this setting is not a sandbox.
 :::
 
 :::note
@@ -810,7 +810,7 @@ This plugin API does not expose a public HTTP endpoint or CLI command for extern
 
 ## Calling MCP servers from plugins
 
-`ctx.call_mcp()` lets a plugin call a tool on one of the user's configured MCP servers — synchronously, from any hook or tool handler — routing through Hermes' existing native MCP client (same connections, trust-tier gates, circuit breaker, and reconnect logic as model-invoked MCP tools; never a parallel client).
+`ctx.call_mcp()` lets a plugin call a tool on one of the user's configured MCP servers — synchronously, from any hook or tool handler — routing through X19' existing native MCP client (same connections, trust-tier gates, circuit breaker, and reconnect logic as model-invoked MCP tools; never a parallel client).
 
 ```python
 result = ctx.call_mcp(

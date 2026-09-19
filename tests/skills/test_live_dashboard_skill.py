@@ -33,7 +33,7 @@ def test_frontmatter_required_fields():
 def test_related_skills_resolve_in_repo():
     fm, _ = _frontmatter_and_body()
     repo_root = SKILL_PATH.parents[3]
-    for name in fm["metadata"]["hermes"]["related_skills"]:
+    for name in fm["metadata"]["x19"]["related_skills"]:
         hits = (
             list(repo_root.glob(f"skills/*/{name}/SKILL.md"))
             + list(repo_root.glob(f"optional-skills/*/{name}/SKILL.md"))
@@ -58,13 +58,13 @@ def test_procedure_is_structured_setup_tick_show():
 
 def test_tools_wired_and_home_not_hardcoded():
     """Scheduling goes through `cronjob`, desktop rendering through `desktop_preview`,
-    no-change ticks stay silent, and the Hermes home path is resolved, never assumed."""
+    no-change ticks stay silent, and the X19 home path is resolved, never assumed."""
     _, body = _frontmatter_and_body()
     assert re.search(r"cronjob\(action=\"create\"", body)
     assert re.search(r"desktop_preview\(action=\"open\"", body)
     assert "[SILENT]" in body
     assert "dashboard.json" in body
-    assert "~/.hermes" not in body
+    assert "~/.x19" not in body
 
 
 def test_frontmatter_blueprint_is_a_valid_installed_blueprint():
@@ -77,4 +77,4 @@ def test_frontmatter_blueprint_is_a_valid_installed_blueprint():
     job = blueprint_to_job_spec(spec)
     assert job["skills"] == ["live-dashboard"]
     assert len(job["schedule"].split()) == 5, f"invalid cron expr: {job['schedule']}"
-    assert "[SILENT]" in job["prompt"] and "~/.hermes" not in job["prompt"]
+    assert "[SILENT]" in job["prompt"] and "~/.x19" not in job["prompt"]

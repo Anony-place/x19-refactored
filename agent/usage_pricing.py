@@ -271,7 +271,7 @@ _OFFICIAL_DOCS_PRICING[("google", "gemini-2.5-pro")] = _snap(
 del _BEDROCK_URL, _ANTHROPIC_URL, _GOOGLE_URL, _OPUS, _SONNET
 
 # GPT-5.6 "-pro" high-effort variants bill at the base tier's per-token rates
-# (more tokens per task, not a higher rate); the Hermes-side "-900k" Codex
+# (more tokens per task, not a higher rate); the X19-side "-900k" Codex
 # picker variants are the same model with the suffix stripped on the wire.
 # The direct Gemini provider emits preview IDs for two models; key the snapshot
 # by both the documented stable name and the emitted ID.
@@ -638,10 +638,3 @@ def format_token_count_compact(value: int) -> str:
     return f"{sign}{text}{suffix}"
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-DEFAULT_PRICING = {"input": 0.0, "output": 0.0}
-# ---- END PLUGIN-COMPAT ----

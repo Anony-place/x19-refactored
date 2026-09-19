@@ -28,7 +28,7 @@ const page = (rowId: number) => ({
 
 beforeEach(() => {
   $transcriptTailBySessionId.set({})
-  Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: { api: vi.fn() } })
+  Object.defineProperty(window, 'x19Desktop', { configurable: true, value: { api: vi.fn() } })
 })
 
 function mount() {
@@ -64,7 +64,7 @@ function mount() {
 
 describe('bounded direct history runtime', () => {
   it('reads one around page and selects it without replacing the live store', async () => {
-    const api = vi.spyOn(window.hermesDesktop, 'api').mockResolvedValue(page(40))
+    const api = vi.spyOn(window.x19Desktop, 'api').mockResolvedValue(page(40))
     const mounted = mount()
     const live = mounted.view.$messages.get()
     let id: string | null = null
@@ -86,7 +86,7 @@ describe('bounded direct history runtime', () => {
   })
 
   it('keeps history static during streaming and restores the newest live tail and capabilities', async () => {
-    vi.spyOn(window.hermesDesktop, 'api').mockResolvedValue(page(40))
+    vi.spyOn(window.x19Desktop, 'api').mockResolvedValue(page(40))
     const mounted = mount()
     await act(async () => { await mounted.window.revealRow(40, new AbortController().signal) })
     const historical = mounted.runtime.thread.getState().messages
@@ -111,7 +111,7 @@ describe('bounded direct history runtime', () => {
 
   it('latest request wins even when the bridge ignores cancellation', async () => {
     const resolves: ((value: ReturnType<typeof page>) => void)[] = []
-    vi.spyOn(window.hermesDesktop, 'api').mockImplementation(() => new Promise(resolve => resolves.push(resolve)))
+    vi.spyOn(window.x19Desktop, 'api').mockImplementation(() => new Promise(resolve => resolves.push(resolve)))
     const mounted = mount()
     let first!: Promise<string | null>
     let second!: Promise<string | null>
@@ -129,7 +129,7 @@ describe('bounded direct history runtime', () => {
 
   it.each(['abort', 'latest', 'session', 'unmount'] as const)('discards pending reads on %s', async action => {
     let resolve!: (value: ReturnType<typeof page>) => void
-    vi.spyOn(window.hermesDesktop, 'api').mockImplementation(() => new Promise(done => { resolve = done }))
+    vi.spyOn(window.x19Desktop, 'api').mockImplementation(() => new Promise(done => { resolve = done }))
     const mounted = mount()
     const signal = new AbortController()
     let pending!: Promise<string | null>
@@ -154,7 +154,7 @@ describe('bounded direct history runtime', () => {
   })
 
   it('rejects oversized, missing-target and failed responses without losing the selected page', async () => {
-    const api = vi.spyOn(window.hermesDesktop, 'api').mockResolvedValue(page(40))
+    const api = vi.spyOn(window.x19Desktop, 'api').mockResolvedValue(page(40))
     const mounted = mount()
     await act(async () => { await mounted.window.revealRow(40, new AbortController().signal) })
     const selected = mounted.window.currentMessages

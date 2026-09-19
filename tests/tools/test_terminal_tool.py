@@ -14,7 +14,7 @@ def teardown_function():
 
 def test_searching_for_sudo_does_not_trigger_rewrite(monkeypatch):
     monkeypatch.delenv("SUDO_PASSWORD", raising=False)
-    monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
+    monkeypatch.delenv("X19_INTERACTIVE", raising=False)
 
     command = "rg --line-number --no-heading --with-filename 'sudo' . | head -n 20"
     transformed, sudo_stdin = terminal_tool_sudo._transform_sudo_command(command)
@@ -33,7 +33,7 @@ def test_terminal_schema_advertises_persistent_env_state():
 
 def test_printf_literal_sudo_does_not_trigger_rewrite(monkeypatch):
     monkeypatch.delenv("SUDO_PASSWORD", raising=False)
-    monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
+    monkeypatch.delenv("X19_INTERACTIVE", raising=False)
 
     command = "printf '%s\\n' sudo"
     transformed, sudo_stdin = terminal_tool_sudo._transform_sudo_command(command)
@@ -44,7 +44,7 @@ def test_printf_literal_sudo_does_not_trigger_rewrite(monkeypatch):
 
 def test_non_command_argument_named_sudo_does_not_trigger_rewrite(monkeypatch):
     monkeypatch.delenv("SUDO_PASSWORD", raising=False)
-    monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
+    monkeypatch.delenv("X19_INTERACTIVE", raising=False)
 
     command = "grep -n sudo README.md"
     transformed, sudo_stdin = terminal_tool_sudo._transform_sudo_command(command)
@@ -55,7 +55,7 @@ def test_non_command_argument_named_sudo_does_not_trigger_rewrite(monkeypatch):
 
 def test_actual_sudo_command_uses_configured_password(monkeypatch):
     monkeypatch.setenv("SUDO_PASSWORD", "testpass")
-    monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
+    monkeypatch.delenv("X19_INTERACTIVE", raising=False)
 
     transformed, sudo_stdin = terminal_tool_sudo._transform_sudo_command("sudo apt install -y ripgrep")
 
@@ -65,7 +65,7 @@ def test_actual_sudo_command_uses_configured_password(monkeypatch):
 
 def test_explicit_empty_sudo_password_tries_empty_without_prompt(monkeypatch):
     monkeypatch.setenv("SUDO_PASSWORD", "")
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("X19_INTERACTIVE", "1")
 
     def _fail_prompt(*_args, **_kwargs):
         raise AssertionError("interactive sudo prompt should not run for explicit empty password")
@@ -81,7 +81,7 @@ def test_explicit_empty_sudo_password_tries_empty_without_prompt(monkeypatch):
 def test_headless_sudo_never_runs_backend_nopasswd_probe(monkeypatch):
     """No prompt can fire without a UI, so the backend round trip must not be paid."""
     monkeypatch.delenv("SUDO_PASSWORD", raising=False)
-    monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
+    monkeypatch.delenv("X19_INTERACTIVE", raising=False)
     terminal_tool.set_sudo_password_callback(None)
 
     def _fail_probe():
@@ -99,7 +99,7 @@ def test_validate_workdir_blocks_shell_metacharacters_in_windows_paths():
 
 def test_validate_workdir_allows_unicode_filesystem_paths():
     assert terminal_tool._validate_workdir(
-        "/Users/alice/Documents/Obs_Hermes_Data/项目-projects/客户拜访"
+        "/Users/alice/Documents/Obs_X19_Data/项目-projects/客户拜访"
     ) is None
     assert terminal_tool._validate_workdir("/tmp/テスト") is None
     assert terminal_tool._validate_workdir("/home/jürgen/über projekt") is None

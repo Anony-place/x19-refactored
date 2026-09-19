@@ -279,7 +279,7 @@ test('registry sources: shared remote hosts read the cross-profile aggregate onc
 
       return {
         sessions: [
-          { id: 'r-1', profile: 'hermes-claude' },
+          { id: 'r-1', profile: 'x19-claude' },
           { id: 'r-2', profile: '' }
         ],
         total: 2
@@ -296,7 +296,7 @@ test('registry sources: shared remote hosts read the cross-profile aggregate onc
   assert.deepEqual(
     rows.map(row => [(row as any).id, (row as any).profile, (row as any).connection_id]),
     [
-      ['r-1', 'hermes-claude', 'gw-cloud'],
+      ['r-1', 'x19-claude', 'gw-cloud'],
       ['r-2', 'default', 'gw-cloud']
     ]
   )
@@ -401,7 +401,7 @@ test('splice: registry rows dedupe by id and extend per-profile totals', () => {
     merged,
     [
       { id: 'dupe', profile: 'work', connection_id: 'gw-1', last_active: 95 },
-      { id: 'remote-1', profile: 'hermes-claude', connection_id: 'gw-1', last_active: 120 },
+      { id: 'remote-1', profile: 'x19-claude', connection_id: 'gw-1', last_active: 120 },
       { id: 'remote-2', connection_id: 'gw-1', last_active: 110 }
     ],
     totals
@@ -412,7 +412,7 @@ test('splice: registry rows dedupe by id and extend per-profile totals', () => {
     merged.map(row => (row as any).id),
     ['local-1', 'dupe', 'remote-1', 'remote-2']
   )
-  assert.equal(totals['hermes-claude'], 1)
+  assert.equal(totals['x19-claude'], 1)
   assert.equal(totals.default, 2) // untagged registry row counts under default
   assert.equal(totals.work, 1) // deduped row does not double-count
 })

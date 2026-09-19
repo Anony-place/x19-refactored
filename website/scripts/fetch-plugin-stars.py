@@ -36,7 +36,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CATALOG_DIR = REPO_ROOT / "plugin-catalog"
 DEFAULT_OUTPUT = REPO_ROOT / "website" / "static" / "api" / "plugin-stars.json"
-LIVE_URL = "https://hermes-agent.nousresearch.com/docs/api/plugin-stars.json"
+LIVE_URL = "https://anony-place.github.io/x19-refactored/docs/api/plugin-stars.json"
 _GITHUB_REPO_RE = re.compile(r"^https://github\.com/([^/\s]+)/([^/\s#?]+?)(?:\.git)?/?$")
 
 
@@ -66,7 +66,7 @@ def catalog_slugs(catalog_dir: Path) -> list[str]:
 
 
 def _http_json(url: str, headers: dict[str, str], timeout: float = 15.0):
-    req = urllib.request.Request(url, headers={"User-Agent": "hermes-agent-docs", **headers})
+    req = urllib.request.Request(url, headers={"User-Agent": "x19-docs", **headers})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -97,7 +97,7 @@ _GRAPHQL_URL = "https://api.github.com/graphql"
 def _graphql(query: str, token: str) -> dict:
     req = urllib.request.Request(
         _GRAPHQL_URL, data=json.dumps({"query": query}).encode("utf-8"), method="POST",
-        headers={"User-Agent": "hermes-agent-docs", "Authorization": f"Bearer {token}",
+        headers={"User-Agent": "x19-docs", "Authorization": f"Bearer {token}",
                  "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=30.0) as resp:
         return json.loads(resp.read().decode("utf-8"))

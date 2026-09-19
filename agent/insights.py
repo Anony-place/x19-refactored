@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from agent.usage_pricing import CanonicalUsage, estimate_usage_cost, format_cost_label, format_duration_compact, has_known_pricing
-from hermes_cli.timefmt import coerce_epoch
+from x19_cli.timefmt import coerce_epoch
 
 _TOKEN_KEYS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
 _SKILL_TOOLS = {"skill_view", "skill_manage"}
@@ -482,7 +482,7 @@ class InsightsEngine:
         lines = [
             "",
             "  ╔══════════════════════════════════════════════════════════╗",
-            "  ║                    📊 Hermes Insights                    ║",
+            "  ║                    📊 X19 Insights                    ║",
             f"  ║{' ' * left_pad} {period_label} {' ' * (padding - left_pad)}║",
             "  ╚══════════════════════════════════════════════════════════╝",
             "",
@@ -553,7 +553,7 @@ class InsightsEngine:
             return f"No sessions found in the last {report.get('days', 30)} days."
         o = report["overview"]
         lines = [
-            f"📊 **Hermes Insights** — Last {report['days']} days\n",
+            f"📊 **X19 Insights** — Last {report['days']} days\n",
             f"**Sessions:** {o['total_sessions']} | **Messages:** {o['total_messages']:,} | **Tool calls:** {o['total_tool_calls']:,}",
             f"**Tokens:** {o['total_tokens']:,} (in: {o['total_input_tokens']:,} / out: {o['total_output_tokens']:,})",
         ]

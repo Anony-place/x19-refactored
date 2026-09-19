@@ -4,7 +4,7 @@ import { assertBootstrapNotSuperseded, redactSecrets, SSH_ERROR } from './ssh-co
 
 const LOCKFILE_SCHEMA_VERSION = 2
 const PROTOCOL_VERSION = 1
-const READY_RE = /^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/gm
+const READY_RE = /^X19_(?:BACKEND|DASHBOARD)_READY port=(\d+)/gm
 const READY_POLL_INTERVAL_MS = 750
 
 function psLiteral(value) {
@@ -19,8 +19,8 @@ function powerShellCommand(script) {
   return `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encodedPowerShell(script)}`
 }
 
-async function probeWindowsRemote(ssh, explicitHermesPath = '') {
-  const explicit = psLiteral(explicitHermesPath)
+async function probeWindowsRemote(ssh, explicitX19Path = '') {
+  const explicit = psLiteral(explicitX19Path)
 
   const script = [
     '$ErrorActionPreference="Stop"',
@@ -36,39 +36,39 @@ async function probeWindowsRemote(ssh, explicitHermesPath = '') {
     '}',
     `$explicit=${explicit}`,
     'if($explicit){Assert-NoReparse $explicit $false;$explicitPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($explicit), "python.exe");Assert-NoReparse $explicitPython $false}',
-    '$hermesHome=$env:HERMES_HOME',
-    'if(-not $hermesHome){$hermesHome=Join-Path $env:LOCALAPPDATA "hermes"}',
-    'Assert-NoReparse $hermesHome $true',
-    '$candidate=[IO.Path]::Combine($hermesHome, "hermes-agent\\venv\\Scripts\\hermes.exe")',
+    '$x19Home=$env:X19_HOME',
+    'if(-not $x19Home){$x19Home=Join-Path $env:LOCALAPPDATA "x19"}',
+    'Assert-NoReparse $x19Home $true',
+    '$candidate=[IO.Path]::Combine($x19Home, "x19\\venv\\Scripts\\x19.exe")',
     '$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe")',
     'Assert-NoReparse $candidate $true',
     'Assert-NoReparse $candidatePython $true',
-    '$profileCandidate=[IO.Path]::Combine($HOME, "hermes-agent\\.venv\\Scripts\\hermes.exe")',
+    '$profileCandidate=[IO.Path]::Combine($HOME, "x19\\.venv\\Scripts\\x19.exe")',
     '$profileCandidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($profileCandidate), "python.exe")',
     'Assert-NoReparse $profileCandidate $true',
     'Assert-NoReparse $profileCandidatePython $true',
-    '$fallbackHomeCandidate=Join-Path $hermesHome "hermes-agent\\venv\\Scripts\\hermes.exe"',
-    '$fallbackProfileCandidate=Join-Path $HOME "hermes-agent\\.venv\\Scripts\\hermes.exe"',
+    '$fallbackHomeCandidate=Join-Path $x19Home "x19\\venv\\Scripts\\x19.exe"',
+    '$fallbackProfileCandidate=Join-Path $HOME "x19\\.venv\\Scripts\\x19.exe"',
     '$candidates=@()',
     'if($explicit){$candidates+=$explicit}',
-    '$cmd=Get-Command hermes.exe -ErrorAction SilentlyContinue',
+    '$cmd=Get-Command x19.exe -ErrorAction SilentlyContinue',
     'if($cmd){Assert-NoReparse $cmd.Source $true;$cmdPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($cmd.Source), "python.exe");Assert-NoReparse $cmdPython $true;$candidates+=$cmd.Source}',
     '$candidates+=$fallbackHomeCandidate',
     '$candidates+=$fallbackProfileCandidate',
-    '$hermes=$null',
-    'foreach($candidate in $candidates){Assert-NoReparse $candidate $true;$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe");Assert-NoReparse $candidatePython $true;try{$item=Get-Item -LiteralPath $candidate -Force -ErrorAction Stop;if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $item.PSIsContainer){$hermes=$item.FullName;break}}catch [Management.Automation.ItemNotFoundException]{continue}}',
-    'if(-not $hermes){throw "Hermes is not installed on the remote Windows host."}',
-    'Assert-NoReparse $hermes $false',
-    'if($explicit -and $hermes -ne $explicit){throw "The configured Hermes path is not an executable file."}',
-    '$python=[IO.Path]::Combine([IO.Path]::GetDirectoryName($hermes), "python.exe")',
+    '$x19=$null',
+    'foreach($candidate in $candidates){Assert-NoReparse $candidate $true;$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe");Assert-NoReparse $candidatePython $true;try{$item=Get-Item -LiteralPath $candidate -Force -ErrorAction Stop;if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $item.PSIsContainer){$x19=$item.FullName;break}}catch [Management.Automation.ItemNotFoundException]{continue}}',
+    'if(-not $x19){throw "X19 is not installed on the remote Windows host."}',
+    'Assert-NoReparse $x19 $false',
+    'if($explicit -and $x19 -ne $explicit){throw "The configured X19 path is not an executable file."}',
+    '$python=[IO.Path]::Combine([IO.Path]::GetDirectoryName($x19), "python.exe")',
     'Assert-NoReparse $python $false',
-    '[ordered]@{os="Windows";arch=$env:PROCESSOR_ARCHITECTURE;hermesHome=$hermesHome;hermesPath=$hermes;python=$python}|ConvertTo-Json -Compress'
+    '[ordered]@{os="Windows";arch=$env:PROCESSOR_ARCHITECTURE;x19Home=$x19Home;x19Path=$x19;python=$python}|ConvertTo-Json -Compress'
   ].join(';')
 
   return JSON.parse((await ssh.exec(powerShellCommand(script))).trim())
 }
 
-function windowsUpdateMarkerProbeCommand(hermesHome) {
+function windowsUpdateMarkerProbeCommand(x19Home) {
   const script = [
     '$ErrorActionPreference="Stop"',
     `Add-Type -TypeDefinition @'
@@ -76,7 +76,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
-public static class HermesMarkerNoFollow {
+public static class X19MarkerNoFollow {
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
   private static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
   public static FileStream OpenRead(string name) {
@@ -97,16 +97,16 @@ public static class HermesMarkerNoFollow {
     '$parent=$item.Parent.FullName;if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false',
     '}',
     '}',
-    `$home=${psLiteral(hermesHome)}`,
+    `$home=${psLiteral(x19Home)}`,
     '$installRoot=$home',
     '$parent=Split-Path -Parent $home',
     'if((Split-Path -Leaf $parent) -ieq "profiles"){$installRoot=Split-Path -Parent $parent}',
-    '$marker=Join-Path $installRoot ".hermes-update-in-progress"',
+    '$marker=Join-Path $installRoot ".x19-update-in-progress"',
     '$result="UNCERTAIN"',
     '$stream=$null;$memory=$null',
     'try{',
     'Assert-NoReparse $marker $true',
-    'if(-not (Test-Path -LiteralPath $marker -PathType Leaf)){$result="CLEAR"}else{$stream=[HermesMarkerNoFollow]::OpenRead($marker)',
+    'if(-not (Test-Path -LiteralPath $marker -PathType Leaf)){$result="CLEAR"}else{$stream=[X19MarkerNoFollow]::OpenRead($marker)',
     'Assert-NoReparse $marker $false',
     '$memory=New-Object IO.MemoryStream;$stream.CopyTo($memory);$bytes=$memory.ToArray()',
     'if($bytes.Length -le 256){',
@@ -137,18 +137,18 @@ public static class HermesMarkerNoFollow {
  * This uses only PowerShell/.NET and therefore never imports the remote
  * checkout while an updater may be replacing it.
  */
-async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome) {
+async function assertWindowsRemoteInstallUpdateClear(ssh, x19Home) {
   let observation = ''
 
   try {
     observation =
-      String(await ssh.exec(windowsUpdateMarkerProbeCommand(hermesHome)))
+      String(await ssh.exec(windowsUpdateMarkerProbeCommand(x19Home)))
         .replace(/^\uFEFF/, '')
         .trim()
         .split(/\r?\n/)
         .pop() || ''
   } catch (cause) {
-    const error: any = new Error('Could not prove that the remote Hermes install is clear for SSH startup.')
+    const error: any = new Error('Could not prove that the remote X19 install is clear for SSH startup.')
     error.kind = 'update-in-progress'
     error.cause = cause
     throw error
@@ -162,8 +162,8 @@ async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome) {
 
   const error: any = new Error(
     live
-      ? `Remote Hermes update process ${live[1]} is still running; SSH startup is paused.`
-      : 'The remote Hermes update marker is unreadable or malformed; refusing SSH startup.'
+      ? `Remote X19 update process ${live[1]} is still running; SSH startup is paused.`
+      : 'The remote X19 update marker is unreadable or malformed; refusing SSH startup.'
   )
 
   error.kind = 'update-in-progress'
@@ -177,7 +177,7 @@ const TRANSPORT_KINDS = new Set([
   SSH_ERROR.UNREACHABLE
 ])
 
-async function detectRemotePlatform(ssh, explicitHermesPath = '') {
+async function detectRemotePlatform(ssh, explicitX19Path = '') {
   try {
     const output = (await ssh.exec('uname -s; uname -m')).trim().split('\n')
 
@@ -194,7 +194,7 @@ async function detectRemotePlatform(ssh, explicitHermesPath = '') {
   }
 
   try {
-    return await probeWindowsRemote(ssh, explicitHermesPath)
+    return await probeWindowsRemote(ssh, explicitX19Path)
   } catch (cause: any) {
     if (TRANSPORT_KINDS.has(cause?.kind)) {
       throw cause
@@ -217,7 +217,7 @@ async function detectRemotePlatform(ssh, explicitHermesPath = '') {
 }
 
 function helperCommand(runtime, operation, args = []) {
-  const argv = [runtime.python, '-m', 'hermes_cli.windows_ssh_runtime', operation, ...args]
+  const argv = [runtime.python, '-m', 'x19_cli.windows_ssh_runtime', operation, ...args]
 
   const script = [
     '$ErrorActionPreference="Stop"',
@@ -247,16 +247,16 @@ async function helper(ssh, runtime, operation, args = [], stdinData?) {
 }
 
 function atomicWindowsSpawnCommand(runtime, reservation: any = {}) {
-  const argv = [runtime.python, '-m', 'hermes_cli.windows_ssh_runtime', 'spawn']
-  const helper = operation => [runtime.python, '-m', 'hermes_cli.windows_ssh_runtime', operation]
+  const argv = [runtime.python, '-m', 'x19_cli.windows_ssh_runtime', 'spawn']
+  const helper = operation => [runtime.python, '-m', 'x19_cli.windows_ssh_runtime', operation]
 
   const script = [
     '$ErrorActionPreference="Stop"',
-    `$home=${psLiteral(runtime.hermesHome)}`,
+    `$home=${psLiteral(runtime.x19Home)}`,
     '$installRoot=$home',
     '$parent=Split-Path -Parent $home',
     'if((Split-Path -Leaf $parent) -ieq "profiles"){$installRoot=Split-Path -Parent $parent}',
-    '$marker=Join-Path $installRoot ".hermes-update-in-progress"',
+    '$marker=Join-Path $installRoot ".x19-update-in-progress"',
     '$mutexPath=$marker+".mutex"',
     '$mutex=[IO.File]::Open($mutexPath,[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::ReadWrite)',
     'try{',
@@ -276,7 +276,7 @@ function atomicWindowsSpawnCommand(runtime, reservation: any = {}) {
       ? '  if($spawnExit -ne 0){exit $spawnExit}'
       : '  if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}',
     reservation.ownershipId
-      ? `  $spawned=$spawnLines[-1]|ConvertFrom-Json; $lock=[ordered]@{schemaVersion=2;protocolVersion=1;ownershipId=${psLiteral(reservation.ownershipId)};spawnNonce=${psLiteral(reservation.spawnNonce)};pid=[int]$spawned.pid;creationTimeNs=[string]$spawned.creationTimeNs;port=0;profile=${psLiteral(reservation.profile)};hermesPath=${psLiteral(reservation.hermesPath)};hermesHome=${psLiteral(reservation.hermesHome)};tokenFingerprint=${psLiteral(reservation.tokenFingerprint)};startedAt=${psLiteral(reservation.startedAt)}}|ConvertTo-Json -Compress; ` +
+      ? `  $spawned=$spawnLines[-1]|ConvertFrom-Json; $lock=[ordered]@{schemaVersion=2;protocolVersion=1;ownershipId=${psLiteral(reservation.ownershipId)};spawnNonce=${psLiteral(reservation.spawnNonce)};pid=[int]$spawned.pid;creationTimeNs=[string]$spawned.creationTimeNs;port=0;profile=${psLiteral(reservation.profile)};x19Path=${psLiteral(reservation.x19Path)};x19Home=${psLiteral(reservation.x19Home)};tokenFingerprint=${psLiteral(reservation.tokenFingerprint)};startedAt=${psLiteral(reservation.startedAt)}}|ConvertTo-Json -Compress; ` +
         `  & ${helper('write-lock').map(psLiteral).join(' ')} ${psLiteral(reservation.ownershipId)} $lock|Out-Null; if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}; $spawnLines|Write-Output`
       : '',
     '  if([IO.File]::Exists($marker)){throw "remote update marker claimed during backend spawn"}',
@@ -332,8 +332,8 @@ function validLock(lock, ownershipId) {
     lock.port >= 0 &&
     lock.port <= 65535 &&
     /^[0-9a-f]{32}$/.test(lock.tokenFingerprint || '') &&
-    typeof lock.hermesPath === 'string' &&
-    typeof lock.hermesHome === 'string'
+    typeof lock.x19Path === 'string' &&
+    typeof lock.x19Home === 'string'
   )
 }
 
@@ -345,8 +345,8 @@ function reusableWindowsLock(lock, state, profile, reuseToken, runtime) {
     lock.profile === profile &&
     reuseToken &&
     lock.tokenFingerprint === fingerprintToken(reuseToken) &&
-    lock.hermesPath === runtime.hermesPath &&
-    lock.hermesHome === runtime.hermesHome
+    lock.x19Path === runtime.x19Path &&
+    lock.x19Home === runtime.x19Home
   )
 }
 
@@ -354,7 +354,7 @@ async function processState(ssh, runtime, lock) {
   return helper(ssh, runtime, 'process-state', [
     String(lock.pid),
     String(lock.creationTimeNs),
-    lock.hermesPath,
+    lock.x19Path,
     lock.spawnNonce
   ])
 }
@@ -377,7 +377,7 @@ async function cleanupOwned(ssh, runtime, ownershipId, lock) {
       await helper(ssh, runtime, 'terminate', [
         String(lock.pid),
         String(lock.creationTimeNs),
-        lock.hermesPath,
+        lock.x19Path,
         lock.spawnNonce
       ])
     }
@@ -400,8 +400,8 @@ function windowsLockMatchesManagedUpdateScope(lock, expected) {
     lock.spawnNonce === expected.spawnNonce &&
     lock.creationTimeNs === expected.creationTimeNs &&
     lock.profile === expected.profile &&
-    lock.hermesPath === expected.hermesPath &&
-    lock.hermesHome === expected.hermesHome
+    lock.x19Path === expected.x19Path &&
+    lock.x19Home === expected.x19Home
   )
 }
 
@@ -458,7 +458,7 @@ async function terminateOwnedWindowsDashboardForUpdate(ssh, runtime, expected) {
   await helper(ssh, runtime, 'terminate', [
     String(lock.pid),
     String(lock.creationTimeNs),
-    lock.hermesPath,
+    lock.x19Path,
     lock.spawnNonce
   ])
 
@@ -550,35 +550,35 @@ async function connectWindowsRemote(deps) {
     ssh,
     ownershipId,
     profile = '',
-    remoteHermesPath = '',
+    remoteX19Path = '',
     reuseToken = '',
     signal,
     pickLocalPort,
     forward,
     cancelForward,
-    waitForHermes,
+    waitForX19,
     probeReuseProof,
     rememberLog = () => {},
     readyTimeoutMs = 45_000
   } = deps
 
   assertBootstrapNotSuperseded(signal)
-  const runtime = await probeWindowsRemote(ssh, remoteHermesPath)
-  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
-  const inspection = await helper(ssh, runtime, 'inspect', [runtime.hermesPath])
+  const runtime = await probeWindowsRemote(ssh, remoteX19Path)
+  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
+  const inspection = await helper(ssh, runtime, 'inspect', [runtime.x19Path])
 
   if (!inspection.supported) {
-    const error: any = new Error('Update Hermes on the remote Windows host before connecting with Desktop SSH.')
+    const error: any = new Error('Update X19 on the remote Windows host before connecting with Desktop SSH.')
     error.kind = 'update-required'
     throw error
   }
 
-  runtime.hermesPath = inspection.path
-  const hermesVersion = inspection.version || ''
+  runtime.x19Path = inspection.path
+  const x19Version = inspection.version || ''
   rememberLog(`[ssh-lifecycle] remote platform Windows/${runtime.arch}`)
-  rememberLog(`[ssh-lifecycle] located hermes at ${runtime.hermesPath}`)
+  rememberLog(`[ssh-lifecycle] located x19 at ${runtime.x19Path}`)
 
-  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
   const lock = await helper(ssh, runtime, 'read-lock', [ownershipId])
 
   if (validLock(lock, ownershipId)) {
@@ -593,7 +593,7 @@ async function connectWindowsRemote(deps) {
     const reusable = reusableWindowsLock(lock, state, profile, reuseToken, runtime)
 
     if (reusable) {
-      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
       const localPort = await pickLocalPort()
       await forward(localPort, lock.port)
 
@@ -610,12 +610,12 @@ async function connectWindowsRemote(deps) {
             pid: lock.pid,
             reused: true,
             platform: { os: 'Windows', arch: runtime.arch },
-            hermesPath: runtime.hermesPath,
-            hermesVersion,
+            x19Path: runtime.x19Path,
+            x19Version,
             ownershipId,
             spawnNonce: lock.spawnNonce,
             creationTimeNs: lock.creationTimeNs,
-            hermesHome: runtime.hermesHome,
+            x19Home: runtime.x19Home,
             pythonPath: runtime.python
           }
         }
@@ -625,23 +625,23 @@ async function connectWindowsRemote(deps) {
         }
 
         await cancelForward(localPort, lock.port)
-        await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+        await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
         await cleanupOwned(ssh, runtime, ownershipId, lock)
       } catch (error) {
         await cancelForward(localPort, lock.port)
         throw error
       }
     } else {
-      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
       await cleanupOwned(ssh, runtime, ownershipId, lock)
     }
   } else if (lock) {
-    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
     await helper(ssh, runtime, 'remove-lock', [ownershipId])
   }
 
   assertBootstrapNotSuperseded(signal)
-  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
   const token = crypto.randomBytes(32).toString('hex')
   const spawnNonce = crypto.randomBytes(8).toString('hex')
   await helper(ssh, runtime, 'upload-token', [ownershipId, spawnNonce], token)
@@ -650,17 +650,17 @@ async function connectWindowsRemote(deps) {
   let spawned
 
   try {
-    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.x19Home)
     spawned = await atomicWindowsSpawn(
       ssh,
       runtime,
-      JSON.stringify({ ownershipId, spawnNonce, profile, hermesPath: runtime.hermesPath }),
+      JSON.stringify({ ownershipId, spawnNonce, profile, x19Path: runtime.x19Path }),
       {
         ownershipId,
         spawnNonce,
         profile,
-        hermesPath: runtime.hermesPath,
-        hermesHome: runtime.hermesHome,
+        x19Path: runtime.x19Path,
+        x19Home: runtime.x19Home,
         tokenFingerprint,
         startedAt
       }
@@ -700,8 +700,8 @@ async function connectWindowsRemote(deps) {
     creationTimeNs: spawned.creationTimeNs,
     port: 0,
     profile,
-    hermesPath: runtime.hermesPath,
-    hermesHome: runtime.hermesHome,
+    x19Path: runtime.x19Path,
+    x19Home: runtime.x19Home,
     tokenFingerprint,
     startedAt
   }
@@ -720,7 +720,7 @@ async function connectWindowsRemote(deps) {
     localPort = await pickLocalPort()
     await forward(localPort, remotePort)
     const baseUrl = `http://127.0.0.1:${localPort}`
-    await waitForHermes(baseUrl, token)
+    await waitForX19(baseUrl, token)
     assertBootstrapNotSuperseded(signal)
     await helper(ssh, runtime, 'write-lock', [ownershipId], JSON.stringify({ ...owned, port: remotePort }))
 
@@ -732,12 +732,12 @@ async function connectWindowsRemote(deps) {
       pid: spawned.pid,
       reused: false,
       platform: { os: 'Windows', arch: runtime.arch },
-      hermesPath: runtime.hermesPath,
-      hermesVersion,
+      x19Path: runtime.x19Path,
+      x19Version,
       ownershipId,
       spawnNonce,
       creationTimeNs: spawned.creationTimeNs,
-      hermesHome: runtime.hermesHome,
+      x19Home: runtime.x19Home,
       pythonPath: runtime.python
     }
   } catch (error) {
@@ -760,7 +760,7 @@ function buildWindowsInteractiveCommand(remoteCwd = '') {
     )
   }
 
-  script.push('$host.UI.RawUI.WindowTitle="Hermes SSH"', 'powershell.exe -NoLogo')
+  script.push('$host.UI.RawUI.WindowTitle="X19 SSH"', 'powershell.exe -NoLogo')
 
   return powerShellCommand(script.join(';'))
 }

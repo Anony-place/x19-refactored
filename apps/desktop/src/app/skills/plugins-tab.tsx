@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { $pluginRecords, type PluginRecord, setPluginEnabled } from '@/contrib/plugins-store'
 import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
-import type { ProfileScope } from '@/hermes'
+import type { ProfileScope } from '@/x19'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { FolderOpen, Loader2, Monitor, Package, RefreshCw } from '@/lib/icons'
@@ -48,14 +48,14 @@ function profileParam(scope: ProfileScope): null | string {
 }
 
 function reveal(file: string) {
-  void window.hermesDesktop?.revealPath?.(file)?.catch(() => undefined)
+  void window.x19Desktop?.revealPath?.(file)?.catch(() => undefined)
 }
 
 async function revealPluginsDir() {
   try {
     // Electron owns the app-level plugin root — deriving it from the backend's
-    // hermes_home breaks against a remote backend (#66899).
-    const dir = await window.hermesDesktop?.desktopPluginsRoot?.()
+    // x19_home breaks against a remote backend (#66899).
+    const dir = await window.x19Desktop?.desktopPluginsRoot?.()
 
     if (!dir) {
       notifyError('Desktop plugins are unavailable', 'Could not resolve the plugins folder')
@@ -63,7 +63,7 @@ async function revealPluginsDir() {
       return
     }
 
-    const result = await window.hermesDesktop?.openDir?.(dir)
+    const result = await window.x19Desktop?.openDir?.(dir)
 
     if (result && !result.ok) {
       notifyError(result.error ?? 'unknown error', 'Could not open the plugins folder')
@@ -76,7 +76,7 @@ async function revealPluginsDir() {
 /** Copy any changed unified desktop halves into the app root FIRST, then
  *  rescan the root — a concurrent scan would read the pre-copy state. */
 async function rescanAll(requestGateway: GatewayRequest, scope: null | string) {
-  await window.hermesDesktop?.reconcileDesktopPlugins?.().catch(() => undefined)
+  await window.x19Desktop?.reconcileDesktopPlugins?.().catch(() => undefined)
   await discoverRuntimePlugins()
   await loadAgentPlugins(requestGateway, scope)
 }

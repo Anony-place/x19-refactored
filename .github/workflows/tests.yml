@@ -74,7 +74,7 @@ jobs:
         # (tools/lazy_deps.py) that tests exercise for real: provider.anthropic,
         # stt/tts.mistral, image.fal, terminal.modal, terminal.daytona,
         # memory.hindsight, search.parallel. The hermetic test env forbids
-        # mid-run pip installs (HERMES_DISABLE_LAZY_INSTALLS=1 in
+        # mid-run pip installs (X19_DISABLE_LAZY_INSTALLS=1 in
         # tests/conftest.py), so the SDKs those tests need must be in the
         # venv up front — resolved from uv.lock like everything else, which
         # also honors the exact supply-chain pins these extras carry.
@@ -135,7 +135,7 @@ jobs:
           # across a 6x range. The suite has sufficient concurrency at this
           # size. The remaining time is the slowest files plus the setup.
           # Workers above the core count only add contention.
-          HERMES_TEST_WORKERS: 96
+          X19_TEST_WORKERS: 96
           # Ensure tests don't accidentally call real APIs
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
@@ -199,7 +199,7 @@ jobs:
         # `uv venv` step is needed.
         #
         # Same extras as the test job's sync above: the hermetic test env
-        # forbids mid-run pip installs (HERMES_DISABLE_LAZY_INSTALLS=1 in
+        # forbids mid-run pip installs (X19_DISABLE_LAZY_INSTALLS=1 in
         # tests/conftest.py), so lazy-install SDKs exercised by tests must be
         # in the venv up front.
         uses: ./.github/actions/retry

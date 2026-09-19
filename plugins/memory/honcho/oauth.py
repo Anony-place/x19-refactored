@@ -283,7 +283,7 @@ def _rotate_and_persist(
                 return disk
             _mark_grant_dead(key, cred)
             logger.error("Honcho OAuth grant for host %s is no longer valid (%s); "
-                         "run 'hermes honcho setup' to re-authenticate", host, exc)
+                         "run 'x19 honcho setup' to re-authenticate", host, exc)
             return None
         _refresh_failure_at[key] = time.monotonic()
         logger.warning("Honcho OAuth %s failed for host %s: %s", op_label, host, redact_sensitive_text(str(exc), force=True))
@@ -405,9 +405,3 @@ def apply_token_to_client(client: Any, token: str) -> bool:
     return True
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Callable  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

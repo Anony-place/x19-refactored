@@ -362,14 +362,14 @@ class TestNotifyIsConfigurable:
         assert router_calls[0]["metadata"]["notify"] is True
 
     def test_default_config_ships_notify_true(self):
-        from hermes_cli.config_defaults import DEFAULT_CONFIG
+        from x19_cli.config_defaults import DEFAULT_CONFIG
 
         assert DEFAULT_CONFIG["cron"]["delivery"]["notify"] is True
 
 
 class TestUnverifiedDeliveryIsRecordedOnTheJob:
     """An evidence-free ack is accepted, but the state must reach the job
-    record (and from there ``hermes cron list`` / ``cron doctor``), not only a
+    record (and from there ``x19 cron list`` / ``cron doctor``), not only a
     WARNING log line."""
 
     def test_evidence_free_ack_records_the_target(self):

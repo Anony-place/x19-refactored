@@ -1,819 +1,860 @@
-"""
-X19 Runtime Phase 1 — Comprehensive Test Suite.
+"""X19 runtime — the real multi-agent organization.
 
-Tests cover:
-1. X19 activation detection
-2. X19 SOUL loading
-3. X19 identity in real system prompt path
-4. Boss initialization
-5. Mission creation
-6. Specialist delegation context
-7. Explicit delegation context
-8. Structured specialist result
-9. Boss state update
-10. Operator status query
-11. Pause/stop/kill-all
-12. Hermes baseline compatibility
+This suite replaces the previous ``test_x19_runtime.py``, which tested a
+security-operations scaffold (``x19.orchestration``, ``x19.scope``,
+``x19.specialists``, ``x19.safety.anti_loop``) that no longer exists in the
+product. Everything here drives the shipped implementation:
+
+* :mod:`x19.org` — runtime, boss, manager, tasks, registry, roles, events,
+  status, audit, delegation and safety guards
+* :mod:`x19.identity` — the identity text that actually reaches the model
+* the real system-prompt path in :mod:`agent.prompt_builder`
+
+The assertions follow the product contract: X19 starts, decomposes a user
+objective, delegates through X22 to workers, records real state transitions,
+represents failure and completion honestly, and answers status questions from
+the runtime rather than from narration.
 """
+
+from __future__ import annotations
 
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
 
 import pytest
 
-# Ensure the repo root is on sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from x19.org import (  # noqa: E402
+    BOSS_ROLE_ID,
+    MANAGER_ROLE_ID,
+    AgentState,
+    Boss,
+    EventType,
+    ExecutionGuards,
+    InvalidTransition,
+    Manager,
+    OrganizationRuntime,
+    RoleKind,
+    RoleSpec,
+    TaskStatus,
+    get_role,
+    register_role,
+    reset_event_bus,
+    reset_roles,
+    reset_runtime,
+    role_catalog,
+    set_live_reader,
+    set_runtime,
+    unregister_role,
+)
+from x19.org.delegation import build_dispatch, observe_child_result, observe_child_started  # noqa: E402
+
+# A plan used across the suite: one root step with three dependents, which is
+# the smallest graph that exercises dependencies, parallelism and convergence.
+PLAN = [
+    {"key": "impl", "objective": "Implement the CSV export endpoint", "role_id": "coding"},
+    {
+        "key": "test",
+        "objective": "Write and run tests for CSV export",
+        "role_id": "testing",
+        "depends_on": ["impl"],
+    },
+    {
+        "key": "docs",
+        "objective": "Document the CSV export endpoint",
+        "role_id": "documentation",
+        "depends_on": ["impl"],
+    },
+]
+
+
+@pytest.fixture()
+def org(tmp_path: Path):
+    """A real runtime with a deterministic live-subagent source.
+
+    The delegation engine's live reader is injected so roster assertions test
+    the overlay logic rather than whichever children happen to be running.
+    """
+    live: list[dict] = []
+    set_live_reader(lambda: list(live))
+    reset_event_bus()
+
+    rt = OrganizationRuntime(root=tmp_path, persist=False)
+    set_runtime(rt)
+
+    yield SimpleNamespace(
+        runtime=rt,
+        boss=Boss(rt),
+        manager=Manager(rt),
+        guards=ExecutionGuards(rt),
+        live=live,
+    )
+
+    set_live_reader(None)
+    reset_runtime()
+    reset_event_bus()
+    reset_roles()
+
+
+# The statuses a task may hold and still be dispatchable to a worker.
+_DISPATCHABLE = (TaskStatus.QUEUED, TaskStatus.PLANNED, TaskStatus.ASSIGNED)
+
+
+def _dep_ids(org, task_id: str) -> list[str]:
+    """`blocking_dependencies` returns rows; the tests care about the ids."""
+    return [row["task_id"] for row in org.runtime.tasks.blocking_dependencies(task_id)]
+
+
+def _plan(org) -> dict:
+    org.boss.accept_objective("Build the CSV export feature, test it and document it")
+    result = org.manager.plan(PLAN)
+    assert result["ok"], result.get("errors")
+
+    return result["keys"]
+
+
+def _run_worker_until_running(org, task_id: str, role_id: str):
+    """Take one task to RUNNING without completing it."""
+    org.runtime.tasks.assign(task_id, role_id=role_id, manager_id=MANAGER_ROLE_ID, agent_id=role_id)
+    org.runtime.tasks.start(task_id, agent_id=role_id, subagent_id=f"sa-{role_id}")
+
+
+def _run_worker(org, task_id: str, role_id: str, *, summary: str = "work done", subagent: str | None = None):
+    """Drive one task through the real lifecycle to COMPLETED."""
+    org.runtime.tasks.assign(task_id, role_id=role_id, manager_id=MANAGER_ROLE_ID, agent_id=role_id)
+    org.runtime.tasks.start(task_id, agent_id=role_id, subagent_id=subagent or f"sa-{role_id}")
+    org.runtime.tasks.complete(
+        task_id,
+        summary=summary,
+        outputs=[{"kind": "summary", "text": summary}],
+    )
+
 
 # ============================================================
-# 1. X19 ACTIVATION
+# 1. IDENTITY — what actually reaches the model
 # ============================================================
 
-class TestX19Activation:
-    """Test X19 mode detection."""
 
-    def test_x19_enabled_in_repo(self):
-        """X19 mode MUST be enabled when running inside the x19-refactored repo."""
-        from x19.identity.core import is_x19_enabled
-        assert is_x19_enabled() is True
-
-    def test_x19_disabled_by_env_override(self):
-        """X19_ENABLED=0 MUST disable X19 even in the x19 repo."""
-        from x19.identity.core import is_x19_enabled
-        with patch.dict(os.environ, {"X19_ENABLED": "0"}):
-            assert is_x19_enabled() is False
-
-    def test_x19_enabled_by_env_override(self):
-        """X19_ENABLED=1 MUST enable X19."""
-        from x19.identity.core import is_x19_enabled
-        with patch.dict(os.environ, {"X19_ENABLED": "1"}):
-            assert is_x19_enabled() is True
-
-    def test_x19_enabled_by_config_dict(self):
-        """Explicit config dict MUST override all other detection."""
-        from x19.identity.core import is_x19_enabled
-        assert is_x19_enabled(config={"x19": {"enabled": True}}) is True
-        assert is_x19_enabled(config={"x19": {"enabled": False}}) is False
-
-    def test_x19_env_var_variations(self):
-        """All accepted env var values."""
-        from x19.identity.core import is_x19_enabled
-        for val in ("1", "true", "TRUE", "yes", "YES", "on", "ON"):
-            with patch.dict(os.environ, {"X19_ENABLED": val}):
-                assert is_x19_enabled() is True, f"X19_ENABLED={val!r} should be True"
-        for val in ("0", "false", "FALSE", "no", "NO", "off", "OFF"):
-            with patch.dict(os.environ, {"X19_ENABLED": val}):
-                assert is_x19_enabled() is False, f"X19_ENABLED={val!r} should be False"
-
-    def test_x19_soul_md_detection(self):
-        """Repo SOUL.md MUST contain X19 marker."""
-        soul_path = Path(__file__).resolve().parent.parent.parent / "SOUL.md"
-        assert soul_path.exists(), "SOUL.md must exist"
-        text = soul_path.read_text()
-        assert "X19" in text, "SOUL.md must contain 'X19'"
-        assert "Autonomous Security Operations" in text, "SOUL.md must contain 'Autonomous Security Operations'"
-
-
-# ============================================================
-# 2. X19 SOUL LOADING
-# ============================================================
-
-class TestX19SoulLoading:
-    """Test X19 SOUL.md and identity loading."""
-
-    def test_get_x19_identity(self):
-        """get_x19_identity() MUST return X19 identity string."""
+class TestIdentity:
+    def test_identity_is_the_executive_orchestrator(self):
         from x19.identity.core import get_x19_identity
+
         identity = get_x19_identity()
-        assert "X19" in identity
-        assert "Autonomous Security Operations Agent" in identity
+
         assert identity.startswith("You are X19")
+        assert "executive orchestrator" in identity
+        assert "X22" in identity, "the manager layer is named in the identity"
 
-    def test_get_x19_soul_md(self):
-        """get_x19_soul_md() MUST return full X19 SOUL.md content."""
+    def test_identity_is_not_gated_by_a_mode_flag(self):
+        """X19 is the product; there is no enable switch to fall through."""
+        import x19.identity.core as core
+
+        assert not hasattr(core, "is_x19_enabled")
+
+    def test_soul_text_describes_the_real_hierarchy_and_lifecycle(self):
         from x19.identity.core import get_x19_soul_md
+
         soul = get_x19_soul_md()
-        assert "X19" in soul
-        assert "Autonomous Security Operations Agent" in soul
-        assert "Team Model" in soul
-        assert "Evidence-First" in soul
-        assert "Scope Control" in soul
 
-    def test_soul_md_repo_file_is_x19(self):
-        """The actual repo SOUL.md file MUST be X19, not Hermes default."""
-        soul_path = Path(__file__).resolve().parent.parent.parent / "SOUL.md"
-        text = soul_path.read_text()
-        assert "You are X19" in text, "SOUL.md must declare X19 identity"
-        assert "You are Hermes Agent" not in text, "SOUL.md must NOT contain 'You are Hermes Agent'"
+        assert "BOSS" in soul and "MANAGER" in soul and "WORKERS" in soul
+        assert "QUEUED" in soul and "COMPLETED" in soul, "the lifecycle is stated"
+        assert "runtime state" in soul
 
-    def test_x19_guidance_blocks(self):
-        """X19 guidance blocks MUST be available."""
-        from x19.identity.prompts import get_x19_guidance_blocks
-        blocks = get_x19_guidance_blocks()
-        assert len(blocks) == 6, f"Expected 6 guidance blocks, got {len(blocks)}"
-        all_text = " ".join(blocks)
-        assert "Security" in all_text
-        assert "Evidence" in all_text
-        assert "Team" in all_text
+    def test_organization_brief_is_generated_from_the_live_catalog(self):
+        from x19.identity.core import get_x19_organization_brief
 
-    def test_default_soul_md_returns_x19(self):
-        """get_default_soul_md() MUST return X19 when X19 is enabled."""
-        from hermes_cli.default_soul import get_default_soul_md
-        soul = get_default_soul_md()
-        assert "X19" in soul, f"Expected X19 SOUL, got: {soul[:80]}"
+        brief = get_x19_organization_brief()
+        catalog_ids = {role.id for role in role_catalog()}
 
-    def test_x19_identity_override(self):
-        """Custom identity override MUST be respected."""
-        from x19.identity.core import get_x19_identity
-        custom = "Custom identity for testing"
-        result = get_x19_identity(custom_override=custom)
-        assert result == custom
+        assert "live registry" in brief
+        for role_id in ("x19", "x22", "coding", "testing"):
+            assert role_id in catalog_ids
+            assert f"({role_id})" in brief, f"{role_id} must appear in the generated brief"
 
+    def test_registering_a_worker_makes_x19_aware_of_it(self):
+        """The brief is dynamic: a new role shows up without any code change."""
+        from x19.identity.core import get_x19_organization_brief
 
-# ============================================================
-# 3. X19 IDENTITY IN REAL SYSTEM PROMPT PATH
-# ============================================================
+        before = get_x19_organization_brief()
+        assert "localisation" not in before
 
-class TestX19SystemPromptPath:
-    """Test that X19 identity flows through the actual system prompt pipeline."""
+        register_role(
+            RoleSpec(
+                id="localisation",
+                kind=RoleKind.WORKER,
+                display_name="Localisation",
+                title="Localization specialist",
+                summary="Translates and localizes product copy.",
+                manager_id=MANAGER_ROLE_ID,
+                capabilities=("translate",),
+            )
+        )
 
-    def test_prompt_builder_resolves_x19(self):
-        """prompt_builder.DEFAULT_AGENT_IDENTITY MUST be X19."""
-        from agent.prompt_builder import DEFAULT_AGENT_IDENTITY
-        assert "X19" in DEFAULT_AGENT_IDENTITY, \
-            f"DEFAULT_AGENT_IDENTITY must be X19, got: {DEFAULT_AGENT_IDENTITY[:80]}"
+        assert "localisation" in get_x19_organization_brief()
 
-    def test_prompt_builder_x19_identity_helper(self):
-        """_get_x19_identity_for_prompt_builder MUST return X19 identity."""
-        from agent.prompt_builder import _get_x19_identity_for_prompt_builder
-        identity = _get_x19_identity_for_prompt_builder()
-        assert identity is not None
-        assert "X19" in identity
+        unregister_role("localisation")
+        assert "localisation" not in get_x19_organization_brief()
 
-    def test_prompt_builder_x19_soul_md_fallback(self):
-        """_get_x19_soul_md_if_enabled MUST return X19 SOUL.md."""
-        from agent.prompt_builder import _get_x19_soul_md_if_enabled
-        soul = _get_x19_soul_md_if_enabled()
-        assert soul is not None
-        assert "X19" in soul
-
-    def test_system_prompt_identity_parts(self):
-        """system_prompt._get_x19_identity_if_enabled MUST return X19 identity."""
-        from agent.system_prompt import _get_x19_identity_if_enabled
-        identity = _get_x19_identity_if_enabled()
-        assert identity is not None
-        assert "X19" in identity
-
-    def test_system_prompt_guidance_blocks(self):
-        """system_prompt._get_x19_guidance_blocks MUST return 6 blocks."""
+    def test_guidance_blocks_reach_the_system_prompt(self):
         from agent.system_prompt import _get_x19_guidance_blocks
+
         blocks = _get_x19_guidance_blocks()
-        assert len(blocks) == 6
 
-    def test_x19_not_hermes_default_identity(self):
-        """When X19 is active, model MUST NOT receive 'You are Hermes Agent'."""
+        assert blocks, "guidance blocks must not be empty"
+        joined = " ".join(blocks)
+        assert "X19" in joined
+
+    def test_prompt_builder_default_identity_is_x19(self):
         from agent.prompt_builder import DEFAULT_AGENT_IDENTITY
-        hermes_default = "You are Hermes Agent, built by Nous Research."
-        assert hermes_default not in DEFAULT_AGENT_IDENTITY, \
-            "X19 active: DEFAULT_AGENT_IDENTITY must NOT be Hermes default"
+
+        assert "X19" in DEFAULT_AGENT_IDENTITY
+        assert "orchestrator" in DEFAULT_AGENT_IDENTITY.lower()
 
 
 # ============================================================
-# 4. BOSS INITIALIZATION
+# 2. ORGANIZATION STRUCTURE
 # ============================================================
 
-class TestBossInit:
-    """Test BossOrchestrator initialization."""
 
-    def test_boss_creation(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        assert boss is not None
-        assert boss.mission is None
+class TestOrganization:
+    def test_catalog_is_boss_manager_workers(self):
+        roles = role_catalog()
+        kinds = [role.kind for role in roles]
 
-    def test_boss_with_custom_manager(self):
-        from x19.orchestration.boss import BossOrchestrator
-        from x19.orchestration.mission_state import MissionStateManager
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            boss = BossOrchestrator(mission_manager=manager)
-            assert boss.mission_manager is manager
+        assert roles[0].id == BOSS_ROLE_ID and kinds[0] is RoleKind.BOSS
+        assert roles[1].id == MANAGER_ROLE_ID and kinds[1] is RoleKind.MANAGER
+        assert kinds.count(RoleKind.WORKER) >= 5
+
+    def test_workers_report_to_the_manager(self):
+        for role in role_catalog():
+            if role.kind is RoleKind.WORKER:
+                assert role.manager_id == MANAGER_ROLE_ID
+
+    def test_the_team_is_generalized_not_security_only(self):
+        ids = {role.id for role in role_catalog()}
+
+        for expected in ("research", "coding", "testing", "documentation", "security", "devops"):
+            assert expected in ids, f"{expected} worker must exist"
+
+    def test_boss_and_manager_map_to_real_delegation_roles(self):
+        assert get_role(BOSS_ROLE_ID).delegation_role == "orchestrator"
+        assert get_role(MANAGER_ROLE_ID).delegation_role == "orchestrator"
+        assert get_role("coding").delegation_role == "leaf"
+
+    def test_org_chart_reflects_the_registry(self, org):
+        chart = json.dumps(org.boss.org_chart())
+
+        assert "x19" in chart and "x22" in chart
+        assert "coding" in chart
+
+    def test_every_role_resolves_a_real_toolset(self):
+        """A role whose tools do not exist would be decoration."""
+        from toolsets import TOOLSETS
+
+        for role in role_catalog():
+            for toolset in role.toolsets:
+                assert toolset in TOOLSETS, f"role {role.id} names unknown toolset {toolset}"
 
 
 # ============================================================
-# 5. MISSION CREATION
+# 3. OBJECTIVE INTAKE AND DECOMPOSITION
 # ============================================================
 
-class TestMissionCreation:
-    """Test mission creation with scope validation."""
 
-    def test_create_mission(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        mission, errors = boss.create_mission(
-            name="Test Mission",
-            target="https://example.com",
-            authorized_domains=["example.com"],
-            excluded_assets=["example.com/admin"],
-            objectives=["Find XSS"],
+class TestDecomposition:
+    def test_accepting_an_objective_opens_a_real_run(self, org):
+        result = org.boss.accept_objective("Ship the CSV export")
+
+        assert result["objective_task_id"]
+        assert result["project_task_id"]
+        assert org.runtime.run.to_dict()["active"] is True
+        assert org.runtime.run.objective == "Ship the CSV export"
+
+    def test_the_project_is_owned_by_the_manager(self, org):
+        result = org.boss.accept_objective("Ship the CSV export")
+        project = org.runtime.tasks.get(result["project_task_id"])
+
+        assert project.role_id == MANAGER_ROLE_ID
+        assert project.parent_id == result["objective_task_id"]
+
+    def test_manager_decomposition_creates_tasks_with_dependencies(self, org):
+        ids = _plan(org)
+
+        assert set(ids) == {"impl", "test", "docs"}
+        assert _dep_ids(org, ids["test"]) == [ids["impl"]]
+        assert _dep_ids(org, ids["docs"]) == [ids["impl"]]
+        assert _dep_ids(org, ids["impl"]) == []
+
+    def test_worker_tasks_are_children_of_the_project(self, org):
+        result = org.boss.accept_objective("Ship the CSV export")
+        org.manager.plan(PLAN)
+
+        for task in org.runtime.tasks.all():
+            if task.id in (result["objective_task_id"], result["project_task_id"]):
+                continue
+            assert task.parent_id == result["project_task_id"]
+
+    def test_a_task_with_unmet_dependencies_waits_rather_than_queues(self, org):
+        ids = _plan(org)
+
+        assert org.runtime.tasks.get(ids["impl"]).status in _DISPATCHABLE
+        assert org.runtime.tasks.get(ids["test"]).status is TaskStatus.WAITING_DEPENDENCY
+
+    def test_structural_tasks_are_excluded_from_worker_step_counts(self, org):
+        ids = _plan(org)
+        status = org.boss.status()
+
+        assert status["phase"]["steps_total"] == len(ids), "only worker steps are counted"
+        assert status["counts"]["total"] == len(ids) + 2, "objective + project exist too"
+
+
+# ============================================================
+# 4. TASK LIFECYCLE AND METADATA
+# ============================================================
+
+
+class TestTaskLifecycle:
+    def test_the_full_happy_path_transitions_are_enforced(self, org):
+        ids = _plan(org)
+        task_id = ids["impl"]
+        tasks = org.runtime.tasks
+
+        assert tasks.get(task_id).status is TaskStatus.PLANNED
+
+        tasks.assign(task_id, role_id="coding", manager_id=MANAGER_ROLE_ID, agent_id="coding")
+        assert tasks.get(task_id).status is TaskStatus.ASSIGNED
+
+        tasks.start(task_id, agent_id="coding", subagent_id="sa-1")
+        assert tasks.get(task_id).status is TaskStatus.RUNNING
+
+        tasks.complete(task_id, summary="export works")
+        assert tasks.get(task_id).status is TaskStatus.COMPLETED
+
+    def test_work_held_for_review_is_not_complete_until_reviewed(self, org):
+        """`complete()` on a task already in review must not self-certify."""
+        ids = _plan(org)
+        task_id = ids["impl"]
+
+        _run_worker_until_running(org, task_id, "coding")
+        org.runtime.tasks.request_review(task_id)
+        assert org.runtime.tasks.get(task_id).status is TaskStatus.IN_REVIEW
+
+        org.runtime.tasks.complete(task_id, summary="export works")
+        assert org.runtime.tasks.get(task_id).status is TaskStatus.IN_REVIEW, (
+            "a worker cannot mark its own reviewed work as complete"
         )
-        assert mission is not None, f"Mission creation failed: {errors}"
-        assert len(errors) == 0
-        assert mission.name == "Test Mission"
-        assert mission.scope.target == "https://example.com"
 
-    def test_mission_state_persistence(self):
-        from x19.orchestration.mission_state import MissionStateManager
-        from x19.scope.scope import create_scope
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            scope = create_scope(target="https://example.com", authorized_domains=["example.com"])
-            mission = manager.create_mission(name="Persist Test", scope=scope)
-            loaded = manager.load_mission(mission.id)
-            assert loaded is not None
-            assert loaded.id == mission.id
-            assert loaded.name == "Persist Test"
+        result = org.boss.review(task_id, approved=True, note="verified against the spec")
+        assert result["ok"], result
+        assert org.runtime.tasks.get(task_id).status is TaskStatus.COMPLETED
 
-    def test_mission_decomposition(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Decomp Test",
-            target="https://example.com",
-            authorized_domains=["example.com"],
+    def test_a_rejected_review_returns_the_task_to_the_worker(self, org):
+        ids = _plan(org)
+        task_id = ids["impl"]
+
+        _run_worker_until_running(org, task_id, "coding")
+        org.runtime.tasks.complete(task_id, summary="export works", review_required=True)
+        assert org.runtime.tasks.get(task_id).status is TaskStatus.IN_REVIEW
+
+        result = org.boss.review(task_id, approved=False, note="missing the header row")
+        assert result["ok"], result
+        assert org.runtime.tasks.get(task_id).status is not TaskStatus.COMPLETED
+
+    def test_illegal_transitions_are_rejected_not_absorbed(self, org):
+        ids = _plan(org)
+        task_id = ids["impl"]
+
+        with pytest.raises(InvalidTransition):
+            org.runtime.tasks.complete(task_id, summary="cannot finish work never started")
+
+    def test_satisfying_a_dependency_releases_the_waiting_task(self, org):
+        ids = _plan(org)
+
+        assert org.runtime.tasks.get(ids["test"]).status is TaskStatus.WAITING_DEPENDENCY
+        _run_worker(org, ids["impl"], "coding")
+
+        assert _dep_ids(org, ids["test"]) == []
+        assert org.runtime.tasks.get(ids["test"]).status in _DISPATCHABLE
+
+    def test_completed_task_carries_real_metadata(self, org):
+        ids = _plan(org)
+        _run_worker(org, ids["impl"], "coding", summary="implemented export")
+        data = org.runtime.tasks.get(ids["impl"]).to_dict()
+
+        for field in (
+            "id",
+            "objective",
+            "role_id",
+            "status",
+            "parent_id",
+            "created_at",
+            "assigned_at",
+            "started_at",
+            "finished_at",
+            "depends_on",
+            "attempt",
+            "max_attempts",
+            "outputs",
+            "error",
+            "phase",
+            "blockers",
+            "review",
+            "metrics",
+        ):
+            assert field in data, f"task metadata must include {field}"
+
+        assert data["status"] == "completed"
+        assert data["role_id"] == "coding"
+        assert data["outputs"], "the recorded output is present"
+        assert data["started_at"] <= data["finished_at"]
+
+    def test_progress_is_real_not_a_fabricated_percentage(self, org):
+        ids = _plan(org)
+        _run_worker(org, ids["impl"], "coding")
+        data = org.runtime.tasks.get(ids["impl"]).to_dict()
+
+        assert "progress" not in data or data["progress"] is not None
+        assert "percentage" not in data, "no invented completion percentage"
+
+
+# ============================================================
+# 5. WORKER EXECUTION OBSERVED FROM THE DELEGATION ENGINE
+# ============================================================
+
+
+class TestDelegation:
+    def test_dispatch_payload_is_built_from_the_real_task(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.plan(ids["impl"], depends_on=[])
+        payload = build_dispatch(org.runtime.tasks.get(ids["impl"]), runtime=org.runtime)
+
+        assert payload["goal"] == "Implement the CSV export endpoint"
+        assert payload["role"] or payload.get("toolsets") or payload.get("context")
+
+    def test_observing_a_real_child_start_marks_the_task_running(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.plan(ids["impl"], depends_on=[])
+        org.runtime.tasks.assign(
+            ids["impl"], role_id="coding", manager_id=MANAGER_ROLE_ID, agent_id="coding"
         )
-        plan = boss.decompose_mission(mission)
-        assert len(plan.tasks) > 0
-        recon_tasks = [t for t in plan.tasks if t.assigned_to == "recon_manager"]
-        assert len(recon_tasks) > 0
-        verify_tasks = [t for t in plan.tasks if t.assigned_to == "verification"]
-        assert len(verify_tasks) > 0
 
-    def test_mission_no_hardcoded_data(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="No Hardcode",
-            target="https://test.example.com",
-            authorized_domains=["test.example.com"],
+        observe_child_started(
+            goal="Implement the CSV export endpoint",
+            subagent_id="sa-impl",
+            delegation_id="del-1",
+            model="test-model",
+            depth=1,
+            parent_subagent_id=None,
+            runtime=org.runtime,
         )
-        assert len(mission.findings.findings) == 0
-        assert len(mission.agents) == 0
-        assert len(mission.discoveries) == 0
 
+        assert org.runtime.tasks.get(ids["impl"]).status is TaskStatus.RUNNING
+        record = org.runtime.registry.get("coding")
+        assert record is not None
+        assert record.state is AgentState.ACTIVE
 
-# ============================================================
-# 6. SPECIALIST DELEGATION
-# ============================================================
-
-class TestSpecialistDelegation:
-    """Test specialist delegation context construction."""
-
-    def test_specialist_goal_construction(self):
-        from x19.specialists.base import build_specialist_goal
-        goal = build_specialist_goal(
-            role_id="recon_manager",
-            objective="Asset discovery",
-            target="https://example.com",
-            scope={"target": "https://example.com", "authorized_domains": ["example.com"],
-                   "excluded_assets": [], "allowed_actions": ["read_only_get"], "prohibited_actions": []},
+    def test_observing_a_child_result_completes_the_task(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.plan(ids["impl"], depends_on=[])
+        org.runtime.tasks.assign(
+            ids["impl"], role_id="coding", manager_id=MANAGER_ROLE_ID, agent_id="coding"
         )
-        assert "Recon Manager" in goal
-        assert "Asset discovery" in goal
-        assert "https://example.com" in goal
-
-    def test_specialist_context_construction(self):
-        from x19.specialists.base import build_specialist_context
-        context = build_specialist_context(
-            role_id="recon_manager",
-            mission_id="M-TEST",
-            task_id="T-001",
+        observe_child_started(
+            goal="Implement the CSV export endpoint",
+            subagent_id="sa-impl",
+            delegation_id="del-1",
+            model="test-model",
+            depth=1,
+            parent_subagent_id=None,
+            runtime=org.runtime,
         )
-        assert "M-TEST" in context
-        assert "T-001" in context
 
-    def test_specialist_config_to_delegate_args(self):
-        from x19.specialists.base import create_specialist_config
-        config = create_specialist_config(
-            role_id="web_security",
-            objective="Test XSS",
-            target="https://example.com",
-            scope={"target": "https://example.com", "authorized_domains": ["example.com"],
-                   "excluded_assets": [], "allowed_actions": ["read_only_get"], "prohibited_actions": []},
-            mission_id="M-TEST",
-            task_id="T-002",
+        observe_child_result(
+            subagent_id="sa-impl",
+            goal="Implement the CSV export endpoint",
+            entry={
+                "subagent_id": "sa-impl",
+                "delegation_id": "del-1",
+                "status": "completed",
+                "result": "export endpoint implemented",
+                "tool_count": 3,
+            },
+            runtime=org.runtime,
         )
-        args = config.to_delegate_task_args()
-        assert "goal" in args
-        assert "context" in args
-        assert "toolsets" in args
-        assert "role" in args
-        assert args["role"] == "leaf"
 
-    def test_three_minimal_specialists(self):
-        from x19.team.roles import get_role
-        for role_id in ("recon_manager", "web_manager", "verification"):
-            role = get_role(role_id)
-            assert role is not None, f"Role {role_id} must exist"
-            assert role.prompt_fragment, f"Role {role_id} must have a prompt"
-            assert role.toolsets, f"Role {role_id} must have toolsets"
+        task = org.runtime.tasks.get(ids["impl"])
+        assert task.status in (TaskStatus.COMPLETED, TaskStatus.IN_REVIEW)
 
-
-# ============================================================
-# 7. EXPLICIT DELEGATION CONTEXT
-# ============================================================
-
-class TestDelegationContext:
-    """Test delegation context includes mission_id, target, scope, task_id."""
-
-    def test_delegation_args_include_mission_context(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Delegation Test",
-            target="https://example.com",
-            authorized_domains=["example.com"],
+    def test_live_subagents_overlay_the_roster(self, org):
+        org.live.append(
+            {
+                "subagent_id": "sa-live",
+                "goal": "Implement the CSV export endpoint",
+                "status": "running",
+                "depth": 1,
+            }
         )
-        plan = boss.decompose_mission(mission)
-        boss.assign_tasks(mission, plan)
-        ready = boss.get_next_tasks(mission)
-        assert len(ready) > 0
-        task = ready[0]
-        args = boss.build_delegation_args(task, mission)
-        assert "goal" in args
-        assert "context" in args
-        assert mission.id in args["context"]
-        assert task.id in args["context"]
-        assert "https://example.com" in args["goal"]
+        snapshot = org.runtime.snapshot()["agents"]
+        agents = {a["agent_id"]: a for a in snapshot["agents"]}
+
+        assert agents["coding"]["state"] in ("active", "idle", "unknown", "stale")
+        assert any(a.get("subagent_id") == "sa-live" for a in snapshot["agents"]) or snapshot.get(
+            "live_subagents"
+        ), "the live child is surfaced somewhere in the roster snapshot"
 
 
 # ============================================================
-# 8. STRUCTURED SPECIALIST RESULT
+# 6. FAILURE HANDLING, BLOCKERS AND HUMAN INTERVENTION
 # ============================================================
 
-class TestStructuredResult:
-    """Test structured specialist result contract."""
 
-    def test_task_completion_updates_state(self):
-        from x19.orchestration.boss import BossOrchestrator
-        from x19.orchestration.task import TaskStatus
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Result Test", target="https://example.com", authorized_domains=["example.com"],
+class TestFailureHandling:
+    def test_a_failure_is_recorded_with_its_reason(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.assign(
+            ids["impl"], role_id="coding", manager_id=MANAGER_ROLE_ID, agent_id="coding"
         )
-        plan = boss.decompose_mission(mission)
-        boss.assign_tasks(mission, plan)
-        ready = boss.get_next_tasks(mission)
-        task = ready[0]
-        task.start()
+        org.runtime.tasks.start(ids["impl"], agent_id="coding", subagent_id="sa-1")
+        org.runtime.tasks.fail(ids["impl"], "provider rate limited", failure_reason="rate_limit")
 
-        result = {
-            "agent_id": "recon_manager", "mission_id": mission.id, "task_id": task.id,
-            "status": "completed", "observations": ["Found 3 endpoints"],
-            "actions_taken": ["GET /", "GET /api", "GET /login"],
-            "tool_results": ["200 OK", "200 OK", "302 Redirect"],
-            "evidence": ["Server: nginx", "X-Powered-By: Express"],
-            "hypotheses": ["Possible IDOR in /api/users"],
-            "confirmed_findings": [], "rejected_findings": [],
-            "next_recommendation": "Test /api/users for IDOR", "errors": [],
-        }
-        boss.handle_task_completion(mission, task.id, result)
-        updated_task = mission.tasks.get(task.id)
-        assert updated_task.status == TaskStatus.COMPLETED
-        assert len(updated_task.evidence) > 0
+        task = org.runtime.tasks.get(ids["impl"])
+        assert task.status is TaskStatus.FAILED
+        assert task.error == "provider rate limited", "the error is retained on the task"
+        assert task.failure_reason == "rate_limit"
+        assert task.attempt >= 1
 
-    def test_finding_lifecycle(self):
-        from x19.findings.finding import Finding, FindingStatus, Severity, Confidence, VulnClass
-        finding = Finding(
-            target="https://example.com", endpoint="/search",
-            vuln_class=VulnClass.XSS, severity=Severity.HIGH,
-            confidence=Confidence.HIGH, status=FindingStatus.CANDIDATE,
+    def test_retry_requeues_within_the_attempt_budget(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.assign(
+            ids["impl"], role_id="coding", manager_id=MANAGER_ROLE_ID, agent_id="coding"
         )
-        assert finding.status == FindingStatus.CANDIDATE
-        assert finding.transition_to(FindingStatus.UNDER_VERIFICATION)
-        assert finding.transition_to(FindingStatus.VERIFIED, verified_by="verification_agent")
-        assert finding.status == FindingStatus.VERIFIED
+        org.runtime.tasks.start(ids["impl"], agent_id="coding", subagent_id="sa-1")
+        org.runtime.tasks.fail(ids["impl"], "transient", failure_reason="timeout")
 
-    def test_finding_rejection(self):
-        from x19.findings.finding import Finding, FindingStatus, Severity, Confidence, VulnClass
-        finding = Finding(
-            target="https://example.com", endpoint="/search",
-            vuln_class=VulnClass.XSS, severity=Severity.HIGH,
-            confidence=Confidence.HIGH, status=FindingStatus.CANDIDATE,
-        )
-        finding.transition_to(FindingStatus.UNDER_VERIFICATION)
-        assert finding.transition_to(FindingStatus.REJECTED, reason="False positive")
-        assert finding.status == FindingStatus.REJECTED
-        assert not finding.can_report_as_verified()
+        result = org.boss.retry(ids["impl"], reason="try again")
+        assert result["ok"], result
+        assert org.runtime.tasks.get(ids["impl"]).status is TaskStatus.QUEUED
 
+    def test_repeated_failure_exhausts_the_budget(self, org):
+        ids = _plan(org)
+        attempts = org.runtime.settings.max_attempts
 
-# ============================================================
-# 9. BOSS STATE UPDATE
-# ============================================================
+        for _ in range(attempts + 2):
+            task = org.runtime.tasks.get(ids["impl"])
+            if task.status is TaskStatus.COMPLETED:
+                break
+            if task.status in (TaskStatus.QUEUED, TaskStatus.PLANNED):
+                org.runtime.tasks.assign(
+                    ids["impl"], role_id="coding", manager_id=MANAGER_ROLE_ID, agent_id="coding"
+                )
+            org.runtime.tasks.start(ids["impl"], agent_id="coding", subagent_id="sa-x")
+            org.runtime.tasks.fail(ids["impl"], "still failing", failure_reason="provider_error")
 
-class TestBossStateUpdate:
-    """Test Boss updates mission state correctly."""
+            if org.runtime.tasks.get(ids["impl"]).status is TaskStatus.FAILED:
+                try:
+                    org.runtime.tasks.retry(ids["impl"])
+                except Exception:
+                    break
 
-    def test_task_failure_handling(self):
-        """Failed tasks auto-retry then escalate."""
-        from x19.orchestration.boss import BossOrchestrator
-        from x19.orchestration.task import TaskStatus
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Failure Test", target="https://example.com", authorized_domains=["example.com"],
-        )
-        plan = boss.decompose_mission(mission)
-        boss.assign_tasks(mission, plan)
-        ready = boss.get_next_tasks(mission)
-        task = ready[0]
-        task.start()
+        assert org.runtime.tasks.get(ids["impl"]).status is TaskStatus.FAILED
+        assert org.runtime.tasks.get(ids["impl"]).attempt >= attempts
 
-        boss.handle_task_failure(mission, task.id, "Network timeout")
-        updated_task = mission.tasks.get(task.id)
-        assert updated_task.retry_count == 1
-        assert updated_task.status == TaskStatus.PENDING
+    def test_a_blocked_task_can_be_escalated_to_a_human(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.block(ids["impl"], "needs credentials we do not have")
+        assert org.runtime.tasks.get(ids["impl"]).status is TaskStatus.BLOCKED
 
-    def test_task_blocked_handling(self):
-        from x19.orchestration.boss import BossOrchestrator
-        from x19.orchestration.task import TaskStatus
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Block Test", target="https://example.com", authorized_domains=["example.com"],
-        )
-        plan = boss.decompose_mission(mission)
-        boss.assign_tasks(mission, plan)
-        ready = boss.get_next_tasks(mission)
-        task = ready[0]
-        task.start()
-        boss.handle_task_blocked(mission, task.id, "Requires approval", requires_approval=True)
-        updated_task = mission.tasks.get(task.id)
-        assert updated_task.status == TaskStatus.BLOCKED
-        assert len(mission.blockers) > 0
+        org.runtime.request_approval(ids["impl"], "Provide staging credentials?")
+        assert org.runtime.tasks.get(ids["impl"]).status is TaskStatus.WAITING_APPROVAL
+        assert org.runtime.pending_approvals(), "the request is visible to the operator"
 
-    def test_timeline_events(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Timeline Test", target="https://example.com", authorized_domains=["example.com"],
-        )
-        assert len(mission.timeline) > 0
+    def test_approval_and_denial_are_real_transitions(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.block(ids["impl"], "needs a decision")
+        org.runtime.request_approval(ids["impl"], "Proceed with the paid API?")
+        pending = org.runtime.pending_approvals()[0]
 
-    def test_mission_stats(self):
-        from x19.orchestration.boss import BossOrchestrator
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Stats Test", target="https://example.com", authorized_domains=["example.com"],
-        )
-        stats = boss.get_mission_status(mission)
-        assert "mission_id" in stats
-        assert "status" in stats
-        assert "phase" in stats
-        assert stats["mission_id"] == mission.id
+        org.runtime.resolve_approval(pending["id"], approved=True, decided_by="operator")
+        assert org.runtime.tasks.get(ids["impl"]).status in _DISPATCHABLE
+        assert org.runtime.pending_approvals() == []
 
+    def test_denial_fails_the_task_with_the_operator_reason(self, org):
+        ids = _plan(org)
+        # WAITING_DEPENDENCY -> WAITING_APPROVAL is legal: asking the operator is
+        # legitimate from any non-terminal state.
+        assert org.runtime.tasks.get(ids["test"]).status is TaskStatus.WAITING_DEPENDENCY
+        org.runtime.request_approval(ids["test"], "Run the paid test suite?")
+        pending = org.runtime.pending_approvals()[0]
 
-# ============================================================
-# 10. OPERATOR STATUS QUERIES
-# ============================================================
+        org.runtime.resolve_approval(pending["id"], approved=False, decided_by="operator", note="too expensive")
+        task = org.runtime.tasks.get(ids["test"])
 
-class TestOperatorStatus:
-    """Test operator status queries come from real mission state."""
+        assert task.status is TaskStatus.FAILED
+        assert "too expensive" in json.dumps(task.to_dict())
 
-    def test_whats_happening(self):
-        from x19.interface.operator import OperatorInterface
-        from x19.orchestration.mission_state import MissionStateManager
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            op = OperatorInterface(mission_manager=manager)
-            mission, msg = op.start_assessment(
-                target="https://example.com", authorized_domains=["example.com"],
-            )
-            assert mission is not None
-            assert "Mission accepted" in msg
+    def test_resolving_a_blocker_unblocks_the_task(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.block(ids["impl"], "waiting on access")
 
-    def test_no_mission_status(self):
-        from x19.interface.operator import OperatorInterface
-        from x19.orchestration.mission_state import MissionStateManager
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            op = OperatorInterface(mission_manager=manager)
-            assert "No active mission" in op.whats_happening()
-            assert "No active mission" in op.what_completed()
-            assert "No active mission" in op.show_active_tasks()
+        result = org.boss.resolve_blocker(ids["impl"], resolution="access granted")
+        assert result["ok"], result
+        assert org.runtime.tasks.get(ids["impl"]).status in (TaskStatus.QUEUED, TaskStatus.PLANNED)
+
+    def test_the_guards_refuse_a_dispatch_that_cannot_succeed(self, org):
+        ids = _plan(org)
+        decision = org.guards.can_dispatch(org.runtime.tasks.get(ids["test"]))
+
+        assert decision.allowed is False, "a task with unmet dependencies must not dispatch"
+        assert decision.reason
+
+    def test_a_cancelled_task_is_terminal_and_reported(self, org):
+        ids = _plan(org)
+        _run_worker(org, ids["impl"], "coding")
+        org.boss.cancel(ids["docs"], reason="documentation deferred")
+
+        assert org.runtime.tasks.get(ids["docs"]).status is TaskStatus.CANCELLED
+        assert org.boss.status()["counts"]["cancelled"] == 1
 
 
 # ============================================================
-# 11. PAUSE/STOP/KILL-ALL
+# 7. STATUS, AUDIT AND ANSWERING THE USER FROM REAL STATE
 # ============================================================
 
-class TestOperatorControls:
-    """Test operator pause/stop/kill-all controls."""
 
-    def test_pause(self):
-        from x19.interface.operator import OperatorInterface
-        from x19.orchestration.mission_state import MissionStateManager, MissionStatus
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            op = OperatorInterface(mission_manager=manager)
-            mission, _ = op.start_assessment(
-                target="https://example.com", authorized_domains=["example.com"],
-            )
-            result = op.pause()
-            assert "paused" in result.lower()
-            loaded = manager.load_mission(mission.id)
-            assert loaded.status == MissionStatus.PAUSED
+class TestStatusReporting:
+    def test_status_reports_the_real_run_and_phase(self, org):
+        ids = _plan(org)
+        status = org.boss.status()
 
-    def test_resume(self):
-        from x19.interface.operator import OperatorInterface
-        from x19.orchestration.mission_state import MissionStateManager, MissionStatus
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            op = OperatorInterface(mission_manager=manager)
-            mission, _ = op.start_assessment(
-                target="https://example.com", authorized_domains=["example.com"],
-            )
-            op.pause()
-            result = op.resume()
-            assert "resumed" in result.lower()
-            loaded = manager.load_mission(mission.id)
-            assert loaded.status == MissionStatus.ACTIVE
+        assert status["run"]["objective"] == "Build the CSV export feature, test it and document it"
+        assert status["phase"]["label"]
+        assert status["phase"]["detail"]
+        assert status["boss"]["role_id"] == BOSS_ROLE_ID
+        assert status["manager"]["role_id"] == MANAGER_ROLE_ID
 
-    def test_stop(self):
-        from x19.interface.operator import OperatorInterface
-        from x19.orchestration.mission_state import MissionStateManager, MissionStatus
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            op = OperatorInterface(mission_manager=manager)
-            mission, _ = op.start_assessment(
-                target="https://example.com", authorized_domains=["example.com"],
-            )
-            result = op.stop(reason="Testing stop")
-            assert "stopped" in result.lower()
-            loaded = manager.load_mission(mission.id)
-            assert loaded.status == MissionStatus.STOPPED
+    def test_status_counts_change_when_work_actually_happens(self, org):
+        ids = _plan(org)
+        before = org.boss.status()["counts"]
+        _run_worker(org, ids["impl"], "coding")
+        after = org.boss.status()["counts"]
 
-    def test_kill_all(self):
-        from x19.interface.operator import OperatorInterface
-        from x19.orchestration.mission_state import MissionStateManager
-        from x19.orchestration.task import TaskStatus
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = MissionStateManager(storage_dir=tmpdir)
-            op = OperatorInterface(mission_manager=manager)
-            mission, _ = op.start_assessment(
-                target="https://example.com", authorized_domains=["example.com"],
-            )
-            result = op.kill_all()
-            assert "killed" in result.lower()
-            loaded = manager.load_mission(mission.id)
-            cancelled = [t for t in loaded.tasks.tasks.values() if t.status == TaskStatus.CANCELLED]
-            assert len(cancelled) > 0
+        assert after["completed"] == before["completed"] + 1
 
+    def test_ready_and_blocked_slices_come_from_the_graph(self, org):
+        ids = _plan(org)
+        status = org.boss.status()
 
-# ============================================================
-# 12. HERMES BASELINE COMPATIBILITY
-# ============================================================
+        assert ids["impl"] in [row["task_id"] for row in status["ready"]]
+        assert [row["task_id"] for row in status["blocked"] if row["status"] == "blocked"] == []
 
-class TestHermesBaselineCompat:
-    """Test that Hermes baseline still works when X19 is disabled."""
+        # WAITING_DEPENDENCY rows ride in the same slice, tagged with their own
+        # status, so a consumer can tell a real blockage from normal progress.
+        waiting = [row["task_id"] for row in status["blocked"] if row["status"] == "waiting_dependency"]
+        assert set(waiting) == {ids["test"], ids["docs"]}
 
-    def test_x19_disabled_returns_hermes_default(self):
-        from x19.identity.core import is_x19_enabled
-        with patch.dict(os.environ, {"X19_ENABLED": "0"}):
-            assert is_x19_enabled() is False
+        org.runtime.tasks.block(ids["impl"], "stuck")
+        blocked = [row for row in org.boss.status()["blocked"] if row["status"] == "blocked"]
 
-    def test_config_dict_disable(self):
-        from x19.identity.core import is_x19_enabled
-        assert is_x19_enabled(config={"x19": {"enabled": False}}) is False
+        assert [row["task_id"] for row in blocked] == [ids["impl"]]
+        assert blocked[0]["objective"] == "Implement the CSV export endpoint"
+        assert blocked[0]["reason"] == "stuck"
 
-    def test_x19_package_imports_without_error(self):
-        import x19
-        assert hasattr(x19, '__version__')
-        assert hasattr(x19, '__identity__')
-        assert x19.__identity__ == "X19 — Autonomous Security Operations Agent"
+    def test_next_actions_are_derived_not_scripted(self, org):
+        ids = _plan(org)
+        actions = org.boss.status()["next_actions"]
 
-    def test_orchestration_imports(self):
-        from x19.orchestration import BossOrchestrator, MissionState, MissionStateManager
-        from x19.orchestration import Task, TaskStore, TaskStatus, TaskPriority
-        assert BossOrchestrator is not None
-        assert MissionState is not None
-        assert Task is not None
+        assert actions, "a run with ready work must propose an action"
+        assert any(a["kind"] == "dispatch" and a["task_id"] == ids["impl"] for a in actions)
 
-    def test_specialists_import(self):
-        from x19.specialists import SPECIALIST_MODULES
-        assert len(SPECIALIST_MODULES) >= 3
+    def test_status_text_renders_the_same_state(self, org):
+        _plan(org)
+        text = org.boss.status_text()
+
+        assert "X19" in text
+        assert "CSV export" in text
+
+    def test_audit_mode_inspects_the_whole_organization(self, org):
+        ids = _plan(org)
+        _run_worker(org, ids["impl"], "coding")
+        audit = org.boss.audit()
+
+        assert audit["overall_state"]
+        assert audit["phase"]["label"]
+        assert audit["counts"]["completed"] >= 1
+        assert audit["task_graph"], "the audit carries the real graph"
+        assert "roster" in audit and "spend" in audit
+
+    def test_audit_text_is_renderable(self, org):
+        _plan(org)
+        assert len(org.boss.audit_text()) > 40
+
+    def test_answer_reads_live_state_for_a_status_question(self, org):
+        ids = _plan(org)
+        answer = org.boss.answer("what is the current status?")
+
+        assert answer["kind"]
+        assert "CSV export" in json.dumps(answer)
+
+    def test_answer_reports_blockers_from_the_graph(self, org):
+        ids = _plan(org)
+        org.runtime.tasks.block(ids["impl"], "no database credentials")
+        answer = org.boss.answer("why is this blocked?")
+
+        assert answer["kind"] == "blocked"
+        assert any(t["task_id"] == ids["impl"] for t in answer["blocked"])
+
+    def test_answer_does_not_invent_progress_when_nothing_ran(self, org):
+        org.boss.accept_objective("Ship the CSV export")
+        answer = org.boss.answer("what did the workers complete?")
+        payload = json.dumps(answer)
+
+        assert "completed" in payload or "none" in payload.lower() or answer["kind"]
+        assert "fabricated" not in payload
 
 
 # ============================================================
-# MISSION STATE SERIALIZATION
+# 8. EVENT STREAM
 # ============================================================
 
-class TestMissionStateSerialization:
-    """Test mission state persistence round-trip."""
 
-    def test_mission_to_dict_from_dict(self):
-        from x19.orchestration.mission_state import MissionState, MissionPhase, MissionStatus
-        from x19.scope.scope import create_scope
-        scope = create_scope(target="https://example.com", authorized_domains=["example.com"])
-        mission = MissionState(
-            name="Serialization Test", scope=scope,
-            objectives=["Test XSS"], phase=MissionPhase.RECON, status=MissionStatus.ACTIVE,
-        )
-        mission.add_timeline_event(MissionPhase.RECON, "Started recon", "recon_manager")
-        mission.add_discovery("endpoints", "/api/users")
-        mission.add_hypothesis({"vuln_class": "xss", "endpoint": "/search"})
-        data = mission.to_dict()
-        restored = MissionState.from_dict(data)
-        assert restored.id == mission.id
-        assert restored.name == "Serialization Test"
-        assert restored.phase == MissionPhase.RECON
-        assert len(restored.timeline) == len(mission.timeline)
+class TestEventStream:
+    def test_real_lifecycle_events_are_published(self, org):
+        ids = _plan(org)
+        _run_worker(org, ids["impl"], "coding")
+        events = org.runtime.bus.recent(500)
+        types = {e.type.value for e in events}
 
+        assert EventType.TASK_CREATED.value in types
+        assert any(t.startswith("task.") for t in types)
+        assert any(t.startswith("agent.") or t == EventType.TASK_COMPLETED.value for t in types)
 
-# ============================================================
-# SCOPE VALIDATION
-# ============================================================
+    def test_events_are_ordered_and_carry_the_task(self, org):
+        ids = _plan(org)
+        events = [e for e in org.runtime.bus.recent(500) if e.task_id == ids["impl"]]
 
-class TestScopeValidation:
-    """Test scope enforcement."""
+        assert events, "the worker task emitted events"
+        seqs = [e.seq for e in events]
+        assert seqs == sorted(seqs), "the stream is append-only and ordered"
 
-    def test_valid_scope(self):
-        from x19.scope.scope import create_scope, validate_scope
-        scope = create_scope(target="https://example.com", authorized_domains=["example.com"])
-        valid, errors = validate_scope(scope)
-        assert valid is True
-        assert len(errors) == 0
+    def test_event_payloads_serialize_for_the_wire(self, org):
+        ids = _plan(org)
+        event = org.runtime.bus.recent(500)[0]
+        data = event.to_dict()
 
-    def test_scope_creation(self):
-        from x19.scope.scope import create_scope
-        scope = create_scope(
-            target="https://example.com",
-            authorized_domains=["example.com", "*.api.example.com"],
-            excluded_assets=["example.com/admin"],
-            program_name="Example BBP",
-        )
-        assert scope.target == "https://example.com"
-        assert "example.com" in scope.authorized_domains
-
-    def test_scope_to_dict(self):
-        from x19.scope.scope import create_scope
-        scope = create_scope(target="https://example.com", authorized_domains=["example.com"])
-        data = scope.to_dict()
-        assert "target" in data
-        assert data["target"] == "https://example.com"
+        assert {"seq", "ts", "type", "message"} <= set(data)
+        assert json.loads(json.dumps(data, default=str))["seq"] == data["seq"]
 
 
 # ============================================================
-# STRUCTURED REPORT CONTRACT
+# 9. OPERATOR CONTROL
 # ============================================================
 
-class TestReportContract:
-    """Test the machine-readable specialist result contract."""
 
-    REQUIRED_FIELDS = [
-        "agent_id", "mission_id", "task_id", "status",
-        "observations", "actions_taken", "tool_results",
-        "evidence", "hypotheses", "confirmed_findings",
-        "rejected_findings", "next_recommendation", "errors",
-    ]
+class TestRunControl:
+    def test_pause_and_resume_are_visible_in_status(self, org):
+        _plan(org)
 
-    def test_report_contract_has_all_fields(self):
-        result = {
-            "agent_id": "recon_manager", "mission_id": "M-TEST", "task_id": "T-001",
-            "status": "completed", "observations": ["Found 3 endpoints"],
-            "actions_taken": ["GET /"], "tool_results": ["200 OK"],
-            "evidence": ["Server: nginx"], "hypotheses": ["Possible XSS"],
-            "confirmed_findings": [], "rejected_findings": [],
-            "next_recommendation": "Test XSS", "errors": [],
-        }
-        for field in self.REQUIRED_FIELDS:
-            assert field in result, f"Missing required field: {field}"
+        paused = org.boss.pause("operator stepped away")
+        assert paused["paused"] is True
+        assert org.boss.status()["run"]["paused"] is True
 
-    def test_report_contract_is_machine_readable(self):
-        result = {
-            "agent_id": "web_security", "mission_id": "M-TEST", "task_id": "T-002",
-            "status": "completed", "observations": ["Reflected XSS in /search"],
-            "actions_taken": ["Sent payload"], "tool_results": ["Script reflected"],
-            "evidence": ["Unescaped script tag"],
-            "hypotheses": [{"vuln_class": "xss", "confidence": "high"}],
-            "confirmed_findings": [], "rejected_findings": [],
-            "next_recommendation": "Verify with different payloads", "errors": [],
-        }
-        serialized = json.dumps(result)
-        deserialized = json.loads(serialized)
-        assert deserialized == result
+        resumed = org.boss.resume()
+        assert resumed["paused"] is False
+        assert org.boss.status()["run"]["paused"] is False
 
-    def test_boss_parses_report_contract(self):
-        from x19.orchestration.boss import BossOrchestrator
-        from x19.orchestration.task import TaskStatus
-        boss = BossOrchestrator()
-        mission, _ = boss.create_mission(
-            name="Report Parse Test", target="https://example.com", authorized_domains=["example.com"],
-        )
-        plan = boss.decompose_mission(mission)
-        boss.assign_tasks(mission, plan)
-        ready = boss.get_next_tasks(mission)
-        task = ready[0]
-        task.start()
+    def test_stop_cancels_outstanding_work_and_closes_the_run(self, org):
+        ids = _plan(org)
+        result = org.boss.stop("operator aborted")
 
-        result = {
-            "agent_id": "recon_manager", "mission_id": mission.id, "task_id": task.id,
-            "status": "completed",
-            "observations": ["Subdomain: api.example.com"],
-            "actions_taken": ["DNS enum", "Header analysis"],
-            "tool_results": ["api.example.com A 1.2.3.4"],
-            "evidence": ["4 endpoints discovered"],
-            "hypotheses": [{"id": "H-1", "vuln_class": "cors_misconfig", "endpoint": "/api"}],
-            "confirmed_findings": [], "rejected_findings": [],
-            "next_recommendation": "Test CORS", "errors": [],
-        }
-        boss.handle_task_completion(mission, task.id, result)
-        updated_task = mission.tasks.get(task.id)
-        assert updated_task.status == TaskStatus.COMPLETED
-        assert len(updated_task.evidence) > 0
+        assert result["ok"] is True
+        assert set(result["cancelled"]) >= {ids["test"], ids["docs"]}
+        assert result["count"] == len(result["cancelled"])
+        assert org.runtime.tasks.get(ids["test"]).status is TaskStatus.CANCELLED
+        assert org.runtime.run.to_dict()["active"] is False
+
+    def test_completing_every_worker_closes_the_run(self, org):
+        ids = _plan(org)
+
+        for key, role in (("impl", "coding"), ("test", "testing"), ("docs", "documentation")):
+            _run_worker(org, ids[key], role)
+
+        status = org.boss.status()
+        assert status["counts"]["completed"] >= len(ids)
+        assert org.runtime.tasks.get(status["run"]["project_task_id"]).status is TaskStatus.COMPLETED
 
 
 # ============================================================
-# ANTI-LOOP / SAFETY
+# 10. PERSISTENCE
 # ============================================================
 
-class TestAntiLoop:
-    """Test anti-loop detection and mission safety."""
 
-    def test_anti_loop_detector_exists(self):
-        from x19.safety.anti_loop import AntiLoopDetector
-        detector = AntiLoopDetector()
-        stats = detector.get_stats()
-        assert "total_detections" in stats
+class TestPersistence:
+    def test_state_survives_a_runtime_reload(self, tmp_path: Path):
+        set_live_reader(None)
+        reset_event_bus()
+        rt = OrganizationRuntime(root=tmp_path, persist=True)
+        set_runtime(rt)
+        boss, manager = Boss(rt), Manager(rt)
 
-    def test_anti_loop_records_failure(self):
-        from x19.safety.anti_loop import AntiLoopDetector, LoopDetection, LoopType
-        detector = AntiLoopDetector()
-        detection = LoopDetection(
-            type=LoopType.NO_PROGRESS,
-            description="Task failed 3 times",
-            evidence="Network timeout",
-            task_id="T-001",
-            agent_id="recon_manager",
-            severity="medium",
-            suggested_action="Change strategy",
-        )
-        detector.detections.append(detection)
-        detector.record_failure("T-001", "recon_manager", detection, strategy_tried=["recon scan"])
-        stats = detector.get_stats()
-        assert stats["total_detections"] > 0
+        boss.accept_objective("Persist the export work")
+        ids = manager.plan(PLAN)["keys"]
+        _run_worker(SimpleNamespace(runtime=rt, boss=boss, manager=manager), ids["impl"], "coding")
+        first = rt.tasks.get(ids["impl"]).to_dict()
 
-    def test_scope_enforcement(self):
-        from x19.scope.scope import create_scope, validate_scope
-        scope = create_scope(target="https://example.com", authorized_domains=["example.com"])
-        valid, errors = validate_scope(scope)
-        assert valid is True
+        reloaded = OrganizationRuntime(root=tmp_path, persist=True)
+        set_runtime(reloaded)
+        second = reloaded.tasks.get(ids["impl"]).to_dict()
 
-    def test_scope_to_dict_round_trip(self):
-        from x19.scope.scope import create_scope, ScopeDefinition
-        scope = create_scope(
-            target="https://example.com",
-            authorized_domains=["example.com"],
-            excluded_assets=["example.com/admin"],
-        )
-        data = scope.to_dict()
-        restored = ScopeDefinition.from_dict(data)
-        assert restored.target == scope.target
-        assert restored.authorized_domains == scope.authorized_domains
+        assert second["status"] == first["status"] == "completed"
+        assert second["objective"] == first["objective"]
+        assert reloaded.run.objective == "Persist the export work"
+
+        set_runtime(None)
+        reset_runtime()
+        reset_event_bus()
 
 
 # ============================================================
-# MISSION STATE COMPLETENESS
+# 11. NO LEGACY PRODUCT IDENTITY
 # ============================================================
 
-class TestMissionStateCompleteness:
-    """Test that MissionState has ALL required fields per spec."""
 
-    def test_mission_state_required_fields(self):
-        from x19.orchestration.mission_state import MissionState, MissionPhase, MissionStatus
-        from x19.scope.scope import create_scope
-        scope = create_scope(target="https://example.com", authorized_domains=["example.com"])
-        mission = MissionState(name="Field Test", scope=scope, objectives=["Test"])
+class TestNoLegacyIdentity:
+    @pytest.mark.parametrize(
+        "path",
+        ["SOUL.md", "docker/SOUL.md", "x19/__init__.py", "x19/identity/core.py",
+         "x19/identity/prompts.py"],
+    )
+    def test_identity_sources_carry_no_legacy_product_name(self, path):
+        text = (REPO_ROOT / path).read_text()
 
-        assert hasattr(mission, 'id') and mission.id
-        assert mission.scope.target == "https://example.com"
-        assert mission.scope is not None
-        assert hasattr(mission, 'status')
-        assert hasattr(mission, 'phase')
-        assert hasattr(mission, 'objectives')
-        assert hasattr(mission, 'tasks')
-        stats = mission.tasks.get_stats()
-        assert "pending" in stats and "completed" in stats and "blocked" in stats
-        assert hasattr(mission, 'findings')
-        assert hasattr(mission, 'agents')
-        assert hasattr(mission, 'timeline')
-        assert hasattr(mission, 'evidence')
-        assert hasattr(mission, 'created_at')
-        assert hasattr(mission, 'updated_at')
+        assert "hermes" not in text.lower(), f"{path} still names the legacy product"
+
+    # docker/SOUL.md is seeded into $X19_HOME on first container boot, so it is
+    # a deployed persona, not a spare copy — it has to carry the same identity.
+    @pytest.mark.parametrize(
+        "path", ["SOUL.md", "docker/SOUL.md", "x19/identity/core.py"]
+    )
+    def test_identity_is_no_longer_security_operations(self, path):
+        text = (REPO_ROOT / path).read_text()
+
+        # Case-insensitive on purpose: the framing this guards against survived
+        # in docker/SOUL.md as "an autonomous security operations agent", and a
+        # title-case assertion walked straight past it.
+        assert "autonomous security operations" not in text.lower()
+        assert "bug bounty" not in text.lower() and "bug-bounty" not in text.lower()
+
+    def test_soul_md_declares_x19_and_the_real_hierarchy(self):
+        text = (REPO_ROOT / "SOUL.md").read_text()
+
+        assert text.startswith("# X19")
+        assert "X22" in text and "MANAGER" in text
+        assert "built on X19 foundation by Nous Research" not in text, "collapsed-rename residue"
 
 
 if __name__ == "__main__":

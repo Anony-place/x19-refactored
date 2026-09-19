@@ -1,4 +1,4 @@
-"""``hermes photon ...`` CLI subcommands (registered via ``ctx.register_cli_command()``):
+"""``x19 photon ...`` CLI subcommands (registered via ``ctx.register_cli_command()``):
 setup (device login + project + user + sidecar), status, install-sidecar (npm install in
 the sidecar dir), telemetry [on|off]. Device login is the first step of ``setup`` (no
 standalone ``login`` verb); inbound is the gRPC stream, so there are no webhook subcommands.
@@ -13,7 +13,7 @@ import subprocess
 import sys
 from typing import Optional
 
-from hermes_cli.colors import Colors, color
+from x19_cli.colors import Colors, color
 
 from . import auth as photon_auth
 from .adapter import sidecar_deps_installed
@@ -22,10 +22,10 @@ import contextlib
 
 
 def register_cli(parser: argparse.ArgumentParser) -> None:
-    """Wire up `hermes photon ...` subcommands."""
+    """Wire up `x19 photon ...` subcommands."""
     subs = parser.add_subparsers(dest="photon_command", required=False)
     p_setup = subs.add_parser("setup", help="First-time setup (device login + project + user + sidecar)")
-    p_setup.add_argument("--project-name", default=None, help="Project name (default: 'Hermes Agent')")
+    p_setup.add_argument("--project-name", default=None, help="Project name (default: 'X19')")
     p_setup.add_argument("--phone", default=None, help="Your E.164 phone number (e.g. +15551234567)")
     p_setup.add_argument("--first-name", default=None)
     p_setup.add_argument("--last-name", default=None)
@@ -144,7 +144,7 @@ def _setup_credentials(token: str, dashboard_id: str, name: str) -> Optional[str
             print(f"  ✓ Spectrum ready (project id {dashboard_id}) — new secret saved")
             print("  ⚠ Project secret was regenerated. If the gateway is running, "
                   "restart it so the sidecar picks up the new secret:\n"
-                  "      hermes gateway restart")
+                  "      x19 gateway restart")
     except Exception as e:
         print(f"spectrum provisioning failed: {e}", file=sys.stderr)
         return None
@@ -215,12 +215,12 @@ def _cmd_setup(args: argparse.Namespace) -> int:
             return rc
     # 7. Enable the platform in config.yaml, or the channel silently stays offline.
     try:
-        from hermes_cli.config import write_platform_config_field
+        from x19_cli.config import write_platform_config_field
         write_platform_config_field("photon", "enabled", True, raw=True)
         print("  ✓ photon platform enabled in config.yaml")
     except Exception as e:
         print(f"      (could not enable Photon in config: {e})", file=sys.stderr)
-    print("\n✓ Photon setup complete.\n  Start the gateway:  hermes gateway start")
+    print("\n✓ Photon setup complete.\n  Start the gateway:  x19 gateway start")
     return 0
 
 
@@ -228,7 +228,7 @@ def _autoconfigure_access(phone: str) -> None:
     """Set PHOTON_ALLOWED_USERS and PHOTON_HOME_CHANNEL to the operator's number, each only
     when unset so a hand-tuned value is never clobbered on re-run."""
     try:
-        from hermes_cli.config import get_env_value, save_env_value
+        from x19_cli.config import get_env_value, save_env_value
     except ImportError:
         return
     for key, label in (("PHOTON_ALLOWED_USERS", "allowlisted your number"),
@@ -257,15 +257,15 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     photon_auth.print_credential_summary(print)
     node_bin = os.getenv("PHOTON_NODE_BIN") or shutil.which("node")
     print(f"  node binary         : {node_bin or '✗ missing (install Node 18+)'}")
-    print(f"  sidecar deps        : {'✓ installed' if sidecar_deps_installed() else '✗ run `hermes photon install-sidecar`'}")
-    print(f"  telemetry           : {'on' if _telemetry_enabled() else 'off'} (`hermes photon telemetry on|off`)")
+    print(f"  sidecar deps        : {'✓ installed' if sidecar_deps_installed() else '✗ run `x19 photon install-sidecar`'}")
+    print(f"  telemetry           : {'on' if _telemetry_enabled() else 'off'} (`x19 photon telemetry on|off`)")
     return 0
 
 
 def _telemetry_enabled() -> bool:
-    """PHOTON_TELEMETRY from env / ~/.hermes/.env; truthy set mirrors the sidecar's."""
+    """PHOTON_TELEMETRY from env / ~/.x19/.env; truthy set mirrors the sidecar's."""
     try:
-        from hermes_cli.config import get_env_value
+        from x19_cli.config import get_env_value
         raw = get_env_value("PHOTON_TELEMETRY")
     except ImportError:
         raw = os.getenv("PHOTON_TELEMETRY")
@@ -276,16 +276,16 @@ def _cmd_telemetry(args: argparse.Namespace) -> int:
     state = getattr(args, "state", None)
     if state is None:
         print(f"Photon telemetry: {'on' if _telemetry_enabled() else 'off'}")
-        print("  Toggle with `hermes photon telemetry on` / `hermes photon telemetry off`.")
+        print("  Toggle with `x19 photon telemetry on` / `x19 photon telemetry off`.")
         return 0
     try:
-        from hermes_cli.config import save_env_value
+        from x19_cli.config import save_env_value
         save_env_value("PHOTON_TELEMETRY", "true" if state == "on" else "false")
     except Exception as e:
         print(f"could not save PHOTON_TELEMETRY: {e}", file=sys.stderr)
         return 1
-    print(f"✓ Spectrum telemetry turned {state} (PHOTON_TELEMETRY in ~/.hermes/.env)")
-    print("  Restart the gateway for the sidecar to pick it up:  hermes gateway restart")
+    print(f"✓ Spectrum telemetry turned {state} (PHOTON_TELEMETRY in ~/.x19/.env)")
+    print("  Restart the gateway for the sidecar to pick it up:  x19 gateway restart")
     return 0
 
 
@@ -328,8 +328,8 @@ _COMMANDS = {
 
 
 def gateway_setup() -> None:
-    """Run Photon first-time setup from the unified `hermes gateway setup` wizard (same flow
-    as ``hermes photon setup``; phone is prompted when stdin is a TTY)."""
+    """Run Photon first-time setup from the unified `x19 gateway setup` wizard (same flow
+    as ``x19 photon setup``; phone is prompted when stdin is a TTY)."""
     _cmd_setup(argparse.Namespace(
         photon_command="setup", project_name=None, phone=None, first_name=None, last_name=None,
         email=None, no_browser=False, skip_sidecar_install=False))
@@ -345,24 +345,3 @@ def _prompt(prompt: str, *, secret: bool = False) -> str:
         return ""
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from pathlib import Path  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'resolve_sidecar_dir': ('plugins.platforms.photon.sidecar_paths', 'resolve_sidecar_dir'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

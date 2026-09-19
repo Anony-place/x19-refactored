@@ -5,7 +5,7 @@ import { test } from 'vitest'
 import { createFirstRunSetupGate } from './first-run-setup-gate'
 
 const bootstrapBackend = {
-  activeRoot: '/tmp/hermes-home/hermes-agent',
+  activeRoot: '/tmp/x19-home/x19',
   kind: 'bootstrap-needed',
   platform: 'linux'
 }

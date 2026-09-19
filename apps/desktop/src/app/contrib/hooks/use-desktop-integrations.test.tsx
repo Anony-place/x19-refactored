@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setApiRequestConnection, setApiRequestProfile } from '@/hermes'
+import { setApiRequestConnection, setApiRequestProfile } from '@/x19'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $confirmRequest, runConfirm, settleConfirm } from '@/store/confirm'
 import { $hubInstalledOverride } from '@/store/hub-actions'
@@ -10,7 +10,7 @@ import { $pluginInstallRequest } from '@/store/plugin-install-request'
 import { _resetLegacyDiscardForTests } from '@/store/session'
 import { dropSessionState, publishSessionState } from '@/store/session-states'
 import type * as WindowsStore from '@/store/windows'
-import type { SessionInfo } from '@/types/hermes'
+import type { SessionInfo } from '@/types/x19'
 
 import { makeSessionInfo } from '../../../test/session-info'
 import { sessionRoute } from '../../routes'
@@ -42,8 +42,8 @@ vi.mock('@/store/windows', async importOriginal => {
 // We import the hook and drive it with explicit rx-stores/props to exercise the
 // profile-ready gate, ownership validation, and legacy-key discard.
 
-const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
-const initialHermesDesktop = desktopWindow.hermesDesktop
+const desktopWindow = window as unknown as { x19Desktop?: Window['x19Desktop'] }
+const initialX19Desktop = desktopWindow.x19Desktop
 
 const session = (over: Partial<SessionInfo> = {}): SessionInfo => makeSessionInfo({ id: 'live', ...over })
 
@@ -60,8 +60,8 @@ describe('useDesktopIntegrations', () => {
 
     // Stub the desktop bridge so the hook's useEffect callbacks don't try to
     // reach real Electron IPC. The established desktop-test pattern assigns a
-    // plain object to window.hermesDesktop rather than using vi.spyOn.
-    desktopWindow.hermesDesktop = {
+    // plain object to window.x19Desktop rather than using vi.spyOn.
+    desktopWindow.x19Desktop = {
       setPreviewShortcutActive: vi.fn(),
       onOpenUpdatesRequested: vi.fn(),
       onFocusSession: vi.fn(),
@@ -71,12 +71,12 @@ describe('useDesktopIntegrations', () => {
       signalDeepLinkReady: vi.fn(),
       onClosePreviewRequested: vi.fn(),
       onOpenFolderRequested: vi.fn()
-    } as unknown as Window['hermesDesktop']
+    } as unknown as Window['x19Desktop']
   })
 
   afterEach(() => {
-    if (initialHermesDesktop) {
-      desktopWindow.hermesDesktop = initialHermesDesktop
+    if (initialX19Desktop) {
+      desktopWindow.x19Desktop = initialX19Desktop
     }
 
     vi.restoreAllMocks()
@@ -141,8 +141,8 @@ describe('useDesktopIntegrations', () => {
   describe('profile-ready gate', () => {
     it('does NOT restore before profileReady is true', () => {
       // Set remembered state, but profileReady=false.
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/remembered-session')
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'remembered-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/remembered-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'remembered-session')
 
       render({ profileReady: false })
 
@@ -151,7 +151,7 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('restores on profileReady when remembered route exists and owns the session', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/remembered-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/remembered-session')
 
       const sessions = [session({ id: 'remembered-session', profile: 'default' })]
 
@@ -161,7 +161,7 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('restores remembered session id when no remembered route exists', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'remembered-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'remembered-session')
 
       const sessions = [session({ id: 'remembered-session', profile: 'default' })]
 
@@ -172,12 +172,12 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('waits for sessions before validating a remembered session route', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/remembered-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/remembered-session')
 
       const result = render({ profileReady: true, sessions: [] })
 
       expect(navigate).not.toHaveBeenCalled()
-      expect(window.localStorage.getItem('hermes.desktop.lastRoute.profile.default')).toBe('/remembered-session')
+      expect(window.localStorage.getItem('x19.desktop.lastRoute.profile.default')).toBe('/remembered-session')
 
       result.rerender({
         activeProfile: 'default',
@@ -195,8 +195,8 @@ describe('useDesktopIntegrations', () => {
 
   describe('display.resume_last_session', () => {
     it('stays on the fresh chat when the setting is off, and keeps remembering the open chat', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/remembered-session')
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'remembered-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/remembered-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'remembered-session')
 
       const sessions = [session({ id: 'remembered-session', profile: 'default' })]
       const result = render({ profileReady: true, resumeLastSession: false, sessions })
@@ -215,11 +215,11 @@ describe('useDesktopIntegrations', () => {
         sessions: [...sessions, session({ id: 'other-session', profile: 'default' })]
       })
 
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.default')).toBe('other-session')
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.default')).toBe('other-session')
     })
 
     it('holds the restore until the config record answers, then restores when on', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'remembered-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'remembered-session')
 
       const sessions = [session({ id: 'remembered-session', profile: 'default' })]
       const result = render({ profileReady: true, resumeLastSession: null, sessions })
@@ -242,7 +242,7 @@ describe('useDesktopIntegrations', () => {
 
   describe('ownership validation', () => {
     it('refuses to restore a session route owned by another profile', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/ai-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/ai-session')
 
       const sessions = [session({ id: 'ai-session', profile: 'ai-engineer' })]
 
@@ -254,8 +254,8 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('refuses to restore a session id owned by another profile', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'ai-session')
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/ai-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'ai-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/ai-session')
 
       const sessions = [session({ id: 'ai-session', profile: 'ai-engineer' })]
 
@@ -266,7 +266,7 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('clears stale remembered route owned by wrong profile', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.ai-engineer', '/ai-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.ai-engineer', '/ai-session')
 
       const sessions = [session({ id: 'ai-session', profile: 'ai-engineer' })]
 
@@ -279,7 +279,7 @@ describe('useDesktopIntegrations', () => {
 
   describe('two profiles with distinct sessions', () => {
     it('restores profile A session when profile A is active', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.coder', '/coder-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.coder', '/coder-session')
 
       const sessions = [
         session({ id: 'coder-session', profile: 'coder' }),
@@ -292,7 +292,7 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('does NOT bleed profile A session into profile B', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.coder', '/coder-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.coder', '/coder-session')
 
       const sessions = [session({ id: 'coder-session', profile: 'coder' })]
 
@@ -314,8 +314,8 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('does NOT restore remembered navigation on a blank new-chat route', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'remembered-session')
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/remembered-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'remembered-session')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/remembered-session')
 
       render({ profileReady: true, sessions: [session({ id: 'remembered-session', profile: 'default' })] })
 
@@ -332,12 +332,12 @@ describe('useDesktopIntegrations', () => {
         sessions: [session({ id: 'live', profile: 'default' })]
       })
 
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.default')).toBeNull()
-      expect(window.localStorage.getItem('hermes.desktop.lastRoute.profile.default')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.default')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastRoute.profile.default')).toBeNull()
     })
 
     it('does not restore the remembered session id either', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'remembered-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'remembered-session')
 
       render({ profileReady: true, sessions: [session({ id: 'remembered-session', profile: 'default' })] })
 
@@ -348,8 +348,8 @@ describe('useDesktopIntegrations', () => {
   describe('legacy key behavior', () => {
     it('discards legacy global keys on read and does NOT restore from them', () => {
       // Simulate a pre-per-profile install.
-      window.localStorage.setItem('hermes.desktop.lastSessionId', 'legacy-session')
-      window.localStorage.setItem('hermes.desktop.lastRoute', '/session/legacy-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId', 'legacy-session')
+      window.localStorage.setItem('x19.desktop.lastRoute', '/session/legacy-session')
 
       // Profile contexts without matching sessions.
       const sessions = [session({ id: 'legacy-session', profile: 'default' })]
@@ -357,8 +357,8 @@ describe('useDesktopIntegrations', () => {
       render({ profileReady: true, sessions })
 
       // Legacy keys must be discarded.
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId')).toBeNull()
-      expect(window.localStorage.getItem('hermes.desktop.lastRoute')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastRoute')).toBeNull()
 
       // And no navigation should happen (the per-profile keys were empty).
       expect(navigate).not.toHaveBeenCalled()
@@ -382,7 +382,7 @@ describe('useDesktopIntegrations', () => {
       })
 
       // The coder session should be persisted under coder's key.
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.coder')).toBe('coder-session')
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.coder')).toBe('coder-session')
 
       // Now switch to ops.
       rerender({
@@ -396,10 +396,10 @@ describe('useDesktopIntegrations', () => {
       })
 
       // The ops session should now be persisted under ops's key.
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.ops')).toBe('ops-session')
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.ops')).toBe('ops-session')
 
       // Coder's remembered session should still be there.
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.coder')).toBe('coder-session')
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.coder')).toBe('coder-session')
     })
 
     it('does NOT overwrite remembered state when session ownership fails validation', () => {
@@ -417,13 +417,13 @@ describe('useDesktopIntegrations', () => {
       })
 
       // No session should be remembered for the active profile.
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.ops')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.ops')).toBeNull()
     })
   })
 
   describe('route-scoped restoration', () => {
     it('restores a non-session route like /skills', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/skills')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/skills')
 
       const sessions = [session({ id: 'some-session', profile: 'default' })]
 
@@ -434,7 +434,7 @@ describe('useDesktopIntegrations', () => {
     })
 
     it('does NOT restore overlay routes (settings/command-center)', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/settings')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/settings')
 
       render({ profileReady: true, sessions: [] })
 
@@ -463,13 +463,13 @@ describe('useDesktopIntegrations', () => {
       })
 
       // Overlay routes must NOT be persisted.
-      expect(window.localStorage.getItem('hermes.desktop.lastRoute.profile.default')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastRoute.profile.default')).toBeNull()
     })
   })
 
   describe('exhausted session cleanup', () => {
     it('clears remembered session id when the exhausted session matches', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'exhausted')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'exhausted')
 
       const sessions = [session({ id: 'exhausted', profile: 'default' })]
 
@@ -479,11 +479,11 @@ describe('useDesktopIntegrations', () => {
         sessions
       })
 
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.default')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.default')).toBeNull()
     })
 
     it('clears remembered route when it carries the exhausted session', () => {
-      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/exhausted')
+      window.localStorage.setItem('x19.desktop.lastRoute.profile.default', '/exhausted')
 
       const sessions = [session({ id: 'exhausted', profile: 'default' })]
 
@@ -493,11 +493,11 @@ describe('useDesktopIntegrations', () => {
         sessions
       })
 
-      expect(window.localStorage.getItem('hermes.desktop.lastRoute.profile.default')).toBeNull()
+      expect(window.localStorage.getItem('x19.desktop.lastRoute.profile.default')).toBeNull()
     })
 
     it('does NOT clear exhausted when profileReady is false', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'exhausted')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'exhausted')
 
       render({
         profileReady: false,
@@ -506,11 +506,11 @@ describe('useDesktopIntegrations', () => {
       })
 
       // profileReady=false gates the cleanup effect.
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.default')).toBe('exhausted')
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.default')).toBe('exhausted')
     })
 
     it('does NOT clear remembered state when exhausted id does not match', () => {
-      window.localStorage.setItem('hermes.desktop.lastSessionId.profile.default', 'other-session')
+      window.localStorage.setItem('x19.desktop.lastSessionId.profile.default', 'other-session')
 
       render({
         profileReady: true,
@@ -518,55 +518,55 @@ describe('useDesktopIntegrations', () => {
         sessions: [session({ id: 'other-session', profile: 'default' })]
       })
 
-      expect(window.localStorage.getItem('hermes.desktop.lastSessionId.profile.default')).toBe('other-session')
+      expect(window.localStorage.getItem('x19.desktop.lastSessionId.profile.default')).toBe('other-session')
     })
   })
 
   describe('notification activate + plugin deep links', () => {
     it('navigates when a plugin notification activate payload arrives', () => {
       let activate: ((payload: { activate?: string }) => void) | undefined
-      desktopWindow.hermesDesktop = {
-        ...desktopWindow.hermesDesktop,
+      desktopWindow.x19Desktop = {
+        ...desktopWindow.x19Desktop,
         onNotificationActivate: (cb: (payload: { activate?: string }) => void) => {
           activate = cb
 
           return () => undefined
         }
-      } as unknown as Window['hermesDesktop']
+      } as unknown as Window['x19Desktop']
 
       render({ profileReady: true, sessions: [] })
       activate?.({ activate: '/index-network/intent/1' })
       expect(navigate).toHaveBeenCalledWith('/index-network/intent/1')
     })
 
-    it('navigates hermes://index-network/intent/1 deep links through the same path vocabulary', () => {
+    it('navigates x19://index-network/intent/1 deep links through the same path vocabulary', () => {
       let deepLink: ((payload: { kind: string; name: string; params: Record<string, string> }) => void) | undefined
-      desktopWindow.hermesDesktop = {
-        ...desktopWindow.hermesDesktop,
+      desktopWindow.x19Desktop = {
+        ...desktopWindow.x19Desktop,
         onDeepLink: (cb: (payload: { kind: string; name: string; params: Record<string, string> }) => void) => {
           deepLink = cb
 
           return () => undefined
         },
         signalDeepLinkReady: vi.fn()
-      } as unknown as Window['hermesDesktop']
+      } as unknown as Window['x19Desktop']
 
       render({ profileReady: true, sessions: [] })
       deepLink?.({ kind: 'index-network', name: 'intent/1', params: {} })
       expect(navigate).toHaveBeenCalledWith('/index-network/intent/1')
     })
 
-    it('routes hermes://mcp/install to the pending-install dialog, not navigation', () => {
+    it('routes x19://mcp/install to the pending-install dialog, not navigation', () => {
       let deepLink: ((payload: { kind: string; name: string; params: Record<string, string> }) => void) | undefined
-      desktopWindow.hermesDesktop = {
-        ...desktopWindow.hermesDesktop,
+      desktopWindow.x19Desktop = {
+        ...desktopWindow.x19Desktop,
         onDeepLink: (cb: (payload: { kind: string; name: string; params: Record<string, string> }) => void) => {
           deepLink = cb
 
           return () => undefined
         },
         signalDeepLinkReady: vi.fn()
-      } as unknown as Window['hermesDesktop']
+      } as unknown as Window['x19Desktop']
 
       render({ profileReady: true, sessions: [] })
       deepLink?.({ kind: 'mcp', name: 'install', params: { name: 'context7' } })
@@ -579,7 +579,7 @@ describe('useDesktopIntegrations', () => {
     function listen() {
       render({ profileReady: true, resumeLastSession: false })
 
-      return vi.mocked(window.hermesDesktop.onDeepLink!).mock.calls[0]![0]
+      return vi.mocked(window.x19Desktop.onDeepLink!).mock.calls[0]![0]
     }
 
     afterEach(() => {
@@ -614,7 +614,7 @@ describe('useDesktopIntegrations', () => {
         return {}
       })
 
-      desktopWindow.hermesDesktop = { ...desktopWindow.hermesDesktop, api } as unknown as Window['hermesDesktop']
+      desktopWindow.x19Desktop = { ...desktopWindow.x19Desktop, api } as unknown as Window['x19Desktop']
       const deepLink = listen()
       const installs = () => api.mock.calls.filter(([r]) => r.path === '/api/skills/hub/install')
       const identifier = 'skills-sh/owner/repo/skill'
@@ -664,14 +664,14 @@ describe('useDesktopIntegrations', () => {
   describe('notification click -> focus-session id translation', () => {
     function withFocusSession(): (sessionId: string) => void {
       let handler: ((sessionId: string) => void) | undefined
-      desktopWindow.hermesDesktop = {
-        ...desktopWindow.hermesDesktop,
+      desktopWindow.x19Desktop = {
+        ...desktopWindow.x19Desktop,
         onFocusSession: (cb: (sessionId: string) => void) => {
           handler = cb
 
           return () => undefined
         }
-      } as unknown as Window['hermesDesktop']
+      } as unknown as Window['x19Desktop']
 
       return sessionId => handler?.(sessionId)
     }

@@ -25,8 +25,8 @@ logger = logging.getLogger("tools.mcp_tool")
 _MISSING = object()
 
 _NEEDS_REAUTH_MSG = (
-    "MCP server '{s}' requires re-authentication. Run `hermes mcp login {s}` (or delete the tokens file under "
-    "~/.hermes/mcp-tokens/ and restart). Do NOT retry this tool — ask the user to re-authenticate.")
+    "MCP server '{s}' requires re-authentication. Run `x19 mcp login {s}` (or delete the tokens file under "
+    "~/.x19/mcp-tokens/ and restart). Do NOT retry this tool — ask the user to re-authenticate.")
 _STDIO_NO_RESPAWN_MSG = (
     "MCP server '{s}' stdio subprocess had exited (this is not a timeout — the call never reached the server). A "
     "respawn was requested but no fresh session came back within {t:.0f}s. Wait a few seconds before retrying; if it "
@@ -36,7 +36,7 @@ _STDIO_DIED_AGAIN_MSG = (
     "cleanly — do NOT retry this tool; ask the user to check the server's command and its stderr log.")
 _STDIO_OUTCOME_UNCERTAIN_MSG = (
     "MCP server '{s}' lost its stdio subprocess after the tool call began. The operation may have completed, so "
-    "Hermes did not replay it. Do NOT retry automatically; inspect the external state first.")
+    "X19 did not replay it. Do NOT retry automatically; inspect the external state first.")
 _SESSION_OUTCOME_UNCERTAIN_MSG = (
     "The MCP transport session to '{s}' expired while this write-capable call was in flight, so the outcome is "
     "UNKNOWN — the operation may or may not have taken effect server-side. It was NOT automatically retried to "
@@ -425,10 +425,10 @@ def _render_content_blocks(result, server_name: str) -> Tuple[str, int]:
     parts: List[str] = []
     usable_parts = 0
     # MCP tool results can also include ImageContent blocks (screenshot / Blockbench / Playwright etc.);
-    # cache those via the gateway's image-cache helper so they flow through Hermes' MEDIA: tag convention
+    # cache those via the gateway's image-cache helper so they flow through X19' MEDIA: tag convention
     # and out to messaging adapters that render images natively. Without this, image blocks were silently
     # dropped and the agent got an empty response. Distilled from #17915 (c3115644151) and #10848
-    # (gnanirahulnutakki), both too stale to cherry-pick. #10848's approach (integrate with Hermes' MEDIA
+    # (gnanirahulnutakki), both too stale to cherry-pick. #10848's approach (integrate with X19' MEDIA
     # tag + cache_image_from_bytes) was the cleaner of the two — plugs into existing infrastructure.
     for block in (result.content or []):
         if getattr(block, "text", None):

@@ -1,6 +1,6 @@
-"""``hermes lsp`` CLI subcommand: status / list / install / install-all / restart / which.
+"""``x19 lsp`` CLI subcommand: status / list / install / install-all / restart / which.
 
-Handlers live here (not in ``hermes_cli/main.py``) so the LSP module ships self-contained.
+Handlers live here (not in ``x19_cli/main.py``) so the LSP module ships self-contained.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ _COMMANDS = {name: handler for name, _, _, handler in _SUBCOMMANDS}
 
 
 def register_subparser(subparsers: argparse._SubParsersAction) -> None:
-    """Wire the ``hermes lsp`` subcommand tree into the main argparse."""
+    """Wire the ``x19 lsp`` subcommand tree into the main argparse."""
     parser = subparsers.add_parser(
         "lsp",
         help="Language Server Protocol management",
@@ -44,7 +44,7 @@ def register_subparser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def run_lsp_command(args: argparse.Namespace) -> int:
-    """Top-level dispatcher for ``hermes lsp <subcommand>``."""
+    """Top-level dispatcher for ``x19 lsp <subcommand>``."""
     sub = getattr(args, "lsp_command", None) or "status"
     try:
         handler = _COMMANDS.get(sub)

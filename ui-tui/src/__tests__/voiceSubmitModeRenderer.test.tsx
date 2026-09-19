@@ -1,6 +1,6 @@
 import { PassThrough } from 'stream'
 
-import { renderSync, Text } from '@hermes/ink'
+import { renderSync, Text } from '@x19/ink'
 import React, { useMemo, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 

@@ -68,7 +68,7 @@ describe('themePrelude', () => {
 
 describe('frameSizeFromMessage', () => {
   const msg = (over: Record<string, unknown> = {}) => ({
-    type: 'hermes-inline-preview-size',
+    type: 'x19-inline-preview-size',
     token: 'tok',
     height: 500,
     width: 300,
@@ -102,7 +102,7 @@ describe('frameSizeFromMessage', () => {
 
 describe('intentFromMessage', () => {
   const msg = (over: Record<string, unknown> = {}) => ({
-    type: 'hermes-inline-preview-intent',
+    type: 'x19-inline-preview-intent',
     token: 'tok',
     prompt: 'get-price eth',
     ...over
@@ -119,7 +119,7 @@ describe('intentFromMessage', () => {
 
   it('rejects wrong token, wrong type, empty, and hostile shapes', () => {
     expect(intentFromMessage(msg({ token: 'stolen' }), 'tok')).toBeNull()
-    expect(intentFromMessage(msg({ type: 'hermes-inline-preview-size' }), 'tok')).toBeNull()
+    expect(intentFromMessage(msg({ type: 'x19-inline-preview-size' }), 'tok')).toBeNull()
     expect(intentFromMessage(msg({ prompt: '   ' }), 'tok')).toBeNull()
     expect(intentFromMessage(msg({ prompt: 42 }), 'tok')).toBeNull()
     expect(intentFromMessage(null, 'tok')).toBeNull()
@@ -127,11 +127,11 @@ describe('intentFromMessage', () => {
 })
 
 describe('withInlineChrome intent wiring', () => {
-  it('injects hermes.send and the data-hermes-send click bridge', () => {
+  it('injects x19.send and the data-x19-send click bridge', () => {
     const framed = withInlineChrome('<html><body><h1>w</h1></body></html>', 'tok', '')
 
-    expect(framed).toContain('window.hermes={send:send}')
-    expect(framed).toContain('data-hermes-send')
-    expect(framed).toContain('hermes-inline-preview-intent')
+    expect(framed).toContain('window.x19={send:send}')
+    expect(framed).toContain('data-x19-send')
+    expect(framed).toContain('x19-inline-preview-intent')
   })
 })

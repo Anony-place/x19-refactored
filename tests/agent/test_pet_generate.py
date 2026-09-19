@@ -13,10 +13,10 @@ from pathlib import Path
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("HERMES_RUN_SLOW_PET_TESTS") != "1",
+    os.environ.get("X19_RUN_SLOW_PET_TESTS") != "1",
     reason=(
         "pet generation image-processing suite is opt-in; run with "
-        "HERMES_RUN_SLOW_PET_TESTS=1 scripts/run_tests.sh tests/agent/test_pet_generate.py"
+        "X19_RUN_SLOW_PET_TESTS=1 scripts/run_tests.sh tests/agent/test_pet_generate.py"
     ),
 )
 

@@ -3,13 +3,13 @@
 
 from typing import Any
 
-from hermes_cli import __version__ as _HERMES_VERSION
+from x19_cli import __version__ as _X19_VERSION
 from providers import register_provider
 from providers.base import ProviderProfile
 
 
 class FireworksProfile(ProviderProfile):
-    """Map Hermes reasoning controls onto Fireworks' OpenAI-compatible wire."""
+    """Map X19 reasoning controls onto Fireworks' OpenAI-compatible wire."""
 
     def build_api_kwargs_extras(
         self, *, reasoning_config: dict | None = None, **context: Any
@@ -31,12 +31,12 @@ fireworks = FireworksProfile(
     description="Fireworks AI — OpenAI-compatible direct model API",
     signup_url="https://app.fireworks.ai/settings/users/api-keys", env_vars=("FIREWORKS_API_KEY",),
     base_url="https://api.fireworks.ai/inference/v1", auth_type="api_key",
-    # Attribution headers (canonical Hermes set); via default_headers so they
+    # Attribution headers (canonical X19 set); via default_headers so they
     # survive switch_model and credential rotation.
     default_headers={
-        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-        "X-Title": "Hermes Agent",
-        "User-Agent": f"HermesAgent/{_HERMES_VERSION}",
+        "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
+        "X-Title": "X19",
+        "User-Agent": f"X19Agent/{_X19_VERSION}",
     },
     default_aux_model="accounts/fireworks/models/glm-5p2",
     # Picker safety net when the live catalog fetch fails.

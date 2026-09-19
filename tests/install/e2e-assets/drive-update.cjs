@@ -1,4 +1,4 @@
-// drive-update.cjs — launch the INSTALLED Hermes.exe (real Electron desktop
+// drive-update.cjs — launch the INSTALLED X19.exe (real Electron desktop
 // app) under Playwright's Electron driver and perform the update the way a
 // user does: Settings -> About -> "Update now". Screenshots at every step.
 //
@@ -6,7 +6,7 @@
 // @playwright/test resolves from ITS node_modules — the same deps the
 // installed app was built with):
 //
-//   node <this file> <path-to-Hermes.exe> <proof-dir>
+//   node <this file> <path-to-X19.exe> <proof-dir>
 //
 // Exit codes: 0 = update hand-off started and the app quit (the detached
 // updater takes it from there — the PowerShell driver polls for the result);
@@ -27,7 +27,7 @@ const exePath = process.argv[2]
 const proofDir = process.argv[3]
 
 if (!exePath || !proofDir) {
-  console.error('usage: node drive-update.cjs <Hermes.exe> <proof-dir>')
+  console.error('usage: node drive-update.cjs <X19.exe> <proof-dir>')
   process.exit(1)
 }
 
@@ -88,7 +88,7 @@ async function main() {
   const app = await _electron.launch({
     executablePath: exePath,
     args: ['--disable-gpu', '--no-sandbox'],
-    // Inherit the driver's env: HERMES_HOME (isolated install) and
+    // Inherit the driver's env: X19_HOME (isolated install) and
     // GIT_CONFIG_GLOBAL (URL redirect to the staged serve repo) MUST reach
     // the main process so its update check fetches from the staged repo.
     env: { ...process.env },
@@ -127,7 +127,7 @@ async function main() {
   log('[zoom] app window prepared at 100%')
 
   // Boot: wait for the composer to exist — the shell is mounted by then.
-  // The real backend (`hermes serve`) is booting underneath; give it time.
+  // The real backend (`x19 serve`) is booting underneath; give it time.
   await page.waitForSelector('textarea, [contenteditable="true"]', {
     state: 'attached',
     timeout: 300_000
@@ -139,7 +139,7 @@ async function main() {
   // ── Reach Settings through the onboarding overlay ─────────────────────
   // A fresh install with no configured provider shows the onboarding card
   // ("Let's get you setup..."). It mounts LATE and in phases: first a
-  // buttonless boot-progress card ("Starting Hermes... 86%"), then the
+  // buttonless boot-progress card ("Starting X19... 86%"), then the
   // provider picker with "I'll choose a provider later".
   // Two traps: a one-shot dismiss probe fires before the picker's button
   // exists, and isVisible() on the settings gear reports true while the
@@ -245,7 +245,7 @@ async function main() {
     // Surface the real git error behind the UI's generic "couldn't reach
     // the update server" line.
     const status = await page.evaluate(() =>
-      window.hermesDesktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
+      window.x19Desktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
     ).catch((err) => `updates.check failed: ${err?.message || err}`)
     log(`[update-status] ${JSON.stringify(status)}`)
     await shot(page, 'ERROR-no-update-now')
@@ -257,7 +257,7 @@ async function main() {
   await updateNow.click()
   log('clicked: Update now')
 
-  // The "Updating Hermes — this window will close" overlay should appear,
+  // The "Updating X19 — this window will close" overlay should appear,
   // then the app quits (hand-off dwell). Screenshot the overlay while the
   // window is still alive.
   // The app can close during the dwell. This wait must outlive its page.
@@ -266,20 +266,20 @@ async function main() {
 
   // ── Wait for the hand-off to take over ────────────────────────────────
   // Clicking Update now spawns the detached updater (desktop-update.ps1 or
-  // the staged binary), which claims HERMES_HOME/.hermes-update-in-progress
+  // the staged binary), which claims X19_HOME/.x19-update-in-progress
   // and then the desktop quits. We do NOT rely on Playwright's app 'close'
   // event: when the app self-quits for the hand-off that event is
   // unreliable (attempt 8 timed out on it even though the hand-off log
-  // proved the desktop had exited and `hermes update` was already running).
+  // proved the desktop had exited and `x19 update` was already running).
   //
   // The authoritative "hand-off started" signal is the marker file (or the
   // result JSON, if the whole update finished fast). Poll for either, and
   // also accept a genuine app close. Any one is success — the PowerShell
   // driver owns asserting the update's OUTCOME (sha, marker cleanup,
   // relaunch) after we return.
-  const hermesHome = process.env.HERMES_HOME
-  const markerPath = hermesHome ? path.join(hermesHome, '.hermes-update-in-progress') : null
-  const resultPath = hermesHome ? path.join(hermesHome, '.hermes-update-result.json') : null
+  const x19Home = process.env.X19_HOME
+  const markerPath = x19Home ? path.join(x19Home, '.x19-update-in-progress') : null
+  const resultPath = x19Home ? path.join(x19Home, '.x19-update-result.json') : null
 
   let appClosed = false
   app.on('close', () => {

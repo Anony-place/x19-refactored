@@ -91,7 +91,7 @@ class ActionResult:
     ``structuredContent`` leaves them ``None``, behavior unchanged.
 
     Beyond the transport-level ``ok`` flag, this carries cua-driver's structured action verdict so the model
-    can follow the documented verify → escalate ladder (NousResearch/hermes-agent#67052).
+    can follow the documented verify → escalate ladder (Anony-place/x19-refactored#67052).
     """
 
     ok: bool

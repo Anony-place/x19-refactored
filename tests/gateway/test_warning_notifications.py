@@ -53,7 +53,7 @@ def test_warning_opt_out_preserves_other_delivery(tmp_path, monkeypatch, platfor
     from gateway import run
 
     (tmp_path / "config.yaml").write_text(configured)
-    monkeypatch.setattr(run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(run, "_x19_home", tmp_path)
     config = _load_gateway_config()
     if "platforms: {slack" in configured and platform != Platform.SLACK:
         enabled = False
@@ -110,8 +110,8 @@ def test_direct_warning_delivery_keeps_failure_state(tmp_path, monkeypatch, enab
     from gateway import run
 
     (tmp_path / "config.yaml").write_text(f"display: {{suppress_warning_notifications: {str(not enabled).lower()}}}")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr(run, "_hermes_home", tmp_path)
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    monkeypatch.setattr(run, "_x19_home", tmp_path)
     adapter = RecordingAdapter()
     source = SessionSource(platform=Platform.SLACK, chat_id="chat", user_id="user")
     gateway = object.__new__(GatewayRunner)

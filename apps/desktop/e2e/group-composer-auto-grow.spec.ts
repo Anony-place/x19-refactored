@@ -18,7 +18,7 @@ import { expect, test } from './test'
 // The group-room composer starts as one compact row, grows with wrapped text
 // and newlines so a long brief can be read back while drafting, and stops at
 // min(50vh, 24rem) — past that the textarea scrolls internally so the room
-// transcript keeps its space (hermes-agent#95300).
+// transcript keeps its space (x19#95300).
 
 type Page = MockBackendFixture['page']
 
@@ -37,8 +37,8 @@ async function capture(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(dir, `${name}.png`) })
 }
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<void> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -57,11 +57,11 @@ const ROOM = 'Standup'
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-group-composer')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
 
   for (const name of ['alpha', 'beta']) {
-    await seedBot(sandbox.hermesHome, mock.url, name)
+    await seedBot(sandbox.x19Home, mock.url, name)
   }
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))

@@ -99,7 +99,7 @@ class TestCheckPackageForMalware:
     @pytest.fixture(autouse=True)
     def _fresh_cache(self, tmp_path, monkeypatch):
         from tools import osv_check
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         with osv_check._cache_lock:
             osv_check._cache.clear()
             osv_check._disk_cache_loaded = False
@@ -228,7 +228,7 @@ class TestCheckPackageForMalware:
         """A warm disk cache is reused by a fresh in-process cache."""
         from tools import osv_check
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({"vulns": []}).encode()
@@ -254,7 +254,7 @@ class TestCheckPackageForMalware:
         """Disk cache JSON has a version field and recoverable entries."""
         from tools import osv_check
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({"vulns": []}).encode()
@@ -278,7 +278,7 @@ class TestCheckPackageForMalware:
         """A busy/unreadable cache file must not disable disk loads for the process."""
         from tools import osv_check
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         cache_file = tmp_path / "cache" / "osv_check.json"
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(

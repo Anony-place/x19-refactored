@@ -106,8 +106,8 @@ test('paste enables when the clipboard holds text', async () => {
   // the SYSTEM clipboard, and writeText('') does not reliably clear it.
   await page.evaluate(() =>
     (
-      window as unknown as { hermesDesktop?: { writeClipboard?: (text: string) => Promise<boolean> } }
-    ).hermesDesktop?.writeClipboard?.('clipboard payload')
+      window as unknown as { x19Desktop?: { writeClipboard?: (text: string) => Promise<boolean> } }
+    ).x19Desktop?.writeClipboard?.('clipboard payload')
   )
   await composer.click()
   await composer.click({ button: 'right' })

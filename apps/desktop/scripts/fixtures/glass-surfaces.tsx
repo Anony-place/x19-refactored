@@ -22,8 +22,8 @@ import { I18nProvider } from '@/i18n'
 // Real primitives and stylesheet; only the sample labels and glass inputs are fixtures.
 const root = document.documentElement
 root.classList.add('dark')
-root.setAttribute('data-hermes-glass', '')
-root.setAttribute('data-hermes-glass-scope', 'window')
+root.setAttribute('data-x19-glass', '')
+root.setAttribute('data-x19-glass-scope', 'window')
 root.style.setProperty('--translucency-glass-keep', '40%')
 
 const messages = Array.from({ length: 6 }, (_, turn) => [

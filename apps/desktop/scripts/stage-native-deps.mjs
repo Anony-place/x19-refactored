@@ -39,7 +39,7 @@ function makeExecutable(filePath) {
 //
 // Node's native (non-libuv) rewrite of fs.cpSync/fs.rmSync mishandles
 // non-ASCII Windows paths (observed on v24.11.1 with an accented Windows
-// user name, i.e. a default %LOCALAPPDATA%\hermes home): a recursive
+// user name, i.e. a default %LOCALAPPDATA%\x19 home): a recursive
 // cpSync fails with EIO "Access is denied" or hard-crashes the process,
 // an overwriting cpSync fails with a bogus errno-0 unlink error, and
 // rmSync silently deletes nothing — leaving a half-staged tree that

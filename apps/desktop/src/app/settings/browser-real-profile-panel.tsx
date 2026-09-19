@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react'
 
-import { type ProfileScope, saveHermesConfigRecord } from '@/hermes'
+import { type ProfileScope, saveX19ConfigRecord } from '@/x19'
 import { useI18n } from '@/i18n'
 import { notify, notifyError } from '@/store/notifications'
 
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '../hooks/use-config-record'
+import { x19ConfigCacheWriter, useX19ConfigRecord } from '../hooks/use-config-record'
 
 import { ToggleRow } from './primitives'
 
@@ -34,7 +34,7 @@ export function readUseRealProfile(record: Record<string, unknown> | undefined):
  * users reasonably never found ("no toggle in the browser section").
  *
  * Semantics mirror the config comment: turning it ON consents to snapshotting
- * the default browser's profile (cookies/logins) into a Hermes-owned copy;
+ * the default browser's profile (cookies/logins) into a X19-owned copy;
  * turning it OFF deletes the snapshot store on next use. The toggle writes
  * config.yaml through the same deep-merging PUT /api/config every other
  * settings surface uses — applies to new sessions.
@@ -42,8 +42,8 @@ export function readUseRealProfile(record: Record<string, unknown> | undefined):
 export function BrowserRealProfilePanel({ profile }: BrowserRealProfilePanelProps) {
   const { t } = useI18n()
   const copy = t.settings.toolsets.browserRealProfile
-  const { data: config } = useHermesConfigRecord(profile)
-  const setConfig = hermesConfigCacheWriter(profile)
+  const { data: config } = useX19ConfigRecord(profile)
+  const setConfig = x19ConfigCacheWriter(profile)
   const [busy, setBusy] = useState(false)
 
   const enabled = readUseRealProfile(config)
@@ -67,7 +67,7 @@ export function BrowserRealProfilePanel({ profile }: BrowserRealProfilePanelProp
       try {
         // Sparse patch: PUT /api/config deep-merges, and echoing the cached
         // snapshot would overwrite keys other surfaces changed since it loaded.
-        await saveHermesConfigRecord({ browser: { use_real_profile: on } }, profile)
+        await saveX19ConfigRecord({ browser: { use_real_profile: on } }, profile)
         notify({
           kind: 'info',
           title: on ? copy.enabledTitle : copy.disabledTitle,

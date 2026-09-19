@@ -115,7 +115,7 @@ async def test_secondary_profile_busy_mode_controls_live_busy_behavior(
     expected_text_mode,
 ):
     """A routed profile chooses queue/steer/interrupt independently."""
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("X19_GATEWAY_BUSY_ACK_ENABLED", "false")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -155,7 +155,7 @@ async def test_secondary_profile_busy_mode_controls_priority_path(
     secondary_mode,
 ):
     """The runner's early active-agent path uses the same routed policy."""
-    monkeypatch.setenv("HERMES_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
+    monkeypatch.setenv("X19_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -208,7 +208,7 @@ async def test_busy_change_updates_only_routed_profile(tmp_path, monkeypatch):
         "display:\n  busy_input_mode: interrupt\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("X19_HOME", str(default_home))
 
     runner = _runner(default_mode="interrupt")
     profile_home = tmp_path / "research"
@@ -220,7 +220,7 @@ async def test_busy_change_updates_only_routed_profile(tmp_path, monkeypatch):
     event = _event(profile="research")
     event.text = "/busy steer"
     monkeypatch.setattr(
-        "hermes_cli.profiles.get_profile_dir",
+        "x19_cli.profiles.get_profile_dir",
         lambda _profile_name: profile_home,
     )
     # Isolate the wrapper's profile scope; active-session dispatch is covered above.
@@ -270,7 +270,7 @@ async def test_secondary_profile_busy_mode_controls_priority_restart_drain(
     tmp_path,
     monkeypatch,
 ):
-    monkeypatch.setenv("HERMES_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
+    monkeypatch.setenv("X19_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -299,7 +299,7 @@ async def test_secondary_adapter_busy_guard_stamps_profile_before_resolving_mode
     monkeypatch,
 ):
     """Per-profile adapters route busy events before the message wrapper runs."""
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("X19_GATEWAY_BUSY_ACK_ENABLED", "false")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -354,7 +354,7 @@ async def test_secondary_legacy_busy_text_mode_is_profile_specific(tmp_path):
 
 @pytest.mark.asyncio
 async def test_default_busy_mode_is_unchanged_by_secondary_profile(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("X19_GATEWAY_BUSY_ACK_ENABLED", "false")
     runner = _runner(default_mode="interrupt")
     await _load_profile_snapshot(runner, tmp_path / "research", "steer")
     adapter = _adapter()
@@ -393,7 +393,7 @@ def test_profile_route_and_nonmultiplexed_resolution_preserve_boundaries(
 ):
     runner = _runner(default_mode="interrupt")
     monkeypatch.setattr(
-        "hermes_cli.profiles.profiles_to_serve",
+        "x19_cli.profiles.profiles_to_serve",
         lambda **_: [("research", tmp_path / "research")],
     )
     runner._snapshot_profile_busy_modes(
@@ -417,7 +417,7 @@ def test_profile_route_and_nonmultiplexed_resolution_preserve_boundaries(
     # before the busy-mode snapshot is consulted. Sibling coverage in
     # tests/gateway/test_profile_resolution.py patches the same seam.
     with patch(
-        "hermes_cli.profiles.profiles_to_serve",
+        "x19_cli.profiles.profiles_to_serve",
         return_value=[
             ("default", Path("/profiles/default")),
             ("research", Path("/profiles/research")),
@@ -460,16 +460,16 @@ async def test_primary_adapter_busy_origin_uses_routed_privacy(
     """The primary busy callback bypasses the scoped normal-message handler."""
     from dataclasses import asdict
     from agent.agent_runtime_helpers import apply_pending_steer_to_tool_results
-    from hermes_constants import get_hermes_home_override
+    from x19_constants import get_x19_home_override
     from run_agent import AIAgent
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     secondary = home / "profiles" / "research"
     secondary.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setattr("gateway.run._hermes_home", home)
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("X19_HOME", str(home))
+    monkeypatch.setattr("gateway.run._x19_home", home)
+    monkeypatch.setenv("X19_GATEWAY_BUSY_ACK_ENABLED", "false")
     for directory, privacy in ((home, not secondary_privacy), (secondary, secondary_privacy)):
         (directory / "config.yaml").write_text(
             f"privacy:\n  redact_pii: {str(privacy).lower()}\n", encoding="utf-8",
@@ -497,7 +497,7 @@ async def test_primary_adapter_busy_origin_uses_routed_privacy(
     agent._executing_tools = mode == "interrupt"
     runner._session_state(key).turn.agent = agent
     adapter._active_sessions[key] = asyncio.Event()
-    ambient = get_hermes_home_override()
+    ambient = get_x19_home_override()
     await adapter._handle_message_while_active(event, key)
     messages = [{"role": "tool", "tool_call_id": "probe", "content": "Tool completed."}]
     apply_pending_steer_to_tool_results(agent, messages, 1)
@@ -506,5 +506,5 @@ async def test_primary_adapter_busy_origin_uses_routed_privacy(
     for value in (event.source.chat_id, event.source.user_id, event.message_id, "research"):
         assert (value not in output) is secondary_privacy
     assert asdict(event.source) == original
-    assert get_hermes_home_override() == ambient
+    assert get_x19_home_override() == ambient
     assert key not in adapter._pending_messages

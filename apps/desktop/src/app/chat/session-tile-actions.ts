@@ -9,7 +9,7 @@
  */
 
 import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
-import { SLASH_COMMAND_RE } from '@hermes/shared'
+import { SLASH_COMMAND_RE } from '@x19/shared'
 import { useCallback, useMemo, useRef } from 'react'
 
 import type { ClientSessionState } from '@/app/types'
@@ -39,7 +39,7 @@ import { broadcastSessionsChanged } from '@/store/session-sync'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
-import type { SessionInfo } from '@/types/hermes'
+import type { SessionInfo } from '@/types/x19'
 
 import type { GatewayRequester } from '../contrib/types'
 import { uploadComposerAttachment } from '../session/hooks/use-prompt-actions'

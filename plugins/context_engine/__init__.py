@@ -64,14 +64,14 @@ class _EngineCollector(_loader.NoopPluginContext):
             return
         conflict = "Context engine '%s' tried to register command '/%s' which %s Skipping."
         try:
-            from hermes_cli.commands import resolve_command
+            from x19_cli.commands import resolve_command
             if resolve_command(clean) is not None:
                 logger.warning(conflict, self._engine_name, clean, "conflicts with a built-in command.")
                 return
         except Exception:
             pass
         try:
-            from hermes_cli.plugins import get_plugin_manager
+            from x19_cli.plugins import get_plugin_manager
             manager = get_plugin_manager()
             if clean in manager._plugin_commands:
                 logger.warning(conflict, self._engine_name, clean, "is already registered by a plugin.")
@@ -84,10 +84,3 @@ class _EngineCollector(_loader.NoopPluginContext):
             logger.debug("Context engine '%s' could not register /%s: %s", self._engine_name, clean, exc)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import importlib.util  # noqa: F401,E402
-import sys  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

@@ -22,8 +22,8 @@ _MAX_TEXT_CHARS = 2000
 
 
 def _store_path() -> str:
-    from hermes_constants import get_hermes_home  # honors the active profile override
-    return os.path.join(str(get_hermes_home()), "state", "rich_sent_index.json")
+    from x19_constants import get_x19_home  # honors the active profile override
+    return os.path.join(str(get_x19_home()), "state", "rich_sent_index.json")
 
 
 def _load(path: str) -> dict:

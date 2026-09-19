@@ -62,9 +62,9 @@ export interface PreviewTab {
   target: PreviewTarget
 }
 
-const TABS_STORAGE_KEY = 'hermes.desktop.previewTabs.v2'
+const TABS_STORAGE_KEY = 'x19.desktop.previewTabs.v2'
 /** Superseded by the tab list above; cleared so it can't leak forever. */
-const LEGACY_SESSION_REGISTRY_KEY = 'hermes.desktop.sessionPreviews.v1'
+const LEGACY_SESSION_REGISTRY_KEY = 'x19.desktop.sessionPreviews.v1'
 
 function isPreviewTarget(value: unknown): value is PreviewTarget {
   if (!value || typeof value !== 'object') {

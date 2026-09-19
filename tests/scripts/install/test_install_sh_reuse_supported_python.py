@@ -23,18 +23,18 @@ def _exe(path: Path, content: str) -> Path:
 def _run_prerequisites(tmp_path: Path, *, uv_find_script: str) -> subprocess.CompletedProcess[str]:
     """Run the real ``--stage prerequisites`` with a stub managed uv whose ``python find`` we script."""
     home = tmp_path / "home"
-    hermes_home = home / ".hermes"
-    (hermes_home / "bin").mkdir(parents=True)
+    x19_home = home / ".x19"
+    (x19_home / "bin").mkdir(parents=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _exe(bin_dir / "python3.13", "#!/bin/sh\n[ \"$1\" = --version ] && echo 'Python 3.13.12'\nexit 0\n")
-    _exe(hermes_home / "bin" / "uv", "#!/bin/sh\n[ \"$1\" = --version ] && { echo 'uv 0.9.0'; exit 0; }\n"
+    _exe(x19_home / "bin" / "uv", "#!/bin/sh\n[ \"$1\" = --version ] && { echo 'uv 0.9.0'; exit 0; }\n"
          "if [ \"$1\" = python ] && [ \"$2\" = find ]; then\n" + uv_find_script + "fi\n"
          "if [ \"$1\" = python ] && [ \"$2\" = install ]; then echo 'DOWNLOAD ATTEMPTED' >&2; exit 1; fi\nexit 0\n")
     for tool in ("git", "node", "npm", "curl", "rg", "g++", "c++"):
         _exe(bin_dir / tool, "#!/bin/sh\ncase \"$1\" in --version|-v) echo 'v22.12.0 2.50.0';; esac\nexit 0\n")
     env = os.environ.copy()
-    env.update({"HOME": str(home), "HERMES_HOME": str(hermes_home),
+    env.update({"HOME": str(home), "X19_HOME": str(x19_home),
                 "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', os.defpath)}"})
     bash = shutil.which("bash") or "/bin/bash"
     return subprocess.run([bash, str(INSTALL_SH), "--stage", "prerequisites", "--non-interactive"],

@@ -1,7 +1,7 @@
 """Tool result persistence -- preserves large outputs instead of truncating. Layers against
 context overflow: (1) per-tool caps inside each tool; (2) ``maybe_persist_tool_result`` —
 output over the tool's threshold is persisted and replaced by a preview + path; canonical home
-is ALWAYS host-side ``$HERMES_HOME/cache/spillover/{id}.txt`` (works for sessions that never
+is ALWAYS host-side ``$X19_HOME/cache/spillover/{id}.txt`` (works for sessions that never
 ran a terminal), remote backends get the translated in-sandbox path (probed for readability)
 else a copy in the sandbox temp dir; (3) ``enforce_turn_budget``."""
 
@@ -18,7 +18,7 @@ from tools.budget_config import DEFAULT_PREVIEW_SIZE_CHARS, BudgetConfig, DEFAUL
 logger = logging.getLogger(__name__)
 PERSISTED_OUTPUT_TAG = "<persisted-output>"
 PERSISTED_OUTPUT_CLOSING_TAG = "</persisted-output>"
-STORAGE_DIR = "/tmp/hermes-results"
+STORAGE_DIR = "/tmp/x19-results"
 SPILLOVER_SUBDIR = "cache/spillover"
 SPILLOVER_MAX_AGE_HOURS = 24
 _BUDGET_TOOL_NAME = "__budget_enforcement__"
@@ -30,9 +30,9 @@ _spillover_pruned_homes: set = set()  # profile home keys already swept this pro
 
 
 def get_spillover_dir():
-    """Return $HERMES_HOME/cache/spillover as a Path (not created)."""
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / SPILLOVER_SUBDIR
+    """Return $X19_HOME/cache/spillover as a Path (not created)."""
+    from x19_constants import get_x19_home
+    return get_x19_home() / SPILLOVER_SUBDIR
 
 
 def cleanup_spillover_cache(max_age_hours: int = SPILLOVER_MAX_AGE_HOURS) -> int:
@@ -58,8 +58,8 @@ def _prune_spillover_once() -> None:
     """Best-effort prune, at most once per process PER PROFILE HOME (CLI-only installs never run
     housekeeping; a multiplexed gateway must sweep every profile's ``cache/spillover``, not just the
     first one that spilled)."""
-    from hermes_constants import hermes_home_key
-    home_key = hermes_home_key()
+    from x19_constants import x19_home_key
+    home_key = x19_home_key()
     with _spillover_prune_lock:
         if home_key in _spillover_pruned_homes:
             return
@@ -84,7 +84,7 @@ def _is_host_side_env(env) -> bool:
 
 
 def _write_to_spillover(content: str, filename: str):
-    """Write host-side to $HERMES_HOME/cache/spillover; returns path str or None.
+    """Write host-side to $X19_HOME/cache/spillover; returns path str or None.
 
     The write is size-verified before the caller tells the model "Full output saved":
     a partially-flushed file (quota, ENOSPC race) fails closed to the bounded inline
@@ -148,7 +148,7 @@ def _resolve_storage_dir(env) -> str:
             temp_dir = get_temp_dir()
         except Exception as exc:
             logger.debug("Could not resolve env temp dir: %s", exc)
-    return f"{temp_dir.rstrip('/') or '/'}/hermes-results" if temp_dir else STORAGE_DIR
+    return f"{temp_dir.rstrip('/') or '/'}/x19-results" if temp_dir else STORAGE_DIR
 
 
 def _safe_result_filename(tool_use_id: str) -> str:
@@ -311,11 +311,3 @@ def enforce_turn_budget(tool_messages: list[dict], env=None,
     return tool_messages
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import uuid  # noqa: F401,E402
-
-HEREDOC_MARKER = "HERMES_PERSIST_EOF"
-# ---- END PLUGIN-COMPAT ----

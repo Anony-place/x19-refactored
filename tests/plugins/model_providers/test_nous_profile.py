@@ -35,7 +35,7 @@ def nous_profile():
 @pytest.fixture
 def portal_catalog(monkeypatch):
     """Prime the Portal reasoning-capability cache with known entries."""
-    import hermes_cli.models as models_mod
+    import x19_cli.models as models_mod
 
     monkeypatch.setattr(models_mod, "_nous_reasoning_caps_failed_at", None)
     monkeypatch.setattr(models_mod, "_nous_reasoning_caps_cache", {
@@ -88,7 +88,7 @@ class TestNousReasoningWireShape:
     def test_disable_dropped_for_non_reasoning_route(self, nous_profile, portal_catalog):
         """A route the catalog says takes no reasoning parameter gets none.
 
-        Hermes' own ``supports_reasoning`` can disagree with the Portal about a
+        X19' own ``supports_reasoning`` can disagree with the Portal about a
         given route; when it does, the catalog of the service actually serving
         the model wins, and we don't send it a parameter it doesn't accept.
         """

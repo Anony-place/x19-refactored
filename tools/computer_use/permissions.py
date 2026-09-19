@@ -1,7 +1,7 @@
 """Cross-platform Computer Use readiness + macOS permission helpers. "Ready to drive" differs per platform: macOS
 needs explicit TCC grants (Accessibility + Screen Recording) via cua-driver ``permissions status`` / ``permissions
 grant``; Windows/Linux have no TCC toggles, so readiness == driver health. The grants attach to cua-driver's OWN
-identity (``com.trycua.driver``), not Hermes, so ``grant`` launches CuaDriver via LaunchServices for correct dialog
+identity (``com.trycua.driver``), not X19, so ``grant`` launches CuaDriver via LaunchServices for correct dialog
 attribution. ``cua-driver doctor --json`` is the universal signal; ``computer_use_status`` folds it with the macOS
 detail into one payload for the desktop card, the ``permissions`` CLI and ``/api/tools/computer-use/status``."""
 
@@ -14,7 +14,7 @@ import sys
 from contextlib import suppress
 from typing import Any, Dict, Optional
 
-from hermes_cli._subprocess_compat import windows_hide_flags
+from x19_cli._subprocess_compat import windows_hide_flags
 
 _RUNTIME_PLATFORMS = frozenset({"darwin", "win32", "linux"})  # mirrors the toolset platform_gate
 _BOOLS = ("accessibility", "screen_recording", "screen_recording_capturable")
@@ -98,7 +98,7 @@ def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
     from tools.computer_use.cua_backend_driver import resolve_cua_driver_cmd
     binary = resolve_cua_driver_cmd(driver_cmd)
     if not binary:
-        print("cua-driver: not installed. Run: hermes computer-use install")
+        print("cua-driver: not installed. Run: x19 computer-use install")
         return 2
     print("Requesting Accessibility + Screen Recording for CuaDriver.\n"
           "macOS will show a dialog attributed to CuaDriver (com.trycua.driver) — approve it, then return here.")
@@ -111,9 +111,3 @@ def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
         return 2
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import List  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

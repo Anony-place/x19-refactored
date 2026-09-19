@@ -31,7 +31,7 @@ from tools.delegate_tool import (
     _resolve_child_credential_pool,
     _resolve_delegation_credentials,
 )
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 def _make_mock_parent(depth=0):
@@ -169,7 +169,7 @@ class TestStripBlockedTools(unittest.TestCase):
     def test_mixed_composite_is_subtracted_at_child_assembly(self):
         """A mixed platform bundle must not re-expose blocked leaf tools.
 
-        ``hermes-cli`` contains both allowed tools and every sensitive
+        ``x19-cli`` contains both allowed tools and every sensitive
         delegate tool, so it cannot be dropped wholesale. Child construction
         must instead pass exact one-tool deny toolsets to AIAgent, where
         model_tools applies them after resolving the composite.
@@ -177,7 +177,7 @@ class TestStripBlockedTools(unittest.TestCase):
         import model_tools
 
         parent = _make_mock_parent()
-        parent.enabled_toolsets = ["hermes-cli"]
+        parent.enabled_toolsets = ["x19-cli"]
         parent.disabled_toolsets = ["browser"]
 
         with patch("run_agent.AIAgent") as MockAgent:
@@ -222,7 +222,7 @@ class TestStripBlockedTools(unittest.TestCase):
         import model_tools
 
         parent = _make_mock_parent()
-        parent.enabled_toolsets = ["hermes-cli"]
+        parent.enabled_toolsets = ["x19-cli"]
         parent.disabled_toolsets = ["delegation", "browser"]
 
         with (
@@ -425,7 +425,7 @@ class TestDelegateTask(unittest.TestCase):
         """Portal is dual-wire — same provider + different model prefix must
         not inherit the parent's Messages/chat_completions mode verbatim.
         Native wire selected (opt-in since 2026-09-06, ``nous.anthropic_wire``)."""
-        with patch("hermes_cli.providers._nous_anthropic_wire", return_value="native"):
+        with patch("x19_cli.providers._nous_anthropic_wire", return_value="native"):
             self._nous_child_rederives_api_mode_from_model()
 
     def _nous_child_rederives_api_mode_from_model(self):
@@ -1043,7 +1043,7 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertEqual(creds["api_mode"], "anthropic_messages")
 
 
-    @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
+    @patch("x19_cli.runtime_provider.resolve_runtime_provider")
     def test_base_url_with_provider_carries_runtime_request_overrides(self, mock_resolve):
         """#65035: the base_url short-circuit must not drop the configured
         provider's generic request_overrides; dedicated output caps are ignored."""
@@ -1082,7 +1082,7 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertIsNone(creds["request_overrides"])
         self.assertNotIn("max_output_tokens", creds)
 
-    @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
+    @patch("x19_cli.runtime_provider.resolve_runtime_provider")
     def test_base_url_survives_runtime_resolution_failure(self, mock_resolve):
         """Best-effort: the explicit endpoint worked before this change even
         when the provider can't resolve — a resolution failure must not
@@ -1095,7 +1095,7 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertIsNone(creds["request_overrides"])
         self.assertNotIn("max_output_tokens", creds)
 
-    @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
+    @patch("x19_cli.runtime_provider.resolve_runtime_provider")
     def test_provider_resolution_failure_raises_valueerror(self, mock_resolve):
         """When provider resolution fails, ValueError is raised with helpful message."""
         mock_resolve.side_effect = RuntimeError("OPENROUTER_API_KEY not set")
@@ -1106,7 +1106,7 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertIn("openrouter", str(ctx.exception).lower())
         self.assertIn("Cannot resolve", str(ctx.exception))
 
-    @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
+    @patch("x19_cli.runtime_provider.resolve_runtime_provider")
     def test_provider_resolves_but_no_api_key_raises(self, mock_resolve):
         """When provider resolves but has no API key, ValueError is raised."""
         mock_resolve.return_value = {
@@ -1121,7 +1121,7 @@ class TestDelegationCredentialResolution(unittest.TestCase):
             _resolve_delegation_credentials(cfg, parent)
         self.assertIn("no API key", str(ctx.exception))
 
-    @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
+    @patch("x19_cli.runtime_provider.resolve_runtime_provider")
     def test_named_custom_provider_preserves_provider_name(self, mock_resolve):
         """Named custom provider (e.g. crof.ai) resolves to 'custom' at runtime level
         but the subagent must retain the original provider identity so that
@@ -1739,7 +1739,7 @@ class TestConcurrencyDefaults(unittest.TestCase):
 
         with patch.dict("sys.modules", {"cli": stale_cli}):
             with patch(
-                "hermes_cli.config.load_config_readonly", return_value=active_config
+                "x19_cli.config.load_config_readonly", return_value=active_config
             ):
                 self.assertEqual(_load_config()["max_concurrent_children"], 50)
                 self.assertEqual(_get_max_concurrent_children(), 50)
@@ -2235,7 +2235,7 @@ class TestFallbackModelInheritance(unittest.TestCase):
             "args": [],
         }
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            "x19_cli.runtime_provider.resolve_runtime_provider",
             return_value=runtime,
         ):
             with patch("shutil.which", return_value=None):

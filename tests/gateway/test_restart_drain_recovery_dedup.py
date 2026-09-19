@@ -23,7 +23,7 @@ import types
 
 import pytest
 
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 def _make_db(tmp_path) -> SessionDB:

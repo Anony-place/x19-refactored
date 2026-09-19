@@ -452,7 +452,7 @@ class TestQueryLocalContextLengthAnthropicProxy:
 
         assert result == 1_000_000, (
             f"Expected max_input_tokens (1M), got {result}. "
-            "If Hermes uses Anthropic max_tokens (128k), compression fires ~8x early."
+            "If X19 uses Anthropic max_tokens (128k), compression fires ~8x early."
         )
 
     def test_model_detail_prefers_max_input_tokens(self):

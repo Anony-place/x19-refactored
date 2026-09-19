@@ -10,7 +10,7 @@ import time
 import pytest
 
 import agent.auxiliary_client as aux
-from hermes_cli.auth import write_credential_pool
+from x19_cli.auth import write_credential_pool
 
 MODEL = "claude-sonnet-4-5"
 
@@ -27,9 +27,9 @@ def _seed(provider: str, token: str, *, model_cooldown: str | None = None) -> No
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / "x19"))
     monkeypatch.setattr(aux, "_client_cache", {})
-    return tmp_path / "hermes"
+    return tmp_path / "x19"
 
 
 @pytest.mark.parametrize("provider", ["anthropic", "openai-codex"])

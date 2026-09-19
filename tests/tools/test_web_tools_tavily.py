@@ -43,7 +43,7 @@ class TestTavilyRequest:
                 mock_post.assert_called_once()
                 headers = mock_post.call_args.kwargs["headers"]
                 payload = mock_post.call_args.kwargs["json"]
-                assert headers["X-Client-Name"] == "hermes-agent"
+                assert headers["X-Client-Name"] == "x19"
                 assert headers["X-Tavily-Access-Mode"] == "keyless"
                 assert "Authorization" not in headers
                 assert "api_key" not in payload
@@ -63,7 +63,7 @@ class TestTavilyRequest:
                 headers = mock_post.call_args.kwargs["headers"]
                 payload = mock_post.call_args.kwargs["json"]
                 assert headers == {
-                    "X-Client-Name": "hermes-agent",
+                    "X-Client-Name": "x19",
                     "Authorization": "Bearer tvly-test-key",
                 }
                 assert "X-Tavily-Access-Mode" not in headers
@@ -316,7 +316,7 @@ class TestWebSearchTavily:
             assert result["success"] is True
             headers = mock_post.call_args.kwargs["headers"]
             assert headers["X-Tavily-Access-Mode"] == "keyless"
-            assert headers["X-Client-Name"] == "hermes-agent"
+            assert headers["X-Client-Name"] == "x19"
             assert "Authorization" not in headers
             assert "api.tavily.com/search" in mock_post.call_args.args[0]
 

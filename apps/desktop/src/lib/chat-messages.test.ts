@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { toolResultRecord } from '@/lib/tool-result-metadata'
-import type { SessionMessage } from '@/types/hermes'
+import type { SessionMessage } from '@/types/x19'
 
 import type { ChatMessage, ChatMessagePart } from './chat-messages'
 import {
@@ -187,13 +187,13 @@ describe('toChatMessages', () => {
     const [message] = toChatMessages([
       {
         role: 'assistant',
-        content: "MEDIA:/Users/brooklyn/.hermes/cache/audio/tts_20260501_222725.mp3\n\nhow's that sound?",
+        content: "MEDIA:/Users/brooklyn/.x19/cache/audio/tts_20260501_222725.mp3\n\nhow's that sound?",
         timestamp: 1
       }
     ])
 
     expect(chatMessageText(message)).toBe(
-      "[Audio: tts_20260501_222725.mp3](#media:%2FUsers%2Fbrooklyn%2F.hermes%2Fcache%2Faudio%2Ftts_20260501_222725.mp3)\n\nhow's that sound?"
+      "[Audio: tts_20260501_222725.mp3](#media:%2FUsers%2Fbrooklyn%2F.x19%2Fcache%2Faudio%2Ftts_20260501_222725.mp3)\n\nhow's that sound?"
     )
   })
 
@@ -262,7 +262,7 @@ describe('toChatMessages', () => {
     // How a turn sent to a natively-vision-capable model comes back out of the
     // session store: a backtick-quoted ref (the path has spaces) and the
     // `[screenshot]` stand-in left by flattening the parts list.
-    const ref = '@image:`/Users/me/Library/Application Support/Hermes/composer-images/a.png`'
+    const ref = '@image:`/Users/me/Library/Application Support/X19/composer-images/a.png`'
 
     const [message] = toChatMessages([
       {

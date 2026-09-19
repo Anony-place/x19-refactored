@@ -1,8 +1,8 @@
-"""Global emergency stop (`hermes pause` / `hermes resume`) — agent/estop.py.
+"""Global emergency stop (`x19 pause` / `x19 resume`) — agent/estop.py.
 
 The ESTOP sentinel is a resumable pause for NEW work only: cron dispatch,
 kanban dispatch, and new gateway turns are halted while it is engaged; work
-already in flight is never touched. Removing the sentinel (`hermes resume`)
+already in flight is never touched. Removing the sentinel (`x19 resume`)
 restores normal operation with no restart.
 
 Ported from: gastownhall/gastown estop.go (MIT); related prior art: #26778
@@ -22,9 +22,9 @@ from agent import estop
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a temp dir and reset estop module log state."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+def x19_home(tmp_path, monkeypatch):
+    """Point X19_HOME at a temp dir and reset estop module log state."""
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     estop._logged_components.clear()
     return tmp_path
 
@@ -32,40 +32,40 @@ def hermes_home(tmp_path, monkeypatch):
 # ── sentinel create / remove ────────────────────────────────────────────────
 
 
-def test_engage_creates_sentinel_and_is_engaged(hermes_home):
+def test_engage_creates_sentinel_and_is_engaged(x19_home):
     assert estop.is_engaged() is False
     estop.engage()
-    assert (hermes_home / "ESTOP").exists()
+    assert (x19_home / "ESTOP").exists()
     assert estop.is_engaged() is True
 
 
-def test_disengage_removes_sentinel(hermes_home):
+def test_disengage_removes_sentinel(x19_home):
     estop.engage()
     assert estop.disengage() is True
-    assert not (hermes_home / "ESTOP").exists()
+    assert not (x19_home / "ESTOP").exists()
     assert estop.is_engaged() is False
     # Disengaging when not engaged is a no-op that reports False.
     assert estop.disengage() is False
 
 
-def test_reason_and_timestamp_stored(hermes_home):
+def test_reason_and_timestamp_stored(x19_home):
     estop.engage(reason="runaway cron fan-out")
     state = estop.get_state()
     assert state is not None
     assert state["reason"] == "runaway cron fan-out"
     assert state["engaged_at"]  # ISO timestamp string
 
-    raw = json.loads((hermes_home / "ESTOP").read_text(encoding="utf-8"))
+    raw = json.loads((x19_home / "ESTOP").read_text(encoding="utf-8"))
     assert raw["reason"] == "runaway cron fan-out"
 
 
-def test_get_state_none_when_disengaged(hermes_home):
+def test_get_state_none_when_disengaged(x19_home):
     assert estop.get_state() is None
 
 
-def test_corrupt_sentinel_still_engages(hermes_home):
+def test_corrupt_sentinel_still_engages(x19_home):
     """A hand-touched/corrupt ESTOP file must still pause (fail safe)."""
-    (hermes_home / "ESTOP").write_text("not json", encoding="utf-8")
+    (x19_home / "ESTOP").write_text("not json", encoding="utf-8")
     assert estop.is_engaged() is True
     state = estop.get_state()
     assert state is not None
@@ -75,31 +75,31 @@ def test_corrupt_sentinel_still_engages(hermes_home):
 # ── paused notice for new gateway turns ─────────────────────────────────────
 
 
-def test_paused_reply_none_when_disengaged(hermes_home):
+def test_paused_reply_none_when_disengaged(x19_home):
     assert estop.paused_reply() is None
 
 
-def test_paused_reply_surfaces_reason_and_resume_hint(hermes_home):
+def test_paused_reply_surfaces_reason_and_resume_hint(x19_home):
     estop.engage(reason="deploy window")
     notice = estop.paused_reply()
     assert notice is not None
     assert "paused" in notice.lower()
     assert "deploy window" in notice
-    assert "hermes resume" in notice
+    assert "x19 resume" in notice
 
 
-def test_paused_reply_without_reason(hermes_home):
+def test_paused_reply_without_reason(x19_home):
     estop.engage()
     notice = estop.paused_reply()
     assert notice is not None
     assert "paused" in notice.lower()
-    assert "hermes resume" in notice
+    assert "x19 resume" in notice
 
 
 # ── check_paused: cheap gate + log-once ─────────────────────────────────────
 
 
-def test_check_paused_logs_once_per_engagement(hermes_home, caplog):
+def test_check_paused_logs_once_per_engagement(x19_home, caplog):
     logger = logging.getLogger("test.estop.component")
     estop.engage()
     with caplog.at_level(logging.INFO, logger=logger.name):
@@ -124,7 +124,7 @@ def test_check_paused_logs_once_per_engagement(hermes_home, caplog):
 # ── cron scheduler integration ──────────────────────────────────────────────
 
 
-def test_cron_tick_skips_dispatch_when_engaged(hermes_home, monkeypatch):
+def test_cron_tick_skips_dispatch_when_engaged(x19_home, monkeypatch):
     from cron import scheduler
 
     calls = []
@@ -140,7 +140,7 @@ def test_cron_tick_skips_dispatch_when_engaged(hermes_home, monkeypatch):
     assert calls == [], "engaged ESTOP must skip the due-job scan entirely"
 
 
-def test_cron_tick_resumes_after_disengage(hermes_home, monkeypatch):
+def test_cron_tick_resumes_after_disengage(x19_home, monkeypatch):
     from cron import scheduler
 
     calls = []
@@ -163,7 +163,7 @@ def test_cron_tick_resumes_after_disengage(hermes_home, monkeypatch):
 # ── kanban dispatcher integration ───────────────────────────────────────────
 
 
-def test_kanban_dispatch_blocked_when_engaged(hermes_home):
+def test_kanban_dispatch_blocked_when_engaged(x19_home):
     from gateway.kanban_watchers_common import _kanban_dispatch_allowed
 
     assert _kanban_dispatch_allowed() is True
@@ -194,7 +194,7 @@ class _FakeEvent:
 
 
 @pytest.mark.asyncio
-async def test_gateway_new_turn_gets_paused_reply(hermes_home):
+async def test_gateway_new_turn_gets_paused_reply(x19_home):
     from gateway.run import GatewayRunner
 
     runner = object.__new__(GatewayRunner)
@@ -207,7 +207,7 @@ async def test_gateway_new_turn_gets_paused_reply(hermes_home):
 
 
 @pytest.mark.asyncio
-async def test_gateway_internal_events_bypass_estop(hermes_home):
+async def test_gateway_internal_events_bypass_estop(x19_home):
     """Internal events (in-flight work completions) must NOT be paused."""
     from gateway.run import GatewayRunner
 
@@ -225,11 +225,11 @@ async def test_gateway_internal_events_bypass_estop(hermes_home):
     assert reply is None or "paused" not in (reply or "").lower()
 
 
-# ── CLI: hermes pause / hermes resume ───────────────────────────────────────
+# ── CLI: x19 pause / x19 resume ───────────────────────────────────────
 
 
-def test_cli_pause_engages_with_reason(hermes_home, capsys):
-    from hermes_cli.subcommands.pause import cmd_pause
+def test_cli_pause_engages_with_reason(x19_home, capsys):
+    from x19_cli.subcommands.pause import cmd_pause
 
     rc = cmd_pause(argparse.Namespace(reason="ops incident"))
     assert rc == 0
@@ -238,16 +238,16 @@ def test_cli_pause_engages_with_reason(hermes_home, capsys):
     assert "paused" in capsys.readouterr().out.lower()
 
 
-def test_cli_pause_idempotent(hermes_home, capsys):
-    from hermes_cli.subcommands.pause import cmd_pause
+def test_cli_pause_idempotent(x19_home, capsys):
+    from x19_cli.subcommands.pause import cmd_pause
 
     assert cmd_pause(argparse.Namespace(reason=None)) == 0
     assert cmd_pause(argparse.Namespace(reason=None)) == 0
     assert estop.is_engaged() is True
 
 
-def test_cli_resume_disengages(hermes_home, capsys):
-    from hermes_cli.subcommands.pause import cmd_pause, cmd_resume
+def test_cli_resume_disengages(x19_home, capsys):
+    from x19_cli.subcommands.pause import cmd_pause, cmd_resume
 
     cmd_pause(argparse.Namespace(reason=None))
     rc = cmd_resume(argparse.Namespace())
@@ -256,8 +256,8 @@ def test_cli_resume_disengages(hermes_home, capsys):
     assert "resumed" in capsys.readouterr().out.lower()
 
 
-def test_cli_resume_when_not_paused(hermes_home, capsys):
-    from hermes_cli.subcommands.pause import cmd_resume
+def test_cli_resume_when_not_paused(x19_home, capsys):
+    from x19_cli.subcommands.pause import cmd_resume
 
     rc = cmd_resume(argparse.Namespace())
     assert rc == 0
@@ -265,17 +265,17 @@ def test_cli_resume_when_not_paused(hermes_home, capsys):
 
 
 def test_builtin_subcommands_include_pause_resume():
-    from hermes_cli.main import _BUILTIN_SUBCOMMANDS
+    from x19_cli.main import _BUILTIN_SUBCOMMANDS
 
     assert "pause" in _BUILTIN_SUBCOMMANDS
     assert "resume" in _BUILTIN_SUBCOMMANDS
 
 
-# ── hermes status surfacing ─────────────────────────────────────────────────
+# ── x19 status surfacing ─────────────────────────────────────────────────
 
 
-def test_status_line_when_paused(hermes_home):
-    from hermes_cli.status import _estop_status_line
+def test_status_line_when_paused(x19_home):
+    from x19_cli.status import _estop_status_line
 
     assert _estop_status_line() is None
     estop.engage(reason="ops")
@@ -290,9 +290,9 @@ def test_status_line_when_paused(hermes_home):
 # ── post-merge audit fixes (#81148 follow-up) ───────────────────────────────
 
 
-def test_is_engaged_fails_safe_on_stat_error(hermes_home, monkeypatch):
+def test_is_engaged_fails_safe_on_stat_error(x19_home, monkeypatch):
     """A stat failure must report ENGAGED (fail safe) — the pause has to
-    hold even when HERMES_HOME is misbehaving, matching the module's
+    hold even when X19_HOME is misbehaving, matching the module's
     corrupt-sentinel doctrine."""
     class _BoomPath:
         def exists(self):
@@ -313,7 +313,7 @@ class _FakeCmdEvent(_FakeEvent):
 
 
 @pytest.mark.asyncio
-async def test_gateway_slash_commands_bypass_estop(hermes_home):
+async def test_gateway_slash_commands_bypass_estop(x19_home):
     """Recognized slash commands must pass the estop gate — /pause off is
     the in-band resume path for messaging-only users, and /status, /help
     and friends must keep working while paused."""
@@ -329,7 +329,7 @@ async def test_gateway_slash_commands_bypass_estop(hermes_home):
         reply = await runner._handle_message(_FakeCmdEvent())
     except Exception:
         return
-    assert reply is None or "hermes is paused" not in (reply or "").lower()
+    assert reply is None or "x19 is paused" not in (reply or "").lower()
 
 
 class _FakePauseEvent(_FakeEvent):
@@ -346,7 +346,7 @@ class _FakePauseEvent(_FakeEvent):
 
 
 @pytest.mark.asyncio
-async def test_gateway_pause_command_engages_and_resumes(hermes_home):
+async def test_gateway_pause_command_engages_and_resumes(x19_home):
     from gateway.run import GatewayRunner
 
     runner = object.__new__(GatewayRunner)
@@ -369,7 +369,7 @@ async def test_gateway_pause_command_engages_and_resumes(hermes_home):
 
 
 def test_pause_command_registered_for_gateway():
-    from hermes_cli.commands import GATEWAY_KNOWN_COMMANDS, resolve_command
+    from x19_cli.commands import GATEWAY_KNOWN_COMMANDS, resolve_command
 
     cmd = resolve_command("pause")
     assert cmd is not None and cmd.name == "pause"
@@ -379,16 +379,16 @@ def test_pause_command_registered_for_gateway():
 
 
 def test_profile_gateway_honors_canonical_root_estop(tmp_path, monkeypatch):
-    """fleet-analyst-class: HERMES_HOME is a profile dir; pause lives at root.
+    """fleet-analyst-class: X19_HOME is a profile dir; pause lives at root.
 
-    A process launched with HERMES_HOME=~/.hermes/profiles/fleet-analyst must
-    still treat ~/.hermes/ESTOP as engaged. Otherwise `hermes pause` is not
+    A process launched with X19_HOME=~/.x19/profiles/fleet-analyst must
+    still treat ~/.x19/ESTOP as engaged. Otherwise `x19 pause` is not
     a global emergency stop (t_7b65ff88).
     """
-    root = tmp_path / "hermes-root"
+    root = tmp_path / "x19-root"
     profile = root / "profiles" / "fleet-analyst"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("X19_HOME", str(profile))
     estop._logged_components.clear()
 
     assert estop.is_engaged() is False

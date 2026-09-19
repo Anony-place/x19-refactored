@@ -9,11 +9,11 @@ import {
 import { expectVisualSnapshot } from './visual-snapshot'
 
 /**
- * E2E smoke tests for the packaged Hermes desktop app.
+ * E2E smoke tests for the packaged X19 desktop app.
  *
  * Launches the real packaged Electron binary (produced by `npm run pack` →
  * `electron-builder --dir`) with BOOT_FAKE=1 and full sandbox isolation
- * (credential stripping, isolated HERMES_HOME + userData, unique app name).
+ * (credential stripping, isolated X19_HOME + userData, unique app name).
  *
  * Skips if the packaged binary doesn't exist — run `npm run pack` first.
  */
@@ -34,9 +34,9 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('window opens with the Hermes title', async () => {
+test('window opens with the X19 title', async () => {
   const title = await fixture!.page.title()
-  expect(title).toContain('Hermes')
+  expect(title).toContain('X19')
 })
 
 test('renderer loads and shows DOM content', async () => {
@@ -72,8 +72,8 @@ test('HUD composer remains fully inside the transparent window', async () => {
 
   await fixture!.page.evaluate(() =>
     (window as typeof window & {
-      hermesDesktop?: { hud?: { open: (options: { sessionId: null }) => Promise<void> } }
-    }).hermesDesktop?.hud?.open({ sessionId: null })
+      x19Desktop?: { hud?: { open: (options: { sessionId: null }) => Promise<void> } }
+    }).x19Desktop?.hud?.open({ sessionId: null })
   )
 
   const hudPage = await hudPagePromise

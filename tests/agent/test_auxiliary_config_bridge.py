@@ -204,14 +204,14 @@ class TestVisionModelOverride:
 
 
 class TestDefaultConfigShape:
-    """Verify the DEFAULT_CONFIG in hermes_cli/config.py has correct auxiliary structure."""
+    """Verify the DEFAULT_CONFIG in x19_cli/config.py has correct auxiliary structure."""
 
     def test_auxiliary_section_exists(self):
-        from hermes_cli.config import DEFAULT_CONFIG
+        from x19_cli.config import DEFAULT_CONFIG
         assert "auxiliary" in DEFAULT_CONFIG
 
     def test_vision_task_structure(self):
-        from hermes_cli.config import DEFAULT_CONFIG
+        from x19_cli.config import DEFAULT_CONFIG
         vision = DEFAULT_CONFIG["auxiliary"]["vision"]
         assert "provider" in vision
         assert "model" in vision
@@ -220,7 +220,7 @@ class TestDefaultConfigShape:
 
     def test_web_extract_task_removed(self):
         """web_extract no longer summarizes via LLM — no aux slot."""
-        from hermes_cli.config import DEFAULT_CONFIG
+        from x19_cli.config import DEFAULT_CONFIG
         assert "web_extract" not in DEFAULT_CONFIG["auxiliary"]
 
 

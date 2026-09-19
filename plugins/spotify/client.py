@@ -1,4 +1,4 @@
-"""Thin Spotify Web API helper used by Hermes native tools.
+"""Thin Spotify Web API helper used by X19 native tools.
 
 Owns auth (token refresh/401 retry), error mapping and id/URI normalization;
 endpoint paths live with their tool handlers in ``tools.py``.
@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from hermes_cli.auth import AuthError, resolve_spotify_runtime_credentials
+from x19_cli.auth import AuthError, resolve_spotify_runtime_credentials
 
 
 class SpotifyError(RuntimeError): """Base Spotify tool error."""
@@ -101,13 +101,13 @@ def _extract_spotify_error_detail(response: httpx.Response, *, fallback: str) ->
 def _friendly_spotify_error_message(*, status_code: int, detail: str, path: str, retry_after: Optional[str]) -> str:
     is_playback_path = path.startswith("/me/player")
     if status_code == 401:
-        return "Spotify authentication failed or expired. Run `hermes auth spotify` again."
+        return "Spotify authentication failed or expired. Run `x19 auth spotify` again."
     if status_code == 403:
         if is_playback_path:
             return ("Spotify rejected this playback request. Playback control usually requires a Spotify Premium account "
                     "and an active Spotify Connect device.")
         if "scope" in detail.lower() or "permission" in detail.lower():
-            return "Spotify rejected the request because the current auth scope is insufficient. Re-run `hermes auth spotify` to refresh permissions."
+            return "Spotify rejected the request because the current auth scope is insufficient. Re-run `x19 auth spotify` to refresh permissions."
         return "Spotify rejected the request. The account may not have permission for this action."
     if status_code == 404:
         return "Spotify could not find an active playback device or player session for this request." if is_playback_path else "Spotify resource not found."
@@ -161,13 +161,3 @@ def normalize_spotify_uris(values: Iterable[str], expected_type: Optional[str] =
     return uris
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-import json  # noqa: F401,E402
-
-def compact_json(data: Any) -> str:
-    return json.dumps(data, ensure_ascii=False)
-# ---- END PLUGIN-COMPAT ----

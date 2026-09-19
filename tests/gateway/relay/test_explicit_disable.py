@@ -1,6 +1,6 @@
 """``platforms.relay.enabled: false`` beats a deployment-injected relay URL.
 
-Real profile files under a temp HERMES_HOME, the production startup hook and the
+Real profile files under a temp X19_HOME, the production startup hook and the
 standalone predicate. Only the connector HTTP calls are replaced.
 """
 from unittest.mock import Mock
@@ -25,13 +25,13 @@ SPELLINGS = {
     "nested": {"gateway": {"platforms": DISABLE}},
     "string-false": {"platforms": {"relay": {"enabled": "false"}}},
     "top-beats-nested": {"platforms": DISABLE, "gateway": {"platforms": {"relay": {"enabled": True}}}},
-    "managed": None,  # user YAML absent; disable comes from HERMES_MANAGED_DIR
+    "managed": None,  # user YAML absent; disable comes from X19_MANAGED_DIR
 }
 
 
 @pytest.fixture
 def profile(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     for key in list(os.environ):
         if key.startswith("GATEWAY_RELAY_"):
             monkeypatch.delenv(key)
@@ -41,7 +41,7 @@ def profile(tmp_path, monkeypatch):
     monkeypatch.setenv("GATEWAY_RELAY_PLATFORMS", "slack")
     monkeypatch.setenv("GATEWAY_RELAY_IDP_TOKEN_URL", "https://identity.example/token")
     monkeypatch.setenv("SLACK_BOT_TOKEN", "native-test-token")
-    monkeypatch.setattr("hermes_cli.plugins.discover_plugins", lambda: None)
+    monkeypatch.setattr("x19_cli.plugins.discover_plugins", lambda: None)
     monkeypatch.setattr(GatewayStartupMixin, "_register_config_hooks", lambda *a, **k: None)
     platform_registry.unregister("relay")
     yield tmp_path
@@ -54,7 +54,7 @@ def write_disable(home, spelling, monkeypatch):
         managed = home / "managed"
         managed.mkdir()
         (managed / "config.yaml").write_text(yaml.safe_dump({"platforms": DISABLE}))
-        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("X19_MANAGED_DIR", str(managed))
         return
     (home / "config.yaml").write_text(yaml.safe_dump(doc))
 

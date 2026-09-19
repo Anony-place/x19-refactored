@@ -1,5 +1,5 @@
 import type { Unstable_TriggerItem } from '@assistant-ui/core'
-import type { ConnectionState } from '@hermes/shared'
+import type { ConnectionState } from '@x19/shared'
 
 import type { SlashChipKind } from '@/components/assistant-ui/directive-text'
 import type { ComposerAttachment } from '@/store/composer'

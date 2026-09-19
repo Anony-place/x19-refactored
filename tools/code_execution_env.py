@@ -18,10 +18,10 @@ logger = logging.getLogger("tools.code_execution_tool")
 _IS_WINDOWS = platform.system() == "Windows"
 
 # Scrub order: secret-substring block first; whatever is left must match a safe
-# prefix, the exact-name HERMES_ allowlist, or (Windows) an OS-essential name.
-# The broad "HERMES_" prefix is deliberately NOT safe — it leaked config vars
-# without a secret substring (HERMES_BASE_URL, HERMES_KANBAN_DB, *_WEBHOOK).
-# HERMES_RPC_SOCKET / HERMES_RPC_DIR / TZ / HOME are injected after scrubbing.
+# prefix, the exact-name X19_ allowlist, or (Windows) an OS-essential name.
+# The broad "X19_" prefix is deliberately NOT safe — it leaked config vars
+# without a secret substring (X19_BASE_URL, X19_KANBAN_DB, *_WEBHOOK).
+# X19_RPC_SOCKET / X19_RPC_DIR / TZ / HOME are injected after scrubbing.
 _SAFE_ENV_PREFIXES = ("PATH", "HOME", "USER", "LANG", "LC_", "TERM", "TMPDIR", "TMP", "TEMP", "SHELL",
                       "LOGNAME", "XDG_", "PYTHONPATH", "VIRTUAL_ENV", "CONDA")
 # "PASS" is intentionally absent: it false-positives on BYPASS_CACHE /
@@ -30,11 +30,11 @@ _SECRET_SUBSTRINGS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "PASSW
                       "WEBHOOK", "CREDS", "BEARER", "APIKEY")
 
 # Non-secret runtime-location flags that repo-root modules a sandbox script
-# imports may read at import time. HERMES_DELEGATED_CHILD_CONTEXT must ride
-# along or a child that imports Hermes code loses the Kanban mutation guard
-# while still inheriting HERMES_HOME.
-_HERMES_CHILD_ALLOWED = frozenset({
-    "HERMES_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV", "HERMES_DELEGATED_CHILD_CONTEXT",
+# imports may read at import time. X19_DELEGATED_CHILD_CONTEXT must ride
+# along or a child that imports X19 code loses the Kanban mutation guard
+# while still inheriting X19_HOME.
+_X19_CHILD_ALLOWED = frozenset({
+    "X19_HOME", "X19_PROFILE", "X19_CONFIG", "X19_ENV", "X19_DELEGATED_CHILD_CONTEXT",
 })
 
 # Windows-only: without these the CRT itself fails — socket.socket() raises
@@ -55,7 +55,7 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     Rules, in order: (1) passthrough vars (skill/config-declared) resolve
     through the active profile secret scope — an absent scoped value is
     omitted; (2) secret-substring names are blocked; (3) safe prefixes pass;
-    (4) operational HERMES_* pass by exact name; (5) on Windows the
+    (4) operational X19_* pass by exact name; (5) on Windows the
     OS-essential allowlist passes by exact name.
     """
     try:
@@ -68,9 +68,9 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     if is_windows is None:
         is_windows = _IS_WINDOWS
     scrubbed = {}
-    # Non-secret HERMES_* vars no allowlist admits are dropped on purpose; a script importing a
+    # Non-secret X19_* vars no allowlist admits are dropped on purpose; a script importing a
     # repo module that reads one would see it silently unset — log the drop, point at the opt-in.
-    _dropped_hermes = []
+    _dropped_x19 = []
     for k, v in source_env.items():
         if is_passthrough(k):
             resolved = resolve_passthrough_value(k, v)
@@ -80,18 +80,18 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
         if any(s in k.upper() for s in _SECRET_SUBSTRINGS):
             continue
         if (any(k.startswith(p) for p in _SAFE_ENV_PREFIXES)
-                or k in _HERMES_CHILD_ALLOWED
+                or k in _X19_CHILD_ALLOWED
                 or (is_windows and k.upper() in _WINDOWS_ESSENTIAL_ENV_VARS)):
             scrubbed[k] = v
-        elif k.startswith("HERMES_"):
-            _dropped_hermes.append(k)
-    if _dropped_hermes:
+        elif k.startswith("X19_"):
+            _dropped_x19.append(k)
+    if _dropped_x19:
         logger.debug(
-            "execute_code: dropped %d non-allowlisted HERMES_* var(s) from the "
+            "execute_code: dropped %d non-allowlisted X19_* var(s) from the "
             "sandbox child env (%s). This is intentional hardening (#27303); if "
             "a sandbox script legitimately needs one, declare it via "
             "env_passthrough in the skill/config so it passes by explicit opt-in.",
-            len(_dropped_hermes), ", ".join(sorted(_dropped_hermes)),
+            len(_dropped_x19), ", ".join(sorted(_dropped_x19)),
         )
     # delegate_task children are marked by a ContextVar, not os.environ, and the sandbox crosses
     # a process boundary: strip dispatcher-owned Kanban vars AFTER the scrub so an explicit
@@ -101,9 +101,9 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     )
     scoped = delegated_child_subprocess_env(source_env)
     # Preserve location only when carrying the descendant fence, not for arbitrary
-    # non-allowlisted HERMES_* values in otherwise ordinary execution environments.
+    # non-allowlisted X19_* values in otherwise ordinary execution environments.
     if scoped.get(DELEGATED_CHILD_ENV_MARKER):
-        for key in (DELEGATED_CHILD_ENV_MARKER, "HERMES_KANBAN_DB", "HERMES_KANBAN_BOARD"):
+        for key in (DELEGATED_CHILD_ENV_MARKER, "X19_KANBAN_DB", "X19_KANBAN_BOARD"):
             if key in scoped:
                 scrubbed[key] = scoped[key]
     return delegated_child_subprocess_env(scrubbed)
@@ -112,53 +112,53 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
 def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
                      child_python: str) -> Dict[str, str]:
     """Build the scrubbed child environment both execution paths share."""
-    from hermes_constants import apply_subprocess_home_env, get_hermes_home_override
+    from x19_constants import apply_subprocess_home_env, get_x19_home_override
     child_env = _scrub_child_env(os.environ)
-    child_env["HERMES_RPC_SOCKET"] = rpc_endpoint
-    child_env["HERMES_RPC_TOKEN"] = rpc_token
+    child_env["X19_RPC_SOCKET"] = rpc_endpoint
+    child_env["X19_RPC_TOKEN"] = rpc_token
     child_env["PYTHONDONTWRITEBYTECODE"] = "1"
     # Force UTF-8 stdio and default file encoding: on Windows sys.stdout is bound to the console
     # code page (cp1252) and print("→") raises; harmless under a C/POSIX locale (containers).
     child_env["PYTHONIOENCODING"] = "utf-8"
     child_env["PYTHONUTF8"] = "1"
-    # Only TZ reaches the child; HERMES_TIMEZONE is an internal setting (and under the multiplexed
-    # gateway holds only the default profile's value — hermes_time resolves the routed profile's).
-    from hermes_time import get_timezone_name
+    # Only TZ reaches the child; X19_TIMEZONE is an internal setting (and under the multiplexed
+    # gateway holds only the default profile's value — x19_time resolves the routed profile's).
+    from x19_time import get_timezone_name
 
     _tz_name = get_timezone_name()
     # Windows CPython does not support IANA names in TZ.  Leaving TZ unset
     # preserves the OS-configured local timezone for the child process.
     if _tz_name and not _IS_WINDOWS:
         child_env["TZ"] = _tz_name
-    child_env.pop("HERMES_TIMEZONE", None)
+    child_env.pop("X19_TIMEZONE", None)
     apply_subprocess_home_env(child_env)
     # Multiplexed gateway/Desktop (#110303): the server process env carries the machine-default
-    # HERMES_HOME, but this turn runs under a per-profile override (ContextVar bound per turn).
+    # X19_HOME, but this turn runs under a per-profile override (ContextVar bound per turn).
     # The scrub above passed the stale default through; rewrite it so skill scripts see the
     # active profile's home — the same per-turn rewrite apply_subprocess_home_env does for HOME.
     # No override (dedicated per-profile process) → leave the inherited value untouched.
-    _home_override = get_hermes_home_override()
+    _home_override = get_x19_home_override()
     if _home_override:
-        child_env["HERMES_HOME"] = _home_override
-    # PYTHONPATH: the staging dir (hermes_tools.py) must always be importable even when project
-    # mode changes CWD. Hermes's root is added ONLY when the child runs in Hermes's Python env —
-    # exposing Hermes's site-packages to an external interpreter can mix incompatible compiled
-    # extensions (3.12 NumPy under a 3.9 venv). Inherited Hermes-owned entries are stripped first.
-    # Before re-injecting PYTHONPATH, strip Hermes-owned entries that leaked through _scrub_child_env
-    # (PYTHONPATH is in _SAFE_ENV_PREFIXES so it passes the scrub). They are redundant for same-Hermes-
+        child_env["X19_HOME"] = _home_override
+    # PYTHONPATH: the staging dir (x19_tools.py) must always be importable even when project
+    # mode changes CWD. X19's root is added ONLY when the child runs in X19's Python env —
+    # exposing X19's site-packages to an external interpreter can mix incompatible compiled
+    # extensions (3.12 NumPy under a 3.9 venv). Inherited X19-owned entries are stripped first.
+    # Before re-injecting PYTHONPATH, strip X19-owned entries that leaked through _scrub_child_env
+    # (PYTHONPATH is in _SAFE_ENV_PREFIXES so it passes the scrub). They are redundant for same-X19-
     # environment children and may be incompatible with external interpreters (project mode can select a
     # different venv), so they must not shadow or poison the child's sys.path (#74817).
-    from tools.environments.local_pythonpath import _strip_hermes_owned_pythonpath
-    _strip_hermes_owned_pythonpath(child_env)
+    from tools.environments.local_pythonpath import _strip_x19_owned_pythonpath
+    _strip_x19_owned_pythonpath(child_env)
     _existing_pp = child_env.get("PYTHONPATH", "")
     _pp_parts = [tmpdir]
-    if _uses_hermes_python_environment(child_python):
+    if _uses_x19_python_environment(child_python):
         _pp_parts.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     elif child_python not in _external_env_logged:
-        # Surface once per interpreter so "import hermes_constants fails" is diagnosable.
+        # Surface once per interpreter so "import x19_constants fails" is diagnosable.
         _external_env_logged.add(child_python)
-        logger.info("execute_code: child interpreter %s is outside the Hermes "
-                    "environment; hermes root omitted from PYTHONPATH", child_python)
+        logger.info("execute_code: child interpreter %s is outside the X19 "
+                    "environment; x19 root omitted from PYTHONPATH", child_python)
     if _existing_pp:
         _pp_parts.append(_existing_pp)
     child_env["PYTHONPATH"] = os.pathsep.join(_pp_parts)
@@ -171,7 +171,7 @@ _PROBE_CACHE_MAX = 32
 _usable_python_cache: dict = {}
 _python_prefix_cache: dict = {}
 
-# Interpreter paths already reported as outside the Hermes environment.
+# Interpreter paths already reported as outside the X19 environment.
 _external_env_logged: set = set()
 
 
@@ -221,10 +221,10 @@ def _python_environment_prefix(python_path: str) -> str:
     return ""
 
 
-def _uses_hermes_python_environment(python_path: str) -> bool:
-    """Whether *python_path* belongs to Hermes's active Python environment. Short-circuits when
+def _uses_x19_python_environment(python_path: str) -> bool:
+    """Whether *python_path* belongs to X19's active Python environment. Short-circuits when
     it IS the running interpreter (by path or realpath — covers ``uv run`` venvs) so no probe
-    runs on the default strict path and a flaky probe can never drop the hermes root."""
+    runs on the default strict path and a flaky probe can never drop the x19 root."""
     if python_path == sys.executable or os.path.realpath(python_path) == os.path.realpath(sys.executable):
         return True
     return _python_environment_prefix(python_path) == os.path.realpath(sys.prefix)

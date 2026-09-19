@@ -1,62 +1,33 @@
+"""X19 — a hierarchical multi-agent system.
+
+    USER
+      ↓
+    X19   BOSS      executive orchestrator: owns the objective, decomposes,
+                    delegates, monitors, resolves blockers, reviews, reports
+      ↓
+    X22   MANAGER   project manager: turns objectives into tasks with
+                    dependencies, assigns workers, tracks progress, validates
+                    output, reports upward, escalates
+      ↓
+    WORKERS         specialized execution agents (research, coding, security,
+                    testing, documentation, analysis, devops, debugging,
+                    tool execution) that use the real tool surface
+      ↓
+    TOOLS / EXECUTION → results → manager review → X19 audit → user
+
+The organization is real: :mod:`x19.org.runtime` holds a task graph with an
+enforced lifecycle, an agent registry overlaid with live subagent state from the
+delegation engine, and an append-only event stream.  Status, audits and the TUI
+all read from it.  Nothing in the product fabricates agents, progress, outputs
+or completions.
 """
-X19 — Autonomous Security Operations Agent
 
-Built on a proven upstream agent runtime. Provides hierarchical security team,
-evidence-driven assessment, and autonomous bug-bounty research capabilities.
+from __future__ import annotations
 
-This package contains the X19 product runtime extensions and reuses the proven
-runtime, tool, skill, memory, session, delegation, terminal, provider,
-and learning architecture.
+__version__ = "2.0.0"
+__product__ = "X19"
+__identity__ = "X19 — hierarchical multi-agent system"
 
-Hierarchy:
-    OPERATOR (human client)
-      ↓
-    X19 BOSS / COMMANDER (you, orchestrator)
-      ↓
-    SECURITY MANAGERS (Recon, Web, API — orchestrator)
-      ↓
-    SPECIALIST AGENTS (9 specialists — leaf)
-      ↓
-    TOOLS / TERMINAL / BROWSER / DATA
-"""
+from . import identity, org, state
 
-__version__ = "0.1.0"
-__identity__ = "X19 — Autonomous Security Operations Agent"
-
-# Marker for X19 mode detection
-X19_MODE_MARKER = "x19"
-
-# Core exports
-from . import identity
-from . import team
-from . import specialists
-from . import scope
-from . import findings
-from . import safety
-from . import orchestration
-from . import mission
-from . import interface
-from . import loop
-from . import knowledge
-from . import datasets
-from . import offensive
-from . import autonomous
-from . import learning
-
-__all__ = [
-    "identity",
-    "team",
-    "specialists",
-    "scope",
-    "findings",
-    "safety",
-    "orchestration",
-    "mission",
-    "interface",
-    "loop",
-    "knowledge",
-    "datasets",
-    "offensive",
-    "autonomous",
-    "learning",
-]
+__all__ = ["identity", "org", "state", "__version__", "__product__", "__identity__"]

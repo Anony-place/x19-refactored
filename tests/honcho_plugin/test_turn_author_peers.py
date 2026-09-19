@@ -23,7 +23,7 @@ from plugins.memory.honcho.session import HonchoSessionManager
 
 
 def _config(**overrides) -> HonchoClientConfig:
-    base = dict(api_key="test-key", peer_name="eri", ai_peer="hermes")
+    base = dict(api_key="test-key", peer_name="eri", ai_peer="x19")
     base.update(overrides)
     return HonchoClientConfig(**base)
 

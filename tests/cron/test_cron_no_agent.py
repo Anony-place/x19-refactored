@@ -20,19 +20,19 @@ import pytest
 
 
 @pytest.fixture
-def hermes_env(tmp_path, monkeypatch):
-    """Isolate HERMES_HOME for each test so jobs/scripts don't leak."""
-    home = tmp_path / ".hermes"
+def x19_env(tmp_path, monkeypatch):
+    """Isolate X19_HOME for each test so jobs/scripts don't leak."""
+    home = tmp_path / ".x19"
     home.mkdir()
     (home / "scripts").mkdir()
     (home / "cron").mkdir()
 
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
 
-    # Reload modules that cache get_hermes_home() at import time.
+    # Reload modules that cache get_x19_home() at import time.
     import importlib
-    import hermes_constants
-    importlib.reload(hermes_constants)
+    import x19_constants
+    importlib.reload(x19_constants)
     import cron.jobs
     importlib.reload(cron.jobs)
     import cron.scheduler
@@ -46,17 +46,17 @@ def hermes_env(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_create_job_no_agent_requires_script(hermes_env):
+def test_create_job_no_agent_requires_script(x19_env):
     from cron.jobs import create_job
 
     with pytest.raises(ValueError, match="no_agent=True requires a script"):
         create_job(prompt=None, schedule="every 5m", no_agent=True)
 
 
-def test_update_job_roundtrips_no_agent_flag(hermes_env):
+def test_update_job_roundtrips_no_agent_flag(x19_env):
     from cron.jobs import create_job, update_job, get_job
 
-    script_path = hermes_env / "scripts" / "w.sh"
+    script_path = x19_env / "scripts" / "w.sh"
     script_path.write_text("echo hi\n")
     job = create_job(prompt=None, schedule="every 5m", script="w.sh", no_agent=True, deliver="local")
 
@@ -74,7 +74,7 @@ def test_update_job_roundtrips_no_agent_flag(hermes_env):
 # ---------------------------------------------------------------------------
 
 
-def test_cronjob_tool_create_no_agent_without_script_errors(hermes_env):
+def test_cronjob_tool_create_no_agent_without_script_errors(x19_env):
     from tools.cronjob_tools import cronjob
 
     result = json.loads(
@@ -89,12 +89,12 @@ def test_cronjob_tool_create_no_agent_without_script_errors(hermes_env):
 # ---------------------------------------------------------------------------
 
 
-def test_run_job_no_agent_success_returns_script_stdout(hermes_env):
+def test_run_job_no_agent_success_returns_script_stdout(x19_env):
     """Happy path: script exits 0 with output, delivered verbatim."""
     from cron.jobs import create_job
     from cron.scheduler import run_job
 
-    script_path = hermes_env / "scripts" / "alert.sh"
+    script_path = x19_env / "scripts" / "alert.sh"
     script_path.write_text("#!/bin/bash\necho 'RAM 92% on host'\n")
 
     job = create_job(
@@ -107,24 +107,24 @@ def test_run_job_no_agent_success_returns_script_stdout(hermes_env):
     assert "RAM 92% on host" in doc
 
 
-def test_run_job_no_agent_reloads_dotenv_before_script(hermes_env, monkeypatch):
+def test_run_job_no_agent_reloads_dotenv_before_script(x19_env, monkeypatch):
     """Regression: a standalone cron tick process starts without home-channel
     vars in its environment, and the agent path's per-run dotenv reload never
     executes for no_agent jobs — delivery home channels stayed unresolved.
     run_job must load .env at the top of the no_agent branch."""
-    import hermes_cli.env_loader as env_loader
+    import x19_cli.env_loader as env_loader
     from cron.jobs import create_job
     from cron.scheduler import run_job
 
     loaded_homes: list = []
 
-    def fake_load(*, hermes_home=None, project_env=None):
-        loaded_homes.append(hermes_home)
+    def fake_load(*, x19_home=None, project_env=None):
+        loaded_homes.append(x19_home)
         return []
 
-    monkeypatch.setattr(env_loader, "load_hermes_dotenv", fake_load)
+    monkeypatch.setattr(env_loader, "load_x19_dotenv", fake_load)
 
-    script_path = hermes_env / "scripts" / "probe.sh"
+    script_path = x19_env / "scripts" / "probe.sh"
     script_path.write_text('#!/bin/bash\necho "ok"\n')
 
     job = create_job(
@@ -133,12 +133,12 @@ def test_run_job_no_agent_reloads_dotenv_before_script(hermes_env, monkeypatch):
     success, doc, final_response, error = run_job(job)
     assert success is True
     assert error is None
-    assert loaded_homes, "load_hermes_dotenv was not called on the no_agent path"
-    assert str(loaded_homes[0]) == str(hermes_env)
+    assert loaded_homes, "load_x19_dotenv was not called on the no_agent path"
+    assert str(loaded_homes[0]) == str(x19_env)
 
 
 def test_timed_out_no_agent_script_delivery_is_not_mislabeled_as_provider_failure(
-    hermes_env, monkeypatch,
+    x19_env, monkeypatch,
 ):
     """A watchdog timeout happens before any LLM/provider call.
 
@@ -149,7 +149,7 @@ def test_timed_out_no_agent_script_delivery_is_not_mislabeled_as_provider_failur
     import cron.scheduler as scheduler
     from cron import scheduler_script as sched_script
 
-    (hermes_env / "scripts" / "slow.py").write_text("import time; time.sleep(999)\n")
+    (x19_env / "scripts" / "slow.py").write_text("import time; time.sleep(999)\n")
     job = create_job(
         prompt=None,
         schedule="every 5m",
@@ -202,7 +202,7 @@ def test_timed_out_no_agent_script_delivery_is_not_mislabeled_as_provider_failur
     assert "fallback" not in delivered[0].lower()
 
 
-def test_agent_provider_timeout_delivery_keeps_fallback_guidance(hermes_env, monkeypatch):
+def test_agent_provider_timeout_delivery_keeps_fallback_guidance(x19_env, monkeypatch):
     """Provider timeout classification remains available to agent-backed jobs."""
     from cron.jobs import create_job
     import cron.scheduler as scheduler
@@ -245,7 +245,7 @@ def test_agent_provider_timeout_delivery_keeps_fallback_guidance(hermes_env, mon
 # ---------------------------------------------------------------------------
 
 
-def test_run_job_script_path_traversal_still_blocked(hermes_env):
+def test_run_job_script_path_traversal_still_blocked(x19_env):
     """Security regression: shell-script support must NOT loosen containment."""
     from cron.scheduler_script import _run_job_script
 
@@ -255,7 +255,7 @@ def test_run_job_script_path_traversal_still_blocked(hermes_env):
     assert "Blocked" in output or "outside" in output
 
 
-def test_run_job_script_nul_path_fails_cleanly(hermes_env):
+def test_run_job_script_nul_path_fails_cleanly(x19_env):
     """Sibling of the lifecycle-guard ingestion fix: a NUL-bearing script
     value can survive to fire time (the creation-time guard treats it as
     "nothing to scan"), and ``Path.expanduser()`` raises ValueError — not
@@ -275,7 +275,7 @@ def test_run_job_script_nul_path_fails_cleanly(hermes_env):
     assert "NUL byte" in output
 
 
-def test_run_job_script_nul_rejected_before_any_path_call(hermes_env, monkeypatch):
+def test_run_job_script_nul_rejected_before_any_path_call(x19_env, monkeypatch):
     """The eager NUL check must run before ``Path(...)`` is ever constructed.
 
     On Windows ``expanduser()`` never expands ``~user`` and never raises,
@@ -296,7 +296,7 @@ def test_run_job_script_nul_rejected_before_any_path_call(hermes_env, monkeypatc
     assert "NUL byte" in output
 
 
-def test_run_job_script_accepts_pathlike_script_path(hermes_env):
+def test_run_job_script_accepts_pathlike_script_path(x19_env):
     """The eager NUL guard must not crash on a non-str script_path.
 
     ``"\x00" in script_path`` raises TypeError for a pathlib.Path (not
@@ -306,7 +306,7 @@ def test_run_job_script_accepts_pathlike_script_path(hermes_env):
     the #86832 review point)."""
     from cron.scheduler_script import _run_job_script
 
-    script = hermes_env / "scripts" / "probe.py"
+    script = x19_env / "scripts" / "probe.py"
     script.write_text('print("pathlike ok")\n', encoding="utf-8")
 
     ok, output = _run_job_script(pathlib.Path(script))
@@ -335,7 +335,7 @@ def test_run_job_script_accepts_pathlike_script_path(hermes_env):
 @pytest.mark.parametrize(
     "error",
     [
-        "Script timed out after 900s: /home/u/.hermes/scripts/nightly.sh",
+        "Script timed out after 900s: /home/u/.x19/scripts/nightly.sh",
         "Script failed: curl returned 429 from api.example.com",
         "Script failed: gpg authentication failed for key",
         "Script failed: ReadTimeout contacting localhost",

@@ -7,16 +7,16 @@ chat_completions reasoning translations (GLM-5.2, Kimi K2, DeepSeek, Ox Alpha).
 from typing import Any
 
 from agent import reasoning_effort as re_
-from hermes_cli import __version__ as _HERMES_VERSION
+from x19_cli import __version__ as _X19_VERSION
 from providers import register_provider
 from providers.base import ProviderProfile
 
 # Attribution headers (same values as OpenRouter / Vercel / Fireworks); via
 # default_headers so they survive model switches and credential rotation.
 _ATTRIBUTION_HEADERS = {
-    "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-    "X-Title": "Hermes Agent",
-    "User-Agent": f"HermesAgent/{_HERMES_VERSION}",
+    "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
+    "X-Title": "X19",
+    "User-Agent": f"X19Agent/{_X19_VERSION}",
 }
 
 

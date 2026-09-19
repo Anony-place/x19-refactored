@@ -4,7 +4,7 @@ This file is the canary. If anyone removes a guard or weakens it, these
 tests fail. If anyone adds a NEW kill primitive to the codebase without
 adding it to the guard, the corresponding test added here will fail too.
 
-The guard exists to protect the developer's live ``hermes-gateway`` process
+The guard exists to protect the developer's live ``x19-gateway`` process
 from being SIGTERMed by tests. See PR #23397 for the original incident
 (5+ live gateway kills in 3 days). Per Teknium 2026-05-10:
 
@@ -128,79 +128,79 @@ def test_os_killpg_blocks_foreign_pgid():
 
 def test_subprocess_run_systemctl_restart_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["systemctl", "--user", "restart", "hermes-gateway"])
+        subprocess.run(["systemctl", "--user", "restart", "x19-gateway"])
 
 
 def test_subprocess_run_full_path_systemctl_blocked():
     """``/usr/bin/systemctl`` (full path) must be blocked too."""
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["/usr/bin/systemctl", "--user", "stop", "hermes-gateway"])
+        subprocess.run(["/usr/bin/systemctl", "--user", "stop", "x19-gateway"])
 
 
 def test_subprocess_run_sudo_systemctl_blocked():
     """``sudo systemctl ...`` defeated the old head==systemctl check."""
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["sudo", "systemctl", "restart", "hermes-gateway"])
+        subprocess.run(["sudo", "systemctl", "restart", "x19-gateway"])
 
 
 def test_subprocess_run_env_systemctl_blocked():
     """``env systemctl ...`` similarly defeated the old head check."""
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["env", "systemctl", "--user", "restart", "hermes-gateway"])
+        subprocess.run(["env", "systemctl", "--user", "restart", "x19-gateway"])
 
 
 def test_subprocess_run_bash_c_systemctl_blocked():
     """``bash -c "systemctl ..."`` must also be caught."""
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["bash", "-c", "systemctl --user restart hermes-gateway"])
+        subprocess.run(["bash", "-c", "systemctl --user restart x19-gateway"])
 
 
 def test_subprocess_run_sh_c_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["sh", "-c", "systemctl --user stop hermes-gateway"])
+        subprocess.run(["sh", "-c", "systemctl --user stop x19-gateway"])
 
 
 def test_subprocess_run_setsid_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["setsid", "systemctl", "kill", "hermes-gateway"])
+        subprocess.run(["setsid", "systemctl", "kill", "x19-gateway"])
 
 
 def test_subprocess_run_string_shell_true_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
         subprocess.run(
-            "systemctl --user restart hermes-gateway",
+            "systemctl --user restart x19-gateway",
             shell=True,
         )
 
 
 def test_subprocess_popen_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.Popen(["systemctl", "--user", "stop", "hermes-gateway"])
+        subprocess.Popen(["systemctl", "--user", "stop", "x19-gateway"])
 
 
 def test_subprocess_call_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.call(["systemctl", "--user", "restart", "hermes-gateway"])
+        subprocess.call(["systemctl", "--user", "restart", "x19-gateway"])
 
 
 def test_subprocess_check_call_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.check_call(["systemctl", "--user", "restart", "hermes-gateway"])
+        subprocess.check_call(["systemctl", "--user", "restart", "x19-gateway"])
 
 
 def test_subprocess_check_output_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.check_output(["systemctl", "--user", "restart", "hermes-gateway"])
+        subprocess.check_output(["systemctl", "--user", "restart", "x19-gateway"])
 
 
 def test_subprocess_getoutput_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.getoutput("systemctl --user restart hermes-gateway")
+        subprocess.getoutput("systemctl --user restart x19-gateway")
 
 
 def test_subprocess_getstatusoutput_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.getstatusoutput("systemctl --user restart hermes-gateway")
+        subprocess.getstatusoutput("systemctl --user restart x19-gateway")
 
 
 # ──────────────────── os.system / os.popen ────────────────────
@@ -208,12 +208,12 @@ def test_subprocess_getstatusoutput_systemctl_blocked():
 
 def test_os_system_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        os.system("systemctl --user restart hermes-gateway")
+        os.system("systemctl --user restart x19-gateway")
 
 
 def test_os_popen_systemctl_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        os.popen("systemctl --user restart hermes-gateway")
+        os.popen("systemctl --user restart x19-gateway")
 
 
 # ──────────────────── pty.spawn ────────────────────────────────
@@ -222,7 +222,7 @@ def test_os_popen_systemctl_blocked():
 def test_pty_spawn_systemctl_blocked():
     import pty
     with pytest.raises(RuntimeError, match="live-system guard"):
-        pty.spawn(["systemctl", "--user", "restart", "hermes-gateway"])
+        pty.spawn(["systemctl", "--user", "restart", "x19-gateway"])
 
 
 # ──────────────────── asyncio.create_subprocess_* ──────────────
@@ -233,7 +233,7 @@ def test_asyncio_create_subprocess_exec_systemctl_blocked():
 
     async def _attempt():
         await asyncio.create_subprocess_exec(
-            "systemctl", "--user", "restart", "hermes-gateway"
+            "systemctl", "--user", "restart", "x19-gateway"
         )
 
     with pytest.raises(RuntimeError, match="live-system guard"):
@@ -245,7 +245,7 @@ def test_asyncio_create_subprocess_shell_systemctl_blocked():
 
     async def _attempt():
         await asyncio.create_subprocess_shell(
-            "systemctl --user restart hermes-gateway"
+            "systemctl --user restart x19-gateway"
         )
 
     with pytest.raises(RuntimeError, match="live-system guard"):
@@ -255,25 +255,25 @@ def test_asyncio_create_subprocess_shell_systemctl_blocked():
 # ──────────────────── pkill / killall / taskkill ───────────────
 
 
-def test_subprocess_pkill_hermes_blocked():
+def test_subprocess_pkill_x19_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["pkill", "-f", "hermes"])
+        subprocess.run(["pkill", "-f", "x19"])
 
 
-def test_subprocess_pkill_hermes_gateway_blocked():
+def test_subprocess_pkill_x19_gateway_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["pkill", "-f", "hermes-gateway"])
+        subprocess.run(["pkill", "-f", "x19-gateway"])
 
 
 def test_subprocess_pkill_python_dash_f_blocked():
-    """``pkill -f python`` matches the gateway's "python -m hermes_cli.main"."""
+    """``pkill -f python`` matches the gateway's "python -m x19_cli.main"."""
     with pytest.raises(RuntimeError, match="live-system guard"):
         subprocess.run(["pkill", "-f", "python"])
 
 
-def test_subprocess_killall_hermes_blocked():
+def test_subprocess_killall_x19_blocked():
     with pytest.raises(RuntimeError, match="live-system guard"):
-        subprocess.run(["killall", "hermes"])
+        subprocess.run(["killall", "x19"])
 
 
 # ──────────────────── pass-through cases (must NOT raise) ──────
@@ -297,13 +297,13 @@ def test_subprocess_killall_hermes_blocked():
 
 
 def test_subprocess_popen_real_gateway_restart_blocked():
-    """``python -m hermes_cli.main gateway restart`` is a detached child that
-    inherits the pytest-tmp HERMES_HOME, resolves the developer's real
-    ``hermes-gateway`` unit, and outlives the test (39 six-day orphans squatted
+    """``python -m x19_cli.main gateway restart`` is a detached child that
+    inherits the pytest-tmp X19_HOME, resolves the developer's real
+    ``x19-gateway`` unit, and outlives the test (39 six-day orphans squatted
     the webhook port, 2026-09-03). Blocked at the spawn primitive."""
     with pytest.raises(RuntimeError, match="live-system guard"):
         subprocess.Popen(
-            [sys.executable, "-m", "hermes_cli.main", "gateway", "restart"],
+            [sys.executable, "-m", "x19_cli.main", "gateway", "restart"],
             start_new_session=True,
         )
 
@@ -313,7 +313,7 @@ def test_subprocess_run_gateway_status_passes_through():
     read-only subcommand) must still spawn — via the canonical matcher, not an
     argv substring."""
     result = subprocess.run(
-        [sys.executable, "-c", "import sys; print(sys.argv[1:])", "-m", "hermes_cli.main", "gateway", "status"],
+        [sys.executable, "-c", "import sys; print(sys.argv[1:])", "-m", "x19_cli.main", "gateway", "status"],
         capture_output=True, text=True,
     )
     assert result.returncode == 0

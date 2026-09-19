@@ -49,16 +49,16 @@ def _assert_sanitized(captured):
 
 
 def _assert_path_preserved(env):
-    """Original PATH entries survive sanitization; the hermes console-script
+    """Original PATH entries survive sanitization; the x19 console-script
     dir may be prepended (see _sanitize_subprocess_env, issue #92998) so we
     assert the contract, not byte equality."""
-    from tools.environments.local import _resolve_hermes_bin_dir
+    from tools.environments.local import _resolve_x19_bin_dir
 
     path_val = env.get("PATH", "")
     assert path_val.endswith("/usr/bin:/bin"), path_val
-    hermes_bin = _resolve_hermes_bin_dir()
-    if hermes_bin and path_val != "/usr/bin:/bin":
-        assert path_val.startswith(hermes_bin + os.pathsep), path_val
+    x19_bin = _resolve_x19_bin_dir()
+    if x19_bin and path_val != "/usr/bin:/bin":
+        assert path_val.startswith(x19_bin + os.pathsep), path_val
 
 
 def _patch_windows_hide_flags(monkeypatch, module):
@@ -79,7 +79,7 @@ def _patch_windows_hide_flags(monkeypatch, module):
 def test_resolve_mcp_invocation_sanitizes_env(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.delenv("HERMES_CUA_TELEMETRY", raising=False)
+    monkeypatch.delenv("X19_CUA_TELEMETRY", raising=False)
 
     from tools.computer_use import cua_backend
     from tools.computer_use import cua_backend_driver
@@ -100,7 +100,7 @@ def test_resolve_mcp_invocation_sanitizes_env(monkeypatch):
 def test_update_check_sanitizes_env(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.delenv("HERMES_CUA_TELEMETRY", raising=False)
+    monkeypatch.delenv("X19_CUA_TELEMETRY", raising=False)
 
     from tools.computer_use import cua_backend
     from tools.computer_use import cua_backend_driver
@@ -129,7 +129,7 @@ def test_update_check_sanitizes_env(monkeypatch):
 def test_cli_fallback_sanitizes_env_and_hides_console_on_windows(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.delenv("HERMES_CUA_TELEMETRY", raising=False)
+    monkeypatch.delenv("X19_CUA_TELEMETRY", raising=False)
 
     from tools.computer_use import cua_backend, cua_backend_driver, cua_backend_session
 
@@ -157,7 +157,7 @@ def test_cli_fallback_sanitizes_env_and_hides_console_on_windows(monkeypatch):
 def test_permissions_run_sanitizes_env(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.delenv("HERMES_CUA_TELEMETRY", raising=False)
+    monkeypatch.delenv("X19_CUA_TELEMETRY", raising=False)
 
     from tools.computer_use import permissions
 
@@ -175,7 +175,7 @@ def test_permissions_run_sanitizes_env(monkeypatch):
 def test_doctor_spawn_sanitizes_env_and_hides_console_on_windows(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.delenv("HERMES_CUA_TELEMETRY", raising=False)
+    monkeypatch.delenv("X19_CUA_TELEMETRY", raising=False)
 
     from tools.computer_use import doctor
 
@@ -221,7 +221,7 @@ def test_doctor_sanitized_env_helper(monkeypatch):
     refactor with identical runtime behavior)."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.delenv("HERMES_CUA_TELEMETRY", raising=False)
+    monkeypatch.delenv("X19_CUA_TELEMETRY", raising=False)
 
     from tools.computer_use import doctor
 

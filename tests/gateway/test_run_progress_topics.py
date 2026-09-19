@@ -345,7 +345,7 @@ class ThinkingAgent:
 
 class LongPreviewAgent:
     """Agent that emits a tool call with a very long preview string."""
-    LONG_CMD = "cd /home/teknium/.hermes/hermes-agent/.worktrees/hermes-d8860339 && source .venv/bin/activate && python -m pytest tests/gateway/test_run_progress_topics.py -n0 -q"
+    LONG_CMD = "cd /home/teknium/.x19/x19/.worktrees/x19-d8860339 && source .venv/bin/activate && python -m pytest tests/gateway/test_run_progress_topics.py -n0 -q"
 
     def __init__(self, **kwargs):
         self.tool_progress_callback = kwargs.get("tool_progress_callback")
@@ -362,7 +362,7 @@ class LongPreviewAgent:
 
 
 class UrlPreviewAgent:
-    URL = "https://hermes-agent.nousresearch.com/docs/gateway/discord/tool-progress"
+    URL = "https://anony-place.github.io/x19-refactored/docs/gateway/discord/tool-progress"
 
     def __init__(self, **kwargs):
         self.tool_progress_callback = kwargs.get("tool_progress_callback")
@@ -495,7 +495,7 @@ def _make_runner(adapter):
 @pytest.mark.asyncio
 async def test_run_agent_progress_uses_event_message_id_for_slack_dm(monkeypatch, tmp_path):
     """Slack DM progress should keep event ts fallback threading."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
     # Since PR #8006, Slack's built-in display tier sets tool_progress="off"
     # by default. Override via config so this test still exercises the
     # progress-callback path the Slack DM event_message_id threading depends on.
@@ -516,7 +516,7 @@ async def test_run_agent_progress_uses_event_message_id_for_slack_dm(monkeypatch
     adapter = ProgressCaptureAdapter(platform=Platform.SLACK)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -549,7 +549,7 @@ async def test_run_agent_progress_uses_event_message_id_for_slack_dm(monkeypatch
 @pytest.mark.asyncio
 async def test_scheduled_heartbeat_suppresses_routine_progress_and_typing(monkeypatch, tmp_path):
     """A silent scheduled heartbeat must not create a visible progress surface."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
     fake_run_agent = types.ModuleType("run_agent")
     fake_run_agent.AIAgent = SilentHeartbeatAgent
     monkeypatch.setitem(sys.modules, "run_agent", fake_run_agent)
@@ -557,7 +557,7 @@ async def test_scheduled_heartbeat_suppresses_routine_progress_and_typing(monkey
     adapter = ProgressCaptureAdapter()
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -590,7 +590,7 @@ async def test_progress_carries_anchor_for_relay_discord_auto_thread(monkeypatch
     anchor (reply_to + metadata.reply_to_message_id) so they route into the
     SAME auto-thread as the final reply — otherwise the search-status updates
     leak into the parent channel (staging repro 2026-08-02)."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
     import yaml
     (tmp_path / "config.yaml").write_text(
         yaml.dump({"display": {"platforms": {"discord": {"tool_progress": "all"}}}}),
@@ -608,7 +608,7 @@ async def test_progress_carries_anchor_for_relay_discord_auto_thread(monkeypatch
     adapter = ProgressCaptureAdapter(platform=Platform.RELAY)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     # Channel-initiating message: no thread_id yet, but the connector stamped
@@ -649,7 +649,7 @@ async def test_progress_no_anchor_for_native_discord_thread_event(monkeypatch, t
     """A message ARRIVING in an existing Discord thread (not the relay
     auto-thread lane) must NOT get the synthetic prospective anchor — it already
     routes by its real thread. Guards against over-broadening the relay fix."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
     import yaml
     (tmp_path / "config.yaml").write_text(
         yaml.dump({"display": {"platforms": {"discord": {"tool_progress": "all"}}}}),
@@ -667,7 +667,7 @@ async def test_progress_no_anchor_for_native_discord_thread_event(monkeypatch, t
     adapter = ProgressCaptureAdapter(platform=Platform.RELAY)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     # No prospective_thread_id (event is IN a real thread already).
@@ -735,7 +735,7 @@ def _run_long_preview_helper(monkeypatch, tmp_path, preview_length=0):
     import asyncio
     import yaml
 
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -752,7 +752,7 @@ def _run_long_preview_helper(monkeypatch, tmp_path, preview_length=0):
     adapter = ProgressCaptureAdapter()
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -794,7 +794,7 @@ def test_discord_truncated_tool_url_links_to_full_destination(monkeypatch, tmp_p
     """The real gateway path must retain the URL beyond its visible cap."""
     import yaml
 
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -812,7 +812,7 @@ def test_discord_truncated_tool_url_links_to_full_destination(monkeypatch, tmp_p
     adapter = DiscordProgressCaptureAdapter()
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(
         gateway_run,
         "_resolve_runtime_agent_kwargs",
@@ -1073,7 +1073,7 @@ async def _run_with_agent(
     gateway_run = importlib.import_module("gateway.run")
     if config_data and "streaming" in config_data:
         runner.config.streaming = StreamingConfig.from_dict(config_data["streaming"])
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
     source = SessionSource(
         platform=platform,
@@ -1237,9 +1237,9 @@ async def test_slack_operator_tool_progress_off_disables_task_cards(monkeypatch,
 @pytest.mark.parametrize("env_mode", [None, "all", "new"])
 async def test_slack_null_tool_progress_is_inheritance_not_explicit_off(monkeypatch, tmp_path, display_cfg, env_mode):
     # A bare key with ``null`` inherits (the resolver skips None); it is not an operator saying "off".
-    monkeypatch.delenv("HERMES_TOOL_PROGRESS_MODE", raising=False)
+    monkeypatch.delenv("X19_TOOL_PROGRESS_MODE", raising=False)
     if env_mode is not None:
-        monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", env_mode)
+        monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", env_mode)
     adapter, result = await _run_with_agent(
         monkeypatch,
         tmp_path,
@@ -1727,7 +1727,7 @@ async def test_run_agent_drops_tool_progress_after_generation_invalidation(monke
     adapter = ProgressCaptureAdapter(platform=Platform.DISCORD)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -1788,7 +1788,7 @@ async def test_run_agent_drops_interim_commentary_after_generation_invalidation(
     adapter = ProgressCaptureAdapter(platform=Platform.DISCORD)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -1911,7 +1911,7 @@ async def test_terminal_progress_renders_fenced_code_block(monkeypatch, tmp_path
     'bash' as a literal first code line).  In non-verbose ("all"/"new") mode the
     command is collapsed to a single line capped at tool_preview_length so a long
     or multi-line command doesn't render as a huge block (#42634)."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -1925,7 +1925,7 @@ async def test_terminal_progress_renders_fenced_code_block(monkeypatch, tmp_path
     adapter = CodeBlockProgressAdapter(platform=Platform.TELEGRAM)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -1964,7 +1964,7 @@ async def test_terminal_progress_verbose_shows_full_command(monkeypatch, tmp_pat
     """Verbose mode on a markdown-capable gateway renders the FULL multi-line
     command in a bare fenced block (no truncation, no 'bash' tag).  This is the
     parity guarantee for #42634: verbose keeps full detail, non-verbose caps."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "verbose")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "verbose")
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -1978,7 +1978,7 @@ async def test_terminal_progress_verbose_shows_full_command(monkeypatch, tmp_pat
     adapter = CodeBlockProgressAdapter(platform=Platform.TELEGRAM)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -2012,7 +2012,7 @@ async def test_terminal_progress_no_bash_block_in_verbose_mode(monkeypatch, tmp_
     """#41215 also rendered the bash block in verbose mode. The revert removed it
     from both branches, so verbose progress must not emit a fenced ```bash block
     either (verbose still shows args by opt-in, just not as a code block)."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "verbose")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "verbose")
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -2026,7 +2026,7 @@ async def test_terminal_progress_no_bash_block_in_verbose_mode(monkeypatch, tmp_
     adapter = CodeBlockProgressAdapter(platform=Platform.TELEGRAM)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(
@@ -2074,7 +2074,7 @@ async def test_consecutive_terminal_progress_collapses_headers(monkeypatch, tmp_
     """Back-to-back terminal calls render ONE "terminal" header followed by
     adjacent code blocks; a different tool in between resets the header so the
     next terminal call gets a fresh one."""
-    monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
+    monkeypatch.setenv("X19_TOOL_PROGRESS_MODE", "all")
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -2088,7 +2088,7 @@ async def test_consecutive_terminal_progress_collapses_headers(monkeypatch, tmp_
     adapter = CodeBlockProgressAdapter(platform=Platform.TELEGRAM)
     runner = _make_runner(adapter)
     gateway_run = importlib.import_module("gateway.run")
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
 
     source = SessionSource(

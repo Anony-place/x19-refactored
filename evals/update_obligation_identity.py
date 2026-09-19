@@ -11,8 +11,8 @@ repo = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(repo))
 root = pathlib.Path(tempfile.mkdtemp(prefix="obligations-live-"))
 os.environ["HOME"] = str(root)
-os.environ["HERMES_HOME"] = str(root / ".hermes")
-from hermes_cli import update_cmd_fleet as fleet, update_receipt as receipts
+os.environ["X19_HOME"] = str(root / ".x19")
+from x19_cli import update_cmd_fleet as fleet, update_receipt as receipts
 
 print("MODULE", fleet.__file__)
 sha = fleet._current_checkout_sha()
@@ -20,13 +20,13 @@ children = []
 rows = []
 try:
     for name in ["alpha", "beta"]:
-        home = root / ".hermes" / "profiles" / name
+        home = root / ".x19" / "profiles" / name
         home.mkdir(parents=True)
         code = "import sys,time; sys.path.insert(0,sys.argv[1]); from gateway.status import write_runtime_status; write_runtime_status(gateway_state='running'); print('ready',flush=True); time.sleep(120)"
         p = subprocess.Popen(
             [sys.executable, "-c", code, str(repo)],
             cwd=repo,
-            env={**os.environ, "HERMES_HOME": str(home)},
+            env={**os.environ, "X19_HOME": str(home)},
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -34,7 +34,7 @@ try:
         )
         children.append(p)
         assert p.stdout.readline().strip() == "ready", p.stderr.read()
-    d = root / ".hermes/logs/update_receipts"
+    d = root / ".x19/logs/update_receipts"
     d.mkdir(parents=True)
     receipt = {
         "outcome": "failed",
@@ -57,7 +57,7 @@ try:
         print(json.dumps(row))
 
     observe("current-successors")
-    home = root / ".hermes/profiles/beta"
+    home = root / ".x19/profiles/beta"
     state = home / "gateway_state.json"
     payload = json.loads(state.read_text())
     payload["code_sha"] = "old"

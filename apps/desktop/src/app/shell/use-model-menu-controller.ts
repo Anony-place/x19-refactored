@@ -1,9 +1,9 @@
-import { DEFAULT_REASONING_EFFORT, type ModelOptionsResult } from '@hermes/shared'
+import { DEFAULT_REASONING_EFFORT, type ModelOptionsResult } from '@x19/shared'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 
 import { useSessionView } from '@/app/chat/session-view'
-import type { HermesGateway } from '@/hermes'
+import type { X19Gateway } from '@/x19'
 import { useI18n } from '@/i18n'
 import { modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
 import { currentPickerSelection } from '@/lib/model-status-label'
@@ -28,7 +28,7 @@ export interface ModelSelection {
 }
 
 export interface ModelMenuHostProps {
-  gateway?: HermesGateway
+  gateway?: X19Gateway
   ownerConnectionId?: string
   onSelectModel: (selection: ModelSelection) => Promise<boolean> | void
   profile?: string

@@ -28,30 +28,30 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 SESSION_ID = "sid-profile"
 SESSION_KEY = "tui-profile-1"
 
 
 @pytest.fixture()
-def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+def x19_home(tmp_path, monkeypatch):
+    home = tmp_path / ".x19"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     yield home
 
 
 @pytest.fixture()
-def server(hermes_home):
+def server(x19_home):
     # Mocks are scoped to the initial import only (see
     # tests/tui_gateway/test_protocol.py for the rationale).
     with patch.dict(
         "sys.modules",
         {
-            "hermes_cli.env_loader": MagicMock(),
-            "hermes_cli.banner": MagicMock(),
+            "x19_cli.env_loader": MagicMock(),
+            "x19_cli.banner": MagicMock(),
         },
     ):
         mod = importlib.import_module("tui_gateway.server")
@@ -69,9 +69,9 @@ def server(hermes_home):
 
 
 @pytest.fixture()
-def launch_db(server, hermes_home):
+def launch_db(server, x19_home):
     """The launch profile's state.db, wired in as the ``_get_db()`` handle."""
-    db = SessionDB(db_path=hermes_home / "state.db")
+    db = SessionDB(db_path=x19_home / "state.db")
     server._db = db
     return db
 

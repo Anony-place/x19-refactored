@@ -56,7 +56,7 @@ from gateway.platforms.yuanbao_media import (
     build_image_msg_body, build_file_msg_body, guess_mime_type, md5_hex,
 )
 from gateway.platforms.yuanbao_proto import (
-    CMD_TYPE, WS_HEARTBEAT_RUNNING, WS_HEARTBEAT_FINISH, HERMES_INSTANCE_ID,
+    CMD_TYPE, WS_HEARTBEAT_RUNNING, WS_HEARTBEAT_FINISH, X19_INSTANCE_ID,
     _fields_to_dict, _get_string, _get_varint, _parse_fields,
     decode_conn_msg, decode_inbound_push, decode_forward_msg_data,
     decode_query_group_info_rsp, decode_get_group_member_list_rsp,
@@ -71,11 +71,11 @@ logger = logging.getLogger(__name__)
 
 # AUTH_BIND / sign-token header values
 try:
-    from hermes_cli import __version__ as _HERMES_VERSION
+    from x19_cli import __version__ as _X19_VERSION
 except ImportError:
-    _HERMES_VERSION = "0.0.0"
-_APP_VERSION = _BOT_VERSION = _HERMES_VERSION
-_YUANBAO_INSTANCE_ID = str(HERMES_INSTANCE_ID)
+    _X19_VERSION = "0.0.0"
+_APP_VERSION = _BOT_VERSION = _X19_VERSION
+_YUANBAO_INSTANCE_ID = str(X19_INSTANCE_ID)
 _OPERATION_SYSTEM = sys.platform
 
 DEFAULT_WS_GATEWAY_URL = "wss://bot-wss.yuanbao.tencent.com/wss/connection"
@@ -2591,7 +2591,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
     MEDIA_MAX_SIZE_MB: int = 50
     DM_MAX_CHARS = 10000
     _active_instance: ClassVar[Optional["YuanbaoAdapter"]] = None
-    # Per Hermes home: a multiplexed gateway runs one Yuanbao adapter per profile, and the tools /
+    # Per X19 home: a multiplexed gateway runs one Yuanbao adapter per profile, and the tools /
     # send_message read "the" adapter from inside a profile-scoped turn, so last-wins would route
     # profile B's sends through profile A's bot. Registration and lookup both key on the ambient
     # override (connect/reconnect tasks inherit the profile's Context); the slot above serves the
@@ -2600,22 +2600,22 @@ class YuanbaoAdapter(BasePlatformAdapter):
 
     @classmethod
     def get_active(cls) -> Optional["YuanbaoAdapter"]:
-        from hermes_constants import get_hermes_home_override, hermes_home_key
+        from x19_constants import get_x19_home_override, x19_home_key
 
-        if get_hermes_home_override() is None:
+        if get_x19_home_override() is None:
             return cls._active_instance
-        return cls._active_instances.get(hermes_home_key())
+        return cls._active_instances.get(x19_home_key())
 
     @classmethod
     def set_active(cls, adapter: Optional["YuanbaoAdapter"]) -> None:
-        from hermes_constants import get_hermes_home_override, hermes_home_key
+        from x19_constants import get_x19_home_override, x19_home_key
 
-        if get_hermes_home_override() is None:
+        if get_x19_home_override() is None:
             cls._active_instance = adapter
         elif adapter is None:
-            cls._active_instances.pop(hermes_home_key(), None)
+            cls._active_instances.pop(x19_home_key(), None)
         else:
-            cls._active_instances[hermes_home_key()] = adapter
+            cls._active_instances[x19_home_key()] = adapter
 
     def __init__(self, config: PlatformConfig, **kwargs: Any) -> None:
         super().__init__(config, Platform.YUANBAO)
@@ -2812,203 +2812,3 @@ class YuanbaoAdapter(BasePlatformAdapter):
         return await SignManager.get_token(self._app_key, self._app_secret, self._api_domain, route_env=self._route_env)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-AUTH_FAILED_CODES = {4001, 4002, 4003}      # permanent auth failure, re-sign token
-
-AUTH_RETRYABLE_CODES = {4010, 4011, 4099}   # transient, can retry with same token
-
-class FileUrlHandler(MediaSendHandler):
-    """Strategy: send file from a URL (download → COS → TIMFileElem)."""
-
-    async def acquire_file(self, adapter, **kwargs):
-        file_url: str = kwargs["file_url"]
-        logger.info("[%s] FileUrlHandler: downloading %s", adapter.name, file_url)
-        file_bytes, content_type = await media_download_url(
-            file_url, max_size_mb=adapter.MEDIA_MAX_SIZE_MB,
-        )
-        filename = kwargs.get("filename")
-        if not filename:
-            path_part = file_url.split("?")[0]
-            filename = os.path.basename(path_part) or "file"
-        if not content_type or content_type == "application/octet-stream":
-            content_type = guess_mime_type(filename) or "application/octet-stream"
-        return file_bytes, filename, content_type
-
-    def build_msg_body(self, upload_result, **kwargs):
-        return build_file_msg_body(
-            url=upload_result["url"],
-            filename=kwargs["filename"],
-            uuid=kwargs["file_uuid"],
-            size=upload_result["size"],
-        )
-
-class GroupQueryService:
-    """Encapsulates all group query operations (both low-level WS calls and
-    higher-level AI-tool-facing wrappers).
-
-    Responsibilities:
-      - Low-level WS encode/decode for group info and member list queries
-      - Chat-id parsing, error wrapping and result filtering for AI tools
-      - Member cache population on the adapter
-    """
-
-    def __init__(self, adapter: "YuanbaoAdapter") -> None:
-        self._adapter = adapter
-
-    # ------------------------------------------------------------------
-    # Low-level WS query methods
-    # ------------------------------------------------------------------
-
-    async def query_group_info_raw(self, group_code: str) -> Optional[dict]:
-        """Query group info via WS (group name, owner, member count, etc.).
-
-        Returns:
-            Decoded dict or None on failure.
-        """
-        adapter = self._adapter
-        if adapter._connection.ws is None:
-            return None
-        encoded = encode_query_group_info(group_code)
-        from gateway.platforms.yuanbao_proto import decode_conn_msg as _decode
-        decoded = _decode(encoded)
-        req_id = decoded["head"]["msg_id"]
-        try:
-            response = await adapter._connection.send_biz_request(encoded, req_id=req_id)
-            head = response.get("head", {})
-            status = head.get("status", 0)
-            if status != 0:
-                logger.warning("[%s] query_group_info failed: status=%d", adapter.name, status)
-                return None
-            biz_data = response.get("data", b"") or response.get("body", b"")
-            if biz_data and isinstance(biz_data, bytes):
-                return decode_query_group_info_rsp(biz_data)
-            return {"group_code": group_code}
-        except asyncio.TimeoutError:
-            logger.warning("[%s] query_group_info timeout: group=%s", adapter.name, group_code)
-            return None
-        except Exception as exc:
-            logger.warning("[%s] query_group_info failed: %s", adapter.name, exc)
-            return None
-
-    async def get_group_member_list_raw(
-        self, group_code: str, offset: int = 0, limit: int = 200
-    ) -> Optional[dict]:
-        """Query group member list via WS.
-
-        Returns:
-            Decoded dict or None on failure.  Also populates adapter._member_cache.
-        """
-        adapter = self._adapter
-        if adapter._connection.ws is None:
-            return None
-        encoded = encode_get_group_member_list(group_code, offset=offset, limit=limit)
-        from gateway.platforms.yuanbao_proto import decode_conn_msg as _decode
-        decoded = _decode(encoded)
-        req_id = decoded["head"]["msg_id"]
-        try:
-            response = await adapter._connection.send_biz_request(encoded, req_id=req_id)
-            head = response.get("head", {})
-            status = head.get("status", 0)
-            if status != 0:
-                logger.warning("[%s] get_group_member_list failed: status=%d", adapter.name, status)
-                return None
-            biz_data = response.get("data", b"") or response.get("body", b"")
-            if biz_data and isinstance(biz_data, bytes):
-                result = decode_get_group_member_list_rsp(biz_data)
-            else:
-                result = {"members": [], "next_offset": 0, "is_complete": True}
-            if result and result.get("members"):
-                adapter._member_cache[group_code] = (time.time(), result["members"])
-            return result
-        except asyncio.TimeoutError:
-            logger.warning("[%s] get_group_member_list timeout: group=%s", adapter.name, group_code)
-            return None
-        except Exception as exc:
-            logger.warning("[%s] get_group_member_list failed: %s", adapter.name, exc)
-            return None
-
-    # ------------------------------------------------------------------
-    # AI-tool-facing wrappers (chat_id parsing + filtering)
-    # ------------------------------------------------------------------
-
-    async def query_group_info(self, chat_id: str) -> dict:
-        """AI tool: Query current group info.
-
-        No parameters needed (group_code extracted from session context).
-        Returns group name, owner, member count, etc.
-        """
-        if not chat_id.startswith("group:"):
-            return {"error": "This command is only available in group chats"}
-        group_code = chat_id[len("group:"):]
-        result = await self.query_group_info_raw(group_code)
-        if result is None:
-            return {"error": "Failed to query group info"}
-        return result
-
-    async def query_session_members(
-        self,
-        chat_id: str,
-        action: str = "list_all",
-        name: Optional[str] = None,
-    ) -> dict:
-        """AI tool: Query group member list.
-
-        Args:
-            chat_id: Chat ID (extracted from session context)
-            action: 'find' (search by name) | 'list_bots' (list bots) | 'list_all' (list all)
-            name: Search keyword when action='find'
-
-        Returns:
-            {"members": [...], "total": int, "mentionHint": str}
-        """
-        if not chat_id.startswith("group:"):
-            return {"error": "This command is only available in group chats"}
-        group_code = chat_id[len("group:"):]
-        result = await self.get_group_member_list_raw(group_code)
-        if result is None:
-            return {"error": "Failed to query group members"}
-
-        members = result.get("members", [])
-
-        if action == "find" and name:
-            query = name.lower()
-            members = [
-                m for m in members
-                if query in (m.get("nickname", "") or "").lower()
-                or query in (m.get("name_card", "") or "").lower()
-                or query in (m.get("user_id", "") or "").lower()
-            ]
-        elif action == "list_bots":
-            members = [m for m in members if "bot" in (m.get("nickname", "") or "").lower()]
-
-        # Construct mentionHint
-        mention_hint = ""
-        if members and len(members) <= 10:
-            names = [m.get("name_card") or m.get("nickname") or m.get("user_id", "") for m in members]
-            mention_hint = "Mention with @name: " + ", ".join(names)
-
-        return {
-            "members": members[:50],  # Limit return count
-            "total": len(members),
-            "mentionHint": mention_hint,
-        }
-
-REPLY_REF_TTL_S = 300.0            # Reference dedup TTL (5 minutes)
-
-def get_active_adapter() -> Optional["YuanbaoAdapter"]:
-    """Delegate to ``YuanbaoAdapter.get_active()``."""
-    return YuanbaoAdapter.get_active()
-
-async def send_yuanbao_direct(
-    adapter: "YuanbaoAdapter",
-    chat_id: str,
-    message: str,
-    media_files: Optional[List[Tuple[str, bool]]] = None,
-) -> Dict[str, Any]:
-    """Delegate to ``OutboundManager.send_direct``."""
-    return await adapter._outbound.sender.send_direct(chat_id, message, media_files)
-# ---- END PLUGIN-COMPAT ----

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { en } from '@/i18n/en'
 import { $freeTierStatus, freeTierSetupFailure } from '@/store/free-tier'
 import type { OnboardingContext } from '@/store/onboarding'
-import type { FreeTierStatus } from '@/types/hermes'
+import type { FreeTierStatus } from '@/types/x19'
 
 import { FreeTierSetupNotice, setupFailureCopy } from './free-tier-setup-notice'
 
@@ -61,7 +61,7 @@ describe('setupFailureCopy', () => {
     const text = failure ? setupFailureCopy(failure, copy) : ''
 
     expect(text).toBe(expected)
-    // Never "the free service is off" — what is unavailable is using Hermes without signing in —
+    // Never "the free service is off" — what is unavailable is using X19 without signing in —
     // and no jargon a first-time user would not know.
     expect(text.toLowerCase()).not.toMatch(/free (service|model|tier) is (off|switched off|unavailable|down)/)
     expect(text.toLowerCase()).not.toMatch(/anonymous|guest|credential|token|rate limit/)

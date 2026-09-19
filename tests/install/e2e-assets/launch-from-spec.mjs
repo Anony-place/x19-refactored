@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * Launch the Hermes desktop app from a captured launch spec and click the
+ * Launch the X19 desktop app from a captured launch spec and click the
  * real update flow: Settings -> About -> "Update now".
  *
- * The spec is written by launch-capture/sitecustomize.py at `hermes
+ * The spec is written by launch-capture/sitecustomize.py at `x19
  * desktop`'s own spawn site, so argv, cwd, and the fully-constructed env
  * are the product's own -- this launcher only translates the npm-exec
  * source shape into a direct electron binary path (Playwright needs a
@@ -12,17 +12,17 @@
  *
  * Usage (from the scratch dir where the driver installed @playwright/test):
  *   node launch-from-spec.mjs --spec /path/launch-spec.json \
- *     [--result $HERMES_HOME/.hermes-update-result.json] \
+ *     [--result $X19_HOME/.x19-update-result.json] \
  *     [--expect-sha <sha> --repo-dir <install dir>] [--no-update]
  *
  * --no-update: launch + wait for the window + close. The smoke arm.
  * Otherwise: click Update now, then poll for completion. Two signals,
  * either satisfies (poll whichever are given, first hit wins):
  *   --result      the windows hand-off's result file
- *                 (HERMES_HOME/.hermes-update-result.json)
+ *                 (X19_HOME/.x19-update-result.json)
  *   --expect-sha  the installed checkout reaching the expected commit -
  *                 the source-install signal, where the About pane's update
- *                 runs `hermes update` and no result file exists.
+ *                 runs `x19 update` and no result file exists.
  * The Playwright close event is unreliable across the update handoff, so
  * neither signal is an app event.
  */
@@ -274,7 +274,7 @@ async function main() {
     // captured. Pull the full status over the same IPC the panel uses so
     // the log names the real error.
     const status = await window.evaluate(() =>
-      window.hermesDesktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
+      window.x19Desktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
     ).catch((err) => `updates.check failed: ${err?.message || err}`);
     log(`[update-status] ${JSON.stringify(status)}`);
     throw e;
@@ -317,7 +317,7 @@ async function main() {
   // ── Post-update: observe the hand-off state, then relaunch and verify ──
   // On CI runners the rebuilt app cannot self-relaunch (chrome-sandbox needs
   // root ownership; user namespaces are restricted), so the product parks on
-  // an "update complete, reopen Hermes to finish" overlay and never exits;
+  // an "update complete, reopen X19 to finish" overlay and never exits;
   // a bare app.close() would wait on it forever. Record the hand-off state,
   // close with a bounded teardown, then do what the overlay asks (the real
   // user journey) and assert the relaunched app runs the updated code.
@@ -384,7 +384,7 @@ async function main() {
       }
     }
     // Killing the Electron root does not cascade: the spawned backend
-    // (`hermes serve` python + node helpers) survives and keeps writing
+    // (`x19 serve` python + node helpers) survives and keeps writing
     // under the install dir. SIGTERM the snapshot first (orderly backend
     // shutdown), then SIGKILL stragglers.
     if (doomed.length) {
@@ -407,7 +407,7 @@ async function main() {
   // from a git checkout (statusbar/About); require the EXPECTED sha's short
   // form, or at minimum a live UI window, logging what we saw.
   phase('relaunch');
-  log('relaunching the updated app (the "reopen Hermes" step)');
+  log('relaunching the updated app (the "reopen X19" step)');
   const relaunch = await _electron.launch({
     executablePath: launch.executablePath,
     args: launch.args,

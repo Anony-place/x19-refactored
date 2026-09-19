@@ -46,9 +46,9 @@ def collect_disk_status(home: Optional[Path] = None) -> Dict[str, Any]:
     status: Dict[str, Any] = {"pressure": "unknown", "total_mb": None, "free_mb": None, "used_percent": None}
     try:
         if home is None:
-            from hermes_constants import get_hermes_home
+            from x19_constants import get_x19_home
 
-            home = get_hermes_home()
+            home = get_x19_home()
         usage = shutil.disk_usage(home)
     except Exception:
         return status
@@ -60,24 +60,3 @@ def collect_disk_status(home: Optional[Path] = None) -> Dict[str, Any]:
     return status
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import logging  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'logger': ('gateway.run', 'logger'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

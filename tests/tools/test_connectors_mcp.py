@@ -82,7 +82,7 @@ def test_mcp_targets_off_the_desktop_settle_unavailable_even_with_a_callback():
     assert out["settled_by"] == SettleReason.unavailable.value
     (target,) = out["targets"]
     assert target["state"] == TargetState.unavailable.value
-    assert target["hint"] == "hermes mcp install linear / hermes mcp login linear"
+    assert target["hint"] == "x19 mcp install linear / x19 mcp login linear"
     assert "error" not in out
 
 

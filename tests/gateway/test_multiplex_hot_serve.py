@@ -33,9 +33,9 @@ class _Adapter:
 
 
 def _runner(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     (home / "profiles").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(multiplex_profiles=True)
@@ -82,7 +82,7 @@ def _served_record(home):
 async def test_created_then_credentialed_profile_is_served_without_restart(tmp_path, monkeypatch):
     runner, home = _runner(tmp_path, monkeypatch)
     alpha_dir = _mkprofile(home, "alpha", "DISCORD_BOT_TOKEN=alpha-token\n")
-    with patch("hermes_cli.profiles.get_active_profile_name", return_value="default"):
+    with patch("x19_cli.profiles.get_active_profile_name", return_value="default"):
         await runner._start_secondary_profile_adapters()
         alpha_adapter = runner._profile_adapters["alpha"][Platform.DISCORD]
         assert _served_record(home) == ["default", "alpha"]
@@ -117,7 +117,7 @@ async def test_deleted_profile_is_torn_down_and_unrouted_others_untouched(tmp_pa
     runner, home = _runner(tmp_path, monkeypatch)
     _mkprofile(home, "alpha", "DISCORD_BOT_TOKEN=alpha-token\n")
     gamma_dir = _mkprofile(home, "gamma", "DISCORD_BOT_TOKEN=gamma-token\n")
-    with patch("hermes_cli.profiles.get_active_profile_name", return_value="default"):
+    with patch("x19_cli.profiles.get_active_profile_name", return_value="default"):
         await runner._start_secondary_profile_adapters()
         alpha_adapter = runner._profile_adapters["alpha"][Platform.DISCORD]
         gamma_adapter = runner._profile_adapters["gamma"][Platform.DISCORD]
@@ -127,7 +127,7 @@ async def test_deleted_profile_is_torn_down_and_unrouted_others_untouched(tmp_pa
         reconnect = asyncio.get_running_loop().create_task(asyncio.sleep(3600))
         runner._profile_failed_platforms = {"gamma": {Platform.TELEGRAM: reconnect}}
 
-        from hermes_constants import mark_named_profile_deleted
+        from x19_constants import mark_named_profile_deleted
         mark_named_profile_deleted(gamma_dir)  # what ``delete_profile`` does before rmtree
         result = await runner.reconcile_served_profiles()
 
@@ -156,7 +156,7 @@ async def test_hot_added_profile_cannot_double_claim_a_live_secondary_token(tmp_
         return 1
 
     runner._start_one_profile_adapters = _start
-    with patch("hermes_cli.profiles.get_active_profile_name", return_value="default"):
+    with patch("x19_cli.profiles.get_active_profile_name", return_value="default"):
         await runner._start_secondary_profile_adapters()
         _mkprofile(home, "dupe", "DISCORD_BOT_TOKEN=shared\n")
         await runner.reconcile_served_profiles()

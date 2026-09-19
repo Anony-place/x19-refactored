@@ -10,21 +10,21 @@ from plugins.memory.hindsight import templates as tpl
 
 _CATALOG = {
     "templates": [
-        {"id": "conversation", "name": "Conversation", "integrations": ["litellm", "hermes"],
+        {"id": "conversation", "name": "Conversation", "integrations": ["litellm", "x19"],
          "manifest_file": "templates/conversation.json"},
         {"id": "coding-agent", "name": "Coding Agent", "integrations": ["claude-code"],
          "manifest_file": "templates/coding-agent.json"},
-        {"id": "hermes-gateway-bot", "name": "Gateway Bot", "integrations": ["hermes"],
-         "manifest_file": "templates/hermes-gateway-bot.json"},
+        {"id": "x19-gateway-bot", "name": "Gateway Bot", "integrations": ["x19"],
+         "manifest_file": "templates/x19-gateway-bot.json"},
     ]
 }
 
 
-def test_fetch_hermes_templates_filters_to_hermes(monkeypatch):
+def test_fetch_x19_templates_filters_to_x19(monkeypatch):
     monkeypatch.setattr(tpl, "_get_json", lambda url: _CATALOG)
-    entries = tpl.fetch_hermes_templates("https://example/templates.json")
+    entries = tpl.fetch_x19_templates("https://example/templates.json")
     ids = [e["id"] for e in entries]
-    assert ids == ["conversation", "hermes-gateway-bot"]  # coding-agent excluded
+    assert ids == ["conversation", "x19-gateway-bot"]  # coding-agent excluded
 
 
 def test_fetch_manifest_resolves_relative_url(monkeypatch):
@@ -36,10 +36,10 @@ def test_fetch_manifest_resolves_relative_url(monkeypatch):
 
     monkeypatch.setattr(tpl, "_get_json", _fake)
     tpl.fetch_manifest(
-        {"manifest_file": "templates/hermes-gateway-bot.json"},
+        {"manifest_file": "templates/x19-gateway-bot.json"},
         "https://raw.example/data/templates.json",
     )
-    assert seen["url"] == "https://raw.example/data/templates/hermes-gateway-bot.json"
+    assert seen["url"] == "https://raw.example/data/templates/x19-gateway-bot.json"
 
 
 def test_apply_template_posts_to_import_endpoint(monkeypatch):
@@ -59,9 +59,9 @@ def test_apply_template_posts_to_import_endpoint(monkeypatch):
         yield _Resp()
 
     monkeypatch.setattr(tpl, "open_credentialed_url", _fake_open)
-    tpl.apply_template("https://api.hindsight.vectorize.io/", "hermes", "hsk_abc", {"version": "1"})
+    tpl.apply_template("https://api.hindsight.vectorize.io/", "x19", "hsk_abc", {"version": "1"})
 
-    assert captured["url"] == "https://api.hindsight.vectorize.io/v1/default/banks/hermes/import"
+    assert captured["url"] == "https://api.hindsight.vectorize.io/v1/default/banks/x19/import"
     assert captured["method"] == "POST"
     assert captured["auth"] == "Bearer hsk_abc"
     assert captured["body"] == {"version": "1"}
@@ -81,7 +81,7 @@ def test_apply_template_omits_auth_when_no_key(monkeypatch):
         yield _Resp()
 
     monkeypatch.setattr(tpl, "open_credentialed_url", _fake_open)
-    tpl.apply_template("http://localhost:8888", "hermes", None, {"version": "1"})
+    tpl.apply_template("http://localhost:8888", "x19", None, {"version": "1"})
     assert captured["auth"] is None
 
 
@@ -108,8 +108,8 @@ def test_supported_for_mode():
 
 
 def test_run_template_step_applies_selected(monkeypatch):
-    monkeypatch.setattr(tpl, "fetch_hermes_templates", lambda url=None: [
-        {"id": "hermes-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"},
+    monkeypatch.setattr(tpl, "fetch_x19_templates", lambda url=None: [
+        {"id": "x19-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"},
     ])
     monkeypatch.setattr(tpl, "fetch_manifest", lambda entry, url=None: {"version": "1"})
     monkeypatch.setattr(tpl, "probe_existing_customization", lambda *a: False)
@@ -118,22 +118,22 @@ def test_run_template_step_applies_selected(monkeypatch):
                         lambda api_url, bank_id, api_key, manifest: applied.update(bank=bank_id))
 
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_returning(0), cancelled=-1, log=lambda *_: None,
     )
-    assert result == "hermes-gateway-bot"
-    assert applied["bank"] == "hermes"
+    assert result == "x19-gateway-bot"
+    assert applied["bank"] == "x19"
 
 
 def test_run_template_step_blank_selection_skips(monkeypatch):
-    entries = [{"id": "hermes-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"}]
-    monkeypatch.setattr(tpl, "fetch_hermes_templates", lambda url=None: entries)
+    entries = [{"id": "x19-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"}]
+    monkeypatch.setattr(tpl, "fetch_x19_templates", lambda url=None: entries)
     called = {"applied": False}
     monkeypatch.setattr(tpl, "apply_template",
                         lambda *a, **k: called.update(applied=True))
     # index len(entries) == the "Blank" row
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_returning(len(entries)), cancelled=-1, log=lambda *_: None,
     )
     assert result is None
@@ -141,9 +141,9 @@ def test_run_template_step_blank_selection_skips(monkeypatch):
 
 
 def test_run_template_step_no_templates_is_noop(monkeypatch):
-    monkeypatch.setattr(tpl, "fetch_hermes_templates", lambda url=None: [])
+    monkeypatch.setattr(tpl, "fetch_x19_templates", lambda url=None: [])
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_returning(0), cancelled=-1, log=lambda *_: None,
     )
     assert result is None
@@ -153,10 +153,10 @@ def test_run_template_step_swallows_fetch_errors(monkeypatch):
     def _boom(url=None):
         raise RuntimeError("network down")
 
-    monkeypatch.setattr(tpl, "fetch_hermes_templates", _boom)
+    monkeypatch.setattr(tpl, "fetch_x19_templates", _boom)
     # must not raise
     assert tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_returning(0), cancelled=-1, log=lambda *_: None,
     ) is None
 
@@ -165,8 +165,8 @@ def test_run_template_step_swallows_apply_errors(monkeypatch):
     # gap 1: a failed apply (e.g. 401 for an OAuth-only user) must not crash setup.
     import urllib.error
 
-    monkeypatch.setattr(tpl, "fetch_hermes_templates", lambda url=None: [
-        {"id": "hermes-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"},
+    monkeypatch.setattr(tpl, "fetch_x19_templates", lambda url=None: [
+        {"id": "x19-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"},
     ])
     monkeypatch.setattr(tpl, "fetch_manifest", lambda entry, url=None: {"version": "1"})
     monkeypatch.setattr(tpl, "probe_existing_customization", lambda *a: False)
@@ -177,7 +177,7 @@ def test_run_template_step_swallows_apply_errors(monkeypatch):
     monkeypatch.setattr(tpl, "apply_template", _raise)
     logs = []
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key=None,
+        api_url="https://api", bank_id="x19", api_key=None,
         select=_select_returning(0), cancelled=-1, log=logs.append,
     )
     assert result is None
@@ -199,13 +199,13 @@ def _fake_open(payload):
 def test_probe_existing_customization_true_when_bank_has_config(monkeypatch):
     monkeypatch.setattr(tpl, "open_credentialed_url",
                         _fake_open({"version": "1", "bank": {"reflect_mission": "x"}}))
-    assert tpl.probe_existing_customization("https://api", "hermes", "k") is True
+    assert tpl.probe_existing_customization("https://api", "x19", "k") is True
 
 
 def test_probe_existing_customization_false_when_empty(monkeypatch):
     monkeypatch.setattr(tpl, "open_credentialed_url",
                         _fake_open({"version": "1"}))
-    assert tpl.probe_existing_customization("https://api", "hermes", "k") is False
+    assert tpl.probe_existing_customization("https://api", "x19", "k") is False
 
 
 def test_probe_existing_customization_false_on_error(monkeypatch):
@@ -217,8 +217,8 @@ def test_probe_existing_customization_false_on_error(monkeypatch):
 
 
 def _wire_apply(monkeypatch, customized):
-    monkeypatch.setattr(tpl, "fetch_hermes_templates", lambda url=None: [
-        {"id": "hermes-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"},
+    monkeypatch.setattr(tpl, "fetch_x19_templates", lambda url=None: [
+        {"id": "x19-gateway-bot", "name": "Gateway Bot", "manifest_file": "templates/x.json"},
     ])
     monkeypatch.setattr(tpl, "fetch_manifest", lambda entry, url=None: {"version": "1"})
     monkeypatch.setattr(tpl, "probe_existing_customization", lambda *a: customized)
@@ -231,7 +231,7 @@ def test_warns_and_keeps_existing_when_declined(monkeypatch):
     called = _wire_apply(monkeypatch, customized=True)
     # first select = pick template (0); second select = confirm -> "Keep existing" (1)
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_seq(0, 1), cancelled=-1, log=lambda *_: None,
     )
     assert result is None
@@ -242,10 +242,10 @@ def test_warns_then_applies_when_confirmed(monkeypatch):
     called = _wire_apply(monkeypatch, customized=True)
     # pick template (0), confirm "Apply" (0)
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_seq(0, 0), cancelled=-1, log=lambda *_: None,
     )
-    assert result == "hermes-gateway-bot"
+    assert result == "x19-gateway-bot"
     assert called["applied"] is True
 
 
@@ -253,8 +253,8 @@ def test_fresh_bank_skips_the_warning(monkeypatch):
     called = _wire_apply(monkeypatch, customized=False)
     # only ONE select call (no confirm) — _select_seq with a single value proves it
     result = tpl.run_template_step(
-        api_url="https://api", bank_id="hermes", api_key="k",
+        api_url="https://api", bank_id="x19", api_key="k",
         select=_select_seq(0), cancelled=-1, log=lambda *_: None,
     )
-    assert result == "hermes-gateway-bot"
+    assert result == "x19-gateway-bot"
     assert called["applied"] is True

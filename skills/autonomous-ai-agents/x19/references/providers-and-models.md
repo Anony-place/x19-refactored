@@ -2,7 +2,7 @@
 
 Set via `x19 model` (picker) or `x19 setup`. 35+ provider profiles ship as
 plugins under `plugins/model-providers/`; user plugins of the same name override.
-Full docs: https://x19.nousresearch.com/docs/integrations/providers
+Full docs: https://anony-place.github.io/x19-refactored/docs/integrations/providers
 
 ### Providers
 

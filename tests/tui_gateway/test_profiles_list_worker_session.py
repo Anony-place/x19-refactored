@@ -3,7 +3,7 @@
 Why: kanban/tool worker sessions are deny-listed out of every conversation
 list, so the desktop Bots roster showed a profile as idle ("3 hr ago")
 while its kanban worker had been running for 12+ minutes
-(NousResearch/hermes-agent#90268). profiles.list now reports the newest
+(Anony-place/x19-refactored#90268). profiles.list now reports the newest
 DENIED row per profile as ``worker_session`` so roster UIs can light
 ACTIVE NOW off the worker's ``last_activity_at`` heartbeat.
 
@@ -24,14 +24,14 @@ import tui_gateway.server as srv
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = tmp_path / ".hermes"
+    h = tmp_path / ".x19"
     h.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("X19_HOME", str(h))
     return h
 
 
 def _db(profile_dir):
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     return SessionDB(db_path=profile_dir / "state.db")
 

@@ -7,7 +7,7 @@ license: MIT
 dependencies: []
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
+  x19:
     tags: [design, poster, print, duotone, risograph, editorial, image-generation]
     category: creative
     related_skills: [baoyu-infographic, meme-generation, pixel-art]
@@ -26,7 +26,7 @@ The user asks for a monochrome editorial poster, duotone print, risograph/zine p
 
 ## Prerequisites
 
-- The Hermes `image_generate` tool (search/describe it via the deferred-tool catalog if not loaded). If image generation is unavailable, deliver prompt-only and say so.
+- The X19 `image_generate` tool (search/describe it via the deferred-tool catalog if not loaded). If image generation is unavailable, deliver prompt-only and say so.
 - The `design-system/` catalogs bundled with this skill (see Quick Reference).
 
 ## Quick Reference

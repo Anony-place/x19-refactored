@@ -113,15 +113,15 @@ class TestKernelLifecycle(unittest.TestCase):
         repo_root = str(Path(__file__).resolve().parents[2])
         host_src = textwrap.dedent(f"""
             import json, os, sys, time
-            os.environ["HERMES_HOME"] = sys.argv[1]
+            os.environ["X19_HOME"] = sys.argv[1]
             sys.path.insert(0, {repo_root!r})
             from tools.code_kernel import SessionKernel, _spawn
             k = SessionKernel(("parent-death",))
             _spawn(k, task_id="parent-death", child_python=sys.executable,
                    child_cwd="", sandbox_tools=frozenset(), max_tool_calls=1)
             cell = json.dumps({{"id": "x", "code": "import os, time\\n"
-                "assert 'HERMES_KERNEL_PARENT_PROCESS_HANDLE' not in os.environ\\n"
-                "assert 'HERMES_KERNEL_PARENT_DEATH_FD' not in os.environ\\n"
+                "assert 'X19_KERNEL_PARENT_PROCESS_HANDLE' not in os.environ\\n"
+                "assert 'X19_KERNEL_PARENT_DEATH_FD' not in os.environ\\n"
                 "time.sleep(300)"}}) + "\\n"
             k.proc.stdin.write(cell.encode()); k.proc.stdin.flush()
             print(k.proc.pid, flush=True)
@@ -212,7 +212,7 @@ class TestKernelOwnershipAndLifecycle(unittest.TestCase):
     with anything. The owner is the approval session key; disposal rides
     the same session boundary that clears approval/yolo state, idle
     kernels are reaped, and the process-wide live count is capped (the
-    lifecycle shape carried forward from hermes-agent#88637).
+    lifecycle shape carried forward from x19#88637).
     """
 
     def _run_as(self, session_key, code, task_id, **kwargs):
@@ -405,7 +405,7 @@ class TestKernelOwnershipAndLifecycle(unittest.TestCase):
         self.assertEqual([r["status"] for r in results], ["success"] * 6)
         self.assertEqual(len(_KERNELS), 1)
         live = subprocess.run(
-            ["pgrep", "-fc", "-P", str(os.getpid()), "hermes_kernel_runner"],
+            ["pgrep", "-fc", "-P", str(os.getpid()), "x19_kernel_runner"],
             capture_output=True, text=True,
         ).stdout.strip()
         self.assertEqual(live, "1")
@@ -434,7 +434,7 @@ class TestPerCellRpcAuthority(unittest.TestCase):
         from tools.terminal_tool import set_approval_callback
 
         seen = []
-        cell = "import hermes_tools\nhermes_tools.web_search(query='q')\n"
+        cell = "import x19_tools\nx19_tools.web_search(query='q')\n"
         with _kernel_config(), patch(
             "model_tools.handle_function_call", new=self._recorder(seen)
         ):
@@ -478,7 +478,7 @@ class TestPerCellRpcAuthority(unittest.TestCase):
 
             set_approval_callback(cb_one)
             try:
-                first = _run("import hermes_tools\nalias = hermes_tools.web_search\n")
+                first = _run("import x19_tools\nalias = x19_tools.web_search\n")
                 set_approval_callback(cb_two)
                 second = _run("alias(query='q')\n")
             finally:

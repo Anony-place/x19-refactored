@@ -16,7 +16,7 @@ toolsets:
   - todo
   - web
 metadata:
-  hermes:
+  x19:
     tags: [Security, X19, Reporting, BugBounty]
 ---
 

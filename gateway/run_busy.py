@@ -187,7 +187,7 @@ class GatewayBusySessionMixin:
         if not session_id:
             return False
         try:
-            from hermes_cli.goals import GoalManager
+            from x19_cli.goals import GoalManager
             return GoalManager(session_id=session_id).is_active()
         except Exception as exc:
             logger.debug("goal continuation: active-state recheck failed: %s", exc)
@@ -196,7 +196,7 @@ class GatewayBusySessionMixin:
     def _get_max_concurrent_sessions(self) -> Optional[int]:
         """Return the configured active chat session cap, if enabled."""
         try:
-            from hermes_cli.active_sessions import resolve_max_concurrent_sessions
+            from x19_cli.active_sessions import resolve_max_concurrent_sessions
             return resolve_max_concurrent_sessions(getattr(self, "config", None))
         except Exception:
             return None
@@ -209,7 +209,7 @@ class GatewayBusySessionMixin:
         active_count = self._running_agent_count()
         if active_count < max_sessions:
             return None
-        from hermes_cli.active_sessions import active_session_limit_message
+        from x19_cli.active_sessions import active_session_limit_message
         return active_session_limit_message(active_count, max_sessions)
 
     def _claim_active_session_slot(
@@ -222,7 +222,7 @@ class GatewayBusySessionMixin:
         if limit_message is not None:
             return None, limit_message
         try:
-            from hermes_cli.active_sessions import try_acquire_active_session
+            from x19_cli.active_sessions import try_acquire_active_session
             platform = source.platform.value if source and source.platform else "gateway"
             return try_acquire_active_session(
                 session_id=session_key,
@@ -350,7 +350,7 @@ class GatewayBusySessionMixin:
 
     # Metadata that must match for two pending events to merge into one slot.
     _SECURITY_METADATA_KEYS = (
-        "hermes_plugin_id", "hermes_plugin_injection", "gateway_session_key",
+        "x19_plugin_id", "x19_plugin_injection", "gateway_session_key",
         "gateway_session_id", "gateway_session_strict",
         "notification_category",
     )
@@ -639,7 +639,7 @@ class GatewayBusySessionMixin:
         # Some mobile chat setups want silent steering — keep the behavior, drop the bubble.
         from gateway.run import _load_gateway_config, _platform_config_key
         from gateway.display_config import resolve_display_setting
-        steer_ack_env = os.environ.get("HERMES_GATEWAY_BUSY_STEER_ACK_ENABLED")
+        steer_ack_env = os.environ.get("X19_GATEWAY_BUSY_STEER_ACK_ENABLED")
         if steer_ack_env is not None:
             steer_ack_enabled = steer_ack_env.strip().lower() in {"1", "true", "yes", "on"}
         else:
@@ -663,7 +663,7 @@ class GatewayBusySessionMixin:
         demoted_for_subagents: bool, demoted_for_compression: bool,
     ) -> str:
         from gateway.run import (
-            _AGENT_PENDING_SENTINEL, _hermes_home, _load_gateway_config, _platform_config_key
+            _AGENT_PENDING_SENTINEL, _x19_home, _load_gateway_config, _platform_config_key
         )
         from gateway.display_config import resolve_display_setting
 
@@ -723,7 +723,7 @@ class GatewayBusySessionMixin:
                     else "interrupt"
                 )
                 message = f"{message}\n\n{busy_input_hint_gateway(_hint_mode)}"
-                mark_seen(_hermes_home / "config.yaml", BUSY_INPUT_FLAG)
+                mark_seen(_x19_home / "config.yaml", BUSY_INPUT_FLAG)
         except Exception as _onb_err:
             logger.debug("Failed to apply busy-input onboarding hint: %s", _onb_err)
         return message
@@ -811,7 +811,7 @@ class GatewayBusySessionMixin:
 
         # Disabled ack: still process input. Checked before debounce so an undelivered ack never
         # stamps the "last ack" timestamp.
-        if os.environ.get("HERMES_GATEWAY_BUSY_ACK_ENABLED", "true").lower() != "true":
+        if os.environ.get("X19_GATEWAY_BUSY_ACK_ENABLED", "true").lower() != "true":
             logger.debug("Busy ack suppressed for session %s", session_key)
             return True  # input still processed, just no ack sent
 
@@ -878,7 +878,7 @@ class GatewayBusySessionMixin:
         """Slash handlers dispatched only on the idle path (busy dispatch has its own allowlist)."""
         return self._command_handler_table(self._IDLE_COMMANDS)
 
-    # busy_handler key (hermes_cli/commands.py CommandDef) → mid-run variant ``_busy_<key>_command``.
+    # busy_handler key (x19_cli/commands.py CommandDef) → mid-run variant ``_busy_<key>_command``.
     _BUSY_SPECIAL_HANDLERS: Dict[str, str] = {
         k: f"_busy_{k}_command" for k in ("start", "stop", "new", "queue", "steer", "egress", "goal", "loop")
     }
@@ -929,11 +929,11 @@ class GatewayBusySessionMixin:
         if args.lower() in {"off", "resume", "stop", "disengage"}:
             if estop.disengage():
                 return "▶️ Resumed — new work is accepted again."
-            return "Hermes wasn't paused."
+            return "X19 wasn't paused."
         state = estop.get_state()
         if state is not None and not args:
             suffix = f" (reason: {state.get('reason')})" if state.get("reason") else ""
-            return f"⏸️ Hermes is already paused{suffix}. Use `/pause off` to resume."
+            return f"⏸️ X19 is already paused{suffix}. Use `/pause off` to resume."
         estop.engage(reason=args or None)
         suffix = f" (reason: {args})" if args else ""
         return (
@@ -947,7 +947,7 @@ class GatewayBusySessionMixin:
         return ""
 
     async def _busy_egress_command(self, event: MessageEvent, quick_key: str, source):
-        from hermes_cli.proxy_cli import format_status_text
+        from x19_cli.proxy_cli import format_status_text
         return format_status_text()
 
     async def _busy_stop_command(self, event: MessageEvent, quick_key: str, source):
@@ -1034,7 +1034,7 @@ class GatewayBusySessionMixin:
     async def _busy_goal_command(self, event: MessageEvent, quick_key: str, source):
         # Control verbs are safe mid-run (state only); setting new goal text is rejected so we don't
         # race a second continuation against the current turn. wait/gate take an argument.
-        from hermes_cli.goal_command import is_goal_control
+        from x19_cli.goal_command import is_goal_control
 
         if is_goal_control(event.get_command_args() or ""):
             return await self._handle_goal_command(event)
@@ -1146,7 +1146,7 @@ class GatewayBusySessionMixin:
         /restart with update_id <= that value is a redelivery when this process booted from that
         restart; otherwise the marker must be < 5 minutes old. Telegram only (numeric ordering).
         """
-        from gateway.run import _hermes_home
+        from gateway.run import _x19_home
         if event is None or event.source is None or event.platform_update_id is None:
             return False
         try:
@@ -1156,7 +1156,7 @@ class GatewayBusySessionMixin:
             return False
 
         try:
-            marker_path = _hermes_home / ".restart_last_processed.json"
+            marker_path = _x19_home / ".restart_last_processed.json"
             if not marker_path.exists():
                 # Missing marker: a redelivered /restart would otherwise re-restart forever. Suppress
                 # ONLY when this process booted from a chat /restart AND is within a short post-boot
@@ -1198,7 +1198,7 @@ class GatewayBusySessionMixin:
         """/suggestions via the shared handler (origin = event source so jobs deliver back here)."""
         from gateway.run import _command_origin_for_source
         try:
-            from hermes_cli.suggestions_cmd import handle_suggestions_command
+            from x19_cli.suggestions_cmd import handle_suggestions_command
             return handle_suggestions_command(
                 (event.get_command_args() or "").strip(),
                 origin=_command_origin_for_source(event.source), surface="gateway",
@@ -1211,14 +1211,14 @@ class GatewayBusySessionMixin:
         """/blueprint via the shared handler (origin = event source so jobs deliver back here)."""
         from gateway.run import _command_origin_for_source
         try:
-            from hermes_cli.blueprint_cmd import handle_blueprint_command
+            from x19_cli.blueprint_cmd import handle_blueprint_command
             return handle_blueprint_command(
                 (event.get_command_args() or "").strip(),
                 origin=_command_origin_for_source(event.source), surface="gateway",
             )
         except Exception as e:
             logger.debug("blueprint command failed: %s", e)
-            from hermes_cli.blueprint_cmd import BlueprintCommandResult
+            from x19_cli.blueprint_cmd import BlueprintCommandResult
             return BlueprintCommandResult(f"Cron blueprint command failed: {e}")
 
     async def _maybe_confirm_destructive_slash(
@@ -1367,7 +1367,7 @@ class GatewayBusySessionMixin:
     def _read_user_config(self) -> Dict[str, Any]:
         """Raw config.yaml for gate lookups that must see on-disk changes without a restart."""
         try:
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
             cfg = load_config()
         except Exception:
             return {}

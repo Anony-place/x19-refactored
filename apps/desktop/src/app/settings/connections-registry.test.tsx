@@ -56,7 +56,7 @@ beforeEach(() => {
   setLaunchMode.mockResolvedValue({ ok: true, registry: { ...registry, launchMode: 'last-used' } })
   setPrimary.mockResolvedValue({ ok: true, registry: { ...registry, primary: 'homelab' } })
   test.mockResolvedValue({ ok: true, reachable: true })
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'x19Desktop', {
     configurable: true,
     value: { connections: { list, remove, save, setLaunchMode, setPrimary, test } }
   })
@@ -72,7 +72,7 @@ describe('ConnectionsRegistrySection', () => {
   it('refreshes a cached roster immediately after a successful connection test', async () => {
     _resetFleetRosterForTests()
     const getAgentRoster = vi.fn().mockResolvedValue({ agents: [], sources: [] })
-    Object.assign(window.hermesDesktop!, { getAgentRoster })
+    Object.assign(window.x19Desktop!, { getAgentRoster })
 
     try {
       await refreshFleetRoster()
@@ -120,7 +120,7 @@ describe('ConnectionsRegistrySection', () => {
     })
   })
 
-  it('saves a custom remote Hermes path for SSH connections', async () => {
+  it('saves a custom remote X19 path for SSH connections', async () => {
     render(<ConnectionsRegistrySection />)
 
     await waitFor(() => expect(screen.getByText('Homelab')).toBeTruthy())
@@ -129,7 +129,7 @@ describe('ConnectionsRegistrySection', () => {
     fireEvent.change(screen.getByPlaceholderText('Homelab'), { target: { value: 'Build host' } })
     fireEvent.change(screen.getByPlaceholderText('user@host:22'), { target: { value: 'dev@build.test:2222' } })
     fireEvent.change(screen.getByPlaceholderText('auto-detect'), {
-      target: { value: '/opt/hermes/bin/hermes' }
+      target: { value: '/opt/x19/bin/x19' }
     })
     fireEvent.click(screen.getByText('Save connection').closest('button')!)
 
@@ -138,11 +138,11 @@ describe('ConnectionsRegistrySection', () => {
       host: 'dev@build.test:2222',
       kind: 'ssh',
       label: 'Build host',
-      remoteHermesPath: '/opt/hermes/bin/hermes'
+      remoteX19Path: '/opt/x19/bin/x19'
     })
   })
 
-  it('clears a saved remote Hermes path back to auto-detect', async () => {
+  it('clears a saved remote X19 path back to auto-detect', async () => {
     const sshRegistry: DesktopConnectionsRegistry = {
       ...registry,
       connections: [
@@ -152,7 +152,7 @@ describe('ConnectionsRegistrySection', () => {
           id: 'build-host',
           kind: 'ssh',
           label: 'Build host',
-          remoteHermesPath: '/opt/hermes/bin/hermes',
+          remoteX19Path: '/opt/x19/bin/x19',
           tokenPreview: null,
           tokenSet: false,
           user: 'dev'
@@ -166,12 +166,12 @@ describe('ConnectionsRegistrySection', () => {
     await screen.findByText('Build host')
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     const pathInput = screen.getByPlaceholderText('auto-detect') as HTMLInputElement
-    expect(pathInput.value).toBe('/opt/hermes/bin/hermes')
+    expect(pathInput.value).toBe('/opt/x19/bin/x19')
     fireEvent.change(pathInput, { target: { value: '   ' } })
     fireEvent.click(screen.getByText('Save connection').closest('button')!)
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
-    expect(save.mock.calls[0][0]).toMatchObject({ id: 'build-host', remoteHermesPath: '' })
+    expect(save.mock.calls[0][0]).toMatchObject({ id: 'build-host', remoteX19Path: '' })
   })
 
   it('offers every kind on create and disables Local while the managed entry exists', async () => {
@@ -182,7 +182,7 @@ describe('ConnectionsRegistrySection', () => {
 
     const localKind = screen.getByRole('button', { name: 'Local' }) as HTMLButtonElement
     expect(localKind.disabled).toBe(true)
-    expect(screen.getByRole('button', { name: 'Hermes Cloud' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'X19 Cloud' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Remote gateway' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'SSH' })).toBeTruthy()
   })

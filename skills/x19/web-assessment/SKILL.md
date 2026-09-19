@@ -18,7 +18,7 @@ toolsets:
   - web
   - file
 metadata:
-  hermes:
+  x19:
     tags: [Security, X19, Web, XSS, SQLi, SSRF]
 ---
 

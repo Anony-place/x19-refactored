@@ -69,7 +69,7 @@ def reset_credential_cache() -> None:
 
 @dataclass(frozen=True)
 class EntraIdentityConfig:
-    """Hermes-managed Entra knobs; everything else (tenant, SP secret, federated token file, authority...) flows
+    """X19-managed Entra knobs; everything else (tenant, SP secret, federated token file, authority...) flows
     through azure-identity's standard ``AZURE_*`` env vars. ``exclude_interactive_browser`` keeps probes
     non-interactive (the setup wizard never writes it). Frozen: hashable for ``lru_cache``, picklable for workers."""
 
@@ -94,7 +94,7 @@ class EntraIdentityConfig:
 @functools.lru_cache(maxsize=1)
 def _default_chain_credential(config: EntraIdentityConfig) -> Any:
     """Cached ``DefaultAzureCredential`` for the unscoped process. ``maxsize=1`` is intentional: a process uses
-    one ``model.entra.*`` block at a time. Only Hermes knobs are passed as kwargs; the rest comes from ``AZURE_*``
+    one ``model.entra.*`` block at a time. Only X19 knobs are passed as kwargs; the rest comes from ``AZURE_*``
     env vars."""
     ai = _require_azure_identity()
     # SDK default already excludes the browser; only pass the kwarg when opting in.
@@ -124,11 +124,11 @@ def _scoped_credential(ai: Any, config: EntraIdentityConfig) -> Any:
 
 def build_credential(config: EntraIdentityConfig) -> Any:
     """Cached Entra credential: the process-wide default chain when unscoped, the routed profile's own
-    credential (built from its secret scope) under a HERMES_HOME override."""
-    from hermes_constants import get_hermes_home_override, hermes_home_key
-    if get_hermes_home_override() is None:
+    credential (built from its secret scope) under a X19_HOME override."""
+    from x19_constants import get_x19_home_override, x19_home_key
+    if get_x19_home_override() is None:
         return _default_chain_credential(config)
-    key = (hermes_home_key(), config)
+    key = (x19_home_key(), config)
     credential = _credentials_by_home.get(key)
     if credential is None:
         credential = _credentials_by_home[key] = _scoped_credential(_require_azure_identity(), config)
@@ -301,7 +301,7 @@ def build_bearer_http_client(token_provider: Callable[[], str], **httpx_kwargs: 
             # WARNING so the misconfiguration is visible at default levels.
             logger.warning("Bearer hook: Entra ID token provider returned empty (%s) "
                            "— stripping Authorization headers. Azure will respond 401. "
-                           "Run `hermes doctor` or `az login` to recover.", exc)
+                           "Run `x19 doctor` or `az login` to recover.", exc)
             _strip_auth_headers(request)
             return
         _strip_auth_headers(request)

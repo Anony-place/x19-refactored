@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from typing import Dict, List, Optional, Any, Callable
 from enum import Enum
 
-from hermes_cli.config import get_hermes_home
+from x19_cli.config import get_x19_home
 from agent.secret_scope import current_secret_scope, get_secret as _get_secret
 from gateway.shutdown_watchdog import (
     DEFAULT_LOOP_WATCHDOG_INTERVAL_S,
@@ -293,45 +293,13 @@ class HomeChannel:
 
 def persist_home_channel(home: HomeChannel, *, enabled_if_new: bool = False) -> None:
     """Persist a logical home without falsely enabling a Relay-fronted adapter."""
-    from hermes_cli.config import load_config, save_config
+    from x19_cli.config import load_config, save_config
     config = load_config()
     platform_config = _dict_slot(_dict_slot(config, "platforms"), home.platform.value)
     if enabled_if_new:
         platform_config.setdefault("enabled", True)
     platform_config["home_channel"] = home.to_dict()
     save_config(config)
-
-
-@dataclass
-class SessionResetPolicy:
-    """Inert legacy value type retained solely for the scheduled plugin-compat window.
-
-    Gateway configuration and session lifecycle do not consume this datatype.
-    """
-    mode: str = "none"
-    at_hour: int = 4  # 0-23, local time
-    idle_minutes: int = 1440
-    notify: bool = True  # Notify the user when auto-reset occurs
-    notify_exclude_platforms: tuple = ("api_server", "webhook")
-    bg_process_max_age_hours: int = 24
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {**asdict(self), "notify_exclude_platforms": list(self.notify_exclude_platforms)}
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SessionResetPolicy":
-        data = _coerce_dict(data)
-        exclude = data.get("notify_exclude_platforms")
-        # Missing keys and explicit YAML nulls both take the field default.
-        plain = {
-            f.name: f.default if data.get(f.name) is None else data[f.name]
-            for f in fields(cls) if f.name not in ("notify", "notify_exclude_platforms")
-        }
-        return cls(
-            notify=_coerce_bool(data.get("notify"), True),
-            notify_exclude_platforms=tuple(exclude) if exclude is not None else ("api_server", "webhook"),
-            **plain,
-        )
 
 
 @dataclass
@@ -405,7 +373,7 @@ class PlatformConfig:
         data = _coerce_dict(data)
         home = data.get("home_channel")
         # Adapters read their settings from ``extra`` (``config.extra.get("port")``), but users
-        # write them where the docs and ``hermes config set platforms.webhook.port`` put them:
+        # write them where the docs and ``x19 config set platforms.webhook.port`` put them:
         # directly under the platform block. Promote every non-typed top-level key so neither
         # spelling is silently dropped (#10206); an explicit ``extra:`` value wins on a clash.
         extra = {**{k: v for k, v in data.items() if k not in cls._TYPED_KEYS}, **_coerce_dict(data.get("extra", {}))}
@@ -493,7 +461,7 @@ def _has_usable_api_server_key(key: object) -> bool:
     if not key:
         return False
     try:
-        from hermes_cli.auth import has_usable_secret
+        from x19_cli.auth import has_usable_secret
         return has_usable_secret(key, min_length=16)
     except ImportError:
         return len(str(key).strip()) >= 16
@@ -533,7 +501,7 @@ class GatewayConfig:
     platforms: Dict[Platform, PlatformConfig] = field(default_factory=dict)
     reset_triggers: List[str] = field(default_factory=lambda: ["/new", "/reset"])
     quick_commands: Dict[str, Any] = field(default_factory=dict)  # slash commands that bypass the agent loop
-    sessions_dir: Path = field(default_factory=lambda: get_hermes_home() / "sessions")
+    sessions_dir: Path = field(default_factory=lambda: get_x19_home() / "sessions")
     # Legacy sessions.json mirror of the routing index (primary: state.db) for external tooling / downgrades.
     # The primary copy lives in state.db (gateway_routing table, #9006). Default True for backward
     # compatibility with external tooling and downgrade safety; set gateway.write_sessions_json: false in
@@ -550,14 +518,14 @@ class GatewayConfig:
     max_concurrent_sessions: Optional[int] = None  # Positive int caps simultaneous active sessions
     # The default profile's gateway serves every profile on the host (profiles stamped into session
     # keys, per-profile adapters/credentials). On by default (DEFAULT_CONFIG), but UNSET here is
-    # ``None``: a request the gateway settles at boot, not a verdict. ``hermes_cli.gateway_multiplex_mode
+    # ``None``: a request the gateway settles at boot, not a verdict. ``x19_cli.gateway_multiplex_mode
     # .resolve_multiplex_mode`` runs the migration preflight (default profile, >= 2 profiles, no
     # secondary running its own gateway, no blocker, migratable host) and only then writes True/False.
     # An explicit value (config.yaml, GATEWAY_MULTIPLEX_PROFILES, a constructor argument) is honoured
     # verbatim. Every reader tests truthiness, so an unresolved ``None`` never multiplexes by accident.
     multiplex_profiles: Optional[bool] = None
     # Public HTTPS endpoint for scoped RoomLink calls (an API key alone must never advertise a
-    # route); HERMES_ROOM_LINK_URL overrides.
+    # route); X19_ROOM_LINK_URL overrides.
     room_link_url: Optional[str] = None
     systemd_watchdog_seconds: int = 0  # opt-in; zero keeps Type=simple and disables sd_notify
     # In-process loop liveness watchdog: after consecutive missed probes it dumps all-thread stacks
@@ -629,7 +597,7 @@ class GatewayConfig:
                 # into, and the gateway then tries to connect to Discord / Teams / Google Chat with no token
                 # and emits noisy retry-forever errors. ``_platform_status`` was already fixed for the same
                 # bug class in commit 7849a3d73; this is the runtime counterpart.
-                from hermes_cli.plugins import discover_plugins
+                from x19_cli.plugins import discover_plugins
                 discover_plugins()
             entry = platform_registry.get(platform.value)
             if entry:
@@ -723,7 +691,7 @@ class GatewayConfig:
             platforms=by_platform("platforms", PlatformConfig.from_dict, dicts_only=True),
             reset_triggers=data.get("reset_triggers", ["/new", "/reset"]),
             quick_commands=_coerce_dict(data.get("quick_commands", {})),
-            sessions_dir=Path(data["sessions_dir"]) if "sessions_dir" in data else get_hermes_home() / "sessions",
+            sessions_dir=Path(data["sessions_dir"]) if "sessions_dir" in data else get_x19_home() / "sessions",
             **{name: _coerce_bool(data.get(name), default) for name, default in _TOPLEVEL_BOOL_DEFAULTS.items()},
             stt_enabled=_coerce_bool(stt_setting("stt_enabled", "enabled"), True),
             stt_echo_transcripts=_coerce_bool(stt_setting("stt_echo_transcripts", "echo_transcripts"), True),
@@ -764,10 +732,10 @@ class GatewayConfig:
 
 
 def load_gateway_config() -> GatewayConfig:
-    """Load gateway configuration. Priority: env > ~/.hermes/config.yaml > legacy gateway.json > defaults."""
+    """Load gateway configuration. Priority: env > ~/.x19/config.yaml > legacy gateway.json > defaults."""
     from gateway import config_loader
 
-    _home = get_hermes_home()
+    _home = get_x19_home()
     gw_data = config_loader.load_legacy_gateway_json(_home)
     try:
         config_loader.load_yaml_layer(_home, gw_data)
@@ -798,7 +766,7 @@ def _validate_gateway_config(config: "GatewayConfig") -> None:
         # Reject known-weak placeholder tokens. Ported from openclaw/openclaw#64586: users who copy
         # .env.example without changing placeholder values get a clear startup error instead of a confusing
         # "auth failed" from the platform API.
-        from hermes_cli.auth import has_usable_secret
+        from x19_cli.auth import has_usable_secret
     except ImportError:
         has_usable_secret = None
 
@@ -829,9 +797,3 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
     _impl(config)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

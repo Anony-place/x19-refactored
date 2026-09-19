@@ -1,4 +1,4 @@
-import type { PluginRestOptions } from '@hermes/plugin-sdk'
+import type { PluginRestOptions } from '@x19/plugin-sdk'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,7 +12,7 @@ import { TaskDrawer } from './drawer'
 import { en, KANBAN_LOCALES } from './i18n'
 import type { KanbanTaskDetail } from './types'
 
-vi.mock('@/hermes', () => ({ setApiRequestProfile: vi.fn() }))
+vi.mock('@/x19', () => ({ setApiRequestProfile: vi.fn() }))
 
 const legacyDetail: Omit<KanbanTaskDetail, 'attachments'> = {
   task: { id: 't_example', title: 'Example task', body: 'Keep this description readable.', status: 'todo' },

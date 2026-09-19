@@ -211,7 +211,7 @@ def test_refresh_is_thread_safe_under_concurrent_calls(monkeypatch):
 
 
 def test_resolve_discovery_timeout_explicit_wins(monkeypatch):
-    from hermes_cli import mcp_startup
+    from x19_cli import mcp_startup
 
     assert mcp_startup._resolve_discovery_timeout(2.5) == 2.5
 
@@ -219,10 +219,10 @@ def test_resolve_discovery_timeout_explicit_wins(monkeypatch):
 def test_wait_returns_instantly_when_no_discovery_thread(monkeypatch):
     """The common case (no MCP / discovery done) pays ~0s regardless of bound."""
     import time
-    from hermes_cli import mcp_startup
+    from x19_cli import mcp_startup
 
     monkeypatch.setattr(mcp_startup, "_mcp_discovery_thread", {})
-    import hermes_cli.config as cfg
+    import x19_cli.config as cfg
     monkeypatch.setattr(cfg, "load_config", lambda: {"mcp_discovery_timeout": 999.0})
 
     t0 = time.time()
@@ -388,11 +388,11 @@ class _BotModeDB:
 
 @pytest.fixture
 def managed_bot_home(tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     profile = home / "profiles" / "researcher"
     profile.mkdir(parents=True)
     (profile / "profile.yaml").write_text(
-        "ui_meta:\n  hermes-bots:\n    shape: cloud\n",
+        "ui_meta:\n  x19-bots:\n    shape: cloud\n",
         encoding="utf-8",
     )
     return home

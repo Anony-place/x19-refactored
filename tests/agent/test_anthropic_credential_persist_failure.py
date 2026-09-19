@@ -4,7 +4,7 @@ Anthropic OAuth refresh tokens are single-use: the POST that returns a new
 pair also invalidates the one that was sent.  The replacement therefore exists
 only in memory until it reaches its authoritative on-disk store —
 ``~/.claude/.credentials.json`` for ``claude_code`` entries,
-``~/.hermes/.anthropic_oauth.json`` for ``hermes_pkce`` ones.  Those singletons
+``~/.x19/.anthropic_oauth.json`` for ``x19_pkce`` ones.  Those singletons
 are authoritative in the strict sense: ``_seed_from_singletons()`` re-reads
 them on every ``load_pool()`` and writes what it finds over the pool row.
 
@@ -68,18 +68,18 @@ def _clean_spent_registry():
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
-    """Real on-disk HERMES_HOME so ``load_pool()`` re-reads what we persisted."""
-    home = tmp_path / "hermes"
+def x19_home(tmp_path, monkeypatch):
+    """Real on-disk X19_HOME so ``load_pool()`` re-reads what we persisted."""
+    home = tmp_path / "x19"
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
     (home / "auth.json").write_text(
         json.dumps({"version": 1, "providers": {}}), encoding="utf-8"
     )
     monkeypatch.setattr(
-        "hermes_cli.auth.is_provider_explicitly_configured", lambda pid: True
+        "x19_cli.auth.is_provider_explicitly_configured", lambda pid: True
     )
     return home
 
@@ -177,8 +177,8 @@ def test_claude_code_writer_raises_instead_of_swallowing(
     )
 
 
-def test_hermes_oauth_writer_raises_instead_of_swallowing(hermes_home, monkeypatch):
-    oauth_file = hermes_home / ".anthropic_oauth.json"
+def test_x19_oauth_writer_raises_instead_of_swallowing(x19_home, monkeypatch):
+    oauth_file = x19_home / ".anthropic_oauth.json"
     oauth_file.write_text(
         json.dumps(
             {
@@ -192,7 +192,7 @@ def test_hermes_oauth_writer_raises_instead_of_swallowing(hermes_home, monkeypat
     _break_durable_write(monkeypatch)
 
     with pytest.raises(CredentialPersistError):
-        AA._write_hermes_oauth_credentials(
+        AA._write_x19_oauth_credentials(
             _ROTATED_ACCESS, _ROTATED_REFRESH, _EXPIRED_MS + 3_600_000
         )
 
@@ -256,7 +256,7 @@ def test_resolve_from_credentials_returns_none_on_failed_commit(
 
 
 def test_pool_claude_code_fails_closed_and_reload_cannot_resurrect(
-    hermes_home, claude_credentials, monkeypatch
+    x19_home, claude_credentials, monkeypatch
 ):
     monkeypatch.setattr(AA, "refresh_anthropic_oauth_pure", _rotating_refresh)
     _break_durable_write(monkeypatch)
@@ -290,7 +290,7 @@ def test_pool_claude_code_fails_closed_and_reload_cannot_resurrect(
 
 
 def test_reauthentication_clears_the_persist_failure_quarantine(
-    hermes_home, claude_credentials, monkeypatch
+    x19_home, claude_credentials, monkeypatch
 ):
     """The quarantine is terminal for the spent pair, not for the account.
 
@@ -309,11 +309,11 @@ def test_reauthentication_clears_the_persist_failure_quarantine(
     # Restore a working filesystem, then simulate the re-login rewriting the
     # authoritative file with a genuinely new pair.
     monkeypatch.undo()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
     monkeypatch.setattr(
-        "hermes_cli.auth.is_provider_explicitly_configured", lambda pid: True
+        "x19_cli.auth.is_provider_explicitly_configured", lambda pid: True
     )
     monkeypatch.setattr(AA, "claude_code_credentials_path", lambda: claude_credentials)
     monkeypatch.setattr(AA, "_read_claude_code_credentials_from_keychain", lambda: None)
@@ -340,14 +340,14 @@ def test_reauthentication_clears_the_persist_failure_quarantine(
 
 
 # ---------------------------------------------------------------------------
-# Pool path: hermes_pkce
+# Pool path: x19_pkce
 # ---------------------------------------------------------------------------
 
 
-def test_pool_hermes_pkce_fails_closed_and_reload_cannot_resurrect(
-    hermes_home, monkeypatch
+def test_pool_x19_pkce_fails_closed_and_reload_cannot_resurrect(
+    x19_home, monkeypatch
 ):
-    oauth_file = hermes_home / ".anthropic_oauth.json"
+    oauth_file = x19_home / ".anthropic_oauth.json"
     oauth_file.write_text(
         json.dumps(
             {
@@ -362,7 +362,7 @@ def test_pool_hermes_pkce_fails_closed_and_reload_cannot_resurrect(
     monkeypatch.setattr(AA, "read_claude_code_credentials", lambda: None)
     _break_durable_write(monkeypatch)
 
-    entry = _entry("hermes_pkce")
+    entry = _entry("x19_pkce")
     pool = CredentialPool("anthropic", [entry])
 
     assert pool._refresh_entry(entry, force=True) is None
@@ -376,7 +376,7 @@ def test_pool_hermes_pkce_fails_closed_and_reload_cannot_resurrect(
     assert on_disk["refreshToken"] == _STALE_REFRESH
 
     reloaded = [
-        e for e in load_pool("anthropic").entries() if e.source == "hermes_pkce"
+        e for e in load_pool("anthropic").entries() if e.source == "x19_pkce"
     ]
     assert reloaded
     assert reloaded[0].refresh_token == _STALE_REFRESH
@@ -389,7 +389,7 @@ def test_pool_hermes_pkce_fails_closed_and_reload_cannot_resurrect(
 
 
 def test_retry_path_fails_closed_when_rotation_cannot_commit(
-    hermes_home, claude_credentials, monkeypatch
+    x19_home, claude_credentials, monkeypatch
 ):
     """The retry branch used to persist an "ok" row *before* committing.
 

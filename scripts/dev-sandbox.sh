@@ -5,10 +5,10 @@
 #
 # By default the sandbox is throwaway: a temp dir is created and removed on
 # exit. Use --persistent to keep the sandbox across restarts (stored under
-# .hermes-sandbox/ in the worktree git root).
+# .x19-sandbox/ in the worktree git root).
 #
 # Usage:
-#   scripts/dev-sandbox.sh python -m hermes_cli.main
+#   scripts/dev-sandbox.sh python -m x19_cli.main
 #   scripts/dev-sandbox.sh x19 desktop
 #   scripts/dev-sandbox.sh electron .
 #   scripts/dev-sandbox.sh -- npm run dev   # from apps/desktop/
@@ -20,10 +20,10 @@
 #   scripts/dev-sandbox.sh --from ~/.x19 x19 desktop
 #
 # Override the app name (default: X19Sandbox):
-#   HERMES_DEV_SANDBOX_NAME=Staging scripts/dev-sandbox.sh x19 desktop
+#   X19_DEV_SANDBOX_NAME=Staging scripts/dev-sandbox.sh x19 desktop
 #
-# Override the persistent sandbox dir name (default: .hermes-sandbox):
-#   HERMES_DEV_SANDBOX_DIR=.staging-sandbox scripts/dev-sandbox.sh --persistent x19 desktop
+# Override the persistent sandbox dir name (default: .x19-sandbox):
+#   X19_DEV_SANDBOX_DIR=.staging-sandbox scripts/dev-sandbox.sh --persistent x19 desktop
 
 set -euo pipefail
 
@@ -37,18 +37,18 @@ Run a X19 instance in an isolated sandbox.
 
 Options:
   --persistent    Keep the sandbox dir across restarts (under the worktree
-                  git root, in .hermes-sandbox/). Without this flag the
+                  git root, in .x19-sandbox/). Without this flag the
                   sandbox is a temp dir that is removed on exit.
   --from DIR      Copy DIR into the sandbox X19_HOME as the starting
                   point (config, sessions, skills, etc.).
                   Ignored if the sandbox X19_HOME already has content
                   (e.g. reusing a --persistent sandbox) to avoid clobbering.
-  --delete        Delete the existing persistent sandbox in .hermes-sandbox.
+  --delete        Delete the existing persistent sandbox in .x19-sandbox.
   -h, --help      Show this help message.
 
 Environment:
-  HERMES_DEV_SANDBOX_NAME  Override the app name (default: X19Sandbox)
-  HERMES_DEV_SANDBOX_DIR   Override the persistent dir name (default: .hermes-sandbox)
+  X19_DEV_SANDBOX_NAME  Override the app name (default: X19Sandbox)
+  X19_DEV_SANDBOX_DIR   Override the persistent dir name (default: .x19-sandbox)
 
 Examples:
   dev-sandbox.sh x19 desktop
@@ -117,7 +117,7 @@ if [ "$#" -eq 0 ]; then
 fi
 
 
-SANDBOX_DIR_NAME="${HERMES_DEV_SANDBOX_DIR:-.hermes-sandbox}"
+SANDBOX_DIR_NAME="${X19_DEV_SANDBOX_DIR:-.x19-sandbox}"
 GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
 GIT_ROOT="$(cd "$GIT_ROOT" && pwd)"
 PERSISTENT_SANDBOX_ROOT="$GIT_ROOT/$SANDBOX_DIR_NAME"
@@ -150,19 +150,19 @@ WORKTREE_HASH="$(printf '%s' "$WORKTREE_ROOT" | cksum | cut -d' ' -f1)"
 WORKTREE_NAME="$(basename "$WORKTREE_ROOT")"
 DEFAULT_SANDBOX_NAME="X19Sandbox-${WORKTREE_NAME}-${WORKTREE_HASH}"
 
-SANDBOX_NAME="${HERMES_DEV_SANDBOX_NAME:-$DEFAULT_SANDBOX_NAME}"
+SANDBOX_NAME="${X19_DEV_SANDBOX_NAME:-$DEFAULT_SANDBOX_NAME}"
 
 if [ "$PERSISTENT" = true ]; then
   SANDBOX_ROOT="$PERSISTENT_SANDBOX_ROOT"
 else
-  SANDBOX_ROOT="$(mktemp -d -t hermes-sandbox.XXXXXX)"
+  SANDBOX_ROOT="$(mktemp -d -t x19-sandbox.XXXXXX)"
 fi
 
-export X19_HOME="$SANDBOX_ROOT/hermes-home"
-export HERMES_DESKTOP_USER_DATA_DIR="$SANDBOX_ROOT/user-data"
-export HERMES_DESKTOP_APP_NAME="$SANDBOX_NAME"
+export X19_HOME="$SANDBOX_ROOT/x19-home"
+export X19_DESKTOP_USER_DATA_DIR="$SANDBOX_ROOT/user-data"
+export X19_DESKTOP_APP_NAME="$SANDBOX_NAME"
 
-mkdir -p "$X19_HOME" "$HERMES_DESKTOP_USER_DATA_DIR"
+mkdir -p "$X19_HOME" "$X19_DESKTOP_USER_DATA_DIR"
 
 if [ -n "$SEED_DIR" ]; then
   # Only seed when the sandbox X19_HOME is empty — avoids clobbering an
@@ -176,8 +176,8 @@ if [ -n "$SEED_DIR" ]; then
 fi
 
 echo "[sandbox] X19_HOME=$X19_HOME" >&2
-echo "[sandbox] userData=$HERMES_DESKTOP_USER_DATA_DIR" >&2
-echo "[sandbox] appName=$HERMES_DESKTOP_APP_NAME" >&2
+echo "[sandbox] userData=$X19_DESKTOP_USER_DATA_DIR" >&2
+echo "[sandbox] appName=$X19_DESKTOP_APP_NAME" >&2
 if [ "$PERSISTENT" = true ]; then
   echo "[sandbox] persistent: $SANDBOX_ROOT" >&2
 else

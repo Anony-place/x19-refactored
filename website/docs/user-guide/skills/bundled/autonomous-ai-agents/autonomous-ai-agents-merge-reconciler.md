@@ -17,16 +17,16 @@ Neutral third-party resolution of agent merge conflicts.
 | Source | Bundled (installed by default) |
 | Path | `skills/autonomous-ai-agents\merge-reconciler` |
 | Version | `1.0.0` |
-| Author | Hermes Agent |
+| Author | X19 |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Multi-Agent`, `Git`, `Merge-Conflict`, `Kanban`, `Arbitration` |
-| Related skills | [`hermes-agent`](/docs/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent) |
+| Related skills | [`x19`](/docs/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-x19) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Merge Reconciler
@@ -52,7 +52,7 @@ produces a merged result, like a merge-queue arbiter.
 - A repo checkout containing the halted merge, or the two branch names plus
   permission to run the merge yourself.
 - Both sides' intent sources: kanban completion summaries (`terminal` running
-  `hermes kanban show <task-id>`), PR bodies, or at minimum each branch's
+  `x19 kanban show <task-id>`), PR bodies, or at minimum each branch's
   commit messages.
 - The project's build/test command, if one exists.
 
@@ -94,7 +94,7 @@ explicitly in the hand-back summary.
   `git log --oneline <base>..<side>` and `git diff <base>..<side> -- <file>`
   for every conflicted file. In a halted merge, `HEAD` is one side and
   `MERGE_HEAD` is the other.
-- Collect each side's intent: `hermes kanban show <task-id>` for completion
+- Collect each side's intent: `x19 kanban show <task-id>` for completion
   summaries/metadata, or the PR body, or the commit messages from the log
   above. Write down one sentence of intent per side before touching any file.
 - Done when: you can state both intents in your own words and have both diffs

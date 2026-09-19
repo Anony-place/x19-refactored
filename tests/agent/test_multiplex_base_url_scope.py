@@ -13,7 +13,7 @@ from agent import secret_scope
 
 @pytest.fixture
 def secondary_scope(monkeypatch):
-    for name in ("OPENAI_BASE_URL", "XAI_BASE_URL", "HERMES_XAI_BASE_URL", "NOUS_INFERENCE_BASE_URL",
+    for name in ("OPENAI_BASE_URL", "XAI_BASE_URL", "X19_XAI_BASE_URL", "NOUS_INFERENCE_BASE_URL",
                  "GATEWAY_PROXY_URL", "FIRECRAWL_API_URL", "BROWSERBASE_BASE_URL", "XAI_API_KEY"):
         monkeypatch.setenv(name, f"https://{name.lower()}.default.example/v1")
     secret_scope.set_multiplex_active(True)
@@ -31,9 +31,9 @@ def test_base_urls_follow_the_scoped_key_not_default_environ(monkeypatch, second
     import plugins.browser.firecrawl.provider as firecrawl
     import plugins.video_gen.xai as xai_video
     from gateway.run_turn import GatewayTurnMixin
-    from hermes_cli import auth_nous
+    from x19_cli import auth_nous
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     monkeypatch.setattr(aux, "_get_named_custom_provider", lambda name: None, raising=False)
 
     _, base = aux._expand_direct_api_alias("openai", None)
@@ -52,7 +52,7 @@ def test_base_urls_follow_the_scoped_key_not_default_environ(monkeypatch, second
 def test_unscoped_single_profile_reads_keep_environ(monkeypatch):
     """Multiplex OFF (CLI / single gateway): environ IS the profile's own value — behaviour unchanged."""
     from gateway.run_turn import GatewayTurnMixin
-    from hermes_cli import auth_nous
+    from x19_cli import auth_nous
 
     secret_scope.set_multiplex_active(False)
     token = secret_scope.set_secret_scope(None)

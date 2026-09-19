@@ -1,6 +1,6 @@
 """Honcho client construction and ``HonchoClientConfig`` resolution.
 
-Config file resolution: $HERMES_HOME/honcho.json -> ~/.honcho/config.json -> env vars
+Config file resolution: $X19_HOME/honcho.json -> ~/.honcho/config.json -> env vars
 (HONCHO_API_KEY, HONCHO_ENVIRONMENT). Within a file, host-block fields win over
 flat/global fields, which win over defaults.
 """
@@ -28,9 +28,9 @@ from urllib.parse import urlparse
 
 from agent.memory_provider import spawn_context_thread as _spawn_context_thread
 from agent.secret_scope import get_secret
-from hermes_cli.profiles import _get_default_hermes_home
-from hermes_constants import get_hermes_home
-from hermes_state_common import TITLE_SOURCE_DERIVED, TITLE_SOURCE_LLM
+from x19_cli.profiles import _get_default_x19_home
+from x19_constants import get_x19_home
+from x19_state_common import TITLE_SOURCE_DERIVED, TITLE_SOURCE_LLM
 
 from plugins.memory.honcho.client_cache import (
     _DEFAULT_HTTP_TIMEOUT, _client_cache_key, _client_slots, _client_slots_lock,
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-HOST = "hermes"
+HOST = "x19"
 _AUTOMATIC_SESSION_TITLE_SOURCES = frozenset({TITLE_SOURCE_DERIVED, TITLE_SOURCE_LLM})
 
 
@@ -56,7 +56,7 @@ def _sanitize_url(url: str | None) -> str | None:
 
 
 def profile_host_key(profile: str | None) -> str:
-    """Return the safe Honcho host key for a Hermes profile."""
+    """Return the safe Honcho host key for a X19 profile."""
     if not profile or profile in {"default", "custom"}:
         return HOST
     sanitized = "".join(c if c.isalnum() or c in "_-" else "_" for c in profile).strip("_")
@@ -73,15 +73,15 @@ def _host_block(raw: dict, host: str) -> dict:
 
 
 def resolve_active_host() -> str:
-    """Honcho host key: HERMES_HONCHO_HOST (profile-scoped .env), else the active profile. The config's
+    """Honcho host key: X19_HONCHO_HOST (profile-scoped .env), else the active profile. The config's
     ``defaultHost`` is honored only for the default profile so named profiles stay isolated — which is
     also why the override is read through the secret scope: from raw environ it would fold every
     multiplexed profile onto the default profile's host block and peer."""
-    explicit = (get_secret("HERMES_HONCHO_HOST", "") or "").strip()
+    explicit = (get_secret("X19_HONCHO_HOST", "") or "").strip()
     if explicit:
         return explicit
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from x19_cli.profiles import get_active_profile_name
         profile_host = profile_host_key(get_active_profile_name())
     except Exception:
         profile_host = HOST
@@ -106,13 +106,13 @@ def resolve_global_config_path() -> Path:
 
 
 def resolve_config_path() -> Path:
-    """Active Honcho config path: $HERMES_HOME/honcho.json -> default profile's honcho.json
+    """Active Honcho config path: $X19_HOME/honcho.json -> default profile's honcho.json
     (host blocks accumulate there via setup/clone) -> ~/.honcho/config.json (also the
     first-time-setup write target when nothing exists)."""
-    local_path = get_hermes_home() / "honcho.json"
+    local_path = get_x19_home() / "honcho.json"
     if local_path.exists():
         return local_path
-    default_path = _get_default_hermes_home() / "honcho.json"
+    default_path = _get_default_x19_home() / "honcho.json"
     if default_path != local_path and default_path.exists():
         return default_path
     return resolve_global_config_path()
@@ -274,7 +274,7 @@ def _connection_fields(look: _HostLookup, host: str, path: Path) -> dict[str, An
                        "is NOT inherited (profiles are credential-isolated). Set apiKey on "
                        "hosts.%s in %s or this profile runs unauthenticated.", host, HOST, host, path)
     # The SDK's native format (and Claude Desktop) nests the URL at endpoint.baseUrl;
-    # read it before the flat Hermes spellings.
+    # read it before the flat X19 spellings.
     endpoint_block = raw.get("endpoint")
     native_base_url = endpoint_block.get("baseUrl") if isinstance(endpoint_block, dict) else None
     base_url = _sanitize_url(host_block.get("baseUrl") or host_block.get("base_url") or native_base_url
@@ -341,14 +341,14 @@ class HonchoClientConfig:
     """Configuration for Honcho client, resolved for a specific host."""
 
     host: str = HOST
-    workspace_id: str = "hermes"
+    workspace_id: str = "x19"
     api_key: str | None = None
     environment: str = "production"
     base_url: str | None = None  # self-hosted override of the environment mapping
     timeout: float | None = None  # SDK HTTP timeout, seconds
     # Identity
     peer_name: str | None = None
-    ai_peer: str = "hermes"
+    ai_peer: str = "x19"
     # True: peer_name wins over gateway runtime identity (Telegram UID, ...), so a
     # single-user deployment keeps one memory across platforms.
     # This keeps memory unified across platforms for single-user deployments where Honcho's one peer-name is
@@ -408,18 +408,18 @@ class HonchoClientConfig:
     # re-resolving (the resolvers read a ContextVar background threads can't see).
     # Provenance: WHERE this config was resolved from, captured at resolution time (inside the caller's
     # profile scope). Bound consumers (session manager, OAuth refresh paths) use these instead of
-    # re-resolving resolve_config_path()/get_hermes_home() later — those resolvers read a ContextVar that
+    # re-resolving resolve_config_path()/get_x19_home() later — those resolvers read a ContextVar that
     # background threads cannot see, so re-resolution from a daemon thread silently lands on the DEFAULT
     # profile (#69123, #74065).
     config_path: Path | None = None
-    hermes_home: Path | None = None
+    x19_home: Path | None = None
 
     def bound_config_path(self) -> Path:
         """Config path this was resolved from; ambient fallback for hand-built configs."""
         return self.config_path if self.config_path is not None else resolve_config_path()
 
     @classmethod
-    def from_env(cls, workspace_id: str = "hermes", host: str | None = None) -> HonchoClientConfig:
+    def from_env(cls, workspace_id: str = "x19", host: str | None = None) -> HonchoClientConfig:
         """Create config from environment variables (fallback)."""
         resolved_host = host or resolve_active_host()
         api_key = get_secret("HONCHO_API_KEY")
@@ -429,13 +429,13 @@ class HonchoClientConfig:
             environment=get_secret("HONCHO_ENVIRONMENT", "") or "production",
             timeout=_resolve_optional_float(os.environ.get("HONCHO_TIMEOUT")),
             ai_peer=resolved_host, enabled=bool(api_key or base_url),
-            config_path=resolve_config_path(), hermes_home=get_hermes_home(),
+            config_path=resolve_config_path(), x19_home=get_x19_home(),
         )
 
     @classmethod
     def from_global_config(cls, host: str | None = None, config_path: Path | None = None) -> HonchoClientConfig:
         """Config from the resolved Honcho config path, falling back to env. ``host=None``
-        derives it from the active Hermes profile."""
+        derives it from the active X19 profile."""
         resolved_host = host or resolve_active_host()
         path = config_path or resolve_config_path()
         if not path.exists():
@@ -453,7 +453,7 @@ class HonchoClientConfig:
         return cls(
             host=resolved_host, **_connection_fields(look, resolved_host, path), **_behavior_fields(look, explicitly_configured),
             sessions=raw.get("sessions", {}), raw=raw, explicitly_configured=explicitly_configured,
-            config_path=path, hermes_home=get_hermes_home(),
+            config_path=path, x19_home=get_x19_home(),
         )
 
     @staticmethod
@@ -621,7 +621,7 @@ def get_honcho_client(config: HonchoClientConfig | None = None) -> Honcho:
 
     if not config.api_key and not config.base_url:
         raise ValueError("Honcho API key not found. Get your API key at https://app.honcho.dev, "
-                         "then run 'hermes honcho setup' or set HONCHO_API_KEY. "
+                         "then run 'x19 honcho setup' or set HONCHO_API_KEY. "
                          "For local instances, set HONCHO_BASE_URL instead.")
 
     return slot.get(lambda: _build_client(config))
@@ -636,13 +636,13 @@ def _build_client(config: HonchoClientConfig) -> "Honcho":
         from honcho import Honcho
     except ImportError:
         raise ImportError("honcho-ai is required for Honcho integration. Install it with: pip install honcho-ai  "
-                          "(or run `hermes honcho setup` to configure).")
+                          "(or run `x19 honcho setup` to configure).")
 
     # config.yaml honcho.base_url / timeout fill whatever honcho.json left unset.
     base_url, timeout = config.base_url, config.timeout
     if not base_url or timeout is None:
         with contextlib.suppress(Exception):
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
             honcho_cfg = load_config().get("honcho", {})
             if isinstance(honcho_cfg, dict):
                 base_url = base_url or _sanitize_url(honcho_cfg.get("base_url", "").strip() or None)
@@ -682,23 +682,3 @@ def reset_honcho_client() -> None:
     _honcho_json_timeout_memo.clear()
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'SingletonSlot': ('plugins.plugin_utils', 'SingletonSlot'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

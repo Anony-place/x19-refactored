@@ -66,12 +66,12 @@ def test_session_search_lazily_opens_db_when_entrypoint_did_not_pass_one(monkeyp
         def __new__(cls):
             return sentinel_db
 
-    hermes_state = ModuleType("hermes_state")
-    hermes_state.SessionDB = FakeSessionDB
-    monkeypatch.setitem(sys.modules, "hermes_state", hermes_state)
-    hermes_state_registry = ModuleType("hermes_state_registry")
-    hermes_state_registry.acquire = lambda db_path=None: sentinel_db
-    monkeypatch.setitem(sys.modules, "hermes_state_registry", hermes_state_registry)
+    x19_state = ModuleType("x19_state")
+    x19_state.SessionDB = FakeSessionDB
+    monkeypatch.setitem(sys.modules, "x19_state", x19_state)
+    x19_state_registry = ModuleType("x19_state_registry")
+    x19_state_registry.acquire = lambda db_path=None: sentinel_db
+    monkeypatch.setitem(sys.modules, "x19_state_registry", x19_state_registry)
 
     session_search_mod = ModuleType("tools.session_search_tool")
 
@@ -85,13 +85,13 @@ def test_session_search_lazily_opens_db_when_entrypoint_did_not_pass_one(monkeyp
     agent = _make_agent(None, platform="acp")
     result = json.loads(agent._invoke_tool(
         "session_search",
-        {"query": "Hermes", "detail": "full"},
+        {"query": "X19", "detail": "full"},
         "task-id",
     ))
 
     assert result["success"] is True
     assert captured["db"] is sentinel_db
-    assert captured["query"] == "Hermes"
+    assert captured["query"] == "X19"
     assert captured["detail"] == "full"
     assert agent._session_db is sentinel_db
 
@@ -114,7 +114,7 @@ def test_sequential_session_search_forwards_detail(monkeypatch):
         id="search-1",
         function=SimpleNamespace(
             name="session_search",
-            arguments=json.dumps({"query": "Hermes", "detail": "full"}),
+            arguments=json.dumps({"query": "X19", "detail": "full"}),
         ),
     )
     assistant_message = SimpleNamespace(tool_calls=[tool_call])
@@ -127,5 +127,5 @@ def test_sequential_session_search_forwards_detail(monkeypatch):
     )
 
     assert captured["db"] is session_db
-    assert captured["query"] == "Hermes"
+    assert captured["query"] == "X19"
     assert captured["detail"] == "full"

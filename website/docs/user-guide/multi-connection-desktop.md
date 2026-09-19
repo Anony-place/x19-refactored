@@ -2,10 +2,10 @@
 sidebar_position: 5
 ---
 
-# Connecting Desktop to Many Hermes Instances
+# Connecting Desktop to Many X19 Instances
 
-Register every Hermes backend you own — the local runtime, remote gateways on
-your LAN or VPS, SSH hosts, and Hermes Cloud instances — in one desktop app,
+Register every X19 backend you own — the local runtime, remote gateways on
+your LAN or VPS, SSH hosts, and X19 Cloud instances — in one desktop app,
 and use the agents on all of them side by side. Connections are persistent:
 each registered gateway dials its own backends and WebSockets on demand, and
 background agents keep streaming while you look at another gateway.
@@ -25,7 +25,7 @@ redirect there). Three doors lead to it:
   **Gateways** in the settings nav). The connections registry is a section
   of that page, below the machine-level connection-mode controls.
 - **The sidebar profile rail** — the plug button at the right end of the rail
-  (tooltip: **"Connect another Hermes gateway…"**) deep-links straight to
+  (tooltip: **"Connect another X19 gateway…"**) deep-links straight to
   the Gateways page. It is always visible, even before you have created
   a second profile or a second connection.
 - **The command palette** — **Cmd/Ctrl+K**, then type *Gateways* (also
@@ -34,16 +34,16 @@ redirect there). Three doors lead to it:
 ## The gateway registry
 
 The **Registered gateways** section of **Settings → Gateways** manages a named
-list of Hermes gateways. Its intro says it plainly: *"Manage this device and
-every Hermes gateway it can reach through remote, SSH, or Cloud connections."*
+list of X19 gateways. Its intro says it plainly: *"Manage this device and
+every X19 gateway it can reach through remote, SSH, or Cloud connections."*
 Each entry is a *connection*:
 
 | Kind | What it is | Auth |
 |---|---|---|
-| **Local** | "The Hermes runtime managed by this app." | automatic |
-| **Remote gateway** | "A Hermes gateway reachable over HTTP(S) — LAN, Tailscale, or the internet." | session token or OAuth |
-| **SSH** | "A Hermes install reached over SSH." The app opens the tunnel and starts the dashboard for you | SSH key + adopted token |
-| **Hermes Cloud** | "A hosted instance discovered through your Hermes Cloud account." | portal sign-in |
+| **Local** | "The X19 runtime managed by this app." | automatic |
+| **Remote gateway** | "A X19 gateway reachable over HTTP(S) — LAN, Tailscale, or the internet." | session token or OAuth |
+| **SSH** | "A X19 install reached over SSH." The app opens the tunnel and starts the dashboard for you | SSH key + adopted token |
+| **X19 Cloud** | "A hosted instance discovered through your X19 Cloud account." | portal sign-in |
 
 Rules worth knowing:
 
@@ -72,8 +72,8 @@ Rules worth knowing:
   kinds, so a cloud entry and a remote entry can't point at the same URL);
   **SSH** entries are deduplicated on the normalized `user@host:port` plus
   remote profile.
-- Cloud entries normally come from the Hermes Cloud sign-in/discovery flow at
-  the top of the Gateways page — the **Hermes Cloud** kind in the add-connection
+- Cloud entries normally come from the X19 Cloud sign-in/discovery flow at
+  the top of the Gateways page — the **X19 Cloud** kind in the add-connection
   editor points you there.
 
 Switch gateways from the **Sessions** sidebar. Profiles, chats, messaging, and
@@ -99,7 +99,7 @@ are remembered on this desktop. Collapsing a gateway preserves its profiles'
 individual collapse states. Each profile's new-session action targets that
 profile on its owning gateway.
 
-The Hermes Cloud panel also lists **Saved Cloud gateways** when portal discovery
+The X19 Cloud panel also lists **Saved Cloud gateways** when portal discovery
 is signed out. **Use gateway** selects an existing saved connection without
 changing the default gateway; **Active in this window** identifies the current
 one. Adding a new instance uses its friendly Cloud name, while existing custom
@@ -111,15 +111,15 @@ authentication; manage sign-in from the registered connection controls.
 1. Open **Settings → Gateways** and scroll to the connections registry (or
    click the plug in the profile rail).
 2. Click **Add connection**.
-3. Pick the kind: **Local**, **Hermes Cloud**, **Remote gateway**, or **SSH**.
+3. Pick the kind: **Local**, **X19 Cloud**, **Remote gateway**, or **SSH**.
    (**Local** is disabled while the app-managed local entry exists — which is
-   almost always; **Hermes Cloud** directs you to the cloud sign-in/discovery
+   almost always; **X19 Cloud** directs you to the cloud sign-in/discovery
    flow above.)
 4. Fill the fields:
    - **Name** — required, unique; the "device name" shown everywhere this
      instance appears (placeholder: `Homelab`). Max 64 characters.
    - *Remote gateway only:*
-     - **Gateway URL** — the base URL of a running `hermes serve` backend,
+     - **Gateway URL** — the base URL of a running `x19 serve` backend,
        e.g. `http://homelab.lan:9119`. Reverse-proxy path prefixes work.
      - **Authentication** — choose **Session token** or **OAuth**:
        - **Session token** — paste the dashboard session token from the
@@ -134,10 +134,10 @@ authentication; manage sign-in from the registered connection controls.
        shell; on a `zsh` login shell the probe watchdog cannot kill the whole
        process group, so a hung probe's grandchildren may linger on the remote
        (bash/sh remotes reap them).
-     - **Hermes path (optional)** — full path to the `hermes` executable on
-       the remote (for example `/opt/hermes/bin/hermes`). Leave blank to
+     - **X19 path (optional)** — full path to the `x19` executable on
+       the remote (for example `/opt/x19/bin/x19`). Leave blank to
        auto-detect. Set it when the remote's non-interactive shell does not
-       have `hermes` on its `PATH` and **Test** reports *"Hermes is not
+       have `x19` on its `PATH` and **Test** reports *"X19 is not
        installed on the remote host"*; clearing the field restores
        auto-detection.
 5. Click **Save connection** (or **Cancel**).
@@ -147,7 +147,7 @@ Edit any non-local entry later with the pencil button, or remove it with the
 trash button — removal asks for confirmation and reminds you that *"The
 instance itself is not touched — you can add it again any time."*
 
-:::info The remote backend is a running `hermes serve` process
+:::info The remote backend is a running `x19 serve` process
 Nothing here works unless the backend is actually up and reachable on the
 other machine. The desktop app attaches to it; it does not start it for you
 (except for SSH connections, where the app starts the dashboard over the
@@ -201,7 +201,7 @@ an obsolete backend.
 ### Switching and scoping
 
 The sidebar foot follows one hierarchy: **gateway → profile → sessions**.
-Gateways are machines or hosted backends; profiles are isolated Hermes agents
+Gateways are machines or hosted backends; profiles are isolated X19s
 that live on one gateway.
 
 - With one registered gateway, no gateway control is added. Local-only Desktop
@@ -288,14 +288,14 @@ side effect of sharing one Desktop window.
 ## Updating every instance at once
 
 **Settings → Gateways → Update all instances** (shown once more than one
-connection is registered) dispatches `hermes update` to every eligible
+connection is registered) dispatches `x19 update` to every eligible
 connection in parallel:
 
 - **Local** updates through the app's own update pipeline (the same flow as
   Settings → Updates).
 - **Remote and SSH** connections are told to update themselves via their own
   backend — the update runs on *that* machine.
-- **Hermes Cloud** instances are skipped with a *"Managed by Hermes Cloud"*
+- **X19 Cloud** instances are skipped with a *"Managed by X19 Cloud"*
   note: the platform manages their versions.
 
 Each instance reports independently, so one unreachable box never wedges the
@@ -304,7 +304,7 @@ with their own message, per row.
 
 You rarely need the Settings button, though: once more than one update target
 exists, the app's regular update affordances (**Update now** on the About
-panel, ⌘K **Update Hermes**, the update-ready toast) run the same fan-out
+panel, ⌘K **Update X19**, the update-ready toast) run the same fan-out
 automatically — active backend first, then every other eligible gateway, then
 the desktop app itself last. See
 [Updating](./desktop.md#updating) in the desktop guide.
@@ -350,7 +350,7 @@ multi-gateway roster is the reference consumer.
 ## Troubleshooting
 
 - **"Connection test failed"** — the backend isn't reachable at that URL from
-  this machine. Check that `hermes serve` is running on the remote host, the
+  this machine. Check that `x19 serve` is running on the remote host, the
   port is open, and (for token auth) the token is current. Re-run **Test**
   after fixing.
 - **An agent shows but won't open** — run **Test** on its connection. The
@@ -359,7 +359,7 @@ multi-gateway roster is the reference consumer.
 - **A remote gateway is missing from the roster** — its backend is down or
   unreachable; the roster lists it under gateways with the error. SSH connections
   show *connect-on-demand* until first use — that's by design, not a failure.
-- **"Update Hermes Desktop to chat with agents on other connections"** — the
+- **"Update X19 Desktop to chat with agents on other connections"** — the
   app predates the multi-connection stack; update the desktop app itself.
 - **Duplicate device names** — not possible; names are enforced unique at
   save time. If a migrated name collided, it was suffixed (`Homelab 2`).

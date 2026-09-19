@@ -1,4 +1,4 @@
-import type { Key } from '@hermes/ink'
+import type { Key } from '@x19/ink'
 import type { ReactNode } from 'react'
 
 import type { Theme } from '../theme.js'

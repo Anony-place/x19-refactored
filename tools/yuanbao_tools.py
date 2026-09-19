@@ -1,4 +1,4 @@
-"""yuanbao_tools.py - 元宝平台工具集 (the "hermes-yuanbao" toolset).
+"""yuanbao_tools.py - 元宝平台工具集 (the "x19-yuanbao" toolset).
 
 get_group_info / query_group_members / search_sticker / send_sticker / send_dm. Sticker
 flow mirrors chatbot-web's sticker-search/sticker-send: the LLM should search_sticker for
@@ -180,12 +180,12 @@ async def search_sticker(args) -> dict:
 
 @_yb_tool("send_sticker")
 async def send_sticker(args) -> dict:
-    """向 chat_id（缺省取当前会话 HERMES_SESSION_CHAT_ID）发送一张内置贴纸（TIMFaceElem）。
+    """向 chat_id（缺省取当前会话 X19_SESSION_CHAT_ID）发送一张内置贴纸（TIMFaceElem）。
     ``sticker``: 名称（如 "六六六"）或 sticker_id（如 "278"）；为空时随机发送。
     ``chat_id``: ``direct:{account_id}`` / ``group:{group_code}`` / 裸 account_id。"""
     from gateway.platforms.yuanbao_sticker import get_sticker_by_id, get_sticker_by_name, get_random_sticker
 
-    target = (args.get("chat_id", "") or "").strip() or _session_env("HERMES_SESSION_CHAT_ID")
+    target = (args.get("chat_id", "") or "").strip() or _session_env("X19_SESSION_CHAT_ID")
     if not target:
         raise _YbError("chat_id is required (no active yuanbao session detected)")
     adapter = _adapter()
@@ -218,7 +218,7 @@ async def send_dm(args) -> dict:
     (path, is_voice) pairs; ``MEDIA:<path>`` tags in the text count too. Partial media failures are
     reported in ``note``, not as failure."""
     group_code = args.get("group_code", "")
-    if not group_code and (chat_id := _session_env("HERMES_SESSION_CHAT_ID")).startswith("group:"):
+    if not group_code and (chat_id := _session_env("X19_SESSION_CHAT_ID")).startswith("group:"):
         group_code = chat_id.split(":", 1)[1]
 
     media_files = []
@@ -271,7 +271,7 @@ async def send_dm(args) -> dict:
 
 def _check_yuanbao():
     """Toolset availability check — True when running in a yuanbao gateway session."""
-    return _session_env("HERMES_SESSION_PLATFORM") == "yuanbao" or _get_active_adapter() is not None
+    return _session_env("X19_SESSION_PLATFORM") == "yuanbao" or _get_active_adapter() is not None
 
 
 # (schema, handler, emoji); the tool name is schema["name"].
@@ -490,15 +490,8 @@ _TOOLS = (
 
 for _schema, _handler, _emoji in _TOOLS:
     registry.register(
-        name=_schema["name"], toolset="hermes-yuanbao", schema=_schema, handler=_handler,
+        name=_schema["name"], toolset="x19-yuanbao", schema=_schema, handler=_handler,
         check_fn=_check_yuanbao, is_async=True, emoji=_emoji,
     )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import List  # noqa: F401,E402
-from typing import Optional  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

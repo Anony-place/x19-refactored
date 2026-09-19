@@ -24,7 +24,7 @@ def _reset_backend(grant_computer_use_approvals):
     from tools.computer_use.tool import reset_backend_for_tests
     reset_backend_for_tests()
     # Force the noop backend.
-    with patch.dict(os.environ, {"HERMES_COMPUTER_USE_BACKEND": "noop"}, clear=False):
+    with patch.dict(os.environ, {"X19_COMPUTER_USE_BACKEND": "noop"}, clear=False):
         yield
     reset_backend_for_tests()
 
@@ -79,7 +79,7 @@ class TestRegistration:
         driver.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         driver.chmod(0o755)
 
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", str(driver))
+        monkeypatch.setenv("X19_CUA_DRIVER_CMD", str(driver))
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
         assert cua_backend_driver.resolve_cua_driver_cmd() == str(driver)
@@ -927,14 +927,14 @@ class TestLazyMcpInstall:
 
         state = {
             "ready": False,
-            "reason": "Hermes computer use requires cua-driver 0.20.0 or newer",
+            "reason": "X19 computer use requires cua-driver 0.20.0 or newer",
         }
         with patch.object(
                  cua_backend,
                  "cua_driver_runtime_contract_status",
                  return_value=state,
              ), patch("tools.lazy_deps.ensure") as mock_ensure:
-            with pytest.raises(RuntimeError, match="hermes computer-use install"):
+            with pytest.raises(RuntimeError, match="x19 computer-use install"):
                 cua_backend.CuaDriverBackend().start()
 
         mock_ensure.assert_not_called()
@@ -965,7 +965,7 @@ class TestContractAutoRepair:
     """An installed-but-incompatible driver is repaired automatically, once.
 
     The 0.20 runtime-contract gate fails closed; when the failure is an old
-    installed driver (a state Hermes' own version-floor bump created),
+    installed driver (a state X19' own version-floor bump created),
     start() runs the standard install/repair path once instead of failing
     every computer_use call until the user runs the CLI by hand.
     """
@@ -975,7 +975,7 @@ class TestContractAutoRepair:
             "ready": False,
             "binary": "/usr/local/bin/cua-driver",
             "version": "0.19.3",
-            "reason": "Hermes computer use requires cua-driver 0.20.0 or newer",
+            "reason": "X19 computer use requires cua-driver 0.20.0 or newer",
         }
 
     def test_start_auto_repairs_incompatible_driver(self, monkeypatch):
@@ -991,7 +991,7 @@ class TestContractAutoRepair:
                  "cua_driver_runtime_contract_status",
                  side_effect=[self._incompatible(), {"ready": True}],
              ), \
-             patch("hermes_cli.tools_config.install_cua_driver",
+             patch("x19_cli.tools_config.install_cua_driver",
                    return_value=True) as installer, \
              patch.object(cua_backend, "_maybe_nudge_update"), \
              patch("tools.lazy_deps.ensure"):
@@ -1012,7 +1012,7 @@ class TestContractAutoRepair:
                  "cua_driver_runtime_contract_status",
                  return_value=self._incompatible(),
              ), \
-             patch("hermes_cli.tools_config.install_cua_driver",
+             patch("x19_cli.tools_config.install_cua_driver",
                    return_value=False), \
              patch("tools.lazy_deps.ensure") as mock_ensure:
             with pytest.raises(RuntimeError, match="0.20.0 or newer"):
@@ -1029,7 +1029,7 @@ class TestContractAutoRepair:
                  "cua_driver_runtime_contract_status",
                  return_value=self._incompatible(),
              ), \
-             patch("hermes_cli.tools_config.install_cua_driver",
+             patch("x19_cli.tools_config.install_cua_driver",
                    return_value=False) as installer, \
              patch("tools.lazy_deps.ensure"):
             for _ in range(2):
@@ -1042,15 +1042,15 @@ class TestContractAutoRepair:
         from tools.computer_use import cua_backend
 
         monkeypatch.setattr(cua_backend, "_contract_repair_attempted", False)
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", "/opt/custom/cua-driver")
+        monkeypatch.setenv("X19_CUA_DRIVER_CMD", "/opt/custom/cua-driver")
         with patch.object(
                  cua_backend,
                  "cua_driver_runtime_contract_status",
                  return_value=self._incompatible(),
              ), \
-             patch("hermes_cli.tools_config.install_cua_driver") as installer, \
+             patch("x19_cli.tools_config.install_cua_driver") as installer, \
              patch("tools.lazy_deps.ensure"):
-            with pytest.raises(RuntimeError, match="HERMES_CUA_DRIVER_CMD"):
+            with pytest.raises(RuntimeError, match="X19_CUA_DRIVER_CMD"):
                 cua_backend.CuaDriverBackend().start()
         installer.assert_not_called()
 
@@ -1070,7 +1070,7 @@ class TestContractAutoRepair:
                  "cua_driver_runtime_contract_status",
                  return_value=state,
              ), \
-             patch("hermes_cli.tools_config.install_cua_driver") as installer, \
+             patch("x19_cli.tools_config.install_cua_driver") as installer, \
              patch("tools.lazy_deps.ensure"):
             with pytest.raises(RuntimeError, match="not installed"):
                 cua_backend.CuaDriverBackend().start()
@@ -1517,14 +1517,14 @@ class TestCuaDriverSessionReconnect:
 
         bridge = FakeBridge()
         session = self._make_session(bridge)
-        session._declared_session_id = "hermes-label"
+        session._declared_session_id = "x19-label"
 
         result = session.call_tool("list_apps", {})
 
         assert result["isError"] is False
         assert bridge.calls == [
             ("call", "list_apps", {}),
-            ("call", "start_session", {"session": "hermes-label"}),
+            ("call", "start_session", {"session": "x19-label"}),
             ("call", "list_apps", {}),
         ]
 
@@ -1779,7 +1779,7 @@ class TestCuaEnvironmentScrubbing:
     def test_cua_session_sanitizes_provider_env_vars(self):
         """_CuaDriverSession lifecycle must sanitize sensitive env vars.
 
-        The cua-driver MCP subprocess should not inherit Hermes-managed
+        The cua-driver MCP subprocess should not inherit X19-managed
         credentials or other sensitive environment variables — only
         runtime-required vars. Regression test for issue #37878.
 
@@ -1897,7 +1897,7 @@ class TestCuaCliFallbackResolution:
 
 
 class TestClickButtonPassthrough:
-    """Surface 5 (NousResearch/hermes-agent#47072) — `middle_click` must
+    """Surface 5 (Anony-place/x19-refactored#47072) — `middle_click` must
     actually reach cua-driver as a middle button, not silently degrade to
     left. Pre-fix, the backend's `click()` chose the tool by name
     (`button == "right"` → `right_click`, everything else → `click` with
@@ -2073,7 +2073,7 @@ class TestZIndexSorting:
         assert desktop["z_index"] == 0
 
 class TestImageMimeTypePropagation:
-    """Surface 7 (NousResearch/hermes-agent#47072): trycua/cua#1961 made
+    """Surface 7 (Anony-place/x19-refactored#47072): trycua/cua#1961 made
     `mimeType` part of every MCP image-part response, so the wrapper no
     longer has to sniff PNG vs JPEG by inspecting the first base64 bytes
     (`/9j/` for JPEG / `iVBOR` for PNG). The sniff is preserved as a
@@ -2119,10 +2119,10 @@ class TestImageMimeTypePropagation:
             )
 
 class TestMcpInvocationResolution:
-    """Surface 8 (NousResearch/hermes-agent#47072): instead of hardcoding
+    """Surface 8 (Anony-place/x19-refactored#47072): instead of hardcoding
     `["mcp"]` as the cua-driver subcommand, we ask the driver via its
     `manifest` JSON (trycua/cua#1961) so a future rename or relocation of
-    the MCP subcommand doesn't require a Hermes patch.
+    the MCP subcommand doesn't require a X19 patch.
 
     The discovery hop must NEVER prevent the wrapper from starting — every
     failure mode (no manifest verb, non-zero exit, junk JSON, missing
@@ -2164,7 +2164,7 @@ class TestMcpInvocationResolution:
 
     def test_falls_back_when_manifest_missing_command(self):
         """If the manifest knows the args but not the command, keep our
-        resolved driver path (so HERMES_CUA_DRIVER_CMD still wins)."""
+        resolved driver path (so X19_CUA_DRIVER_CMD still wins)."""
         from unittest.mock import patch
         from tools.computer_use.cua_backend_driver import _resolve_mcp_invocation
 
@@ -2191,7 +2191,7 @@ class TestMcpInvocationResolution:
 
 
 class TestStructuredElementsConsumption:
-    """Surface 2 (NousResearch/hermes-agent#47072): trycua/cua#1961 made
+    """Surface 2 (Anony-place/x19-refactored#47072): trycua/cua#1961 made
     `structuredContent.elements` part of every `get_window_state` MCP
     response. The wrapper used to parse the markdown AX tree with a
     regex — lossy because bounds always came back (0,0,0,0). The
@@ -2267,7 +2267,7 @@ class TestStructuredElementsConsumption:
         assert cap.elements == []
 
 class TestCapabilityDiscovery:
-    """Surface 4 (NousResearch/hermes-agent#47072): the wrapper learns
+    """Surface 4 (Anony-place/x19-refactored#47072): the wrapper learns
     what cua-driver supports from the per-tool `capabilities[]` array on
     `tools/list` (trycua/cua#1961) instead of name-checking. The infra
     here is consumed by other surfaces (e.g. Surface 6 only carries
@@ -2307,7 +2307,7 @@ class TestCapabilityDiscovery:
 
 
 class TestElementTokenAttachment:
-    """Surface 6 (NousResearch/hermes-agent#47072): trycua/cua#1961 added
+    """Surface 6 (Anony-place/x19-refactored#47072): trycua/cua#1961 added
     an opaque `element_token` alongside `element_index` so the wrapper
     can carry per-snapshot handles instead of relying on raw indices that
     silently re-resolve when the snapshot is superseded.
@@ -2413,7 +2413,7 @@ class TestElementTokenAttachment:
 
 
 class TestSessionLifecycle:
-    """Surface gap (audit June 2026): Hermes never declared a cua-driver
+    """Surface gap (audit June 2026): X19 never declared a cua-driver
     session, so the agent-cursor overlay was inert and per-run state
     (config overrides, recording ownership, cursor identity) was shared
     across concurrent runs. Wired now: backend.start() calls
@@ -2688,7 +2688,7 @@ class TestElementSpillFile:
                              window_title="Discord", png_bytes_len=0)
 
     def test_spill_file_holds_full_untruncated_tree(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from tools.computer_use.tool import _capture_response
 
         out = json.loads(_capture_response(self._dense_capture()))
@@ -2703,7 +2703,7 @@ class TestElementSpillFile:
         assert spill["elements"][119]["label"].startswith("msg 119")
 
     def test_no_spill_when_nothing_dropped(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from tools.computer_use.backend import CaptureResult, UIElement
         from tools.computer_use.tool import _capture_response
 
@@ -2717,7 +2717,7 @@ class TestElementSpillFile:
         assert "elements_file" not in out
 
     def test_spill_pruning_bounds_cache_growth(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from tools.computer_use import tool as cu_tool
 
         cap = self._dense_capture()
@@ -2760,7 +2760,7 @@ class TestCaptureScreenshotPersistence:
     def test_multimodal_capture_exposes_shareable_screenshot(
         self, tmp_path, monkeypatch,
     ):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from tools.computer_use import tool as cu_tool
 
         monkeypatch.setattr(
@@ -2775,7 +2775,7 @@ class TestCaptureScreenshotPersistence:
         assert Path(screenshot_path).read_bytes() == base64.b64decode(self._PNG_B64)
 
     def test_capture_cache_is_bounded(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from tools.computer_use import tool as cu_tool
 
         monkeypatch.setattr(cu_tool, "_MAX_CAPTURE_FILES", 2)
@@ -2788,7 +2788,7 @@ class TestCaptureScreenshotPersistence:
 
 class TestBoundsScaleField:
     def test_scale_reported_when_spaces_diverge(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from tools.computer_use.backend import CaptureResult, UIElement
         from tools.computer_use.tool import _capture_response
 

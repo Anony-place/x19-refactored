@@ -694,7 +694,7 @@ class RelayAdapter(BasePlatformAdapter):
         chat_id: str,
         tasks: list,
         *,
-        title: str = "Hermes is working",
+        title: str = "X19 is working",
         reply_to: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         fallback_text: Optional[str] = None,
@@ -1161,7 +1161,7 @@ class RelayAdapter(BasePlatformAdapter):
             # read off the wire (engages /sethome's via_relay guard).
             delivered_via_upstream_relay=True,
             # Profile routing (multiplex mode), mirroring _event_from_wire.
-            # The HERMES profile this interaction is routed to (multiplex mode) — mirrors _event_from_wire's
+            # The X19 profile this interaction is routed to (multiplex mode) — mirrors _event_from_wire's
             # profile stamping for plain relayed messages (#60586). Without this, a Team-Gateway's Discord
             # slash-command/button/modal always fell back to the legacy agent:main namespace even when the
             # connector resolved a specific profile for it.
@@ -1169,7 +1169,7 @@ class RelayAdapter(BasePlatformAdapter):
         )
         event = MessageEvent(text=text, message_type=message_type, source=source)
         if itype == 3:
-            # A component press whose custom_id is a Hermes prompt token
+            # A component press whose custom_id is a X19 prompt token
             # (hp1:<prompt_id>:<option_id>) becomes a STRUCTURED prompt answer;
             # foreign custom_ids keep the best-effort TEXT shape.
             decoded = self._decode_prompt_token(text)
@@ -2323,9 +2323,3 @@ _PROMPT_RESOLVERS = {
 }
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import cast  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

@@ -16,11 +16,11 @@ def home(tmp_path, monkeypatch):
     class DurableRunStore:
         durable = True
 
-    path = tmp_path / ".hermes"
+    path = tmp_path / ".x19"
     path.mkdir()
     (path / "profiles" / "ops").mkdir(parents=True)
     (path / "profiles" / "ops" / "config.yaml").write_text("{}\n")  # identity marker: local roster
-    monkeypatch.setenv("HERMES_HOME", str(path))
+    monkeypatch.setenv("X19_HOME", str(path))
     monkeypatch.setattr(srv, "_run_idempotency_store", DurableRunStore(), raising=False)
     methods_groups.stop_hosted_room_service(timeout=1.0)
     methods_groups.start_hosted_room_service()
@@ -50,7 +50,7 @@ def _create_room():
                     {
                         "member_id": "default",
                         "profile": "default",
-                        "handle": "hermes",
+                        "handle": "x19",
                     },
                     {"member_id": "ops", "profile": "ops", "handle": "ops"},
                 ],
@@ -88,7 +88,7 @@ def test_capabilities_are_honest_about_the_driver_boundary(home):
 
 def test_capabilities_and_invitation_advertise_scoped_roomlink(home, monkeypatch):
     monkeypatch.setenv("API_SERVER_KEY", "gateway-api-key-1234567890")
-    monkeypatch.setenv("HERMES_PROFILE", "reviewer")
+    monkeypatch.setenv("X19_PROFILE", "reviewer")
     result = _result(srv._methods["groups.capabilities"](1, {}))
     assert result["room_link"]["enabled"] is True
     assert result["room_link"]["profile"] == "reviewer"
@@ -174,8 +174,8 @@ def test_app_managed_catalog_and_self_advertised_endpoint_are_consistent(
     home, monkeypatch
 ):
     monkeypatch.setenv("API_SERVER_KEY", "gateway-api-key-1234567890")
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_ROOM_LINK_URL", "https://peer.example.test/hermes")
+    monkeypatch.setenv("X19_DESKTOP", "1")
+    monkeypatch.setenv("X19_ROOM_LINK_URL", "https://peer.example.test/x19")
     capability = _result(srv._methods["groups.capabilities"](1, {}))
     invitation = _result(
         srv._methods["groups.peer.invite"](
@@ -193,7 +193,7 @@ def test_app_managed_catalog_and_self_advertised_endpoint_are_consistent(
     assert capability["room_link"]["catalog"] == invitation["catalog"]
     assert capability["room_link"]["endpoint"] == {
         "available": True,
-        "url": "https://peer.example.test/hermes",
+        "url": "https://peer.example.test/x19",
         "transport_security": "tls",
     }
     assert invitation["endpoint"] == capability["room_link"]["endpoint"]
@@ -201,7 +201,7 @@ def test_app_managed_catalog_and_self_advertised_endpoint_are_consistent(
 
 def test_launch_profile_is_valid_for_roomlink_invitation(home, monkeypatch):
     monkeypatch.setenv("API_SERVER_KEY", "gateway-api-key-1234567890")
-    monkeypatch.setenv("HERMES_PROFILE", "default")
+    monkeypatch.setenv("X19_PROFILE", "default")
 
     capability = _result(
         srv._methods["groups.capabilities"](1, {"profile": "default"})
@@ -227,7 +227,7 @@ def test_launch_profile_is_valid_for_roomlink_invitation(home, monkeypatch):
 
 def test_roomlink_endpoint_absence_has_machine_reason(home, monkeypatch):
     monkeypatch.setenv("API_SERVER_KEY", "gateway-api-key-1234567890")
-    monkeypatch.delenv("HERMES_ROOM_LINK_URL", raising=False)
+    monkeypatch.delenv("X19_ROOM_LINK_URL", raising=False)
     result = _result(srv._methods["groups.capabilities"](1, {}))
     assert result["room_link"]["endpoint"] == {
         "available": False,
@@ -478,7 +478,7 @@ def test_groups_list_returns_bounded_pages(home):
                     {
                         "member_id": "default",
                         "profile": "default",
-                        "handle": "hermes",
+                        "handle": "x19",
                     },
                     {"member_id": "ops", "profile": "ops", "handle": "ops"},
                 ],
@@ -641,7 +641,7 @@ def test_send_does_not_trust_client_supplied_actor_identity(home):
 
 def test_create_ignores_client_supplied_authority_identity(home):
     members = [
-        {"member_id": "default", "profile": "default", "handle": "hermes"},
+        {"member_id": "default", "profile": "default", "handle": "x19"},
         {"member_id": "ops", "profile": "ops", "handle": "ops"},
     ]
     created = _result(
@@ -671,7 +671,7 @@ def test_legacy_room_adoption_emits_one_lineage_receipt(home):
     from gateway.hosted_rooms import create_room, default_db_path
 
     members = [
-        {"member_id": "default", "profile": "default", "handle": "hermes"},
+        {"member_id": "default", "profile": "default", "handle": "x19"},
         {"member_id": "ops", "profile": "ops", "handle": "ops"},
     ]
     create_room(
@@ -862,7 +862,7 @@ def test_pruned_room_send_and_log_report_expired_history(home, monkeypatch):
     from gateway import hosted_rooms
 
     members = [
-        {"member_id": "default", "profile": "default", "handle": "hermes"},
+        {"member_id": "default", "profile": "default", "handle": "x19"},
         {"member_id": "ops", "profile": "ops", "handle": "ops"},
     ]
     _create_room()

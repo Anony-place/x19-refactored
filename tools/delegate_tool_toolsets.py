@@ -14,6 +14,7 @@ logger = logging.getLogger("tools.delegate_tool")  # log-record parity with the 
 DELEGATE_BLOCKED_TOOLS = frozenset(
     [
         "delegate_task",  # no recursive delegation
+        "x19_org",  # workers execute; only X19/X22 run the organization
         "clarify",  # no user interaction
         "memory",  # no writes to shared MEMORY.md
         "send_message",  # no cross-platform side effects
@@ -36,7 +37,7 @@ def _is_mcp_toolset_name(name: str) -> bool:
     return bool(target and str(target).startswith("mcp-"))
 
 def _expand_parent_toolsets(parent_toolsets: set) -> set:
-    """Add every toolset whose tools are a subset of the parent's tools: a parent on a composite like ``hermes-cli``
+    """Add every toolset whose tools are a subset of the parent's tools: a parent on a composite like ``x19-cli``
     must still let a child request ``web``/``terminal``; bare name intersection would reject them. Both sides use
     the RESOLVED static surface: a composite's ``includes`` (``debugging`` -> ``web``/``file``, ``safe``) are tools
     the parent genuinely holds, and the child never gains a tool the parent lacks."""
@@ -69,7 +70,10 @@ def _blocked_toolsets_for_role(role: str) -> List[str]:
     blocked names inside mixed bundles are subtracted AFTER composite expansion."""
     blocked_names = set(DELEGATE_BLOCKED_TOOLS)
     if role == "orchestrator":
+        # An orchestrator child is a manager in the X19 hierarchy: it delegates and
+        # it reads/writes the organization state. A leaf child does neither.
         blocked_names.discard("delegate_task")
+        blocked_names.discard("x19_org")
     return sorted(
         name for name, defn in TOOLSETS.items() if defn.get("tools") and set(defn.get("tools", ())).issubset(blocked_names)
     )
@@ -80,7 +84,7 @@ def _resolve_child_toolsets(
     """``(enabled_toolsets, disabled_toolsets)`` for a child. Children never gain tools the parent lacks: explicit
     ``toolsets`` are intersected with the parent's (composite-expanded) set, else the parent's enabled set is
     inherited. Blocked tools are stripped twice — whole blocked toolsets here, and exact one-tool deny toolsets via
-    ``disabled_toolsets`` so blocked names inside mixed bundles (hermes-cli) are subtracted AFTER composite
+    ``disabled_toolsets`` so blocked names inside mixed bundles (x19-cli) are subtracted AFTER composite
     expansion and survive registry refreshes. Orchestrators get ``delegation`` re-added unconditionally
     (role-granted, not inherited)."""
     # enabled_toolsets=None means "all tools", so derive from loaded tool names.

@@ -1,7 +1,7 @@
 # Configuration, Toolsets & Voice
 
 Edit with `x19 config edit` or `x19 config set section.key value`.
-Full reference: https://x19.nousresearch.com/docs/user-guide/configuration
+Full reference: https://anony-place.github.io/x19-refactored/docs/user-guide/configuration
 
 ### Config Sections (most-used keys)
 
@@ -26,7 +26,7 @@ Full reference: https://x19.nousresearch.com/docs/user-guide/configuration
 ### Toolsets
 
 Enable/disable via `x19 tools` (interactive) or `x19 tools enable/disable NAME`.
-Full enumeration: `TOOLSETS` dict in `toolsets.py` (`_HERMES_CORE_TOOLS` is the default bundle most platforms inherit).
+Full enumeration: `TOOLSETS` dict in `toolsets.py` (`_X19_CORE_TOOLS` is the default bundle most platforms inherit).
 
 | Toolset | What it provides |
 |---------|-----------------|

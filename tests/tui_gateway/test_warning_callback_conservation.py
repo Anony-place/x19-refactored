@@ -26,7 +26,7 @@ def test_real_tui_callbacks_filter_only_diagnostics_at_owner_sink(tmp_path, monk
     launch, owner = tmp_path / "launch", tmp_path / "owner"
     launch.mkdir()
     owner.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setenv("X19_HOME", str(launch))
     (launch / "config.yaml").write_text(yaml.safe_dump({"display": {"suppress_warning_notifications": setting is not True}}))
     (owner / "config.yaml").write_text(yaml.safe_dump({} if setting is None else {"display": {"suppress_warning_notifications": setting}}))
     frames = []
@@ -56,7 +56,7 @@ def test_post_turn_drain_uses_owner_and_preserves_real_clarify(turn_env, marker_
     from tui_gateway import server_requests
     owner = marker_home / "owner"
     owner.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(marker_home))
+    monkeypatch.setenv("X19_HOME", str(marker_home))
     (marker_home / "config.yaml").write_text(yaml.safe_dump({"display": {"suppress_warning_notifications": setting is not True}}))
     (owner / "config.yaml").write_text(yaml.safe_dump({} if setting is None else {"display": {"suppress_warning_notifications": setting}}))
     frames, work, controls = [], [], []
@@ -95,7 +95,7 @@ def test_post_turn_drain_uses_owner_and_preserves_real_clarify(turn_env, marker_
 @pytest.mark.parametrize("setting", [None, False, True])
 def test_diagnostic_turn_callbacks_from_real_worker_keep_controls_and_logs(turn_env, marker_home, monkeypatch, setting, caplog):
     from tui_gateway import server_requests
-    monkeypatch.setenv("HERMES_HOME", str(marker_home))
+    monkeypatch.setenv("X19_HOME", str(marker_home))
     (marker_home / "config.yaml").write_text(yaml.safe_dump(
         {} if setting is None else {"display": {"suppress_warning_notifications": setting}}))
     frames, controls, failures = [], [], []

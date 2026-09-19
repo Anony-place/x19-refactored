@@ -22,13 +22,13 @@ from typing import Any, Callable, NamedTuple, Optional  # noqa: F401  (Callable:
 # Several of these look unused here but are resolved BARE by split-module bodies rebound onto this
 # namespace (method_ctx.bind_module) — deleting one breaks a handler at call time, not import time.
 from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope  # noqa: F401
-from hermes_constants import (
-    get_hermes_home, get_hermes_home_override, get_process_hermes_home, profile_name_for_home,
-    reset_hermes_home_override, set_hermes_home_override)
-from hermes_cli.env_loader import load_hermes_dotenv
+from x19_constants import (
+    get_x19_home, get_x19_home_override, get_process_x19_home, profile_name_for_home,
+    reset_x19_home_override, set_x19_home_override)
+from x19_cli.env_loader import load_x19_dotenv
 from utils import file_signature, is_truthy_value
-from hermes_state_ids import new_session_id
-from tools.environments.local import hermes_subprocess_env
+from x19_state_ids import new_session_id
+from tools.environments.local import x19_subprocess_env
 from agent.replay_cleanup import canonicalize_replay_history
 from agent.compaction_display import project_compaction_message_for_display  # noqa: F401
 from agent.skill_commands import describe_skill_invocation  # noqa: F401
@@ -46,13 +46,13 @@ from tui_gateway.transport import (FanoutTransport, StdioTransport, Transport, b
 
 logger = logging.getLogger(__name__)
 
-_hermes_home = _HERMES_HOME_AT_IMPORT = get_hermes_home()
-load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).parent.parent / ".env")
+_x19_home = _X19_HOME_AT_IMPORT = get_x19_home()
+load_x19_dotenv(x19_home=_x19_home, project_env=Path(__file__).parent.parent / ".env")
 
 
 # ── Panic logger: crashes otherwise leave no forensics (stdout is the JSON-RPC pipe, stderr doesn't
 # flush before exit) → append every unhandled exception to the crash log + one-line stderr summary.
-_CRASH_LOG = os.path.join(_hermes_home, "logs", "tui_gateway_crash.log")
+_CRASH_LOG = os.path.join(_x19_home, "logs", "tui_gateway_crash.log")
 
 
 def _record_crash(kind: str, exc_type, exc_value, exc_tb, *, thread_name: str | None = None) -> None:
@@ -80,7 +80,7 @@ threading.excepthook = lambda args: _record_crash(
     "thread exception", args.exc_type, args.exc_value, args.exc_traceback, thread_name=args.thread.name)
 
 with contextlib.suppress(Exception):
-    from hermes_cli.banner import prefetch_update_check
+    from x19_cli.banner import prefetch_update_check
 
     prefetch_update_check()
 
@@ -100,7 +100,7 @@ _cfg_cache: dict | None = None
 _cfg_sig: tuple | None = None
 _cfg_path = None
 _session_resume_lock = threading.Lock()
-_SLASH_WORKER_TIMEOUT_S = max(5.0, env_float("HERMES_TUI_SLASH_TIMEOUT_S", 45.0))
+_SLASH_WORKER_TIMEOUT_S = max(5.0, env_float("X19_TUI_SLASH_TIMEOUT_S", 45.0))
 
 def _ws_orphan_setting(env_var: str, cfg_key: str, default: float) -> float:
     """``dashboard.<cfg_key>`` seconds; the env var is an internal override that wins when set."""
@@ -108,7 +108,7 @@ def _ws_orphan_setting(env_var: str, cfg_key: str, default: float) -> float:
     if raw is None or not str(raw).strip():
         raw = None
         with contextlib.suppress(Exception):
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
             raw = (load_config().get("dashboard") or {}).get(cfg_key)
     with contextlib.suppress(ValueError, TypeError):
         return max(0.0, float(raw) if raw is not None else default)
@@ -127,13 +127,13 @@ def _resolve_ws_orphan_reap_grace() -> float:
     """Grace before an orphaned WS session is interrupted/reaped (0 = park forever): ws.py parks a
     disconnected session for a quick reattach, but a browser refresh mints a NEW sid and never
     reattaches the old one (leaking its slash worker)."""
-    return _ws_orphan_setting("HERMES_TUI_WS_ORPHAN_REAP_GRACE_S", "ws_orphan_reap_grace_s", 20.0)
+    return _ws_orphan_setting("X19_TUI_WS_ORPHAN_REAP_GRACE_S", "ws_orphan_reap_grace_s", 20.0)
 
 
 _WS_ORPHAN_REAP_GRACE_S = _resolve_ws_orphan_reap_grace()
 # A detached RUNNING turn is interrupted only once its activity clock (API waits, stream tokens, tool
 # heartbeats) idled this long; 600s = the turn-liveness watchdog so "wedged" means the same. 0 disables.
-_WS_ORPHAN_ACTIVITY_STALE_S = _ws_orphan_setting("HERMES_TUI_WS_ORPHAN_ACTIVITY_STALE_S", "ws_orphan_activity_stale_s", 600.0)
+_WS_ORPHAN_ACTIVITY_STALE_S = _ws_orphan_setting("X19_TUI_WS_ORPHAN_ACTIVITY_STALE_S", "ws_orphan_activity_stale_s", 600.0)
 _WS_ORPHAN_INTERRUPT_REAP_POLL_S = 1.0
 # Interrupt-then-reap poll budget: a turn that never settles (thread hung in a syscall) would
 # reschedule the 1s poll forever; after this many polls, log loudly and force-reap.
@@ -174,17 +174,17 @@ _LONG_HANDLERS = frozenset({
     "command.dispatch",  # /goal draft invokes the auxiliary model; never block the RPC reader
 })
 
-_rpc_pool_workers = max(2, env_int("HERMES_TUI_RPC_POOL_WORKERS", 8))
+_rpc_pool_workers = max(2, env_int("X19_TUI_RPC_POOL_WORKERS", 8))
 _pool = concurrent.futures.ThreadPoolExecutor(max_workers=_rpc_pool_workers, thread_name_prefix="tui-rpc")
 atexit.register(lambda: _pool.shutdown(wait=False, cancel_futures=True))
 
 # Exact in-memory session record executing on the current turn thread — unlike a public session id,
 # this object identity cannot be supplied by RPC.
 _current_runtime_session_record: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
-    "hermes_gateway_runtime_session_record", default=None)
+    "x19_gateway_runtime_session_record", default=None)
 # JSON-RPC method being dispatched on this thread/task. Diagnostic only (names WHICH client
 # poll is looping in the 4001 warning); never authorization — the method string is client-supplied.
-_current_rpc_method: contextvars.ContextVar[str] = contextvars.ContextVar("hermes_gateway_rpc_method", default="")
+_current_rpc_method: contextvars.ContextVar[str] = contextvars.ContextVar("x19_gateway_rpc_method", default="")
 
 # Reserve real stdout for JSON-RPC only; redirect Python's stdout to stderr so stray print() from
 # libraries/tools becomes harmless gateway.stderr instead of corrupting the JSON protocol.
@@ -213,10 +213,10 @@ _detached_ws_transport = _DropTransport()
 
 def _prepend_tool_paths(env: dict[str, str]) -> dict[str, str]:
     """Prepend managed bin (first: managed-first policy for the Browser Use CLI), venv bin and
-    ~/.local/bin to PATH so slash_worker children resolve Hermes-managed CLIs under the Desktop's minimal PATH."""
+    ~/.local/bin to PATH so slash_worker children resolve X19-managed CLIs under the Desktop's minimal PATH."""
     managed_bin = ""
     with contextlib.suppress(Exception):
-        managed_bin = str(Path(get_hermes_home()) / "bin")
+        managed_bin = str(Path(get_x19_home()) / "bin")
     venv_bin = str(Path(sys.executable).parent)  # <venv>/bin (POSIX) or <venv>/Scripts (Windows)
     parts = [p for p in (managed_bin, venv_bin, str(Path.home() / ".local" / "bin"), env.get("PATH") or "") if p]
     env["PATH"] = os.pathsep.join(parts)
@@ -224,7 +224,7 @@ def _prepend_tool_paths(env: dict[str, str]) -> dict[str, str]:
 
 
 class _SlashWorker:
-    """Persistent HermesCLI subprocess for slash commands."""
+    """Persistent X19CLI subprocess for slash commands."""
 
     def __init__(self, session_key: str, model: str, profile_home: str | None = None):
         self._lock = threading.Lock()
@@ -233,17 +233,17 @@ class _SlashWorker:
         self.stdout_queue: queue.Queue[dict | None] = queue.Queue()
         argv = [sys.executable, "-m", "tui_gateway.slash_worker", "--session-key", session_key] + (["--model", model] if model else [])
         self._closed = False
-        from hermes_cli._subprocess_compat import windows_hide_flags
-        # slash_worker runs the Hermes agent → needs provider credentials. Tier-1 secrets
+        from x19_cli._subprocess_compat import windows_hide_flags
+        # slash_worker runs the X19 → needs provider credentials. Tier-1 secrets
         # (gateway/GitHub/infra) are still stripped (#29157). Global-remote / multi-profile sessions: the
         # worker must resolve config/skills/state against the session's profile home, not the gateway's
-        # launch HERMES_HOME (#40677).
+        # launch X19_HOME (#40677).
         from tools.environments.local import served_profile_child_env
 
         # The worker runs the agent → needs provider credentials; tier-1 secrets (gateway/GitHub/
         # infra) are still stripped. A served profile's worker gets THAT profile's home + secrets and
         # none of the launch profile's .env / TERMINAL_* residue, exactly what a standalone
-        # `hermes -p X` would load itself.
+        # `x19 -p X` would load itself.
         env = _prepend_tool_paths(served_profile_child_env(target_home=profile_home, inherit_credentials=True))
         # Internal slash workers must import the same checkout as their parent.
         module_root = str(Path(__file__).resolve().parent.parent)
@@ -253,8 +253,8 @@ class _SlashWorker:
         # start_new_session: otherwise the worker inherits the gateway's pgid and mcp_tool's orphan
         # sweep, racing the spawn, killpg()s the TUI parent itself. errors="replace": bytes invalid
         # in the system locale (GBK Windows) must not raise UnicodeDecodeError in the drain threads.
-        # Prepend the Hermes venv bin dir and the user-local bin dir to PATH so slash_worker child processes
-        # can resolve Hermes-managed CLIs (browser-use, uvx) even when the parent gateway was launched with
+        # Prepend the X19 venv bin dir and the user-local bin dir to PATH so slash_worker child processes
+        # can resolve X19-managed CLIs (browser-use, uvx) even when the parent gateway was launched with
         # a minimal PATH (e.g. by the Desktop/Dashboard app). See #83845.
         self.proc = subprocess.Popen(
             argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -352,12 +352,12 @@ def _shutdown_sessions() -> None:
 # Session reaping / flushing knobs (session_reaper.py). TTL is the last-resort net for disconnect paths that
 # slip past the WS finally; hours-scale because last_active freezes during a long turn and on passive
 # viewing — running/pending/starting/live-transport are hard exemptions.
-_SESSION_TTL_S = max(0.0, env_float("HERMES_TUI_SESSION_TTL_S", float(6 * 3600)))
+_SESSION_TTL_S = max(0.0, env_float("X19_TUI_SESSION_TTL_S", float(6 * 3600)))
 _REAPER_SCAN_S = 300.0
 # Flush-on-kill budget + periodic incremental flush (piggybacks the reaper scan): a SIGTERM/SIGKILL
 # mid-update loses at most one flush interval of session state.
-_EXIT_FLUSH_BUDGET_S = max(0.0, env_float("HERMES_TUI_EXIT_FLUSH_BUDGET_S", 5.0))
-_INCREMENTAL_FLUSH_INTERVAL_S = max(0.0, env_float("HERMES_TUI_SESSION_FLUSH_INTERVAL_S", _REAPER_SCAN_S))
+_EXIT_FLUSH_BUDGET_S = max(0.0, env_float("X19_TUI_EXIT_FLUSH_BUDGET_S", 5.0))
+_INCREMENTAL_FLUSH_INTERVAL_S = max(0.0, env_float("X19_TUI_SESSION_FLUSH_INTERVAL_S", _REAPER_SCAN_S))
 
 
 def _start_idle_reaper() -> None:
@@ -377,20 +377,20 @@ _start_idle_reaper()
 
 
 def _launch_state_db_path() -> Path:
-    """Launch profile's ``state.db`` at call time: the patched ``_hermes_home`` when a test changed
-    it, else the live process home — resolved through :func:`get_process_hermes_home`, which honours
-    ``HERMES_HOME`` but ignores the context-local override. The desktop multiplex cron ticker sets
+    """Launch profile's ``state.db`` at call time: the patched ``_x19_home`` when a test changed
+    it, else the live process home — resolved through :func:`get_process_x19_home`, which honours
+    ``X19_HOME`` but ignores the context-local override. The desktop multiplex cron ticker sets
     that override per profile at startup, and a first touch inside a foreign window would bind this
     process-wide handle to another profile's ``state.db`` (#102526). Resolving here rather than at
-    import time lets a harness that redirects ``HERMES_HOME`` after import be honoured (#112692)."""
-    home = _hermes_home if _hermes_home != _HERMES_HOME_AT_IMPORT else get_process_hermes_home()
+    import time lets a harness that redirects ``X19_HOME`` after import be honoured (#112692)."""
+    home = _x19_home if _x19_home != _X19_HOME_AT_IMPORT else get_process_x19_home()
     return Path(home) / "state.db"
 
 
 def _get_db():
     global _db, _db_error
     if _db is None:
-        from hermes_state_registry import acquire
+        from x19_state_registry import acquire
         try:
             # Launch home, never the context-local override (#102526); resolved at first
             # use, not import time (#112692). See _launch_state_db_path.
@@ -427,7 +427,7 @@ def _open_profile_session_db(profile_home):
     """Open a DEDICATED handle on ``profile_home``'s ``state.db`` — FAIL CLOSED: a silent fallback to the
     launch ``state.db`` would bleed rows into the wrong profile's store exactly when the profile store is
     briefly unopenable (locked, mid-restore); callers let the error abort the build (→ ``agent_error``)."""
-    from hermes_state_registry import acquire
+    from x19_state_registry import acquire
     db_path = Path(profile_home) / "state.db"
     try:
         return acquire(db_path)
@@ -442,7 +442,7 @@ def _profile_db(params: dict | None = None, *, writer: bool = False):
 
     Foreign-profile handles are read-only unless ``writer=True``: that store belongs to ITS
     gateway/dashboard, and a writer here would take its write lock per RPC. Mirrors
-    hermes_cli.web_routers.profiles._read_profile_db."""
+    x19_cli.web_routers.profiles._read_profile_db."""
     profile = (params.get("profile") or "").strip() or None if isinstance(params, dict) else None
     # Launch/own profile → the shared _get_db() handle (left open); another profile → a dedicated
     # handle closed below (app-global remote mode). db is None when unavailable.
@@ -451,10 +451,10 @@ def _profile_db(params: dict | None = None, *, writer: bool = False):
     else:
         try:
             if writer:
-                from hermes_state_registry import acquire
+                from x19_state_registry import acquire
                 db = acquire(Path(profile_home) / "state.db")
             else:
-                from hermes_cli.web_server_sessions import _open_session_db_at_path
+                from x19_cli.web_server_sessions import _open_session_db_at_path
                 db = _open_session_db_at_path(Path(profile_home) / "state.db", read_only=True)
             owns = True
         except Exception as exc:
@@ -472,12 +472,12 @@ def _canonical_profile_request(name: str) -> str:
     """Canonicalize profile basenames emitted by older session-info payloads.
 
     ``Path(default_home).name`` was historically sent as a profile id. Those basenames are
-    installation details — unless a real named profile of that name exists (``hermes`` is a legal
+    installation details — unless a real named profile of that name exists (``x19`` is a legal
     id), in which case it wins; other unknown names keep failing closed in ``_profile_home``.
     """
-    if name.casefold() in {".hermes", "hermes"}:
-        from hermes_cli import profiles as profiles_mod
-        # Check the profiles root directly: get_profile_dir rejects "hermes" as a
+    if name.casefold() in {".x19", "x19"}:
+        from x19_cli import profiles as profiles_mod
+        # Check the profiles root directly: get_profile_dir rejects "x19" as a
         # reserved name, but a pre-reserved-list install may still carry that dir.
         if not (profiles_mod._get_profiles_root() / profiles_mod.normalize_profile_name(name)).is_dir():
             return "default"
@@ -496,7 +496,7 @@ def _response_profile_name(profile: str | None = None) -> str:
 
 
 def _db_unavailable_error(rid, *, code: int):
-    from hermes_state_user_copy import describe_storage_failure, storage_failure_details
+    from x19_state_user_copy import describe_storage_failure, storage_failure_details
     failure = describe_storage_failure(_db_error)
     return _err(
         rid, code,
@@ -505,7 +505,7 @@ def _db_unavailable_error(rid, *, code: int):
 
 
 # ── Per-session profile scoping: the desktop's app-global remote mode points every profile at this
-# backend, so calls carry ``profile`` → open that profile's db and bind its HERMES_HOME (ContextVar
+# backend, so calls carry ``profile`` → open that profile's db and bind its X19_HOME (ContextVar
 # override) so config/skills/model/persistence resolve to it. Omitted/own profile → launch profile.
 class ProfileUnavailableError(FileNotFoundError):
     """An explicit ``profile`` param names no live profile on this host. Raised out of the method
@@ -517,14 +517,14 @@ def _profile_home(profile: str | None) -> Path | None:
     """Resolve a named profile's home on THIS host, or None for the launch profile."""
     if not (name := _canonical_profile_request((profile or "").strip())):
         return None
-    from hermes_cli import profiles as profiles_mod
+    from x19_cli import profiles as profiles_mod
     try:
         home = Path(profiles_mod.get_profile_dir(name))
     except ValueError:
         home = None
     if home is None or not home.is_dir():
         raise ProfileUnavailableError(f"Profile '{name}' does not exist.")
-    if home.resolve() == Path(_hermes_home).resolve():
+    if home.resolve() == Path(_x19_home).resolve():
         return None  # already the launch profile (no override needed)
     if home not in _served_profile_homes:
         # This process now hosts a second profile home: freeze the launch env as the launch
@@ -543,7 +543,7 @@ _served_profile_homes: set[Path] = set()
 
 
 def _profile_scoped(handler):
-    """Bind ``params['profile']``'s full runtime scope (HERMES_HOME + secrets + terminal policy) around a
+    """Bind ``params['profile']``'s full runtime scope (X19_HOME + secrets + terminal policy) around a
     handler, so config.yaml ``${VAR}`` refs, provider credential checks and ``.env`` writes resolve to
     THAT profile (app-global remote mode hits the focused profile). Home alone left ``get_secret`` on the
     launch process's ``os.environ``: ``config.get full`` for a secondary shipped the default profile's
@@ -588,7 +588,7 @@ def _profile_configured_cwd(profile_home: Path | None) -> str | None:
     if profile_home is None:
         return None
     with contextlib.suppress(Exception):
-        from hermes_cli.config_effective import load_user_config_effective
+        from x19_cli.config_effective import load_user_config_effective
         p = Path(profile_home) / "config.yaml"
         return _configured_cwd_from_cfg(load_user_config_effective(p)) if p.exists() else None
     return None
@@ -758,7 +758,7 @@ def _emit_approval_request(sid: str, data: dict | None) -> None:
             if request_id:
                 _approval.withdraw_gateway_approval(session_key, request_id,
                                                     "the attached client cannot answer approval requests "
-                                                    "(update the Hermes app)")
+                                                    "(update the X19 app)")
             return
         choice = str(result.get("choice") or "deny")
         _approval.resolve_gateway_approval(session_key, choice, resolve_all=bool(result.get("all")),
@@ -920,7 +920,7 @@ def _wait_agent_for_prompt(session: dict, rid: str, sid: str) -> dict | None:
 
 
 def _bind_build_profile_scopes(profile_home: "str | None") -> "_TurnScopes | None":
-    """Bind a session profile's HERMES_HOME / secret / terminal scopes for an agent build. ``None`` is the
+    """Bind a session profile's X19_HOME / secret / terminal scopes for an agent build. ``None`` is the
     launch profile: its own launch-env secret scope (live env while single-profile, frozen once
     multiplexing is active — a hosted-room turn for a default member otherwise died at build with
     ``UnscopedSecretError`` because the launch profile was treated as "no scope"). Fail-open per scope (the build must not die on
@@ -930,7 +930,7 @@ def _bind_build_profile_scopes(profile_home: "str | None") -> "_TurnScopes | Non
     with contextlib.suppress(Exception):
         return _profile_runtime_scope_tokens(profile_home)
     if profile_home:  # secret/terminal helper failed: keep at least the home + terminal refusal scope
-        scopes.home = set_hermes_home_override(profile_home)
+        scopes.home = set_x19_home_override(profile_home)
         with contextlib.suppress(Exception):
             from tools.terminal_scope import install_profile_terminal_scope
             scopes.terminal = install_profile_terminal_scope(Path(profile_home))
@@ -1084,7 +1084,7 @@ def _start_agent_build(sid: str, session: dict) -> None:
                 current["agent_error"] = AGENT_BUILD_ABANDONED
                 return
             tokens = _set_session_context(key, cwd=_session_cwd(current))
-            # Global-remote: bind the session profile's HERMES_HOME and hand the agent that profile's db —
+            # Global-remote: bind the session profile's X19_HOME and hand the agent that profile's db —
             # DEDICATED and ours until _transfer_db_to_agent in the finally; FAIL CLOSED rather than
             # binding the launch DB and bleeding rows into the wrong state.db.
             scopes = _bind_build_profile_scopes(profile_home)
@@ -1185,8 +1185,8 @@ def _load_dashboard_process_isolation_config(cfg: dict | None = None) -> dict[st
 
 def _active_config_path() -> Path:
     """config.yaml of the per-session profile override (session.resume) when bound, else the launch home."""
-    override = get_hermes_home_override()
-    return Path(override if isinstance(override, str) and override else _hermes_home) / "config.yaml"
+    override = get_x19_home_override()
+    return Path(override if isinstance(override, str) and override else _x19_home) / "config.yaml"
 
 
 def _load_cfg_raw() -> dict:
@@ -1201,7 +1201,7 @@ def _load_cfg_raw() -> dict:
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)
-        from hermes_cli.config import read_user_config_raw
+        from x19_cli.config import read_user_config_raw
         data = read_user_config_raw(p) if p.exists() else {}
         with _cfg_lock:  # cache the RAW config: _save_cfg writes _cfg_cache back to disk
             _cfg_cache, _cfg_sig, _cfg_path = copy.deepcopy(data), sig, p
@@ -1215,7 +1215,7 @@ def _load_cfg() -> dict:
     ``_load_cfg() == {}`` sentinels. Fail-open to ``{}``. Never pass the result to ``_save_cfg`` (use
     ``_load_cfg_raw()``)."""
     with contextlib.suppress(Exception):
-        from hermes_cli.config_effective import load_user_config_effective
+        from x19_cli.config_effective import load_user_config_effective
         return load_user_config_effective(_active_config_path())
     return {}
 
@@ -1250,7 +1250,7 @@ def _set_session_context(session_key: str, cwd: str | None = None, *, ui_session
         resolved = cwd if cwd is not None else (str(sess.get("cwd") or "") if sess is not None else "")
         source = _resolve_session_platform()
         browser_control_principal = browser_control_transport_family = ""
-        # Live conversation id for subprocess HERMES_SESSION_ID: an explicitly empty contextvar is authoritative
+        # Live conversation id for subprocess X19_SESSION_ID: an explicitly empty contextvar is authoritative
         # (no os.environ fallback), so never leave it "" — agent's durable session_id, then session_key.
         session_id = session_key
         if sess is not None:
@@ -1277,7 +1277,7 @@ def _clear_session_context(tokens: list) -> None:
 
 def _enable_gateway_prompts() -> None:
     """Route approvals through gateway callbacks instead of CLI input()."""
-    os.environ.update(HERMES_GATEWAY_SESSION="1", HERMES_EXEC_ASK="1", HERMES_INTERACTIVE="1")
+    os.environ.update(X19_GATEWAY_SESSION="1", X19_EXEC_ASK="1", X19_INTERACTIVE="1")
 
 
 # ── Blocking prompt factory ──────────────────────────────────────────
@@ -1331,9 +1331,9 @@ _TOUR_PROBE_TIMEOUT_S = 10
 
 _TOUR_BRIDGE_UNAVAILABLE = json.dumps({
     "success": False,
-    "error": ("No Hermes Desktop window answered the tour request. The tour is driven by the desktop app's "
+    "error": ("No X19 Desktop window answered the tour request. The tour is driven by the desktop app's "
               "renderer, which updates separately from this backend, so an app build older than the tour tool "
-              "has nothing listening. Update the Hermes Desktop app and start a new session. Do not retry tour "
+              "has nothing listening. Update the X19 Desktop app and start a new session. Do not retry tour "
               "in this session.")})
 
 
@@ -1374,8 +1374,8 @@ def _clear_pending(sid: str | None = None) -> None:
 
 
 def _env_model_seed() -> str:
-    """The launch-scoped model seed (``hermes --tui -m``, hosted provisioning); "" when unset."""
-    return (os.environ.get("HERMES_MODEL", "") or os.environ.get("HERMES_INFERENCE_MODEL", "")).strip()
+    """The launch-scoped model seed (``x19 --tui -m``, hosted provisioning); "" when unset."""
+    return (os.environ.get("X19_MODEL", "") or os.environ.get("X19_INFERENCE_MODEL", "")).strip()
 
 
 def _resolve_model() -> str:
@@ -1388,16 +1388,16 @@ def _resolve_model() -> str:
         return m.strip()
     # No env seed / config preference: the cost-safe silent default (cache-only read), never an unpicked flagship.
     with contextlib.suppress(Exception):
-        from hermes_cli.models import get_preferred_silent_default_model
+        from x19_cli.models import get_preferred_silent_default_model
         return get_preferred_silent_default_model()
     return "z-ai/glm-5.2"
 
 
 def _resolve_session_platform() -> str:
-    """``HERMES_DESKTOP=1`` without ``HERMES_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
-    suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``hermes --tui``)."""
-    desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP"))
-    return "desktop" if desktop and not is_truthy_value(os.environ.get("HERMES_DESKTOP_TERMINAL")) else "tui"
+    """``X19_DESKTOP=1`` without ``X19_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
+    suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``x19 --tui``)."""
+    desktop = is_truthy_value(os.environ.get("X19_DESKTOP"))
+    return "desktop" if desktop and not is_truthy_value(os.environ.get("X19_DESKTOP_TERMINAL")) else "tui"
 
 
 def _resolve_session_source(explicit: str | None) -> str:
@@ -1411,7 +1411,7 @@ def _resolve_agent_platform(source: str | None) -> str:
 
 
 def _config_model_target() -> tuple[str, str]:
-    """(model, provider) selected by config.yaml — and ONLY config: the HERMES_MODEL launch seed fed into
+    """(model, provider) selected by config.yaml — and ONLY config: the X19_MODEL launch seed fed into
     the per-turn sync would be replayed as a /model switch and persisted globally, or pin the session so
     dashboard/CLI model changes never reach an open chat. Empty model = "no preference" → no-op sync."""
     cfg_model = _load_cfg().get("model")
@@ -1423,15 +1423,15 @@ def _config_model_target() -> tuple[str, str]:
 
 def _resolve_startup_runtime() -> tuple[str, str | None]:
     model = _resolve_model()
-    if explicit_provider := os.environ.get("HERMES_TUI_PROVIDER", "").strip():
+    if explicit_provider := os.environ.get("X19_TUI_PROVIDER", "").strip():
         return model, explicit_provider
     if not (explicit_model := _env_model_seed()):
         return model, None
     with contextlib.suppress(Exception):
-        from hermes_cli.models import detect_static_provider_for_model
+        from x19_cli.models import detect_static_provider_for_model
         cfg = _load_cfg().get("model") or {}
         current_provider = ((str(cfg.get("provider") or "").strip().lower() if isinstance(cfg, dict) else "")
-                            or os.environ.get("HERMES_INFERENCE_PROVIDER", "").strip().lower() or "auto")
+                            or os.environ.get("X19_INFERENCE_PROVIDER", "").strip().lower() or "auto")
         if detected := detect_static_provider_for_model(explicit_model, current_provider):
             provider, detected_model = detected
             return detected_model, provider
@@ -1445,12 +1445,12 @@ def _resolve_startup_runtime() -> tuple[str, str | None]:
 # routable provider with its own API key and base_url. Sessions that used OpenRouter store
 # ``billing_provider="openrouter"``; dropping it forces resume to the current global model (e.g. a custom
 # endpoint), which is the wrong provider for the stored model. See #57588.
-from hermes_state import _BARE_BILLING_PROVIDERS
+from x19_state import _BARE_BILLING_PROVIDERS
 
 
 def _is_routable_provider(provider: str) -> bool:
     with contextlib.suppress(Exception):
-        from hermes_cli.runtime_provider import is_routable_provider
+        from x19_cli.runtime_provider import is_routable_provider
         return is_routable_provider(provider)
     return False
 
@@ -1508,7 +1508,7 @@ def _stored_session_runtime_overrides(row: dict | None) -> dict:
     if provider and not _is_routable_provider(provider):
         healed = None
         try:
-            from hermes_cli.runtime_provider import canonical_custom_identity
+            from x19_cli.runtime_provider import canonical_custom_identity
             healed = canonical_custom_identity(base_url=base_url or None, model=model or None)
         except Exception:
             logger.debug("custom provider identity recovery failed", exc_info=True)
@@ -1543,7 +1543,7 @@ def _runtime_model_config(agent, existing: dict | None = None) -> dict:
         # ``agent.provider`` resolves every named custom entry to the literal "custom", losing the entry
         # identity (api_key is never persisted): recover ``custom:<name>`` from the endpoint URL.
         try:
-            from hermes_cli.runtime_provider import canonical_custom_identity
+            from x19_cli.runtime_provider import canonical_custom_identity
             provider = canonical_custom_identity(base_url=base_url, model=model or None) or provider
         except Exception:
             logger.debug("custom provider identity lookup failed", exc_info=True)
@@ -1601,7 +1601,7 @@ def _persist_live_session_system_prompt(session: dict | None) -> None:
     agent, session_key, db = live
     # Re-bind the session's profile runtime scope (the build's finally reset it → root profile's SOUL.md/skills,
     # #50233) and session context (on the RPC thread _SESSION_CWD is unset → the process TERMINAL_CWD would
-    # persist). The full scope, not HERMES_HOME alone: the external memory provider's system_prompt_block()
+    # persist). The full scope, not X19_HOME alone: the external memory provider's system_prompt_block()
     # reads its credential through get_secret, which fails closed once this process multiplexes (#112927).
     session_tokens = _set_session_context(session_key, cwd=_session_cwd(session))
     try:
@@ -1724,12 +1724,12 @@ def _display_mouse_tracking(display: dict) -> str:
 
 
 def _load_reasoning_config(model: str = "") -> dict | None:
-    """Via the shared chokepoint :func:`hermes_constants.resolve_reasoning_config` (per-model override >
+    """Via the shared chokepoint :func:`x19_constants.resolve_reasoning_config` (per-model override >
     global ``agent.reasoning_effort``; YAML False = disabled).
 
     Closes #21256.
     """
-    from hermes_constants import resolve_reasoning_config
+    from x19_constants import resolve_reasoning_config
     return resolve_reasoning_config(_load_cfg(), model)
 
 
@@ -1766,7 +1766,7 @@ _TOOL_PROGRESS_MODES = frozenset({"off", "new", "all", "verbose"})
 
 
 def _load_tool_progress_mode() -> str:
-    env = os.environ.get("HERMES_TUI_TOOL_PROGRESS", "").strip().lower()
+    env = os.environ.get("X19_TUI_TOOL_PROGRESS", "").strip().lower()
     if env in _TOOL_PROGRESS_MODES:
         return env
     raw = _display_cfg().get("tool_progress", "all")
@@ -1777,9 +1777,9 @@ def _load_tool_progress_mode() -> str:
 
 
 def _gui_surface_toolsets(platform: str) -> set[str]:
-    """Toolsets that exist because of the CLIENT (both off ``_HERMES_CORE_TOOLS``; this is the one gate).
+    """Toolsets that exist because of the CLIENT (both off ``_X19_CORE_TOOLS``; this is the one gate).
     ``platform`` is the SESSION's source, never a process env var: the desktop may drive a URL/cloud
-    backend where ``HERMES_DESKTOP`` is unset (AGENTS.md surface rule)."""
+    backend where ``X19_DESKTOP`` is unset (AGENTS.md surface rule)."""
     return {"project", "desktop_ui"} if platform == "desktop" else {"project"}
 
 
@@ -1788,12 +1788,12 @@ def _tui_notice(text: str) -> None:
 
 
 def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[str] | None | bool:
-    """Resolve a HERMES_TUI_TOOLSETS pin: list, None for "all", False when nothing was valid."""
+    """Resolve a X19_TUI_TOOLSETS pin: list, None for "all", False when nothing was valid."""
     built_in = [name for name in explicit if validate_toolset(name)]
     unresolved = [name for name in explicit if name not in built_in]
     if unresolved:
         try:
-            from hermes_cli.plugins import discover_plugins
+            from x19_cli.plugins import discover_plugins
             discover_plugins()
             plugin_valid = [name for name in unresolved if validate_toolset(name)]
         except Exception:
@@ -1802,13 +1802,13 @@ def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[st
         unresolved = [name for name in unresolved if name not in plugin_valid]
     if any(name in {"all", "*"} for name in built_in):
         if ignored := [name for name in explicit if name not in {"all", "*"}]:
-            _tui_notice(f"[tui] HERMES_TUI_TOOLSETS=all enables every toolset; ignoring additional entries: {', '.join(ignored)}")
+            _tui_notice(f"[tui] X19_TUI_TOOLSETS=all enables every toolset; ignoring additional entries: {', '.join(ignored)}")
         return None
     if not unresolved:
         return built_in
     try:  # (enabled, disabled) MCP server names from raw config; both empty on any failure
-        from hermes_cli.config import read_raw_config
-        from hermes_cli.tools_config import _parse_enabled_flag
+        from x19_cli.config import read_raw_config
+        from x19_cli.tools_config import _parse_enabled_flag
         raw_cfg = read_raw_config()
         mcp_servers = raw_cfg.get("mcp_servers") if isinstance(raw_cfg.get("mcp_servers"), dict) else {}
         mcp_names, mcp_disabled = set(), set()
@@ -1822,19 +1822,19 @@ def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[st
     disabled = [name for name in unresolved if name in mcp_disabled]
     unknown = [name for name in unresolved if name not in mcp_names and name not in mcp_disabled]
     if unknown:
-        _tui_notice(f"[tui] ignoring unknown HERMES_TUI_TOOLSETS entries: {', '.join(unknown)}")
+        _tui_notice(f"[tui] ignoring unknown X19_TUI_TOOLSETS entries: {', '.join(unknown)}")
     if disabled:
-        _tui_notice("[tui] ignoring disabled MCP servers in HERMES_TUI_TOOLSETS "
+        _tui_notice("[tui] ignoring disabled MCP servers in X19_TUI_TOOLSETS "
                     f"(set enabled: true in config.yaml to use): {', '.join(disabled)}")
     return (built_in + mcp_valid) or False
 
 
 def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
-    """The agent's toolsets for this session (None = all): an explicit HERMES_TUI_TOOLSETS pin; else the
+    """The agent's toolsets for this session (None = all): an explicit X19_TUI_TOOLSETS pin; else the
     coding posture (coding_context collapses to coding toolset + enabled MCP servers in a code workspace);
     else the configured CLI toolsets. Client-surface toolsets fold in here — only this surface can answer them."""
     session_platform = platform or _resolve_session_platform()
-    explicit = [item.strip() for item in os.environ.get("HERMES_TUI_TOOLSETS", "").split(",") if item.strip()]
+    explicit = [item.strip() for item in os.environ.get("X19_TUI_TOOLSETS", "").split(",") if item.strip()]
     fallback_notice = None
     if not explicit:
         with contextlib.suppress(Exception):
@@ -1850,10 +1850,10 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
         resolved = _resolve_explicit_toolsets(explicit, validate_toolset)
         if resolved is not False:
             return resolved
-        fallback_notice = "[tui] no valid HERMES_TUI_TOOLSETS entries; using configured CLI toolsets"
+        fallback_notice = "[tui] no valid X19_TUI_TOOLSETS entries; using configured CLI toolsets"
     try:
-        from hermes_cli.config import load_config
-        from hermes_cli.tools_config import _get_platform_tools
+        from x19_cli.config import load_config
+        from x19_cli.tools_config import _get_platform_tools
         cfg = load_config()
         # include_default_mcp_servers=True is the runtime variant (the agent must be able to call
         # default MCP servers); the config-editing variant would silently drop MCP tools from the TUI.
@@ -1866,7 +1866,7 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
         return sorted(enabled | _gui_surface_toolsets(session_platform)) if enabled else None
     except Exception:
         if fallback_notice is not None:
-            _tui_notice("[tui] no valid HERMES_TUI_TOOLSETS entries and configured CLI toolsets could not be loaded; enabling all toolsets")
+            _tui_notice("[tui] no valid X19_TUI_TOOLSETS entries and configured CLI toolsets could not be loaded; enabling all toolsets")
         return None
 
 
@@ -1948,8 +1948,8 @@ def _get_usage(agent) -> dict:
     with contextlib.suppress(Exception):
         from tools.async_delegation import active_count as _async_active_count
         usage["active_subagents"] = _async_active_count()
-    # Dev-only live credits-spent readout, gated on HERMES_DEV_CREDITS so the payload stays clean otherwise.
-    if is_truthy_value(os.environ.get("HERMES_DEV_CREDITS")):
+    # Dev-only live credits-spent readout, gated on X19_DEV_CREDITS so the payload stays clean otherwise.
+    if is_truthy_value(os.environ.get("X19_DEV_CREDITS")):
         with contextlib.suppress(Exception):
             spent = agent.get_credits_spent_micros()
             if spent is not None:
@@ -1980,7 +1980,7 @@ def _probe_config_health(cfg: dict) -> str:
         personality = str(display_cfg.get("personality", "") or "").strip().lower()
         if personality and personality not in {"default", "none", "neutral"}:
             with contextlib.suppress(Exception):
-                from hermes_cli.personality import available_personalities
+                from x19_cli.personality import available_personalities
                 if personality not in available_personalities(cfg):
                     warnings.append(f"`display.personality: {personality}` does not match any built-in or "
                                     "`agent.personalities` entry; personality overlay will be skipped.")
@@ -1989,7 +1989,7 @@ def _probe_config_health(cfg: dict) -> str:
 
 def _current_profile_name() -> str:
     with contextlib.suppress(Exception):
-        from hermes_cli.profiles import get_active_profile_name
+        from x19_cli.profiles import get_active_profile_name
         return get_active_profile_name() or "default"
     return "default"
 
@@ -2017,7 +2017,7 @@ def _project_info_for_cwd(cwd: str) -> dict | None:
     if not str(cwd or "").strip():
         return None
     try:
-        from hermes_cli import projects_db as pdb
+        from x19_cli import projects_db as pdb
         with pdb.connect_closing() as conn:
             project = pdb.project_for_path(conn, cwd)
         return None if project is None else {
@@ -2065,7 +2065,7 @@ def _session_info(agent, session: dict | None = None) -> dict:
     if provider == "custom" and "provider" not in mirror and agent is not None:
         # Clients reuse this identity for new chats without carrying the endpoint or key.
         # Broadcast/resume callers need not be bound to this session's profile.
-        with _profile_build_scope(sess.get("profile_home") or _hermes_home):
+        with _profile_build_scope(sess.get("profile_home") or _x19_home):
             provider = _runtime_model_config(agent).get("provider", provider)
     info: dict = {
         "model": pending_model or mirror.get("model", getattr(agent, "model", "")),
@@ -2084,7 +2084,7 @@ def _session_info(agent, session: dict | None = None) -> dict:
         "profile_name": profile_name_for_home(sess.get("profile_home")) or _current_profile_name(),
     }
     with contextlib.suppress(Exception):
-        from hermes_cli import __version__, __release_date__
+        from x19_cli import __version__, __release_date__
         info.update(version=__version__, release_date=__release_date__)
     live_agent = agent is not None and not sess.get("_compute_host_active")
     if live_agent:
@@ -2095,7 +2095,7 @@ def _session_info(agent, session: dict | None = None) -> dict:
                 name = t["function"]["name"]
                 info["tools"].setdefault(get_toolset_for_tool(name) or "other", []).append(name)
         with contextlib.suppress(Exception):
-            from hermes_cli.banner import get_available_skills
+            from x19_cli.banner import get_available_skills
             info["skills"] = get_available_skills()
     info["mcp_servers"] = []
     with contextlib.suppress(Exception):
@@ -2105,8 +2105,8 @@ def _session_info(agent, session: dict | None = None) -> dict:
         info["system_prompt"] = (
             mirror.get("system_prompt") if "system_prompt" in mirror else getattr(agent, "_cached_system_prompt", "") or "")
     with contextlib.suppress(Exception):
-        from hermes_cli.banner import get_update_result
-        from hermes_cli.config import recommended_update_command
+        from x19_cli.banner import get_update_result
+        from x19_cli.config import recommended_update_command
         # Two assignments (not one info.update): if recommended_update_command() raises,
         # update_behind must still be reported, as on main.
         info["update_behind"] = get_update_result(timeout=0.5)
@@ -2184,8 +2184,8 @@ class _RuntimeFallbackResolution(NamedTuple):
 def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _RuntimeFallbackResolution:
     """Resolve the primary runtime or one complete provider/model fallback. Provider-only fallback entries
     are skipped so the unavailable primary model can never leak into a different runtime."""
-    from hermes_cli.auth import AuthError
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from x19_cli.auth import AuthError
+    from x19_cli.runtime_provider import resolve_runtime_provider
     try:
         return _RuntimeFallbackResolution(resolve_runtime_provider(**(resolve_kwargs or {})), None, False)
     except AuthError as primary_exc:
@@ -2195,7 +2195,7 @@ def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _Runti
             if not fb_provider or not fb_model:
                 continue
             try:
-                from hermes_cli.fallback_config import effective_runtime_provider, resolve_entry_api_key
+                from x19_cli.fallback_config import effective_runtime_provider, resolve_entry_api_key
                 fb_kwargs: dict = {"requested": fb_provider, "target_model": fb_model,
                                    **({"explicit_base_url": entry["base_url"]} if entry.get("base_url") else {})}
                 if fb_api_key := resolve_entry_api_key(entry):
@@ -2223,7 +2223,7 @@ def _resolve_agent_model_runtime(model_override, provider_override) -> tuple[str
         override_base_url = model_override.get("base_url")
         resolve_kwargs = {}
         if str(requested_provider or "").strip().lower() == "custom":
-            from hermes_cli.runtime_provider import canonical_custom_identity
+            from x19_cli.runtime_provider import canonical_custom_identity
             if recovered := canonical_custom_identity(base_url=override_base_url or None, model=model or None):
                 requested_provider = recovered
             if override_base_url:
@@ -2252,9 +2252,9 @@ def _resolve_agent_model_runtime(model_override, provider_override) -> tuple[str
 
 
 def _startup_system_prompt(cfg: dict, task_id: str) -> str:
-    """Config ephemeral system prompt + HERMES_TUI_SKILLS preload block. Hard-fails only when EVERY requested
+    """Config ephemeral system prompt + X19_TUI_SKILLS preload block. Hard-fails only when EVERY requested
     skill is missing (cli.py parity): a typo'd name must not auto-block the Kanban task."""
-    from hermes_cli.config import resolve_ephemeral_system_prompt_from_config
+    from x19_cli.config import resolve_ephemeral_system_prompt_from_config
     system_prompt = resolve_ephemeral_system_prompt_from_config(cfg)
     startup_skills = _parse_tui_skills_env()
     if not startup_skills:
@@ -2266,7 +2266,7 @@ def _startup_system_prompt(cfg: dict, task_id: str) -> str:
         if not loaded_skills:
             raise ValueError(f"Unknown skill(s): {missing_display}")
         logger.warning("Unknown skill(s) requested, skipping: %s. Continuing with: %s. "
-                       "List available skills with `hermes skills list`.", missing_display, ", ".join(loaded_skills))
+                       "List available skills with `x19 skills list`.", missing_display, ", ".join(loaded_skills))
     if skills_prompt:
         system_prompt = "\n\n".join(part for part in (system_prompt, skills_prompt) if part).strip()
     return system_prompt
@@ -2306,7 +2306,7 @@ def _make_agent(
     from run_agent import AIAgent
     # MCP discovery runs in a daemon thread (a dead server can't freeze the shell); the agent snapshots its tool
     # list once, so briefly wait for in-flight discovery. Dashboard /api/ws uses mcp_startup; TUI stdio uses entry.
-    for _mod in ("hermes_cli.mcp_startup", "tui_gateway.entry"):
+    for _mod in ("x19_cli.mcp_startup", "tui_gateway.entry"):
         with contextlib.suppress(Exception):
             importlib.import_module(_mod).wait_for_mcp_discovery()
     cfg = _load_cfg()
@@ -2317,7 +2317,7 @@ def _make_agent(
     model, runtime = _resolve_agent_model_runtime(model_override, provider_override)
     _pr = _load_provider_routing()
     platform = _resolve_agent_platform(platform_override)
-    ignore_rules = is_truthy_value(os.environ.get("HERMES_IGNORE_RULES"))
+    ignore_rules = is_truthy_value(os.environ.get("X19_IGNORE_RULES"))
     with _sessions_lock:
         session = _sessions.get(sid)
     agent = AIAgent(
@@ -2339,8 +2339,8 @@ def _make_agent(
         # Builds that run before the record exists (branch, eager resume, compute host) pass it explicitly.
         user_id=auth_user_id if auth_user_id is not None else _session_auth_user_id(session),
         session_db=session_db if session_db is not None else _get_db(), ephemeral_system_prompt=system_prompt or None,
-        checkpoints_enabled=is_truthy_value(os.environ.get("HERMES_TUI_CHECKPOINTS")),
-        pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
+        checkpoints_enabled=is_truthy_value(os.environ.get("X19_TUI_CHECKPOINTS")),
+        pass_session_id=is_truthy_value(os.environ.get("X19_TUI_PASS_SESSION_ID")),
         skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
         **_agent_cbs(sid))
     if context_cwd_is_launch_artifact is None:
@@ -2394,7 +2394,7 @@ def _init_session(
             "explicit_cwd": bool(explicit_cwd), "cols": cols, "slash_worker": None,
             "show_reasoning": _load_show_reasoning(), "source": _resolve_session_source(source),
             "tool_progress_mode": _load_tool_progress_mode(), "edit_snapshots": {}, "tool_started_at": {},
-            # Profile-scoped HERMES_HOME (None = launch); SessionBranch copies the parent's (same state.db).
+            # Profile-scoped X19_HOME (None = launch); SessionBranch copies the parent's (same state.db).
             "profile_home": profile_home,
             # In-session /model switch, honored on rebuild (/new, resume) — never leaks to siblings via env vars.
             "model_override": None,
@@ -2546,7 +2546,7 @@ def _schedule_agent_build(sid: str, delay: float = 0.05) -> None:
 def _load_resume_transcript(db, stored_id: str, *, model_history_only: bool = False) -> tuple[list, list, list]:
     """(raw_history, display_history, ancestor_prefix) for a cold resume. The full lineage is materialized
     only while it fits sessions.max_resume_messages (the transcript is REST-paginated), else the tip alone."""
-    from hermes_state import SessionResumeTooLargeError
+    from x19_state import SessionResumeTooLargeError
     if model_history_only:
         raw_history = db.get_messages_as_conversation(
             stored_id, repair_alternation=True, include_row_ids=True)
@@ -2844,7 +2844,7 @@ def _pet_row_frame_counts(spritesheet) -> dict:
 def _pet_cfg() -> dict:
     """``display.pet`` from the canonical config ({} on any failure)."""
     with contextlib.suppress(Exception):
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         display = load_config().get("display")
         pet = display.get("pet") if isinstance(display, dict) else None
         return pet if isinstance(pet, dict) else {}
@@ -2920,7 +2920,7 @@ def _pet_state_rows(spritesheet) -> list[str]:
 
 def _pet_gen_root():
     """Profile-scoped staging dir for in-progress generation drafts."""
-    root = get_hermes_home() / "cache" / "pet-gen"
+    root = get_x19_home() / "cache" / "pet-gen"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -2953,7 +2953,7 @@ _pet_cancel_lock = threading.Lock()
 _pet_cancelled: set[str] = set()
 _PET_REFERENCE_MIME_EXT = {"png": "png", "jpeg": "jpg", "jpg": "jpg", "webp": "webp", "gif": "gif"}
 try:
-    _PET_REFERENCE_MAX_BYTES = max(1, int(os.environ.get("HERMES_PET_REFERENCE_MAX_BYTES") or str(16 * 1024 * 1024)))
+    _PET_REFERENCE_MAX_BYTES = max(1, int(os.environ.get("X19_PET_REFERENCE_MAX_BYTES") or str(16 * 1024 * 1024)))
 except (TypeError, ValueError):
     _PET_REFERENCE_MAX_BYTES = 16 * 1024 * 1024
 
@@ -3004,7 +3004,7 @@ def _pet_is_cancelled(token: str) -> bool:
 
 
 def _spawn_trees_root():
-    root = get_hermes_home() / "spawn-trees"
+    root = get_x19_home() / "spawn-trees"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -3194,24 +3194,24 @@ def _rank_slash_completions(items: list[dict], usage, origin_of, *, browsing: bo
 
 # argv shapes that must not run headless in the gateway process → user hint.
 _CLI_EXEC_BLOCKED = {
-    ("setup",): "`hermes setup` needs a full terminal — run it outside the TUI",
-    ("gateway",): "`hermes gateway` is long-running — run it in another terminal",
-    ("sessions", "browse"): "`hermes sessions browse` is interactive — use /resume here, or run browse in another terminal",
-    ("config", "edit"): "`hermes config edit` needs $EDITOR in a real terminal",
+    ("setup",): "`x19 setup` needs a full terminal — run it outside the TUI",
+    ("gateway",): "`x19 gateway` is long-running — run it in another terminal",
+    ("sessions", "browse"): "`x19 sessions browse` is interactive — use /resume here, or run browse in another terminal",
+    ("config", "edit"): "`x19 config edit` needs $EDITOR in a real terminal",
 }
 
 
 def _cli_exec_blocked(argv: list[str]) -> str | None:
     """Return user hint if this argv must not run headless in the gateway process."""
     if not argv:
-        return "bare `hermes` is interactive — use `/hermes chat -q …` or run `hermes` in another terminal"
+        return "bare `x19` is interactive — use `/x19 chat -q …` or run `x19` in another terminal"
     head = tuple(a.lower() for a in argv[:2])
     return _CLI_EXEC_BLOCKED.get(head[:1]) or _CLI_EXEC_BLOCKED.get(head)
 
 
 def _resolve_name(name: str) -> str:
     with contextlib.suppress(Exception):
-        from hermes_cli.commands import resolve_command
+        from x19_cli.commands import resolve_command
         return r.name if (r := resolve_command(name)) else name
     return name
 
@@ -3244,7 +3244,8 @@ from . import (  # noqa: E402
     methods_projects as _methods_projects, methods_session_foreign as _methods_session_foreign,
     methods_session_control as _methods_session_control, methods_subagents as _methods_subagents,
     methods_vault as _methods_vault, methods_free_tier as _methods_free_tier,
-    methods_connectors as _methods_connectors)
+    methods_connectors as _methods_connectors,
+    methods_org as _methods_org)
 
 for _m in (
     _session_transports, _session_reaper, _session_lifecycle, _session_workdir, _compute_host_bridge, _model_switch,
@@ -3254,6 +3255,7 @@ for _m in (
     _methods_browser_control, _methods_session, _methods_prompt, _methods_config,
     _methods_config_set, _methods_complete, _methods_tools, _methods_profiles, _methods_images,
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
-    _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors):
+    _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors,
+    _methods_org):
     _m.register(sys.modules[__name__])
 del _m

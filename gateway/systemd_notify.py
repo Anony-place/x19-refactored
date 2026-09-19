@@ -67,7 +67,7 @@ class SystemdWatchdog:
         except RuntimeError:
             return False
         self._stopping = self._unhealthy = self._stopping_notified = False
-        self._task = asyncio.create_task(self._run(), name="hermes-systemd-watchdog")
+        self._task = asyncio.create_task(self._run(), name="x19-systemd-watchdog")
         return True
 
     def ready(self, status: str = "Gateway running") -> bool:
@@ -119,9 +119,3 @@ class SystemdWatchdog:
             self._stopping_notified = True
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Optional  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

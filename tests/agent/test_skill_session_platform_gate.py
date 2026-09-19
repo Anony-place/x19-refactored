@@ -1,6 +1,6 @@
 """The session_platforms frontmatter gate (skills-index slim PR).
 
-A skill whose metadata.hermes.session_platforms names gateway channels is
+A skill whose metadata.x19.session_platforms names gateway channels is
 hidden from the skills index on every other channel; unknown platform
 fails OPEN (offline builds/tests must not hide skills).
 """
@@ -10,7 +10,7 @@ from agent.skill_utils import extract_skill_conditions
 
 def _conds(platforms):
     return extract_skill_conditions(
-        {"metadata": {"hermes": {"session_platforms": platforms}}}
+        {"metadata": {"x19": {"session_platforms": platforms}}}
     )
 
 
@@ -45,4 +45,4 @@ class TestSessionPlatformGate:
         content = p.read_text(encoding="utf-8")
         m = re.search(r"\n---\s*\n", content[3:])
         fm = yaml.safe_load(content[3 : m.start() + 3])
-        assert fm["metadata"]["hermes"]["session_platforms"] == ["teams", "cron"]
+        assert fm["metadata"]["x19"]["session_platforms"] == ["teams", "cron"]

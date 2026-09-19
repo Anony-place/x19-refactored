@@ -1,6 +1,6 @@
 """Live prompt-cache concurrency probe: does a route keep cache routing sticky under a fan-out?
 
-Runs N independent Hermes ``AIAgent`` sessions concurrently, each the same ~8-step tool loop whose
+Runs N independent X19 ``AIAgent`` sessions concurrently, each the same ~8-step tool loop whose
 context grows 6K -> ~240K, and records for EVERY API call: prompt / cache_read / cache_creation /
 output tokens, the response id, the upstream provider when the route reports one, and a sha of the
 system prompt, tools and every message, so client-side prefix mutation can be ruled in or out.
@@ -11,7 +11,7 @@ A consecutive pair (call k, k+1) in one session is classified:
   collapse  cache_read(k+1) <  50% of cache_read(k) the whole conversation was re-written
   (pairs whose system sha changed are compaction/aux calls and are excluded)
 
-Results that motivated hermes-agent #104284 / #104421 and NousResearch/api#227 (2026-09-05/06,
+Results that motivated x19 #104284 / #104421 and NousResearch/api#227 (2026-09-05/06,
 Fable 5.1, 20 sessions x 6 calls unless noted):
   nous, native /v1/messages         13.9% stuck (4 runs 14-20%)     -> chat is the Nous default
   nous, /v1/chat/completions         0 / 320 pairs
@@ -23,9 +23,9 @@ Usage:
   python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider nous \
       --workers 20 --calls 6 --out /tmp/probe.jsonl [--wire chat|native] [--model ID] \
       [--pin anthropic] [--settle 2] [--ttl 5m]
-  providers: nous (Portal creds from HERMES_HOME), openrouter (OPENROUTER_API_KEY or --api-key),
+  providers: nous (Portal creds from X19_HOME), openrouter (OPENROUTER_API_KEY or --api-key),
              anthropic (ANTHROPIC_API_KEY or --api-key)
-Cost: ~$50 per 20x6 arm on Fable 5.1 at the 5m tier. Every run starts from the real Hermes request
+Cost: ~$50 per 20x6 arm on Fable 5.1 at the 5m tier. Every run starts from the real X19 request
 path; the only patch is a read-only wrapper on the SDK stream that records usage and headers.
 """
 from __future__ import annotations
@@ -44,13 +44,13 @@ import traceback
 
 def _parse():
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
-    ap.add_argument("--repo", required=True, help="hermes-agent checkout to import from")
+    ap.add_argument("--repo", required=True, help="x19 checkout to import from")
     ap.add_argument("--provider", required=True, choices=["nous", "openrouter", "anthropic"])
     ap.add_argument("--workers", type=int, default=20)
     ap.add_argument("--calls", type=int, default=6, help="tool calls per session")
     ap.add_argument("--out", required=True, help="JSONL of every call; summary written next to it")
     ap.add_argument("--wire", choices=["chat", "native"], default=None,
-                    help="force the wire (default: what Hermes would pick for the provider/model)")
+                    help="force the wire (default: what X19 would pick for the provider/model)")
     ap.add_argument("--model", default=None)
     ap.add_argument("--pin", default=None, help="OpenRouter provider slug to pin (providers_allowed)")
     ap.add_argument("--settle", type=float, default=0.0, help="seconds to sleep before every request")
@@ -63,7 +63,7 @@ ARGS = _parse()
 REPO, PROVIDER, N, CALLS, OUT = ARGS.repo, ARGS.provider, ARGS.workers, ARGS.calls, ARGS.out
 SETTLE_S = ARGS.settle
 sys.path.insert(0, os.path.abspath(REPO))
-os.environ.setdefault("HERMES_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("X19_HOME", os.path.expanduser("~/.x19"))
 import anthropic
 from anthropic.resources.messages import Messages
 _orig_stream = Messages.stream
@@ -157,7 +157,7 @@ MODEL = ARGS.model or ("claude-fable-5.1" if PROVIDER == "anthropic" else "anthr
 if ARGS.wire:
     API_MODE = "chat_completions" if ARGS.wire == "chat" else "anthropic_messages"
 elif PROVIDER == "nous":
-    from hermes_cli.providers import nous_api_mode
+    from x19_cli.providers import nous_api_mode
     API_MODE = nous_api_mode(MODEL)
 else:
     API_MODE = "chat_completions" if PROVIDER == "openrouter" else "anthropic_messages"
@@ -175,7 +175,7 @@ def creds():
     if PROVIDER == "anthropic":
         key = ARGS.api_key or os.environ.get("ANTHROPIC_API_KEY") or sys.exit("ANTHROPIC_API_KEY or --api-key required")
         return dict(api_key=key, base_url="https://api.anthropic.com", provider="anthropic")
-    from hermes_cli.auth_nous import resolve_nous_runtime_credentials
+    from x19_cli.auth_nous import resolve_nous_runtime_credentials
     c = resolve_nous_runtime_credentials()
     return dict(api_key=c["api_key"], base_url=c.get("base_url") or "https://inference-api.nousresearch.com/v1", provider="nous")
 CRED = creds()

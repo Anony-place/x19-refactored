@@ -50,7 +50,7 @@ import {
   useQuery,
   useQueryClient,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@x19/plugin-sdk'
 import {
   type CSSProperties,
   type DragEvent as ReactDragEvent,

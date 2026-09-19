@@ -33,7 +33,7 @@ def test_gateway_dispatcher_stuck_warning_names_guard_reason(monkeypatch, caplog
     import logging
 
     import gateway.kanban_watchers as kw
-    from hermes_cli import kanban_db_dispatch as kbd
+    from x19_cli import kanban_db_dispatch as kbd
 
     held = kbd.DispatchResult(respawn_guarded=[("t_held", "active_pr")])
     runner = object.__new__(kw.GatewayKanbanWatchersMixin)

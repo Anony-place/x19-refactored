@@ -8,7 +8,7 @@ from gateway.config import Platform
 from gateway.platforms.event import MessageEvent
 from gateway.run import GatewayRunner
 from gateway.session import SessionEntry, SessionSource, build_session_key
-from hermes_state import AsyncSessionDB
+from x19_state import AsyncSessionDB
 
 
 def _runner(entry, adapters):

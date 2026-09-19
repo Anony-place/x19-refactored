@@ -111,7 +111,7 @@ class TestListSessionsRichQueryBound:
 
     @pytest.fixture()
     def chain_db(self, tmp_path: Path):
-        from hermes_state import SessionDB
+        from x19_state import SessionDB
 
         db = SessionDB(db_path=tmp_path / "state.db")
         for i in range(self.N_CHAINS):
@@ -127,7 +127,7 @@ class TestListSessionsRichQueryBound:
         """Rows from ``list_sessions_rich`` plus the writer-conn statement count.
 
         Uses the house trace-callback idiom (``statements.append`` — see
-        tests/hermes_state/test_hermes_state.py) so failures can dump the captured SQL.
+        tests/x19_state/test_x19_state.py) so failures can dump the captured SQL.
         """
         statements: list[str] = []
         db._conn.set_trace_callback(statements.append)

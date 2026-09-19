@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from hermes_constants import hermes_home_key, reset_hermes_home_override, set_hermes_home_override
+from x19_constants import x19_home_key, reset_x19_home_override, set_x19_home_override
 
 
 def _tool():
@@ -46,15 +46,15 @@ def two_profiles(tmp_path, monkeypatch):
     tokens = []
 
     def enter(which):
-        tokens.append(set_hermes_home_override(homes[which]))
-        return hermes_home_key(homes[which])
+        tokens.append(set_x19_home_override(homes[which]))
+        return x19_home_key(homes[which])
 
     yield enter
     for tool_name in list(registry.get_tool_names_for_toolset("mcp-x")):
         for home in homes.values():
-            registry.deregister(tool_name, scope=hermes_home_key(home))
+            registry.deregister(tool_name, scope=x19_home_key(home))
     for token in reversed(tokens):
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
     for n in ledgers:
         getattr(core, n).clear()
         getattr(core, n).update(saved[n])
@@ -244,7 +244,7 @@ def test_parallel_safe_opt_in_is_per_profile(two_profiles):
 
 
 def test_served_profile_without_multiplex_flag_gets_its_own_connection(two_profiles, monkeypatch):
-    """A dashboard/desktop backend serves profiles through the HERMES_HOME override with
+    """A dashboard/desktop backend serves profiles through the X19_HOME override with
     ``gateway.multiplex_profiles`` off; a same-named server with other credentials must still be a
     separate connection there, or profile B calls the server as profile A (#111151). The launch
     profile itself (no override) keeps the bare, unscoped key."""
@@ -269,7 +269,7 @@ def test_served_profile_without_multiplex_flag_gets_its_own_connection(two_profi
     assert registry.get_tool_names_for_toolset("mcp-x") == []
     assert "x" in disc._select_new_servers({"x": cfg_b})
 
-    with patch("hermes_constants.get_hermes_home_override", return_value=None):
+    with patch("x19_constants.get_x19_home_override", return_value=None):
         assert core._mcp_registry_scope() is None
         assert _server_key("x") == "x"
 
@@ -286,7 +286,7 @@ def test_served_profile_check_fn_verdict_does_not_shadow_launch_profile(two_prof
     monkeypatch.setattr("agent.secret_scope.is_multiplex_active", lambda: False)
     cfg_a = {"url": "https://mcp.example/x", "headers": {"Authorization": "Bearer A"}}
     srv_a = _server("x", cfg_a)
-    with patch("hermes_constants.get_hermes_home_override", return_value=None):
+    with patch("x19_constants.get_x19_home_override", return_value=None):
         disc._adopt_server("x", srv_a)
         srv_a._registered_tool_names = reg._register_server_tools("x", srv_a, cfg_a)
         entry = registry._tools["mcp__x__t"]
@@ -295,7 +295,7 @@ def test_served_profile_check_fn_verdict_does_not_shadow_launch_profile(two_prof
         two_profiles("b")
         assert registry_mod.check_fn_cache_scope() is not None
         assert registry_mod._check_fn_cached(entry.check_fn) is False
-        with patch("hermes_constants.get_hermes_home_override", return_value=None):
+        with patch("x19_constants.get_x19_home_override", return_value=None):
             assert registry_mod._check_fn_cached(entry.check_fn) is True
     finally:
         registry.deregister("mcp__x__t")
@@ -318,7 +318,7 @@ def test_launch_profile_pruning_a_server_keeps_served_profiles_same_named_connec
     disc._adopt_server("x", srv_b)
     assert core._server_scope_keys[(scope_b, "x")] == scope_b
 
-    with patch("hermes_constants.get_hermes_home_override", return_value=None):
+    with patch("x19_constants.get_x19_home_override", return_value=None):
         assert core._mcp_registry_scope() is None
         srv_launch = _server("x", cfg)
         disc._adopt_server("x", srv_launch)

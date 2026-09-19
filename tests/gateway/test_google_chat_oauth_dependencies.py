@@ -54,7 +54,7 @@ def test_installer_repairs_stale_transitives(monkeypatch):
 
     monkeypatch.setattr("tools.lazy_deps.ensure", fake_ensure)
     monkeypatch.setattr(
-        "hermes_cli.tools_config._pip_install",
+        "x19_cli.tools_config._pip_install",
         lambda argv: pip_calls.append(argv) or SimpleNamespace(returncode=0, stderr=""),
     )
 

@@ -33,7 +33,7 @@ function mount(target: string, surfaceId: string, key = 'draft-a') {
 }
 
 function bridge() {
-  window.hermesDesktop = { ...window.hermesDesktop, screenshot: {
+  window.x19Desktop = { ...window.x19Desktop, screenshot: {
     getSettings: vi.fn(), setEnabled: vi.fn(), openPermissionSettings: vi.fn(), onStatus: () => () => undefined,
     capture,
     onRequest: callback => { listeners.add(callback); return () => listeners.delete(callback) }
@@ -44,7 +44,7 @@ afterEach(() => {
   cleanup()
   listeners.clear()
   vi.clearAllMocks()
-  delete window.hermesDesktop.screenshot
+  delete window.x19Desktop.screenshot
   markActiveComposer('main')
 })
 

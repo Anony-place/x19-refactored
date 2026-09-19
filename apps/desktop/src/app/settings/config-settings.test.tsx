@@ -7,15 +7,15 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import type { ConfigSettings as ConfigSettingsType } from './config-settings'
 
-const getHermesConfigRecord = vi.fn()
-const getHermesConfigSchema = vi.fn()
-const saveHermesConfig = vi.fn()
+const getX19ConfigRecord = vi.fn()
+const getX19ConfigSchema = vi.fn()
+const saveX19Config = vi.fn()
 const getElevenLabsVoices = vi.fn()
 
-vi.mock('@/hermes', () => ({
-  getHermesConfigRecord: () => getHermesConfigRecord(),
-  getHermesConfigSchema: () => getHermesConfigSchema(),
-  saveHermesConfig: (config: unknown, profile?: string) => saveHermesConfig(config, profile),
+vi.mock('@/x19', () => ({
+  getX19ConfigRecord: () => getX19ConfigRecord(),
+  getX19ConfigSchema: () => getX19ConfigSchema(),
+  saveX19Config: (config: unknown, profile?: string) => saveX19Config(config, profile),
   getElevenLabsVoices: () => getElevenLabsVoices(),
   setApiRequestProfile: () => {}
 }))
@@ -53,8 +53,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   getElevenLabsVoices.mockResolvedValue({ available: false })
-  getHermesConfigSchema.mockResolvedValue({ fields: {} })
-  saveHermesConfig.mockResolvedValue({ ok: true })
+  getX19ConfigSchema.mockResolvedValue({ fields: {} })
+  saveX19Config.mockResolvedValue({ ok: true })
 })
 
 afterEach(() => {
@@ -79,10 +79,10 @@ function renderConfigSettings(activeSectionId = 'safety') {
 
 describe('ConfigSettings autosave', () => {
   it('renders and saves the Codex compression auto-raise setting', async () => {
-    getHermesConfigRecord.mockResolvedValue({
+    getX19ConfigRecord.mockResolvedValue({
       compression: { codex_gpt55_autoraise: true }
     })
-    getHermesConfigSchema.mockResolvedValue({
+    getX19ConfigSchema.mockResolvedValue({
       fields: {
         'compression.codex_gpt55_autoraise': { type: 'boolean' }
       }
@@ -100,7 +100,7 @@ describe('ConfigSettings autosave', () => {
       await vi.advanceTimersByTimeAsync(700)
 
       await vi.waitFor(() =>
-        expect(saveHermesConfig).toHaveBeenCalledWith({ compression: { codex_gpt55_autoraise: false } }, undefined)
+        expect(saveX19Config).toHaveBeenCalledWith({ compression: { codex_gpt55_autoraise: false } }, undefined)
       )
     } finally {
       vi.useRealTimers()
@@ -108,7 +108,7 @@ describe('ConfigSettings autosave', () => {
   })
 
   it('sends a later revert instead of diffing it away against the stale page-load baseline', async () => {
-    getHermesConfigRecord.mockResolvedValue({ checkpoints: { enabled: false }, other: 'untouched' })
+    getX19ConfigRecord.mockResolvedValue({ checkpoints: { enabled: false }, other: 'untouched' })
 
     vi.useFakeTimers({ shouldAdvanceTime: true })
 
@@ -121,19 +121,19 @@ describe('ConfigSettings autosave', () => {
       toggle.click()
       await vi.advanceTimersByTimeAsync(700)
 
-      await vi.waitFor(() => expect(saveHermesConfig).toHaveBeenCalledTimes(1))
-      expect(saveHermesConfig.mock.calls[0][0]).toEqual({ checkpoints: { enabled: true } })
+      await vi.waitFor(() => expect(saveX19Config).toHaveBeenCalledTimes(1))
+      expect(saveX19Config.mock.calls[0][0]).toEqual({ checkpoints: { enabled: true } })
 
       // Revert: flip it back to its original value and let autosave fire again.
       toggle.click()
       await vi.advanceTimersByTimeAsync(700)
 
-      await vi.waitFor(() => expect(saveHermesConfig).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() => expect(saveX19Config).toHaveBeenCalledTimes(2))
       // Must still explicitly send the reverted value — diffing against the
       // never-advanced page-load baseline would produce an empty patch here
       // (the field is back to its original value) and leave disk stuck at
       // `enabled: true` from the first save.
-      expect(saveHermesConfig.mock.calls[1][0]).toEqual({ checkpoints: { enabled: false } })
+      expect(saveX19Config.mock.calls[1][0]).toEqual({ checkpoints: { enabled: false } })
     } finally {
       vi.useRealTimers()
     }

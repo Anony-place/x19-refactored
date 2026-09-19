@@ -28,7 +28,7 @@ type Page = MockBackendFixture['page']
 let fixture: MockBackendFixture | null = null
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..')
-const PYTHON = process.env.HERMES_E2E_PYTHON ?? path.join(REPO_ROOT, '.venv', 'bin', 'python')
+const PYTHON = process.env.X19_E2E_PYTHON ?? path.join(REPO_ROOT, '.venv', 'bin', 'python')
 
 async function openBots(page: Page): Promise<void> {
   const tab = page
@@ -40,8 +40,8 @@ async function openBots(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
 }
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<void> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -79,7 +79,7 @@ except Exception as exc:
 
   return execFileSync(PYTHON, ['-c', script, profileHome, message], {
     cwd: REPO_ROOT,
-    env: { ...process.env, PYTHONPATH: REPO_ROOT, HERMES_HOME: profileHome },
+    env: { ...process.env, PYTHONPATH: REPO_ROOT, X19_HOME: profileHome },
     encoding: 'utf8'
   }).trim()
 }
@@ -87,9 +87,9 @@ except Exception as exc:
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-mailbox-unreadable')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  await seedBot(sandbox.hermesHome, mock.url, 'alpha')
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  await seedBot(sandbox.x19Home, mock.url, 'alpha')
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
 
@@ -116,7 +116,7 @@ test.afterAll(async () => {
 test('a teammate DM still reaches the open Bot Chat when an unreadable ticket sits in the mailbox', async () => {
   test.setTimeout(300_000)
   const page = fixture!.page
-  const profileHome = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha')
+  const profileHome = path.join(fixture!.sandbox.x19Home, 'profiles', 'alpha')
 
   await openBots(page)
   const alphaRow = page.getByRole('button', { name: /^alpha\b/i }).filter({ visible: true }).first()

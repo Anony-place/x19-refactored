@@ -37,7 +37,7 @@ from agent.conversation_compression import (
     compression_blocked_transiently,
     run_compress_context_with_progress_timeout,
 )
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 def _build_agent(tmp_path: Path, session_id: str, db: SessionDB | None = None):

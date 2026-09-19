@@ -81,7 +81,7 @@ export async function openFirstBuildLinks(storedId: string, part: FirstBuildConn
   $firstBuildConnections.setKey(storedId, {
     toolCallId: part.toolCallId,
     rows,
-    started: previous?.started ?? readKey(`hermes.onboarding.started.v1.${storedId}`) === '1'
+    started: previous?.started ?? readKey(`x19.onboarding.started.v1.${storedId}`) === '1'
   })
 
   const links = entries.flatMap(entry => {
@@ -91,7 +91,7 @@ export async function openFirstBuildLinks(storedId: string, part: FirstBuildConn
     return url && connector !== undefined ? [{ connector, url }] : []
   })
 
-  const key = `hermes.onboarding.links-opened.v1.${part.toolCallId}`
+  const key = `x19.onboarding.links-opened.v1.${part.toolCallId}`
 
   if (!deps.open || !links.length || readKey(key) === '1') {
     return
@@ -187,7 +187,7 @@ export function watchFirstBuildRows(
   $firstBuildConnections.setKey(storedId, {
     toolCallId: part.toolCallId,
     rows,
-    started: previous?.started ?? readKey(`hermes.onboarding.started.v1.${storedId}`) === '1'
+    started: previous?.started ?? readKey(`x19.onboarding.started.v1.${storedId}`) === '1'
   })
 
   if (!polling) {
@@ -269,7 +269,7 @@ export function watchFirstBuildRows(
 /** A true result from submit means the composer delivered the text through send, steer or queue. */
 export function startFirstBuild(storedId: string, submit: (text: string) => boolean): void {
   const state = $firstBuildConnections.get()[storedId]
-  const key = `hermes.onboarding.started.v1.${storedId}`
+  const key = `x19.onboarding.started.v1.${storedId}`
 
   if (!isFirstBuildSession(storedId) || !state || state.started || readKey(key) === '1') {
     return

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $cronReviewRequest } from '@/store/cron'
 import { $notifications, clearNotifications, dismissNotification } from '@/store/notifications'
-import type { ModelAssignmentResponse } from '@/types/hermes'
+import type { ModelAssignmentResponse } from '@/types/x19'
 
 const setModelAssignment = vi.fn()
 const getApiRequestProfile = vi.fn<() => string | null>(() => 'default')
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   setModelAssignment: (...args: unknown[]) => setModelAssignment(...args),
   getApiRequestProfile: () => getApiRequestProfile()
 }))

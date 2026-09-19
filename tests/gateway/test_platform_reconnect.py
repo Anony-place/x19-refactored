@@ -119,8 +119,8 @@ class TestStartupPlatformIsolation:
             return MagicMock()
 
         with patch("gateway.status.write_runtime_status"):
-            with patch("hermes_cli.plugins.discover_plugins"):
-                with patch("hermes_cli.config.load_config", return_value={}):
+            with patch("x19_cli.plugins.discover_plugins"):
+                with patch("x19_cli.config.load_config", return_value={}):
                     with patch("agent.shell_hooks.register_from_config"):
                         with patch(
                             "tools.process_registry.process_registry.recover_from_checkpoint",
@@ -535,7 +535,7 @@ class TestSpawnSupervised:
             is_delegated_child_context,
         )
         from gateway.kanban_watchers_common import _to_thread_process_service
-        from hermes_cli.kanban_db import _assert_not_delegated_child_mutation
+        from x19_cli.kanban_db import _assert_not_delegated_child_mutation
 
         with delegated_child_context():
             assert is_delegated_child_context() is True
@@ -931,8 +931,8 @@ class TestVoiceInputCallbackWiring:
 
         with patch.object(runner, "_create_adapter", return_value=adapter):
             with patch("gateway.status.write_runtime_status"):
-                with patch("hermes_cli.plugins.discover_plugins"):
-                    with patch("hermes_cli.config.load_config", return_value={}):
+                with patch("x19_cli.plugins.discover_plugins"):
+                    with patch("x19_cli.config.load_config", return_value={}):
                         with patch("agent.shell_hooks.register_from_config"):
                             with patch(
                                 "tools.process_registry.process_registry.recover_from_checkpoint",

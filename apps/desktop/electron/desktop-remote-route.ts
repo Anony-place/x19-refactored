@@ -16,7 +16,7 @@ interface SshRouteConfig {
   keyPath?: string
   mode: 'ssh'
   port?: number
-  remoteHermesPath?: string
+  remoteX19Path?: string
   remoteProfile?: string
   user?: string
 }
@@ -125,8 +125,8 @@ export function resolveDesktopRemoteRoute({
 
     if (!envToken) {
       throw new Error(
-        'HERMES_DESKTOP_REMOTE_URL is set but HERMES_DESKTOP_REMOTE_TOKEN is not. ' +
-          'Both must be provided to connect to a remote Hermes backend.'
+        'X19_DESKTOP_REMOTE_URL is set but X19_DESKTOP_REMOTE_TOKEN is not. ' +
+          'Both must be provided to connect to a remote X19 backend.'
       )
     }
 
@@ -152,7 +152,7 @@ export function resolveDesktopRemoteRoute({
     // Registry-primary fallback (#91564/#90316): "Make primary" on a
     // registered remote/cloud/ssh gateway only rewrites connections.json —
     // the v1 config.mode stays 'local'. Without this rung the primary boot
-    // resolves local and spawns a loopback `hermes serve` the desktop never
+    // resolves local and spawns a loopback `x19 serve` the desktop never
     // uses (it dials the registry primary separately): duplicated MCP sets,
     // port squat, and a respawn on every poll. A 'local' registry primary
     // still resolves null, so genuinely-local desktops are untouched.

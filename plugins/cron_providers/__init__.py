@@ -1,5 +1,5 @@
 """Cron scheduler provider discovery: bundled ``plugins/cron_providers/<name>/`` then user
-``$HERMES_HOME/plugins/<name>/`` (bundled wins on collision). The built-in InProcessCronScheduler
+``$X19_HOME/plugins/<name>/`` (bundled wins on collision). The built-in InProcessCronScheduler
 is core, not discovered here, so the fallback can't be removed; one provider is active
 (``cron.provider`` in config.yaml, empty = built-in)."""
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 _CRON_PLUGINS_DIR = Path(__file__).parent
 # Synthetic parent package for user-installed providers (keeps them out of the bundled namespace).
-_USER_NAMESPACE = "_hermes_user_cron"
+_USER_NAMESPACE = "_x19_user_cron"
 
 
 def _is_cron_provider_dir(path: Path) -> bool:
@@ -31,7 +31,7 @@ def _is_cron_provider_dir(path: Path) -> bool:
 
 
 def _user_provider_dirs() -> List[Path]:
-    """User-installed ``$HERMES_HOME/plugins/<name>/`` dirs that look like cron providers."""
+    """User-installed ``$X19_HOME/plugins/<name>/`` dirs that look like cron providers."""
     user_dir = _loader.user_plugins_dir()
     return [c for c in _loader.iter_plugin_dirs(user_dir) if _is_cron_provider_dir(c)] if user_dir else []
 
@@ -96,10 +96,3 @@ class _ProviderCollector(_loader.NoopPluginContext):
         self.provider = provider
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import importlib.util  # noqa: F401,E402
-import sys  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

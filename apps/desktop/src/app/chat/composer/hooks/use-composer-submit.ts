@@ -1,4 +1,4 @@
-import { SLASH_COMMAND_RE } from '@hermes/shared'
+import { SLASH_COMMAND_RE } from '@x19/shared'
 import { type RefObject, useLayoutEffect, useRef } from 'react'
 
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'

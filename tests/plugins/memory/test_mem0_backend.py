@@ -65,7 +65,7 @@ class TestPlatformBackend:
     def test_add_forwards_kwargs(self):
         backend, client = self._make()
         msgs = [{"role": "user", "content": "hi"}]
-        result = backend.add(msgs, user_id="u1", agent_id="hermes", infer=False)
+        result = backend.add(msgs, user_id="u1", agent_id="x19", infer=False)
         call = client.calls[0]
         assert call[2]["user_id"] == "u1"
         assert call[2]["infer"] is False
@@ -407,13 +407,13 @@ class TestOSSBackend:
 
         assert len(Memory.instances) == 1
         captured = Memory.instances[0].config
-        assert captured.llm.provider == "hermes_openai"
+        assert captured.llm.provider == "x19_openai"
         assert captured.llm.config["openai_base_url"] == "https://llm.example/v1"
         assert captured.embedder.provider == "ollama"
         assert captured.embedder.config["ollama_base_url"] == "http://ollama:11434"
         assert "api_base" not in captured.llm.config
         assert "api_base" not in captured.embedder.config
-        assert factory.provider_to_class["hermes_openai"][1].__name__ == "OpenAIConfig"
+        assert factory.provider_to_class["x19_openai"][1].__name__ == "OpenAIConfig"
         assert len(state.factory_registrations) == 1
         assert state.from_config_calls == 0
         assert raw == before
@@ -432,8 +432,8 @@ class TestOSSBackend:
             openai_base_url="https://openai.example/v1",
             models=["router-model"],
             route="lowest-latency",
-            site_url="https://hermes.example",
-            app_name="Hermes",
+            site_url="https://x19.example",
+            app_name="X19",
             store=True,
             response_callback=lambda *args: callback_calls.append(args),
         )
@@ -572,7 +572,7 @@ class TestOSSBackend:
         OSSBackend(second)
 
         assert len(state.factory_registrations) == 1
-        assert factory.provider_to_class["hermes_openai"][0].endswith(
+        assert factory.provider_to_class["x19_openai"][0].endswith(
             "_openai_llm.DirectOpenAILLM"
         )
         assert [
@@ -613,7 +613,7 @@ class TestOSSBackend:
         assert state.from_config_calls == 1
         assert Memory.instances[0].config.llm.provider == "ollama"
         assert Memory.instances[0].config.embedder.provider == "ollama"
-        assert "hermes_openai" not in factory.provider_to_class
+        assert "x19_openai" not in factory.provider_to_class
         assert state.clients == []
         assert raw == before
 

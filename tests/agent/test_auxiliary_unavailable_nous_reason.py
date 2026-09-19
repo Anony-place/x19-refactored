@@ -8,7 +8,7 @@ import logging
 import yaml
 
 import agent.auxiliary_unavailable as unavailable
-from hermes_cli.auth_constants import AuthError
+from x19_cli.auth_constants import AuthError
 
 
 def _reset(monkeypatch):
@@ -19,19 +19,19 @@ def _reset(monkeypatch):
 def test_goal_judge_reason_names_nous_auth_failure_and_still_fails_open(tmp_path, monkeypatch):
     """Real judge_goal → call_llm → ladder with goal_judge pinned to nous and no Nous login."""
     _reset(monkeypatch)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text(yaml.safe_dump({
         "model": {"provider": "nous", "default": "test-model"},
         "auxiliary": {"goal_judge": {"provider": "nous", "model": "test-model"}},
     }), encoding="utf-8")
-    from hermes_cli.goals import judge_goal
+    from x19_cli.goals import judge_goal
 
     verdict, reason, parse_failed, wait_directive, judge_errored = judge_goal(
         "ship the fix", "edited the file and ran the tests", timeout=5)
 
     assert (verdict, parse_failed, wait_directive, judge_errored) == ("continue", False, None, True)
     assert reason.startswith("goal_judge auxiliary client unavailable: Nous Portal runtime credentials unavailable:")
-    assert "hermes model" in reason, reason
+    assert "x19 model" in reason, reason
     assert "judge error" not in reason
 
 
@@ -43,7 +43,7 @@ def test_nous_credential_failure_is_remembered_and_warned_once(caplog, monkeypat
         unavailable.record_nous_credential_failure(exc)
 
     assert detail.startswith("Nous Portal runtime credentials unavailable: ")
-    assert "invalid_grant" in detail and "Run `hermes model` to re-authenticate." in detail
+    assert "invalid_grant" in detail and "Run `x19 model` to re-authenticate." in detail
     assert "Invalid refresh token. Run" in detail, detail  # sentence-terminated before the remediation
     assert unavailable.nous_credential_failure_detail() == detail
     assert sum(detail in rec.getMessage() for rec in caplog.records) == 1
@@ -54,8 +54,8 @@ def test_nous_credential_failure_is_remembered_and_warned_once(caplog, monkeypat
 def test_never_logged_in_is_debug_but_a_dead_credential_warns(caplog, monkeypatch, tmp_path):
     """The auto-route walk resolves Nous on every pass; users who never chose Nous must not be nagged."""
     _reset(monkeypatch)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    not_logged_in = AuthError("Hermes is not logged into Nous Portal.", provider="nous", relogin_required=True)
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    not_logged_in = AuthError("X19 is not logged into Nous Portal.", provider="nous", relogin_required=True)
     dead = AuthError("Invalid refresh token", provider="nous", code="invalid_grant", relogin_required=True)
     with caplog.at_level(logging.DEBUG, logger="agent.auxiliary_unavailable"):
         quiet = unavailable.record_nous_credential_failure(not_logged_in)
@@ -64,4 +64,4 @@ def test_never_logged_in_is_debug_but_a_dead_credential_warns(caplog, monkeypatc
     levels = {rec.levelno for rec in caplog.records if quiet in rec.getMessage()}
     assert levels == {logging.DEBUG}, caplog.records
     assert {rec.levelno for rec in caplog.records if loud in rec.getMessage()} == {logging.WARNING}
-    assert "hermes model" in quiet  # the goal judge still gets the remediation text
+    assert "x19 model" in quiet  # the goal judge still gets the remediation text

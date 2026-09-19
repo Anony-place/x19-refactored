@@ -1,7 +1,7 @@
 import { PassThrough } from 'stream'
 
-import { Box, renderSync } from '@hermes/ink'
-import { stripAnsi } from '@hermes/shared/ansi'
+import { Box, renderSync } from '@x19/ink'
+import { stripAnsi } from '@x19/shared/ansi'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 

@@ -1,24 +1,24 @@
 ---
 sidebar_position: 11
 title: "Feishu / Lark"
-description: "Set up Hermes Agent as a Feishu or Lark bot"
+description: "Set up X19 as a Feishu or Lark bot"
 ---
 
 # Feishu / Lark Setup
 
-Hermes Agent integrates with Feishu and Lark as a full-featured bot. Once connected, you can chat with the agent in direct messages or group chats, receive cron job results in a home chat, and send text, images, audio, and file attachments through the normal gateway flow.
+X19 integrates with Feishu and Lark as a full-featured bot. Once connected, you can chat with the agent in direct messages or group chats, receive cron job results in a home chat, and send text, images, audio, and file attachments through the normal gateway flow.
 
 The integration supports both connection modes:
 
-- `websocket` — recommended; Hermes opens the outbound connection and you do not need a public webhook endpoint
+- `websocket` — recommended; X19 opens the outbound connection and you do not need a public webhook endpoint
 - `webhook` — useful when you want Feishu/Lark to push events into your gateway over HTTP
 
-## How Hermes Behaves
+## How X19 Behaves
 
 | Context | Behavior |
 |---------|----------|
-| Direct messages | Hermes responds to every message. |
-| Group chats | Hermes responds only when the bot is @mentioned in the chat. |
+| Direct messages | X19 responds to every message. |
+| Group chats | X19 responds only when the bot is @mentioned in the chat. |
 | Shared group chats | By default, session history is isolated per user inside a shared chat. |
 
 This shared-chat behavior is controlled by `config.yaml`:
@@ -34,10 +34,10 @@ Set it to `false` only if you explicitly want one shared conversation per chat.
 ### Recommended: Scan-to-Create (one command)
 
 ```bash
-hermes gateway setup
+x19 gateway setup
 ```
 
-Select **Feishu / Lark** and scan the QR code with your Feishu or Lark mobile app. Hermes will automatically create a bot application with the correct permissions and save the credentials.
+Select **Feishu / Lark** and scan the QR code with your Feishu or Lark mobile app. X19 will automatically create a bot application with the correct permissions and save the credentials.
 
 ### Alternative: Manual Setup
 
@@ -49,7 +49,7 @@ If scan-to-create is not available, the wizard falls back to manual input:
 2. Create a new app.
 3. In **Credentials & Basic Info**, copy the **App ID** and **App Secret**.
 4. Enable the **Bot** capability for the app.
-5. Run `hermes gateway setup`, select **Feishu / Lark**, and enter the credentials when prompted.
+5. Run `x19 gateway setup`, select **Feishu / Lark**, and enter the credentials when prompted.
 
 :::warning
 Keep the App Secret private. Anyone with it can impersonate your app.
@@ -94,7 +94,7 @@ After configuring permissions and events, go to **Version Management** and publi
 
 ### Recommended: WebSocket mode
 
-Use WebSocket mode when Hermes runs on your laptop, workstation, or a private server. No public URL is required. The official Lark SDK opens and maintains a persistent outbound WebSocket connection with automatic reconnection.
+Use WebSocket mode when X19 runs on your laptop, workstation, or a private server. No public URL is required. The official Lark SDK opens and maintains a persistent outbound WebSocket connection with automatic reconnection.
 
 ```bash
 FEISHU_CONNECTION_MODE=websocket
@@ -106,13 +106,13 @@ FEISHU_CONNECTION_MODE=websocket
 
 ### Optional: Webhook mode
 
-Use webhook mode only when you already run Hermes behind a reachable HTTP endpoint.
+Use webhook mode only when you already run X19 behind a reachable HTTP endpoint.
 
 ```bash
 FEISHU_CONNECTION_MODE=webhook
 ```
 
-In webhook mode, Hermes starts an HTTP server (via `aiohttp`) and serves a Feishu endpoint at:
+In webhook mode, X19 starts an HTTP server (via `aiohttp`) and serves a Feishu endpoint at:
 
 ```text
 /feishu/webhook
@@ -130,19 +130,19 @@ FEISHU_WEBHOOK_PATH=/feishu/webhook  # default: /feishu/webhook
 
 When Feishu sends a URL verification challenge (`type: url_verification`), the webhook responds automatically so you can complete the subscription setup in the Feishu developer console. The challenge response is gated on `FEISHU_VERIFICATION_TOKEN` when set — challenge requests with a missing or mismatched token are rejected so an unauthenticated remote cannot prove endpoint control by echoing attacker-controlled challenge data.
 
-## Step 3: Configure Hermes
+## Step 3: Configure X19
 
 ### Option A: Interactive Setup
 
 ```bash
-hermes gateway setup
+x19 gateway setup
 ```
 
 Select **Feishu / Lark** and fill in the prompts.
 
 ### Option B: Manual Configuration
 
-Add the following to `~/.hermes/.env`:
+Add the following to `~/.x19/.env`:
 
 ```bash
 FEISHU_APP_ID=cli_xxx
@@ -163,7 +163,7 @@ FEISHU_HOME_CHANNEL=oc_xxx
 ## Step 4: Start the Gateway
 
 ```bash
-hermes gateway
+x19 gateway
 ```
 
 Then message the bot from Feishu/Lark to confirm that the connection is live.
@@ -224,7 +224,7 @@ Both `FEISHU_ENCRYPT_KEY` and `FEISHU_VERIFICATION_TOKEN` can be used together f
 
 ## Group Message Policy
 
-The `FEISHU_GROUP_POLICY` environment variable controls whether and how Hermes responds in group chats:
+The `FEISHU_GROUP_POLICY` environment variable controls whether and how X19 responds in group chats:
 
 ```bash
 FEISHU_GROUP_POLICY=allowlist   # default
@@ -232,15 +232,15 @@ FEISHU_GROUP_POLICY=allowlist   # default
 
 | Value | Behavior |
 |-------|----------|
-| `open` | Hermes responds to @mentions from any user in any group. |
-| `allowlist` | Hermes only responds to @mentions from users listed in `FEISHU_ALLOWED_USERS`. |
-| `disabled` | Hermes ignores all group messages entirely. |
+| `open` | X19 responds to @mentions from any user in any group. |
+| `allowlist` | X19 only responds to @mentions from users listed in `FEISHU_ALLOWED_USERS`. |
+| `disabled` | X19 ignores all group messages entirely. |
 
 In all modes, the bot must be explicitly @mentioned (or @all) in the group before the message is processed. Direct messages always bypass this gate.
 
 With the default `allowlist` policy and an empty `FEISHU_ALLOWED_USERS`, every human group message is rejected while DMs keep working. The first such drop is logged once at `WARNING` with the keys to set; later drops are `DEBUG`. Under a [multiplexed gateway](../multi-profile-gateways.md), each profile reads only its **own** `.env` — a `FEISHU_GROUP_POLICY=open` in the default profile's `.env` does not apply to a secondary profile's bot. Put `FEISHU_GROUP_POLICY` / `FEISHU_ALLOWED_USERS` in `profiles/<name>/.env`, or use `group_rules` in that profile's `config.yaml`.
 
-Set `FEISHU_REQUIRE_MENTION=false` to let Hermes read all group traffic without requiring an @mention:
+Set `FEISHU_REQUIRE_MENTION=false` to let X19 read all group traffic without requiring an @mention:
 
 ```bash
 FEISHU_REQUIRE_MENTION=false
@@ -250,7 +250,7 @@ For per-chat control, set `require_mention` on a `group_rules` entry — see [Pe
 
 ### Bot Identity
 
-Hermes auto-detects the bot's `open_id` and display name on startup. You only need to set these manually when auto-detection cannot reach the Feishu API, or when your app uses tenant-scoped user IDs:
+X19 auto-detects the bot's `open_id` and display name on startup. You only need to set these manually when auto-detection cannot reach the Feishu API, or when your app uses tenant-scoped user IDs:
 
 ```bash
 FEISHU_BOT_OPEN_ID=ou_xxx     # only when auto-detection fails
@@ -260,7 +260,7 @@ FEISHU_BOT_NAME=MyBot         # only when auto-detection fails
 
 ## Bot-to-Bot Messaging
 
-By default Hermes ignores messages sent by other bots. Enable bot-to-bot messaging when you want Hermes to participate in A2A orchestration or receive notifications from other bots in the same group.
+By default X19 ignores messages sent by other bots. Enable bot-to-bot messaging when you want X19 to participate in A2A orchestration or receive notifications from other bots in the same group.
 
 ```bash
 FEISHU_ALLOW_BOTS=mentions   # default: none
@@ -269,7 +269,7 @@ FEISHU_ALLOW_BOTS=mentions   # default: none
 | Value | Behavior |
 |-------|----------|
 | `none` | Ignore all messages from other bots (default). |
-| `mentions` | Accept only when the peer bot @mentions Hermes. |
+| `mentions` | Accept only when the peer bot @mentions X19. |
 | `all` | Accept every peer bot message. |
 
 Also configurable as `feishu.allow_bots` in `config.yaml` (env wins when both are set).
@@ -286,7 +286,7 @@ When users click buttons or interact with interactive cards sent by the bot, the
 - The action's `value` payload from the card definition is included as JSON.
 - Card actions are deduplicated with a 15-minute window to prevent double processing.
 
-Gateway-driven update prompts use a native Feishu `Yes` / `No` card instead of falling back to plain text replies. When `hermes update --gateway` needs confirmation, the adapter records the selected answer in Hermes's `.update_response` file and replaces the card inline with a resolved state.
+Gateway-driven update prompts use a native Feishu `Yes` / `No` card instead of falling back to plain text replies. When `x19 update --gateway` needs confirmation, the adapter records the selected answer in X19's `.update_response` file and replaces the card inline with a resolved state.
 
 Card action events are dispatched with `MessageType.COMMAND`, so they flow through the normal command processing pipeline.
 
@@ -300,7 +300,7 @@ Interactive cards need the following configuration in the Feishu Developer Conso
    In **Development Configuration > Events and Callbacks**, open the **Callback Configuration** tab — it is separate from the **Event Configuration** tab where `im.message.receive_v1` lives — and add `card.action.trigger` under *Subscribed Callbacks*. Adding it as an event does not deliver button clicks.
 
 2. **Set the callback delivery mode:**
-   On the same tab choose **Long Connection** when Hermes runs in `websocket` mode (the Lark SDK receives the callback on the existing connection), or enter the request URL in webhook mode (the same endpoint as your event webhook, e.g. `https://your-server:8765/feishu/webhook`). Feishu must be able to reach and resolve that URL; otherwise clicks fail with 200342/200343.
+   On the same tab choose **Long Connection** when X19 runs in `websocket` mode (the Lark SDK receives the callback on the existing connection), or enter the request URL in webhook mode (the same endpoint as your event webhook, e.g. `https://your-server:8765/feishu/webhook`). Feishu must be able to reach and resolve that URL; otherwise clicks fail with 200342/200343.
 
 3. **Enable the Interactive Card capability:**
    In **App Features > Bot**, ensure the **Interactive Card** toggle is enabled.
@@ -309,14 +309,14 @@ Interactive cards need the following configuration in the Feishu Developer Conso
    Callback changes only take effect after **Version Management > Create version** is published (and approved, for enterprise apps). Feishu's own description of 200340 is "the application has not configured the card callback address or the configured address is invalid … ensure that you have created and published the latest version of the app".
 
 :::warning
-Without a published card callback, Feishu will still successfully *send* interactive cards (sending only requires `im:message:send` permission), but clicking any button returns error 200340. The card appears to work — the error only surfaces when a user interacts with it, and the click never reaches Hermes (nothing is logged), because Feishu rejects it before delivering the callback.
+Without a published card callback, Feishu will still successfully *send* interactive cards (sending only requires `im:message:send` permission), but clicking any button returns error 200340. The card appears to work — the error only surfaces when a user interacts with it, and the click never reaches X19 (nothing is logged), because Feishu rejects it before delivering the callback.
 :::
 
-Error codes 200672 / 200673 indicate the callback *did* reach Hermes and Feishu rejected the response; if you see them, please file an issue with the matching `gateway.log` lines.
+Error codes 200672 / 200673 indicate the callback *did* reach X19 and Feishu rejected the response; if you see them, please file an issue with the matching `gateway.log` lines.
 
 ## Document Comment Intelligent Reply
 
-Beyond chat, the adapter can also answer `@`-mentions left on **Feishu/Lark documents**. When a user comments on a document (local text selection or whole-doc comment) and @-mentions the bot, Hermes reads the document plus the surrounding comment thread and posts an LLM reply inline on the thread.
+Beyond chat, the adapter can also answer `@`-mentions left on **Feishu/Lark documents**. When a user comments on a document (local text selection or whole-doc comment) and @-mentions the bot, X19 reads the document plus the surrounding comment thread and posts an LLM reply inline on the thread.
 
 Powered by the `drive.notice.comment_add_v1` event, the handler:
 
@@ -338,7 +338,7 @@ Two policies are available per rule:
 - **`allowlist`** — a static list of users / tenants.
 - **`pairing`** — static list ∪ runtime-approved store. Useful for rollouts where moderators can grant access live.
 
-Rules live in `~/.hermes/feishu_comment_rules.json` (pairing grants in `~/.hermes/feishu_comment_pairing.json`) with mtime-cached hot-reload — edits take effect on the next comment event without restarting the gateway.
+Rules live in `~/.x19/feishu_comment_rules.json` (pairing grants in `~/.x19/feishu_comment_pairing.json`) with mtime-cached hot-reload — edits take effect on the next comment event without restarting the gateway.
 
 CLI:
 
@@ -364,15 +364,15 @@ On top of the chat/card permissions already granted, add the drive comment event
 
 ## Meeting Invitation Events
 
-You can invite the Hermes Feishu/Lark bot into a video meeting the same way you invite a human participant. When the bot receives the meeting invitation event, Hermes can automatically start an agent turn that attempts to join the meeting.
+You can invite the X19 Feishu/Lark bot into a video meeting the same way you invite a human participant. When the bot receives the meeting invitation event, X19 can automatically start an agent turn that attempts to join the meeting.
 
 Powered by the `vc.bot.meeting_invited_v1` event, the flow is:
 
 - A user invites the bot to a Feishu/Lark video meeting.
-- Feishu/Lark sends Hermes the meeting invitation event.
-- Hermes extracts the inviter, meeting topic, and meeting number.
+- Feishu/Lark sends X19 the meeting invitation event.
+- X19 extracts the inviter, meeting topic, and meeting number.
 - If the inviter is authorized by the normal gateway allowlist or pairing policy, the agent receives the meeting number and tries to join automatically.
-- If the invite is malformed, or the agent cannot join, Hermes drops the event or replies to the inviter with a concise explanation.
+- If the invite is malformed, or the agent cannot join, X19 drops the event or replies to the inviter with a concise explanation.
 
 Malformed invitations that do not include both an inviter and a `meeting_no` are ignored.
 
@@ -382,7 +382,7 @@ On top of the chat/card permissions already granted, add the video-meeting invit
 
 - Subscribe to `vc.bot.meeting_invited_v1` in **Event Subscriptions**.
 - Enable the Video Conferencing permission scope prompted by the Feishu/Lark developer console for that event.
-- Keep `im:message` and `im:message:send_as_bot` enabled so Hermes can reply to the inviter.
+- Keep `im:message` and `im:message:send_as_bot` enabled so X19 can reply to the inviter.
 - Ensure the gateway user allowlist or pairing policy authorizes the inviter. Meeting invitations do not bypass normal gateway access checks.
 
 ## Media Support
@@ -444,9 +444,9 @@ When a user sends multiple text messages in quick succession, they are merged in
 
 | Setting | Env Var | Default |
 |---------|---------|---------|
-| Quiet period | `HERMES_FEISHU_TEXT_BATCH_DELAY_SECONDS` | 0.6s |
-| Max messages per batch | `HERMES_FEISHU_TEXT_BATCH_MAX_MESSAGES` | 8 |
-| Max characters per batch | `HERMES_FEISHU_TEXT_BATCH_MAX_CHARS` | 4000 |
+| Quiet period | `X19_FEISHU_TEXT_BATCH_DELAY_SECONDS` | 0.6s |
+| Max messages per batch | `X19_FEISHU_TEXT_BATCH_MAX_MESSAGES` | 8 |
+| Max characters per batch | `X19_FEISHU_TEXT_BATCH_MAX_CHARS` | 4000 |
 
 ### Media Batching
 
@@ -454,7 +454,7 @@ Multiple media attachments sent in quick succession (e.g., dragging several imag
 
 | Setting | Env Var | Default |
 |---------|---------|---------|
-| Quiet period | `HERMES_FEISHU_MEDIA_BATCH_DELAY_SECONDS` | 0.8s |
+| Quiet period | `X19_FEISHU_MEDIA_BATCH_DELAY_SECONDS` | 0.8s |
 
 ### Per-Chat Serialization
 
@@ -538,11 +538,11 @@ Groups not listed in `group_rules` fall back to `default_group_policy` (defaults
 
 ## Deduplication
 
-Inbound messages are deduplicated using message IDs with a 24-hour TTL. The dedup state is persisted across restarts to `~/.hermes/feishu_seen_message_ids.json`.
+Inbound messages are deduplicated using message IDs with a 24-hour TTL. The dedup state is persisted across restarts to `~/.x19/feishu_seen_message_ids.json`.
 
 | Setting | Env Var | Default |
 |---------|---------|---------|
-| Cache size | `HERMES_FEISHU_DEDUP_CACHE_SIZE` | 2048 entries |
+| Cache size | `X19_FEISHU_DEDUP_CACHE_SIZE` | 2048 entries |
 
 ## All Environment Variables
 
@@ -565,11 +565,11 @@ Inbound messages are deduplicated using message IDs with a 24-hour TTL. The dedu
 | `FEISHU_WEBHOOK_HOST` | — | `127.0.0.1` | Webhook server bind address |
 | `FEISHU_WEBHOOK_PORT` | — | `8765` | Webhook server port |
 | `FEISHU_WEBHOOK_PATH` | — | `/feishu/webhook` | Webhook endpoint path |
-| `HERMES_FEISHU_DEDUP_CACHE_SIZE` | — | `2048` | Max deduplicated message IDs to track |
-| `HERMES_FEISHU_TEXT_BATCH_DELAY_SECONDS` | — | `0.6` | Text burst debounce quiet period |
-| `HERMES_FEISHU_TEXT_BATCH_MAX_MESSAGES` | — | `8` | Max messages merged per text batch |
-| `HERMES_FEISHU_TEXT_BATCH_MAX_CHARS` | — | `4000` | Max characters merged per text batch |
-| `HERMES_FEISHU_MEDIA_BATCH_DELAY_SECONDS` | — | `0.8` | Media burst debounce quiet period |
+| `X19_FEISHU_DEDUP_CACHE_SIZE` | — | `2048` | Max deduplicated message IDs to track |
+| `X19_FEISHU_TEXT_BATCH_DELAY_SECONDS` | — | `0.6` | Text burst debounce quiet period |
+| `X19_FEISHU_TEXT_BATCH_MAX_MESSAGES` | — | `8` | Max messages merged per text batch |
+| `X19_FEISHU_TEXT_BATCH_MAX_CHARS` | — | `4000` | Max characters merged per text batch |
+| `X19_FEISHU_MEDIA_BATCH_DELAY_SECONDS` | — | `0.8` | Media burst debounce quiet period |
 
 WebSocket and per-group ACL settings are configured via `config.yaml` under `platforms.feishu.extra` (see [WebSocket Tuning](#websocket-tuning) and [Per-Group Access Control](#per-group-access-control) above).
 
@@ -580,20 +580,20 @@ WebSocket and per-group ACL settings are configured via `config.yaml` under `pla
 | `lark-oapi not installed` | Install the SDK: `pip install lark-oapi` |
 | `websockets not installed; websocket mode unavailable` | Install websockets: `pip install websockets` |
 | `aiohttp not installed; webhook mode unavailable` | Install aiohttp: `pip install aiohttp` |
-| `FEISHU_APP_ID or FEISHU_APP_SECRET not set` | Set both env vars or configure via `hermes gateway setup` |
-| `Another local Hermes gateway is already using this Feishu app_id` | Only one Hermes instance can use the same app_id at a time. Stop the other gateway first. |
+| `FEISHU_APP_ID or FEISHU_APP_SECRET not set` | Set both env vars or configure via `x19 gateway setup` |
+| `Another local X19 gateway is already using this Feishu app_id` | Only one X19 instance can use the same app_id at a time. Stop the other gateway first. |
 | Bot doesn't respond in groups | Ensure the bot is @mentioned, check `FEISHU_GROUP_POLICY`, and verify the sender is in `FEISHU_ALLOWED_USERS` if policy is `allowlist` |
 | `Webhook rejected: invalid verification token` | Ensure `FEISHU_VERIFICATION_TOKEN` matches the token in your Feishu app's Event Subscriptions config |
 | `Webhook rejected: invalid signature` | Ensure `FEISHU_ENCRYPT_KEY` matches the encrypt key in your Feishu app config |
 | Post messages show as plain text | The Feishu API rejected the post payload; this is normal fallback behavior. Check logs for details. |
 | Images/files not received by bot | Grant `im:message` and `im:resource` permission scopes to your Feishu app |
 | Bot identity not auto-detected | Usually a transient network issue reaching Feishu's bot info endpoint. Set `FEISHU_BOT_OPEN_ID` and `FEISHU_BOT_NAME` manually as a workaround. |
-| Peer bot messages still ignored after enabling `FEISHU_ALLOW_BOTS` | Hermes can't identify itself yet — set `FEISHU_BOT_OPEN_ID` (and `FEISHU_BOT_USER_ID` if your app uses `sender_id_type=user_id`). |
+| Peer bot messages still ignored after enabling `FEISHU_ALLOW_BOTS` | X19 can't identify itself yet — set `FEISHU_BOT_OPEN_ID` (and `FEISHU_BOT_USER_ID` if your app uses `sender_id_type=user_id`). |
 | Peer bots show as `ou_xxxxxx` instead of by name | Grant the `application:bot.basic_info:read` scope. |
-| Error 200340 (also seen as 220340) when clicking approval buttons | Feishu has no valid card callback for the published app version: add `card.action.trigger` under the **Callback Configuration** tab (not Event Configuration), pick Long Connection / the request URL, enable **Interactive Card**, then publish a new version. See [Required Feishu App Configuration](#required-feishu-app-configuration). The click never reaches Hermes, so nothing appears in `gateway.log`. |
+| Error 200340 (also seen as 220340) when clicking approval buttons | Feishu has no valid card callback for the published app version: add `card.action.trigger` under the **Callback Configuration** tab (not Event Configuration), pick Long Connection / the request URL, enable **Interactive Card**, then publish a new version. See [Required Feishu App Configuration](#required-feishu-app-configuration). The click never reaches X19, so nothing appears in `gateway.log`. |
 | Error 200342 / 200343 when clicking approval buttons | Webhook mode: Feishu cannot connect to / resolve the callback request URL. Fix the URL or switch to Long Connection. |
 | `Webhook rate limit exceeded` | More than 120 requests/minute from the same IP. This is usually a misconfiguration or loop. |
 
 ## Toolset
 
-Feishu / Lark uses the `hermes-feishu` platform preset, which includes the same core tools as Telegram and other gateway-based messaging platforms.
+Feishu / Lark uses the `x19-feishu` platform preset, which includes the same core tools as Telegram and other gateway-based messaging platforms.

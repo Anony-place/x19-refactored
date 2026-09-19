@@ -218,7 +218,7 @@ def gateway_tts_turn(monkeypatch, tmp_path):
     from gateway.turn_context import TurnContext
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
 
     class Agent(StreamDeliveryMixin):
         _strip_think_blocks = strip_think_blocks

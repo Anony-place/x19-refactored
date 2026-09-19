@@ -21,8 +21,8 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from hermes_cli.sqlite_util import add_column_if_missing
-from hermes_constants import get_hermes_home
+from x19_cli.sqlite_util import add_column_if_missing
+from x19_constants import get_x19_home
 
 logger = logging.getLogger(__name__)
 _DB_LOCK = threading.Lock()
@@ -139,11 +139,11 @@ def _runtime_retryable(last_error: Any) -> bool:
 
 
 def _db_path():
-    return get_hermes_home() / "state.db"
+    return get_x19_home() / "state.db"
 
 
 def _connect() -> sqlite3.Connection:
-    from hermes_cli.sqlite_util import open_db
+    from x19_cli.sqlite_util import open_db
 
     # Shared state.db: SessionDB owns the durable PRAGMA set; this opener keeps the plain-tuple rows
     # and the 10 s busy timeout it always had.
@@ -175,7 +175,7 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
 
 
 def _transaction():
-    from hermes_cli.sqlite_util import transaction
+    from x19_cli.sqlite_util import transaction
 
     return transaction(_connect())
 
@@ -492,7 +492,7 @@ def ledger_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
     """Read the ``gateway.delivery_ledger`` config gate (default on)."""
     try:
         if config is None:
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
             config = load_config()
         value = (config.get("gateway") or {}).get("delivery_ledger", True)
         return value.strip().lower() not in {"false", "0", "no", "off"} if isinstance(value, str) else bool(value)
@@ -500,31 +500,3 @@ def ledger_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
         return True
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-import json  # noqa: F401,E402
-
-def debug_rows(limit: int = 20) -> str:
-    """Human-readable dump for ad-hoc inspection (sqlite3-free path)."""
-    with _DB_LOCK, _transaction() as conn:
-        rows = conn.execute(
-            """SELECT obligation_id, session_key, state, attempts,
-                      created_at, updated_at, last_error
-               FROM delivery_obligations
-               ORDER BY updated_at DESC LIMIT ?""",
-            (limit,),
-        ).fetchall()
-    return json.dumps(
-        [
-            {
-                "id": r[0], "session": r[1], "state": r[2], "attempts": r[3],
-                "created_at": r[4], "updated_at": r[5], "last_error": r[6],
-            }
-            for r in rows
-        ],
-        indent=2,
-    )
-# ---- END PLUGIN-COMPAT ----

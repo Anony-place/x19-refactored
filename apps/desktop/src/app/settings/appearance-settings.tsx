@@ -7,7 +7,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import type { DesktopMarketplaceSearchItem } from '@/global'
-import { saveHermesConfig } from '@/hermes'
+import { saveX19Config } from '@/x19'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { Check, Download, Loader2, Palette, Trash2 } from '@/lib/icons'
@@ -61,7 +61,7 @@ import { installVscodeThemeFromMarketplace } from '@/themes/install'
 import type { DesktopTheme } from '@/themes/types'
 import { $marketplaceInstalls, isUserTheme, removeUserTheme } from '@/themes/user-themes'
 
-import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
+import { setX19ConfigCache, useX19ConfigRecord } from '../hooks/use-config-record'
 
 import { ChatFontSetting } from './chat-font-setting'
 import { MODE_OPTIONS } from './constants'
@@ -79,7 +79,7 @@ import { useDeepLinkHighlight } from './use-deep-link-highlight'
 function ResumeLastSessionSetting() {
   const { t } = useI18n()
   const a = t.settings.appearance
-  const configQuery = useHermesConfigRecord()
+  const configQuery = useX19ConfigRecord()
   const config = configQuery.data
   const checked = (config?.display as { resume_last_session?: unknown } | undefined)?.resume_last_session !== false
 
@@ -89,17 +89,17 @@ function ResumeLastSessionSetting() {
     }
 
     const next = setNested(config, 'display.resume_last_session', on)
-    setHermesConfigCache(next)
+    setX19ConfigCache(next)
     // Sparse patch: PUT /api/config deep-merges, and echoing the cached
     // snapshot would overwrite keys other surfaces changed since it loaded.
-    void saveHermesConfig(setNested({}, 'display.resume_last_session', on))
+    void saveX19Config(setNested({}, 'display.resume_last_session', on))
       .then(result => {
         if (!result.ok) {
           throw new Error(t.settings.config.autosaveFailed)
         }
       })
       .catch(error => {
-        setHermesConfigCache(config)
+        setX19ConfigCache(config)
         notifyError(error, t.settings.config.autosaveFailed)
       })
   }
@@ -192,7 +192,7 @@ function MarketplaceThemeResults({
 
   const search = useQuery({
     enabled: debounced.length > 0,
-    queryFn: () => window.hermesDesktop?.themes?.searchMarketplace(debounced) ?? Promise.resolve([]),
+    queryFn: () => window.x19Desktop?.themes?.searchMarketplace(debounced) ?? Promise.resolve([]),
     queryKey: ['marketplace-themes-settings', debounced],
     staleTime: 5 * 60 * 1000
   })

@@ -11,11 +11,11 @@ goals, notifications, shutdown, ...), sessions in `session*.py`, slash handlers 
 over `platforms/base.py`. `builtin_hooks/` is the extension point for always-registered gateway
 hooks (none shipped). The gateway reads user YAML **raw** (`run.py` + `config.py`), not through
 `DEFAULT_CONFIG` — a key the CLI sees but the gateway doesn't means you're on the wrong loader
-(`hermes_cli/AGENTS.md`). Each adapter picks a base toolset (Telegram → `"messaging"`).
+(`x19_cli/AGENTS.md`). Each adapter picks a base toolset (Telegram → `"messaging"`).
 
 Slash commands: handlers are looked up by name through `_command_handler_table`; a command is
 listed in `_IDLE_COMMANDS` or `_PLAIN_COMMANDS` (works mid-run) in `run_busy.py`. No
-`if canonical == ...` chains. Registry + adding a command: `hermes_cli/AGENTS.md`.
+`if canonical == ...` chains. Registry + adding a command: `x19_cli/AGENTS.md`.
 
 ## The gateway has TWO message guards — both must bypass approval/control commands
 
@@ -31,7 +31,7 @@ lifecycle.
 
 Adapters with `draft_stream_is_message = True` (relay Slack native streaming) keep ONE cumulative
 native stream per turn; the stream IS the final message. Four invariants, each from a live
-duplicate-final incident (NS-658 canary ledger, hermes#85796 / gateway-gateway#210); violating any
+duplicate-final incident (NS-658 canary ledger, x19#85796 / gateway-gateway#210); violating any
 re-creates a duplicate or frozen stream:
 
 1. **Draft frames are prefix-stable.** Frame N must be a string prefix of frame N+1. Never mutate
@@ -60,7 +60,7 @@ MagicMock adapters in older tests auto-create truthy attributes.
 
 `terminal(background=true, notify_on_complete=true)` starts a gateway watcher that detects
 completion and triggers a new agent turn. Verbosity: `display.background_process_notifications`
-(or `HERMES_BACKGROUND_NOTIFICATIONS`): `concise` (default; one line, failures append an output
+(or `X19_BACKGROUND_NOTIFICATIONS`): `concise` (default; one line, failures append an output
 tail), `all` (running updates + final raw output), `result` (final raw output only), `error`
 (final raw output only on non-zero exit), `off`.
 
@@ -90,7 +90,7 @@ briefs are labelled user turns appended at a turn boundary, preserving role alte
 
 ## `/login` (off-turn, paired DM only)
 
-`/login` is registered in `hermes_cli/commands.py` with `busy_policy="dispatch"` and
+`/login` is registered in `x19_cli/commands.py` with `busy_policy="dispatch"` and
 `desktop="settings"`, listed in `run_busy.py::_PLAIN_COMMANDS`, and handled by
 `GatewayLoginCommandsMixin` (`gateway/slash_commands_login.py`). It refuses outside a paired DM:
 `chat_type in {"dm","private"}`, a truthy `chat_id`, and a platform whose `"dm"` really is a paired
@@ -122,9 +122,9 @@ an expiring access token that nothing refreshes.
 
 ## Gateway lifecycle vs. the Desktop app
 
-`hermes serve` (control plane, desktop-spawned child) dies with the app — by design. The messaging
+`x19 serve` (control plane, desktop-spawned child) dies with the app — by design. The messaging
 gateway (`gateway run`) SURVIVES the app: the serve backend's `/api/gateway/*` endpoints spawn it
-detached (`_spawn_hermes_action` — `start_new_session` / `DETACHED_PROCESS`), so `before-quit`'s
+detached (`_spawn_x19_action` — `start_new_session` / `DETACHED_PROCESS`), so `before-quit`'s
 SIGTERM never reaches it and bots keep running. The known breach is the Windows shim-unlock
 teardown (`taskkill /T /F` on venv-shim holders, #85265), which exists to let updates proceed and is
 replaced by #92091's `pause-for-update`. Do NOT "fix" gateway-dies-with-app by re-parenting the

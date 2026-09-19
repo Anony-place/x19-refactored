@@ -1,7 +1,7 @@
 /**
  * E2E: the New Group Chat menu gate with one local bot plus remote-connection
  * bots (#101543). "This device" is the Electron-managed local backend with
- * only its `default` profile; "Homelab" is a REAL second `hermes serve`
+ * only its `default` profile; "Homelab" is a REAL second `x19 serve`
  * registered as a remote URL connection. The gate must count the same
  * selectable set the dialog seats — bots from every registered connection —
  * so 1 local + 1 remote enables New Group Chat and the room can be created.
@@ -37,23 +37,23 @@ interface RemoteGateway {
   close: () => Promise<void>
 }
 
-/** The worktree's own backend: `python -m hermes_cli.main` from the repo root
- *  (the venv's `hermes` console script resolves the package it was installed
+/** The worktree's own backend: `python -m x19_cli.main` from the repo root
+ *  (the venv's `x19` console script resolves the package it was installed
  *  from, which need not be this checkout). */
-function hermesCommand(): { bin: string; args: string[] } {
+function x19Command(): { bin: string; args: string[] } {
   const venvPython = path.join(REPO_ROOT, '.venv', 'bin', 'python')
 
   if (fs.existsSync(venvPython)) {
-    return { bin: venvPython, args: ['-m', 'hermes_cli.main'] }
+    return { bin: venvPython, args: ['-m', 'x19_cli.main'] }
   }
 
-  const result = spawnSync('which', ['hermes'], { encoding: 'utf8' })
+  const result = spawnSync('which', ['x19'], { encoding: 'utf8' })
 
   if (result.status === 0 && result.stdout.trim()) {
     return { bin: result.stdout.trim(), args: [] }
   }
 
-  throw new Error('hermes backend not found: create the repo venv (uv sync) or put hermes on PATH')
+  throw new Error('x19 backend not found: create the repo venv (uv sync) or put x19 on PATH')
 }
 
 async function freePort(): Promise<number> {
@@ -85,12 +85,12 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
   const port = await freePort()
   const url = `http://127.0.0.1:${port}`
 
-  const hermes = hermesCommand()
+  const x19 = x19Command()
 
-  const child: ChildProcess = spawn(hermes.bin, [...hermes.args, 'serve', '--host', '127.0.0.1', '--port', String(port), '--skip-build'], {
+  const child: ChildProcess = spawn(x19.bin, [...x19.args, 'serve', '--host', '127.0.0.1', '--port', String(port), '--skip-build'], {
     cwd: REPO_ROOT,
     detached: true,
-    env: { ...process.env, HERMES_HOME: home, HERMES_DASHBOARD_SESSION_TOKEN: REMOTE_TOKEN, PYTHONPATH: REPO_ROOT },
+    env: { ...process.env, X19_HOME: home, X19_DASHBOARD_SESSION_TOKEN: REMOTE_TOKEN, PYTHONPATH: REPO_ROOT },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
@@ -101,11 +101,11 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
 
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`remote hermes serve exited early (${child.exitCode}):\n${log}`)
+      throw new Error(`remote x19 serve exited early (${child.exitCode}):\n${log}`)
     }
 
     try {
-      const response = await fetch(`${url}/api/status`, { headers: { 'X-Hermes-Session-Token': REMOTE_TOKEN } })
+      const response = await fetch(`${url}/api/status`, { headers: { 'X-X19-Session-Token': REMOTE_TOKEN } })
 
       if (response.ok) {
         break
@@ -118,7 +118,7 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
   }
 
   if (Date.now() >= deadline) {
-    throw new Error(`remote hermes serve never became ready:\n${log}`)
+    throw new Error(`remote x19 serve never became ready:\n${log}`)
   }
 
   return {
@@ -171,8 +171,8 @@ test.describe('New Group Chat gate — one local bot plus remote-connection bots
     test.setTimeout(240_000)
     mock = await startMockServer()
     sandbox = createSandbox('group-gate')
-    writeMockProviderConfig(sandbox.hermesHome, mock.url)
-    writeEnvFile(sandbox.hermesHome)
+    writeMockProviderConfig(sandbox.x19Home, mock.url)
+    writeEnvFile(sandbox.x19Home)
     // This device: ONLY its primary `default` profile. Homelab: default + inbox (rendered title-cased, "Inbox").
     remote = await startRemoteGateway(sandbox.root, mock.url, ['inbox'])
     writeConnectionsRegistry(sandbox, remote.url)
@@ -206,7 +206,7 @@ test.describe('New Group Chat gate — one local bot plus remote-connection bots
 
     const dialog = page.getByRole('dialog', { name: 'New Group Chat' })
     await expect(dialog).toBeVisible()
-    await dialog.getByText('Hermes', { exact: true }).first().locator('xpath=ancestor::label').getByRole('checkbox').click()
+    await dialog.getByText('X19', { exact: true }).first().locator('xpath=ancestor::label').getByRole('checkbox').click()
     await dialog.getByText('Inbox', { exact: true }).first().locator('xpath=ancestor::label').getByRole('checkbox').click()
     await expect(dialog.getByRole('button', { name: 'Create Group (2)' })).toBeEnabled()
     await page.screenshot({ path: `${SHOTS}/group-create-gate-dialog.png` })

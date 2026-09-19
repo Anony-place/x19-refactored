@@ -25,7 +25,7 @@ from gateway.config import Platform
 from gateway.media_repair import repair_explicit_computer_use_media_paths
 from gateway.platforms.base import BasePlatformAdapter
 from gateway.turn_context import TurnContext
-from hermes_cli.config import cfg_get
+from x19_cli.config import cfg_get
 from utils import is_truthy_value
 
 if TYPE_CHECKING:  # string annotations only; never imported at runtime (cycle)
@@ -210,7 +210,7 @@ class TurnRunner:
     def _progress_onboarding_hint(self, kwargs: dict) -> None:
         """First-touch onboarding: the first time a tool exceeds _LONG_TOOL_THRESHOLD_S while
         streaming every tool (progress_mode == "all"), append a one-time /verbose hint."""
-        from gateway.run import _hermes_home, _load_gateway_config
+        from gateway.run import _x19_home, _load_gateway_config
         ctx = self._ctx
         try:
             if (kwargs.get("duration") or 0) >= ctx._LONG_TOOL_THRESHOLD_S and ctx.progress_mode == "all":
@@ -220,7 +220,7 @@ class TurnRunner:
                 if gate_on and not is_seen(cfg, TOOL_PROGRESS_FLAG):
                     ctx.long_tool_hint_fired[0] = True
                     ctx.progress_queue.put(tool_progress_hint_gateway())
-                    mark_seen(_hermes_home / "config.yaml", TOOL_PROGRESS_FLAG)
+                    mark_seen(_x19_home / "config.yaml", TOOL_PROGRESS_FLAG)
         except Exception as err:
             logger.debug("tool-progress onboarding hint failed: %s", err)
 
@@ -344,7 +344,7 @@ class TurnRunner:
         def fallback_text(self) -> str:
             labels = {"in_progress": "running", "complete": "complete", "error": "error"}
             lines = [f"- {t['title']} - {labels.get(t['status'], t['status'])}" for t in self.visible_tasks()]
-            return "Hermes is working\n" + "\n".join(lines)
+            return "X19 is working\n" + "\n".join(lines)
 
         def _upsert(self, call_id: str, title: str) -> Dict[str, str]:
             if call_id not in self.tasks:
@@ -421,7 +421,7 @@ class TurnRunner:
                 return
         if not st.native_failed:
             result = await st.adapter.send_native_task_card_progress(
-                chat_id=ctx.source.chat_id, tasks=st.visible_tasks(), title="Hermes is working",
+                chat_id=ctx.source.chat_id, tasks=st.visible_tasks(), title="X19 is working",
                 reply_to=ctx._progress_reply_to, metadata=ctx._progress_metadata, fallback_text=st.fallback_text(),
             )
             if getattr(result, "success", False):
@@ -982,7 +982,7 @@ class TurnRunner:
         """gateway.platforms.<plat>.skip_context_files: messaging platforms may opt out of
         filesystem-heavy context-file discovery (SOUL.md, AGENTS.md, .cursorrules)."""
         platforms_cfg = (self._ctx.user_config.get("gateway") or {}).get("platforms") or {}
-        # ``hermes gateway setup`` writes ``gateway.platforms`` as a LIST of enabled platform names,
+        # ``x19 gateway setup`` writes ``gateway.platforms`` as a LIST of enabled platform names,
         # not a dict; treat any non-dict shape as "no per-platform overrides" rather than crashing.
         if not isinstance(platforms_cfg, dict):
             return False
@@ -1859,7 +1859,7 @@ class TurnRunner:
 
         The turn message lives on the shared TurnContext (``ctx.message``) so ``_run_agent_inner`` sees
         every rebind. session_key propagates via contextvars (_set_session_env / set_current_session_key)
-        — never os.environ["HERMES_SESSION_KEY"], which would misroute approvals across sessions.
+        — never os.environ["X19_SESSION_KEY"], which would misroute approvals across sessions.
         """
         from gateway.run import _current_max_iterations, _normalize_empty_agent_response, _sanitize_gateway_final_response
         ctx = self._ctx
@@ -1867,13 +1867,13 @@ class TurnRunner:
         # Platform.LOCAL ("local") maps to the "cli" hint key the agent understands.
         # session_key is propagated via contextvars in _set_session_env() (_SESSION_KEY) and via
         # set_current_session_key() (_approval_session_key) below — both concurrency-safe and inherited by
-        # tool worker threads. We deliberately do NOT write os.environ["HERMES_SESSION_KEY"] here:
+        # tool worker threads. We deliberately do NOT write os.environ["X19_SESSION_KEY"] here:
         # os.environ is process-global, so concurrent gateway sessions (e.g. two Discord threads) would
         # clobber each other's value, and a tool thread whose contextvar is unset would fall back to
         # os.environ and read the wrong session key — misrouting command-approval prompts to the wrong
         # thread (#24100). The non-gateway surfaces don't depend on this write: CLI and cron bind the
         # session via contextvars (set_current_session_key / session context), and only the TUI slash-worker
-        # *subprocess* exports HERMES_SESSION_KEY (from its own --session-key argv, a separate process) — so
+        # *subprocess* exports X19_SESSION_KEY (from its own --session-key argv, a separate process) — so
         # removing this in-process gateway write does not affect any of them.
         platform_key = "cli" if ctx.source.platform == Platform.LOCAL else ctx.source.platform.value
         combined_ephemeral = self._combined_ephemeral_prompt()
@@ -1894,7 +1894,7 @@ class TurnRunner:
                 "final_response": (
                     "⚠️ I couldn't connect to the AI model service, so this message wasn't processed. "
                     "Use /login to sign in again, or /model to pick a different model. If it keeps "
-                    "failing, run `hermes doctor` on the host."),
+                    "failing, run `x19 doctor` on the host."),
                 "messages": [], "api_calls": 0, "tools": [],
             }
         pr = runner._provider_routing

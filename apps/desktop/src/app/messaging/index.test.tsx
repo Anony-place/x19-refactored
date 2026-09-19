@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { MessagingPlatformInfo } from '@/types/hermes'
+import type { MessagingPlatformInfo } from '@/types/x19'
 
 const getMessagingPlatforms = vi.fn()
 const updateMessagingPlatform = vi.fn()
@@ -17,7 +17,7 @@ const startTelegramOnboarding = vi.fn()
 const getTelegramOnboardingStatus = vi.fn()
 const applyTelegramOnboarding = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   approvePairing: (platformId: string, requestId: string, profile?: null | string) =>
     approvePairing(platformId, requestId, profile),
   getMessagingPlatforms: (profile?: null | string) => getMessagingPlatforms(profile),
@@ -144,7 +144,7 @@ describe('MessagingView setup-guide link', () => {
   })
 
   it('opens a real docs URL through the validated external opener', async () => {
-    const docsUrl = 'https://hermes-agent.nousresearch.com/docs/user-guide/messaging/teams'
+    const docsUrl = 'https://anony-place.github.io/x19-refactored/docs/user-guide/messaging/teams'
     getMessagingPlatforms.mockResolvedValue({ platforms: [platform({ docs_url: docsUrl })] })
 
     await renderMessaging()
@@ -319,10 +319,10 @@ describe('MessagingView Telegram quick setup', () => {
       expires_at: new Date(Date.now() + 600_000).toISOString(),
       pairing_id: 'pair-1',
       qr_payload: 'tg://pair',
-      suggested_username: 'hermes_bot'
+      suggested_username: 'x19_bot'
     })
     getTelegramOnboardingStatus.mockResolvedValue({
-      bot_username: 'hermes_bot',
+      bot_username: 'x19_bot',
       expires_at: new Date(Date.now() + 600_000).toISOString(),
       owner_user_id: '8792111505',
       status: 'ready'

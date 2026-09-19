@@ -23,7 +23,7 @@ rung right below (credential-pool rotation) documents the intended behavior with
 fall through to the provider fallback" and guards its retry with try/except.
 
 The first test drives the real ladder generator with a scripted driver. The second
-exercises the real path end to end: a temp ``HERMES_HOME`` whose ``config.yaml``
+exercises the real path end to end: a temp ``X19_HOME`` whose ``config.yaml``
 declares a ``fallback_chain``, the real client construction and HTTP layer against a
 local endpoint, with only the credential sources stubbed (the Nous portal account
 probe and the runtime-credential fetch are external boundaries).
@@ -241,7 +241,7 @@ def test_auth_refresh_retry_failure_reaches_the_configured_chain_over_http(
     """End to end: the configured chain must serve the retry the refresh could not."""
     host_url, requests = nous_ladder_endpoint
     local_url = "http://127.0.0.1:%s" % host_url.rsplit(":", 1)[1]
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     monkeypatch.setenv("AUX_FB_KEY", "fallback-test-key")
     config = {
         "model": {"provider": "nous", "default": AUX_MODEL},

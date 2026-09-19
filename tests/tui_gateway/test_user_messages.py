@@ -47,7 +47,7 @@ def test_busy_message_names_the_real_gesture_not_a_missing_slash_command(command
 def test_agent_init_and_resume_failures_point_at_existing_commands():
     init = um.agent_init_failed_message(RuntimeError("Unknown provider 'openrouterr'"))
     assert not init.startswith("agent init failed")
-    assert "openrouterr" in init and "/model" in init and "hermes setup" in init
+    assert "openrouterr" in init and "/model" in init and "x19 setup" in init
     assert "/setup" not in init  # ui-tui-only launcher; Desktop has no such command
 
     resume = um.resume_failed_message(ValueError("corrupt row"))

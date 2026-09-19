@@ -16,7 +16,7 @@ import threading
 
 import pytest
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 from tools.mcp_dashboard_oauth import DashboardOAuthFlow
 from tui_gateway import mcp_oauth_sessions
 from tui_gateway.mcp_oauth_sessions import (
@@ -73,7 +73,7 @@ def _fake_worker_publishes_url(monkeypatch, state="teststate123"):
     carrying *state* and then waits for the callback like the real worker's
     SDK does."""
 
-    def worker(session_id, hermes_home, server_name, cfg, reconnect_live):
+    def worker(session_id, x19_home, server_name, cfg, reconnect_live):
         rec = mcp_oauth_sessions._sessions.get(session_id)
         flow = rec["flow"]
         import asyncio
@@ -107,7 +107,7 @@ def test_start_flow_client_redirect_skips_gateway_listener(monkeypatch):
     )
 
     result = mcp_oauth_sessions.start_flow(
-        str(get_hermes_home()),
+        str(get_x19_home()),
         "clicky",
         {"url": "https://mcp.example.com/mcp", "auth": "oauth"},
         client_redirect_uri="http://127.0.0.1:8412/callback",
@@ -132,7 +132,7 @@ def test_start_flow_rejects_bad_client_redirect(monkeypatch):
     _fake_worker_publishes_url(monkeypatch)
     with pytest.raises(ValueError):
         mcp_oauth_sessions.start_flow(
-            str(get_hermes_home()),
+            str(get_x19_home()),
             "clicky2",
             {"url": "https://mcp.example.com/mcp", "auth": "oauth"},
             client_redirect_uri="https://evil.example.com/callback",
@@ -153,7 +153,7 @@ def _make_session(session_id="sess-relay-1", server="hosp", state="s3cr3tstate")
         flow_id=session_id,
         server_name=server,
         profile=None,
-        hermes_home=str(get_hermes_home()),
+        x19_home=str(get_x19_home()),
         redirect_uri="http://127.0.0.1:9000/callback",
     )
     # Pin the expected state the way publish_authorization_url does.
@@ -167,7 +167,7 @@ def _make_session(session_id="sess-relay-1", server="hosp", state="s3cr3tstate")
     rec = {
         "session_id": session_id,
         "server_name": server,
-        "hermes_home": str(get_hermes_home()),
+        "x19_home": str(get_x19_home()),
         "flow": flow,
         "httpd": None,
         "created_at": __import__("time").time(),

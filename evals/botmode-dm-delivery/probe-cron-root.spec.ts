@@ -16,19 +16,19 @@ test.beforeAll(async () => {
   const sandbox = createSandbox('cron-root')
   const mock = await startMockServer({ holdFirstCompletionContaining: 'ORDINARY_CRON_SENTINEL' })
   for (const name of ['default', 'alpha', 'beta']) {
-    const home = name === 'default' ? sandbox.hermesHome : path.join(sandbox.hermesHome, 'profiles', name)
+    const home = name === 'default' ? sandbox.x19Home : path.join(sandbox.x19Home, 'profiles', name)
     fs.mkdirSync(home, { recursive: true })
     writeMockProviderConfig(home, mock.url)
     writeEnvFile(home)
     fs.writeFileSync(path.join(home, 'SOUL.md'), `# ${name}\nA Bot Mode teammate.\n`)
-    fs.writeFileSync(path.join(home, 'profile.yaml'), `name: ${name}\nui_meta:\n  hermes-bots: {}\n`)
+    fs.writeFileSync(path.join(home, 'profile.yaml'), `name: ${name}\nui_meta:\n  x19-bots: {}\n`)
   }
   const bin = path.join(sandbox.root, 'bin')
   fs.mkdirSync(bin)
-  fs.writeFileSync(path.join(bin, 'hermes'), `#!/bin/sh\ncd ${repo}\nprintf '%s\\n' "$$ $HERMES_HOME $*" >> ${evidence}/children.log\nexec ${python} -m hermes_cli.main "$@"\n`, { mode: 0o755 })
-  env = buildAppEnv(sandbox, { HOME: sandbox.root, HERMES_DESKTOP_PYTHON: python,
-    HERMES_DESKTOP_HERMES: path.join(bin, 'hermes'), PATH: `${bin}:${process.env.PATH}`,
-    PYTHONPATH: repo, HERMES_SINGLE_QUERY_LINGER_SECONDS: '1' })
+  fs.writeFileSync(path.join(bin, 'x19'), `#!/bin/sh\ncd ${repo}\nprintf '%s\\n' "$$ $X19_HOME $*" >> ${evidence}/children.log\nexec ${python} -m x19_cli.main "$@"\n`, { mode: 0o755 })
+  env = buildAppEnv(sandbox, { HOME: sandbox.root, X19_DESKTOP_PYTHON: python,
+    X19_DESKTOP_X19: path.join(bin, 'x19'), PATH: `${bin}:${process.env.PATH}`,
+    PYTHONPATH: repo, X19_SINGLE_QUERY_LINGER_SECONDS: '1' })
   const { app, page } = await launchDesktop(env)
   fixture = { app, page, sandbox, mock, mockUrl: mock.url, cleanup: async () => {
     await app.close().catch(() => undefined)
@@ -58,12 +58,12 @@ async function openBot(name: string) {
 test('ordinary cron pins an unowned named target under a custom root', async () => {
   test.setTimeout(240_000)
   const page = fixture.page
-  const composer = await openBot('Hermes')
+  const composer = await openBot('X19')
   await expect(page.getByText('Say something to get started.').filter({ visible: true })).toBeVisible({ timeout: 120_000 })
   await composer.fill('initialize default Desktop owner')
   await page.keyboard.press('Enter')
   await expect(page.getByText(MOCK_REPLY).filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 })
-  const discovery = 'from pathlib import Path; import json,os; from tools.bot_live_delivery import find_canonical_owner; h=Path(os.environ["HERMES_HOME"]); print(json.dumps({"default":find_canonical_owner(h),"alpha":find_canonical_owner(h/"profiles"/"alpha")}))'
+  const discovery = 'from pathlib import Path; import json,os; from tools.bot_live_delivery import find_canonical_owner; h=Path(os.environ["X19_HOME"]); print(json.dumps({"default":find_canonical_owner(h),"alpha":find_canonical_owner(h/"profiles"/"alpha")}))'
   const before = probe(discovery)
   expect(before.default.surface).toBe('desktop')
   expect(before.alpha).toBeNull()
@@ -82,21 +82,21 @@ test('ordinary cron pins an unowned named target under a custom root', async () 
     expect(held.alpha.surface).toBe('cli')
     const launched = fs.readFileSync(path.join(evidence, 'children.log'), 'utf8').trim().split('\n').at(-1)!
     expect(Number(launched.split(' ')[0])).toBe(held.alpha.pid)
-    expect(launched).toContain(path.join(fixture.sandbox.hermesHome, 'profiles', 'alpha'))
+    expect(launched).toContain(path.join(fixture.sandbox.x19Home, 'profiles', 'alpha'))
     expect(held.default.lease_id).toBe(before.default.lease_id)
-    expect(fs.existsSync(path.join(fixture.sandbox.hermesHome, 'cron', 'bot_chat_pending'))).toBe(false)
+    expect(fs.existsSync(path.join(fixture.sandbox.x19Home, 'cron', 'bot_chat_pending'))).toBe(false)
     fs.writeFileSync(path.join(evidence, 'owners.json'), JSON.stringify({ before, held }, null, 2))
     fixture.mock.releaseHeldStream()
     await expect.poll(() => child.exitCode, { timeout: 60_000 }).toBe(0)
     expect(JSON.parse(fs.readFileSync(resultPath, 'utf8')).result).toBeNull()
     await openBot('alpha')
     await expect(page.getByText(/ORDINARY_CRON_SENTINEL/).filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 })
-    const rows = probe('import sqlite3,json,os; from pathlib import Path; h=Path(os.environ["HERMES_HOME"]); print(json.dumps({n:sqlite3.connect(h/"state.db" if n=="default" else h/"profiles"/n/"state.db").execute("select session_id,role,content from messages").fetchall() for n in ["default","alpha"]}))')
+    const rows = probe('import sqlite3,json,os; from pathlib import Path; h=Path(os.environ["X19_HOME"]); print(json.dumps({n:sqlite3.connect(h/"state.db" if n=="default" else h/"profiles"/n/"state.db").execute("select session_id,role,content from messages").fetchall() for n in ["default","alpha"]}))')
     expect(rows.alpha.filter((r: string[]) => r[1] === 'user' && r[2].includes('ORDINARY_CRON_SENTINEL'))).toHaveLength(1)
     expect(rows.default.filter((r: string[]) => r[2].includes('ORDINARY_CRON_SENTINEL'))).toHaveLength(0)
     fs.writeFileSync(path.join(evidence, 'rows.json'), JSON.stringify(rows, null, 2))
     await page.screenshot({ path: path.join(evidence, 'ordinary-recipient.png') })
-    const missing = probe('import json,os; from pathlib import Path; from cron.scheduler_delivery import _deliver_to_bot_chat; h=Path(os.environ["HERMES_HOME"]); p=h/"profiles"/"beta"; p.rename(h/"profiles"/"beta-removed"); result=_deliver_to_bot_chat({"id":"removed","execution_id":"missing"},"MUST_NOT_RUN","beta"); print(json.dumps({"result":result,"recreated":p.exists(),"wrong_root":(Path.home()/".hermes").exists()}))')
+    const missing = probe('import json,os; from pathlib import Path; from cron.scheduler_delivery import _deliver_to_bot_chat; h=Path(os.environ["X19_HOME"]); p=h/"profiles"/"beta"; p.rename(h/"profiles"/"beta-removed"); result=_deliver_to_bot_chat({"id":"removed","execution_id":"missing"},"MUST_NOT_RUN","beta"); print(json.dumps({"result":result,"recreated":p.exists(),"wrong_root":(Path.home()/".x19").exists()}))')
     expect(missing.result).not.toBeNull()
     expect(missing.recreated).toBe(false)
     expect(missing.wrong_root).toBe(false)

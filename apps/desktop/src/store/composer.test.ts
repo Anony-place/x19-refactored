@@ -126,14 +126,14 @@ describe('updateComposerAttachment', () => {
     expect(
       scope.updateIfCurrent(original, {
         attachedSessionId: 'session-1',
-        path: '/root/.hermes/attachments/photo.png',
+        path: '/root/.x19/attachments/photo.png',
         uploadState: undefined
       })
     ).toBe(true)
 
     expect(scope.$attachments.get()[0]).toMatchObject({
       attachedSessionId: 'session-1',
-      path: '/root/.hermes/attachments/photo.png',
+      path: '/root/.x19/attachments/photo.png',
       thumbnailUrl: 'data:image/png;base64,current'
     })
   })

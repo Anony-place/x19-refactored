@@ -15,7 +15,7 @@ RETRY_POLICY = REPO_ROOT / "scripts" / "desktop-update" / "retry-policy.ps1"
 
 @pytest.mark.windows_only
 def test_retry_policy_distinguishes_self_lock_deferral(tmp_path: Path) -> None:
-    install_root = tmp_path / "hermes-agent"
+    install_root = tmp_path / "x19"
     install_root.mkdir()
     marker = install_root / ".update-incomplete"
 
@@ -24,12 +24,12 @@ def test_retry_policy_distinguishes_self_lock_deferral(tmp_path: Path) -> None:
     command = f"""
         . '{policy}'
         $withoutMarker = @(
-            (Test-HermesUpdateShouldRetry -ExitCode 0 -InstallRoot '{root}'),
-            (Test-HermesUpdateShouldRetry -ExitCode 1 -InstallRoot '{root}'),
-            (Test-HermesUpdateShouldRetry -ExitCode 2 -InstallRoot '{root}')
+            (Test-X19UpdateShouldRetry -ExitCode 0 -InstallRoot '{root}'),
+            (Test-X19UpdateShouldRetry -ExitCode 1 -InstallRoot '{root}'),
+            (Test-X19UpdateShouldRetry -ExitCode 2 -InstallRoot '{root}')
         )
         New-Item -ItemType File -Path (Join-Path '{root}' '.update-incomplete') | Out-Null
-        $withMarker = Test-HermesUpdateShouldRetry -ExitCode 2 -InstallRoot '{root}'
+        $withMarker = Test-X19UpdateShouldRetry -ExitCode 2 -InstallRoot '{root}'
         @{{ withoutMarker = $withoutMarker; withMarker = $withMarker }} |
             ConvertTo-Json -Compress
     """

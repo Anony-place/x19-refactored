@@ -365,7 +365,7 @@ export interface MessageReactResult {
   row_id: number
   reactions: MessageReaction[]
 }
-/** One persisted reaction row (``hermes_state_messages.set_message_reaction``); ``seen`` is stamped once announced. */
+/** One persisted reaction row (``x19_state_messages.set_message_reaction``); ``seen`` is stamped once announced. */
 export interface MessageReaction {
   emoji: string
   author: string
@@ -537,7 +537,7 @@ export interface ConfigGetResult {
   mtime?: number | null
   mcp_rev?: string | null
 }
-/** ``hermes_cli/models.py::list_available_providers`` row. */
+/** ``x19_cli/models.py::list_available_providers`` row. */
 export interface ConfigProviderRef {
   id: string
   label: string
@@ -710,7 +710,7 @@ export interface ModelOptionsResult {
   model?: string
   provider?: string
 }
-/** One ``hermes_cli/inventory.py::build_models_payload`` provider row (the union of every field the builder sets; ``pricing_pending`` / ``free_tier_pending`` mark the cached-only path). */
+/** One ``x19_cli/inventory.py::build_models_payload`` provider row (the union of every field the builder sets; ``pricing_pending`` / ``free_tier_pending`` mark the cached-only path). */
 export interface ModelOptionProvider {
   slug: string
   name: string
@@ -735,13 +735,13 @@ export interface ModelOptionProvider {
   unavailable_models?: string[] | null
   [key: string]: unknown
 }
-/** ``hermes_cli/inventory.py::_apply_capabilities``. */
+/** ``x19_cli/inventory.py::_apply_capabilities``. */
 export interface ModelCapabilities {
   fast: boolean
   reasoning: boolean
   can_disable_reasoning?: boolean | null
 }
-/** ``hermes_cli/inventory.py::_apply_pricing`` — formatted $/Mtok strings (``""`` unknown, ``"free"``); the sale fields are Nous Portal-only. */
+/** ``x19_cli/inventory.py::_apply_pricing`` — formatted $/Mtok strings (``""`` unknown, ``"free"``); the sale fields are Nous Portal-only. */
 export interface ModelPricing {
   input: string
   output: string
@@ -831,7 +831,7 @@ export interface GoalSnapshot {
   last_reason?: string | null
   wait_barrier?: WaitBarrierUntil | WaitBarrierTarget | null
 }
-/** ``hermes_cli/goals.py::GoalContract.to_dict``. */
+/** ``x19_cli/goals.py::GoalContract.to_dict``. */
 export interface GoalContractSnapshot {
   outcome?: string
   verification?: string
@@ -1384,6 +1384,136 @@ export interface ClientCapabilitiesParams {
 export interface ClientCapabilitiesResult {
   server_requests: string[]
 }
+export interface OrgStatusParams {
+  profile?: string | null
+  event_limit?: number | null
+}
+/** ``status`` is the full projection; ``render`` is the same content as dense text. */
+export interface OrgStatusResult {
+  status: OpenModel
+  render?: string
+}
+/** A result/payload row whose known fields are typed but which the producer may extend (the closed set is owned elsewhere: x19_state rows, provider inventories). */
+export type OpenModel = Record<string, unknown>
+export interface OrgAuditParams {
+  profile?: string | null
+  include_outputs?: boolean | null
+}
+export interface OrgAuditResult {
+  audit: OpenModel
+  render?: string
+}
+export interface OrgAgentsResult {
+  agents: OrgAgent[]
+  live_subagents: OpenModel[]
+  counts: OpenModel
+}
+/** One roster slot overlaid with live delegation state (``x19.org.registry``). */
+export interface OrgAgent {
+  role_id: string
+  state?: string
+  kind?: string | null
+  [key: string]: unknown
+}
+export interface OrgRolesResult {
+  roles: OrgRole[]
+}
+/** One registered role (``x19.org.roles.RoleSpec.to_dict``). */
+export interface OrgRole {
+  id: string
+  kind?: string
+  manager_id?: string | null
+  [key: string]: unknown
+}
+export interface OrgTasksParams {
+  profile?: string | null
+  status?: string | null
+  limit?: number | null
+}
+export interface OrgTasksResult {
+  stats: OpenModel
+  tree: OpenModel[]
+  ready: OpenModel[]
+  blocked: OpenModel[]
+  failed: OrgTask[]
+  in_review: OrgTask[]
+  run: OpenModel
+  filtered?: OrgTask[] | null
+  filter?: string | null
+}
+/** One task-graph node (``x19.org.tasks.Task.to_dict``). */
+export interface OrgTask {
+  id: string
+  objective?: string
+  role_id?: string | null
+  status?: string
+  parent_id?: string | null
+  [key: string]: unknown
+}
+export interface OrgEventsParams {
+  profile?: string | null
+  limit?: number | null
+  since_seq?: number | null
+  task_id?: string | null
+  agent_id?: string | null
+}
+export interface OrgEventsResult {
+  events: OrgEvent[]
+  last_seq?: number
+  counts_by_type: OpenModel
+}
+/** One event from the append-only stream (``x19.org.events.OrgEvent.to_dict``). */
+export interface OrgEvent {
+  seq?: number
+  type?: string
+  message?: string
+  [key: string]: unknown
+}
+export interface OrgApprovalsResult {
+  pending: OrgApproval[]
+}
+/** A decision waiting on the operator, or one already made. */
+export interface OrgApproval {
+  id: string
+  task_id?: string | null
+  question?: string
+  decision?: string | null
+  [key: string]: unknown
+}
+export interface OrgApprovalDecisionParams {
+  profile?: string | null
+  approval_id: string
+  decided_by?: string | null
+  note?: string | null
+}
+export interface OrgApprovalResult {
+  approval: OrgApproval
+}
+export interface OrgControlParams {
+  profile?: string | null
+  reason?: string | null
+}
+export interface OrgPauseResult {
+  paused: boolean
+  enforced?: boolean
+}
+export interface OrgStopResult {
+  stopped: boolean
+  cancelled: string[]
+}
+export interface OrgTaskControlParams {
+  profile?: string | null
+  task_id: string
+  op: string
+  reason?: string | null
+  note?: string | null
+  approved?: boolean | null
+}
+export interface OrgTaskControlResult {
+  op: string
+  task_id: string
+  result: OpenModel
+}
 /** ``word`` is the token under the cursor (``@`` prefix = context reference); ``cwd`` / ``session_id`` pick the directory the listing resolves against. */
 export interface CompletePathParams {
   profile?: string | null
@@ -1722,7 +1852,7 @@ export interface SessionForeignListResult {
   host: string
   unreadable?: number
 }
-/** ``hermes_cli/foreign_sessions_browser.py::list_foreign_sessions`` — ``id`` is an opaque handle, never a path. */
+/** ``x19_cli/foreign_sessions_browser.py::list_foreign_sessions`` — ``id`` is an opaque handle, never a path. */
 export interface ForeignSessionRow {
   id: string
   source: ForeignSource
@@ -1795,7 +1925,7 @@ export interface ProjectsPayload {
   projects: ProjectInfo[]
   active_id?: string | null
 }
-/** ``hermes_cli/projects_db.py::Project.to_dict`` — one stored project with its folders. */
+/** ``x19_cli/projects_db.py::Project.to_dict`` — one stored project with its folders. */
 export interface ProjectInfo {
   id: string
   slug: string
@@ -1809,7 +1939,7 @@ export interface ProjectInfo {
   created_at: number
   folders?: ProjectFolder[]
 }
-/** ``hermes_cli/projects_db.py::ProjectFolder.to_dict``. */
+/** ``x19_cli/projects_db.py::ProjectFolder.to_dict``. */
 export interface ProjectFolder {
   path: string
   label?: string | null
@@ -3390,7 +3520,7 @@ export interface SkillHubHit {
   name: string
   description: string
 }
-/** ``hermes_cli.skills_hub.browse_skills`` row. */
+/** ``x19_cli.skills_hub.browse_skills`` row. */
 export interface SkillBrowseItem {
   name?: string
   description?: string
@@ -3399,7 +3529,7 @@ export interface SkillBrowseItem {
   identifier?: string | null
   [key: string]: unknown
 }
-/** ``hermes_cli.skills_hub.inspect_skill``; ``{}`` when the identifier resolves nowhere. */
+/** ``x19_cli.skills_hub.inspect_skill``; ``{}`` when the identifier resolves nowhere. */
 export interface SkillInspectInfo {
   name?: string | null
   description?: string | null
@@ -3658,7 +3788,7 @@ export interface PluginsManageParams {
   ref?: string | null
 }
 export type PluginsAction = 'list' | 'toggle' | 'install' | 'update'
-/** ``list`` → ``plugins`` + counts; ``toggle`` → ``ok``/``unchanged``/``name``/``plugin``; ``install`` → ``hermes_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` → ``ok``/``unchanged``/``sha``. */
+/** ``list`` → ``plugins`` + counts; ``toggle`` → ``ok``/``unchanged``/``name``/``plugin``; ``install`` → ``x19_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` → ``ok``/``unchanged``/``sha``. */
 export interface PluginsManageResult {
   plugins?: AgentPluginRow[] | null
   user_count?: number | null
@@ -3825,7 +3955,7 @@ export interface GatewayReadyPayload {
   replay_epoch: string
   heartbeat?: boolean | null
 }
-/** ``tui_gateway/change_watcher.py::resolve_skin`` — the resolved active skin (``HermesSkin``). ``{}`` when the skin engine failed to load. Colour maps are token → colour string. */
+/** ``tui_gateway/change_watcher.py::resolve_skin`` — the resolved active skin (``X19Skin``). ``{}`` when the skin engine failed to load. Colour maps are token → colour string. */
 export interface SkinPayload {
   name?: string
   description?: string
@@ -3839,7 +3969,7 @@ export interface SkinPayload {
   help_header?: string
   [key: string]: unknown
 }
-/** ``hermes_cli/free_tier_bootstrap.py::SetupRecord.as_payload``. */
+/** ``x19_cli/free_tier_bootstrap.py::SetupRecord.as_payload``. */
 export interface SetupReadyPayload {
   provider_configured: boolean
   inference_provider: string
@@ -4220,7 +4350,7 @@ export interface RpcMethods {
   'browser.manage': { params: BrowserManageParams; result: BrowserManageResult }
   /** Lock one answer of a batch clarify request (editable until every question is locked). */
   'clarify.lock': { params: ClarifyLockParams; result: ClarifyLockResult }
-  /** Run ``hermes <argv>`` non-interactively and capture its output; ``blocked`` explains a refusal. */
+  /** Run ``x19 <argv>`` non-interactively and capture its output; ``blocked`` explains a refusal. */
   'cli.exec': { params: CliExecParams; result: CliExecResult }
   /** What the calling client handles, sent once per connection (after gateway.ready); returns the server→client request methods this backend may send. */
   'client.capabilities': { params: ClientCapabilitiesParams; result: ClientCapabilitiesResult }
@@ -4362,6 +4492,32 @@ export interface RpcMethods {
   'model.options': { params: ModelOptionsParams; result: ModelOptionsResult }
   /** Save an API key for a provider and return its refreshed inventory row. */
   'model.save_key': { params: ModelSaveKeyParams; result: ModelSaveKeyResult }
+  /** Registered roster overlaid with the delegation engine's live subagents. */
+  'org.agents': { params: ProfileParams; result: OrgAgentsResult }
+  /** Decisions waiting on the operator. */
+  'org.approvals': { params: ProfileParams; result: OrgApprovalsResult }
+  /** Approve a gated task or a delivered output. Never auto-resolved. */
+  'org.approve': { params: OrgApprovalDecisionParams; result: OrgApprovalResult }
+  /** Boss Audit Mode: the executive report over the task graph, queue, failures and spend. */
+  'org.audit': { params: OrgAuditParams; result: OrgAuditResult }
+  /** Deny a request; the task fails with the operator's reason recorded. */
+  'org.deny': { params: OrgApprovalDecisionParams; result: OrgApprovalResult }
+  /** Recent organization events; pass since_seq to poll incrementally. */
+  'org.events': { params: OrgEventsParams; result: OrgEventsResult }
+  /** Pause the run; ``enforced`` reports whether the spawn gate really closed. */
+  'org.pause': { params: OrgControlParams; result: OrgPauseResult }
+  /** Resume the run and reopen the spawn gate. */
+  'org.resume': { params: OrgControlParams; result: OrgPauseResult }
+  /** The live role catalog — dynamic, so the client never hardcodes the org chart. */
+  'org.roles': { params: ProfileParams; result: OrgRolesResult }
+  /** Run, phase, counts, roster, blocked/failed/ready tasks and derived next actions. */
+  'org.status': { params: OrgStatusParams; result: OrgStatusResult }
+  /** Stop the run and cancel everything not already terminal; returns the cancelled ids. */
+  'org.stop': { params: OrgControlParams; result: OrgStopResult }
+  /** Retry, cancel, resolve a blocker on, or review one task — the real transition. */
+  'org.task.control': { params: OrgTaskControlParams; result: OrgTaskControlResult }
+  /** The task graph: tree, counts and the ready/blocked/failed/review slices. */
+  'org.tasks': { params: OrgTasksParams; result: OrgTasksResult }
   /** Spill a large paste to a file and hand back the inline placeholder. */
   'paste.collapse': { params: PasteCollapseParams; result: PasteCollapseResult }
   /** Render a PDF's pages to PNG and queue them as images for the next turn. */
@@ -4462,7 +4618,7 @@ export interface RpcMethods {
   'prompt.btw': { params: SideAgentParams; result: TaskIdResult }
   /** Send a user turn to a live session; busy sessions queue / steer / redirect instead of refusing. */
   'prompt.submit': { params: PromptSubmitParams; result: PromptSubmitResult }
-  /** Re-read ~/.hermes/.env (CLI /reload parity); built agents keep their pool until /new. */
+  /** Re-read ~/.x19/.env (CLI /reload parity); built agents keep their pool until /new. */
   'reload.env': { params: ReloadEnvParams; result: ReloadEnvResult }
   /** Tear down and rediscover MCP servers for every live session (prompt cache is invalidated). */
   'reload.mcp': { params: ReloadMcpParams; result: ReloadMcpResult }
@@ -4518,7 +4674,7 @@ export interface RpcMethods {
   'session.redirect': { params: SessionCorrectionParams; result: SessionCorrectionResult }
   /** Attach to a stored session: reuse it if live here, else lazy / deferred / cold / eager rebuild. */
   'session.resume': { params: SessionResumeParams; result: SessionResumeResult }
-  /** Export the transcript to ~/.hermes/sessions/saved (classic /save). */
+  /** Export the transcript to ~/.x19/sessions/saved (classic /save). */
   'session.save': { params: SessionSaveParams; result: SessionSaveResult }
   /** Set/clear hidden (out of the default list, still resumable by its owner) on a session + lineage. */
   'session.set_hidden': { params: SessionSetHiddenParams; result: SessionSetHiddenResult }
@@ -4711,6 +4867,19 @@ export const RPC_METHODS = [
   'model.disconnect',
   'model.options',
   'model.save_key',
+  'org.agents',
+  'org.approvals',
+  'org.approve',
+  'org.audit',
+  'org.deny',
+  'org.events',
+  'org.pause',
+  'org.resume',
+  'org.roles',
+  'org.status',
+  'org.stop',
+  'org.task.control',
+  'org.tasks',
   'paste.collapse',
   'pdf.attach',
   'pet.cancel',

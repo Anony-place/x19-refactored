@@ -75,7 +75,7 @@ class TestMarkRunningJobsInterrupted:
         import cron.scheduler as sched
 
         sched._running_job_ids.update({"job-1", "job-2"})
-        profile_home = sched._get_hermes_home().resolve()
+        profile_home = sched._get_x19_home().resolve()
         sched._running_fire_owners.update(
             {
                 "job-1": {object(): ("owner-1", profile_home)},
@@ -113,7 +113,7 @@ class TestMarkRunningJobsInterrupted:
         import cron.scheduler as sched
 
         sched._running_job_ids.update({"job-1", "job-2"})
-        profile_home = sched._get_hermes_home().resolve()
+        profile_home = sched._get_x19_home().resolve()
         sched._running_fire_owners.update(
             {
                 "job-1": {object(): ("owner-1", profile_home)},
@@ -174,7 +174,7 @@ class TestRunningFireOwnerRegistry:
 
         def _observe_registry(current_job, run):
             assert list(sched._running_fire_owners[current_job["id"]].values()) == [
-                ("owner-1", sched._get_hermes_home().resolve())
+                ("owner-1", sched._get_x19_home().resolve())
             ]
             return True
 
@@ -308,7 +308,7 @@ class TestExecutionScopedInterruption:
     def test_interruption_targets_only_the_interrupted_execution(self):
         import cron.scheduler as sched
 
-        profile_home = sched._get_hermes_home().resolve()
+        profile_home = sched._get_x19_home().resolve()
         old_token = object()
         sched._running_fire_owners["job-1"] = {
             old_token: ("owner-1", profile_home),
@@ -328,7 +328,7 @@ class TestExecutionScopedInterruption:
     def test_only_owners_marks_only_targeted_executions(self):
         import cron.scheduler as sched
 
-        profile_home = sched._get_hermes_home().resolve()
+        profile_home = sched._get_x19_home().resolve()
         token_a, token_b = object(), object()
         sched._running_fire_owners["job-a"] = {token_a: ("owner-a", profile_home)}
         sched._running_fire_owners["job-b"] = {token_b: ("owner-b", profile_home)}
@@ -350,7 +350,7 @@ class TestExecutionScopedInterruption:
         complete through the normal mark path, not the interrupted one."""
         import cron.scheduler as sched
 
-        profile_home = sched._get_hermes_home().resolve()
+        profile_home = sched._get_x19_home().resolve()
         stale_token = object()
         sched._running_fire_owners["job-1"] = {
             stale_token: ("stale-owner", profile_home),

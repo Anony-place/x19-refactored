@@ -40,21 +40,21 @@ from urllib.parse import urlparse
 import httpx
 
 from agent.web_search_provider import WebSearchProvider
-from hermes_cli import __version__ as _HERMES_VERSION
+from x19_cli import __version__ as _X19_VERSION
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = "https://api.perplexity.ai"
 _KEY_URL = "https://www.perplexity.ai/account/api"
 
-# Identify Hermes to Perplexity: the same static harness identity Hermes sends Kimi and
+# Identify X19 to Perplexity: the same static harness identity X19 sends Kimi and
 # OpenCode, plus Perplexity's integration header. No per-user identifier and no separate
 # request; the call already carries the user's own API key.
 _HEADERS = {
-    "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-    "X-Title": "Hermes Agent",
-    "User-Agent": f"HermesAgent/{_HERMES_VERSION}",
-    "X-Pplx-Integration": "hermes-agent",
+    "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
+    "X-Title": "X19",
+    "User-Agent": f"X19Agent/{_X19_VERSION}",
+    "X-Pplx-Integration": "x19",
 }
 
 

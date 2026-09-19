@@ -25,7 +25,7 @@ _ORCHESTRATE_MAX_WORKERS = 6  # max parallel peers for fan-out
 
 def _load_config() -> dict:
     """Read-only view of config.yaml; peers are only read, never mutated (cache-safe)."""
-    from hermes_cli.config import load_config_readonly
+    from x19_cli.config import load_config_readonly
     return load_config_readonly() or {}
 
 
@@ -361,9 +361,3 @@ def register_tools(ctx) -> None:
                           emoji="\U0001f9e9", check_fn=_a2a_tools_available)  # puzzle piece
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import TypedDict  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

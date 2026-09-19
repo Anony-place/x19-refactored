@@ -30,7 +30,7 @@ import {
 
 describe('resolveVenvPython', () => {
   it('returns a real path when a temp venv python file exists', () => {
-    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-vt-'))
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'x19-vt-'))
 
     try {
       const scriptsDir = process.platform === 'win32' ? 'Scripts' : 'bin'
@@ -46,7 +46,7 @@ describe('resolveVenvPython', () => {
   })
 
   it('resolves a uv-default .venv python when legacy venv is absent', () => {
-    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-vt-'))
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'x19-vt-'))
 
     try {
       const scriptsDir = process.platform === 'win32' ? 'Scripts' : 'bin'
@@ -62,7 +62,7 @@ describe('resolveVenvPython', () => {
   })
 
   it('keeps legacy venv precedence when both supported layouts exist', () => {
-    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-vt-'))
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'x19-vt-'))
 
     try {
       fs.mkdirSync(path.join(sandbox, 'venv'), { recursive: true })
@@ -99,9 +99,9 @@ describe('formatBlockerMessage', () => {
 })
 
 describe('formatProbeFailedMessage', () => {
-  it('suggests retry and hermes update', () => {
+  it('suggests retry and x19 update', () => {
     const msg = formatProbeFailedMessage()
-    assert.ok(msg.includes('hermes update'))
+    assert.ok(msg.includes('x19 update'))
     assert.ok(msg.includes('retry'))
   })
 
@@ -182,7 +182,7 @@ describe('parseVenvBlockerScanOutput', () => {
           {
             pid: 47484,
             name: 'python.exe',
-            cmdline: 'C:\\Hermes\\venv\\Scripts\\python.exe -m http.server 8766 --directory C',
+            cmdline: 'C:\\X19\\venv\\Scripts\\python.exe -m http.server 8766 --directory C',
             kind: 'local-preview',
             safeToStop: true,
             label: 'Example Preview',
@@ -202,7 +202,7 @@ describe('parseVenvBlockerScanOutput', () => {
     assert.deepEqual(o.result.processes[0], {
       pid: 47484,
       name: 'python.exe',
-      cmdline: 'C:\\Hermes\\venv\\Scripts\\python.exe -m http.server 8766 --directory C',
+      cmdline: 'C:\\X19\\venv\\Scripts\\python.exe -m http.server 8766 --directory C',
       kind: 'local-preview',
       safeToStop: true,
       label: 'Example Preview',
@@ -381,7 +381,7 @@ describe('scanVenvBlockers', () => {
     assert.equal(calls.length, 1)
     const c = calls[0]
     assert.ok(c.cmd.endsWith('python.exe'))
-    assert.deepEqual(c.args, ['-m', 'hermes_cli._scan_venv_blockers'])
+    assert.deepEqual(c.args, ['-m', 'x19_cli._scan_venv_blockers'])
     assert.equal(c.cwd, '/update/root')
     assert.equal(c.timeout, 60_000)
   })
@@ -422,13 +422,13 @@ describe('stopSafeVenvBlockers', () => {
         ]
       },
       exec,
-      () => 'C:\\Hermes\\venv\\Scripts\\python.exe'
+      () => 'C:\\X19\\venv\\Scripts\\python.exe'
     )
 
     assert.deepEqual(calls, [
       {
-        command: 'C:\\Hermes\\venv\\Scripts\\python.exe',
-        args: ['-m', 'hermes_cli._scan_venv_blockers', '--terminate-safe', '47484', '1722798000.25']
+        command: 'C:\\X19\\venv\\Scripts\\python.exe',
+        args: ['-m', 'x19_cli._scan_venv_blockers', '--terminate-safe', '47484', '1722798000.25']
       }
     ])
     assert.deepEqual(outcome, { stopped: [47484], failed: [] })

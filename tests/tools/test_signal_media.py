@@ -141,7 +141,7 @@ class TestSendSignalMediaWarningMessages:
         if not hasattr(httpx, 'Proxy') or not hasattr(httpx, 'URL'):
             pytest.skip("httpx type annotations incompatible with telegram library")
         from tools.send_message_tool import _send_to_platform
-        from hermes_cli.plugins import discover_plugins
+        from x19_cli.plugins import discover_plugins
         from gateway.platform_registry import platform_registry
 
         config = MagicMock()

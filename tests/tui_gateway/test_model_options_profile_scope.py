@@ -16,12 +16,12 @@ def test_model_options_binds_requested_profile_home(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "_model_picker_context", lambda agent: object())
 
     def build_payload(ctx, **kwargs):
-        from hermes_constants import get_hermes_home
+        from x19_constants import get_x19_home
 
-        seen["home"] = Path(get_hermes_home())
+        seen["home"] = Path(get_x19_home())
         return {"providers": []}
 
-    monkeypatch.setattr("hermes_cli.inventory.build_model_options_payload", build_payload)
+    monkeypatch.setattr("x19_cli.inventory.build_model_options_payload", build_payload)
 
     response = server._methods["model.options"](1, {"profile": "fred-work"})
 

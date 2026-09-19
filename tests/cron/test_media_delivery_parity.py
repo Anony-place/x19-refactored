@@ -2,7 +2,7 @@
 
 Field report (enterprise, v0.20.0/2026.8.3): cron jobs whose output carries
 PDF/image MEDIA attachments deliver text+attachment on scheduled ticks but
-text-only on manual ``hermes cron run <job-id>``. Same box, same token, same
+text-only on manual ``x19 cron run <job-id>``. Same box, same token, same
 scopes — the divergence is process context and error visibility, not
 credentials.
 
@@ -70,7 +70,7 @@ def _install_fake_slack_sender(monkeypatch, result_factory):
     entry = reg_mod.platform_registry.get("slack")
     if entry is None:
         # Populate the registry the same way tools/send_message_tool does.
-        import hermes_cli.plugins as hp_boot
+        import x19_cli.plugins as hp_boot
 
         hp_boot.discover_plugins()
         entry = reg_mod.platform_registry.get("slack")
@@ -78,7 +78,7 @@ def _install_fake_slack_sender(monkeypatch, result_factory):
         pytest.skip("slack platform entry not registered in this environment")
     monkeypatch.setattr(entry, "standalone_sender_fn", fake_sender)
     # Keep plugin discovery from replacing our fake mid-test.
-    import hermes_cli.plugins as hp
+    import x19_cli.plugins as hp
 
     monkeypatch.setattr(hp, "discover_plugins", lambda *a, **k: None)
     return calls
@@ -86,13 +86,13 @@ def _install_fake_slack_sender(monkeypatch, result_factory):
 
 @pytest.fixture()
 def slack_platform_config(monkeypatch, tmp_path):
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "x19-home"
     home.mkdir()
     (home / "config.yaml").write_text(
         "platforms:\n  slack:\n    enabled: true\n    token: xoxb-test\n"
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    # Config caches are process-global; clear them so the temp HERMES_HOME wins.
+    monkeypatch.setenv("X19_HOME", str(home))
+    # Config caches are process-global; clear them so the temp X19_HOME wins.
     try:
         from gateway import config as gwconfig
 
@@ -225,7 +225,7 @@ class TestMediaPolicyEnvBridge:
     """Defect 3: media-policy config must apply outside the gateway process."""
 
     def test_bridge_helper_exists_and_applies_config(self, monkeypatch, tmp_path):
-        home = tmp_path / "hermes-home"
+        home = tmp_path / "x19-home"
         home.mkdir()
         allow_dir = tmp_path / "reports"
         allow_dir.mkdir()
@@ -235,11 +235,11 @@ class TestMediaPolicyEnvBridge:
             f"  media_delivery_allow_dirs: [{str(allow_dir)!r}]\n"
             "  trust_recent_files: false\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("X19_HOME", str(home))
         for var in (
-            "HERMES_MEDIA_DELIVERY_STRICT",
-            "HERMES_MEDIA_ALLOW_DIRS",
-            "HERMES_MEDIA_TRUST_RECENT_FILES",
+            "X19_MEDIA_DELIVERY_STRICT",
+            "X19_MEDIA_ALLOW_DIRS",
+            "X19_MEDIA_TRUST_RECENT_FILES",
         ):
             monkeypatch.delenv(var, raising=False)
 
@@ -247,14 +247,14 @@ class TestMediaPolicyEnvBridge:
 
         apply_media_policy_env()
 
-        assert os.environ.get("HERMES_MEDIA_DELIVERY_STRICT") == "1"
-        assert str(allow_dir) in os.environ.get("HERMES_MEDIA_ALLOW_DIRS", "")
-        assert os.environ.get("HERMES_MEDIA_TRUST_RECENT_FILES") == "0"
+        assert os.environ.get("X19_MEDIA_DELIVERY_STRICT") == "1"
+        assert str(allow_dir) in os.environ.get("X19_MEDIA_ALLOW_DIRS", "")
+        assert os.environ.get("X19_MEDIA_TRUST_RECENT_FILES") == "0"
 
     def test_standalone_filter_honors_bridged_allowlist(self, monkeypatch, tmp_path):
         """End-to-end: strict-mode file inside allow_dirs passes validation
         in a process that never ran gateway startup."""
-        home = tmp_path / "hermes-home"
+        home = tmp_path / "x19-home"
         home.mkdir()
         allow_dir = tmp_path / "reports"
         allow_dir.mkdir()
@@ -269,8 +269,8 @@ class TestMediaPolicyEnvBridge:
             "  strict: true\n"
             f"  media_delivery_allow_dirs: [{str(allow_dir)!r}]\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
-        for var in ("HERMES_MEDIA_DELIVERY_STRICT", "HERMES_MEDIA_ALLOW_DIRS"):
+        monkeypatch.setenv("X19_HOME", str(home))
+        for var in ("X19_MEDIA_DELIVERY_STRICT", "X19_MEDIA_ALLOW_DIRS"):
             monkeypatch.delenv(var, raising=False)
 
         from gateway.media_policy import apply_media_policy_env
@@ -288,13 +288,13 @@ class TestMediaPolicyEnvBridge:
     def test_deliver_result_runs_bridge(self, monkeypatch, tmp_path, media_file):
         """_deliver_result itself must apply the bridge before filtering.
 
-        Realistic enterprise shape: HERMES_MEDIA_DELIVERY_STRICT=1 arrives via
+        Realistic enterprise shape: X19_MEDIA_DELIVERY_STRICT=1 arrives via
         .env (loaded by BOTH processes), but the allowlist lives in
         config.yaml's gateway block — bridged only at gateway boot. Without
         the bridge, a CLI manual run is strict WITHOUT the allowlist and
         silently drops the attachment the scheduled (gateway) run delivers.
         """
-        home = tmp_path / "hermes-home"
+        home = tmp_path / "x19-home"
         home.mkdir()
         media_dir = str(Path(media_file).parent)
         (home / "config.yaml").write_text(
@@ -304,12 +304,12 @@ class TestMediaPolicyEnvBridge:
             f"  media_delivery_allow_dirs: [{media_dir!r}]\n"
             "  trust_recent_files: false\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("X19_HOME", str(home))
         # Strict comes from the shared .env in both processes...
-        monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "1")
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
+        monkeypatch.setenv("X19_MEDIA_DELIVERY_STRICT", "1")
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_FILES", "0")
         # ...but the allowlist is config-only (gateway-boot bridge).
-        monkeypatch.delenv("HERMES_MEDIA_ALLOW_DIRS", raising=False)
+        monkeypatch.delenv("X19_MEDIA_ALLOW_DIRS", raising=False)
         old = 1_600_000_000
         os.utime(media_file, (old, old))
 

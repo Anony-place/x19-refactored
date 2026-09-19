@@ -18,7 +18,7 @@ def _image_to_data_url(ref: str, cap: int):
     try:
         if ref.startswith(("http://", "https://")):
             import urllib.request
-            req = urllib.request.Request(ref, headers={"User-Agent": "hermes-agent"})
+            req = urllib.request.Request(ref, headers={"User-Agent": "x19"})
             with urllib.request.urlopen(req, timeout=60) as resp:
                 if resp.length is not None and resp.length > cap:
                     return None
@@ -57,7 +57,7 @@ def _(rid, params: dict) -> dict:
     if not available:
         return _ok(rid, {
             "available": False, "success": False,
-            "error": "No image generation backend configured (run `hermes tools` to enable one)."})
+            "error": "No image generation backend configured (run `x19 tools` to enable one)."})
     prompt = str(params.get("prompt") or "").strip()
     if not prompt:
         return _err(rid, 4071, "prompt required")

@@ -23,7 +23,7 @@ import logging
 from datetime import timedelta
 from typing import Any, Dict, Optional
 
-from hermes_time import now as _hermes_now
+from x19_time import now as _x19_now
 
 logger = logging.getLogger("cron.scheduler")
 
@@ -41,7 +41,7 @@ def retry_enabled(cfg: Optional[dict] = None) -> bool:
     model calls were made)."""
     if cfg is None:
         try:
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
 
             cfg = load_config() or {}
         except Exception:  # config unreadable — keep the reliability default
@@ -103,7 +103,7 @@ def plan_retry(job: Dict[str, Any]) -> bool:
             job.get("name", job.get("id", "?")), attempt, job.get("next_run_at"))
         return False
     delay = RETRY_DELAYS_SECONDS[attempt]
-    retry_dt = _hermes_now() + timedelta(seconds=delay)
+    retry_dt = _x19_now() + timedelta(seconds=delay)
     from cron.jobs import _parse_aware  # late: jobs imports this module's helpers
 
     natural_next = _parse_aware(job.get("next_run_at"))

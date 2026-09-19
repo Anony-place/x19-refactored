@@ -10,10 +10,10 @@
 # dev:mock flow writes) with a real, chat-capable backend.
 #
 # Usage (sourced from a driver):
-#   mock_start <workroot>      start, write config into $HERMES_HOME
+#   mock_start <workroot>      start, write config into $X19_HOME
 #   mock_stop                  kill the background server
 #
-# Requires: ASSETS (e2e-assets dir), LOG_DIR, HERMES_HOME, ok/fail helpers.
+# Requires: ASSETS (e2e-assets dir), LOG_DIR, X19_HOME, ok/fail helpers.
 
 MOCK_PIDFILE=""
 MOCK_URLFILE=""
@@ -45,7 +45,7 @@ mock_start() {
 
   # The provider config, byte-compatible with writeMockConfig() in
   # tests-js/scripts/mock-server.ts.
-  cat > "$HERMES_HOME/config.yaml" <<EOF
+  cat > "$X19_HOME/config.yaml" <<EOF
 model:
   default: mock-model
   provider: mock
@@ -59,8 +59,8 @@ providers:
       mock-model: {}
     context_length: 64000
 EOF
-  printf 'MOCK_API_KEY=e2e-mock-key\n' >> "$HERMES_HOME/.env"
-  ok "provider 'mock' configured in $HERMES_HOME (api $url/v1)"
+  printf 'MOCK_API_KEY=e2e-mock-key\n' >> "$X19_HOME/.env"
+  ok "provider 'mock' configured in $X19_HOME (api $url/v1)"
 }
 
 mock_stop() {

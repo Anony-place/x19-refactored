@@ -233,13 +233,13 @@ export interface Translations {
       loadingSessions: string
       retryingRemoteBackend: string
       startingDesktopConnection: string
-      startingHermesDesktop: string
+      startingX19Desktop: string
     }
     errors: {
       backgroundExited: string
       backgroundExitedDuringStartup: string
       backendStopped: string
-      restartHermes: string
+      restartX19: string
       openLogs: string
       desktopBootFailed: string
       gatewayConnectionLost: string
@@ -306,7 +306,7 @@ export interface Translations {
     backendOutOfDateTitle: string
     backendOutOfDateMessage: string
     installMethodUnsupportedTitle: string
-    updateHermes: string
+    updateX19: string
     updateReadyTitle: string
     updateReadyMessage: (count: number) => string
     updateReadyMessageUnknown: string
@@ -333,10 +333,10 @@ export interface Translations {
       openaiRejectedApiKey: string
       openaiTtsNeedsKey: string
       codeSkewRestartRequired: string
-      restartHermesFailed: string
+      restartX19Failed: string
     }
     actions: {
-      restartHermes: string
+      restartX19: string
       openKeys: string
       openGateways: string
       openMaintenance: string
@@ -788,7 +788,7 @@ export interface Translations {
     uninstallSection: {
       dangerZone: string
       confirmUninstall: string
-      uninstallHermes: string
+      uninstallX19: string
     }
     poolLimits: {
       warmBotBackendsAria: string
@@ -1109,9 +1109,9 @@ export interface Translations {
       sshPortDesc: string
       sshKeyTitle: string
       sshKeyDesc: string
-      sshHermesPathTitle: string
-      sshHermesPathDesc: string
-      sshHermesPathPlaceholder: string
+      sshX19PathTitle: string
+      sshX19PathDesc: string
+      sshX19PathPlaceholder: string
       sshTestConnection: string
       sshConnect: string
       sshButtonsHint: string
@@ -1833,7 +1833,7 @@ export interface Translations {
     noSessions: string
     gatewayRunning: string
     gatewayStopped: string
-    hermesActiveSessions: (version: string, count: number) => string
+    x19ActiveSessions: (version: string, count: number) => string
     restartGateway: string
     openBrowser: string
     gatewayRestartFailed: string
@@ -1841,7 +1841,7 @@ export interface Translations {
     sharedGatewayRestartDescription: (bots: string) => string
     sharedGatewayRestartConfirm: string
     sharedGatewayRestarted: (count: number) => string
-    updateHermes: string
+    updateX19: string
     reloadWindow: string
     actionRunning: string
     actionDone: string
@@ -3096,8 +3096,8 @@ export interface Translations {
     alreadySignedInHeading: string
     alreadySignedInBody: string
     // First-launch set-up failure notice: the free tier could not be created at boot.
-    // One sentence per backend code (`hermes_cli/anon_auth.py::ANON_*`); the copy never says
-    // the free MODEL is off — what is unavailable is using Hermes without signing in.
+    // One sentence per backend code (`x19_cli/anon_auth.py::ANON_*`); the copy never says
+    // the free MODEL is off — what is unavailable is using X19 without signing in.
     setupFailed: {
       gateClosed: string
       paused: string
@@ -3580,8 +3580,8 @@ export interface Translations {
       errorChooseModel: string
       errorCompressConversation: string
       errorCompressFailed: string
-      errorOpenHermesFolder: string
-      errorOpenHermesFolderFailed: string
+      errorOpenX19Folder: string
+      errorOpenX19FolderFailed: string
       errorUpdateApiKey: string
       /** One-click recovery for an expired/revoked OAuth grant: re-runs that
        *  provider's sign-in flow (auth layer, authKind 'oauth'). */

@@ -6,7 +6,7 @@ proactor event loop with the DEFAULT verb handlers, then drives the real
 sync client and the real fleet consumers against it — no mocks anywhere.
 
 Proves, on windows-latest:
-  1. `GatewayControlServer` binds ``\\\\.\\pipe\\hermes-gateway-<hash>`` via
+  1. `GatewayControlServer` binds ``\\\\.\\pipe\\x19-gateway-<hash>`` via
      ``loop.start_serving_pipe`` and answers ``identify``/``status``.
   2. The sync client's pipe transport (open/write/read/busy-retry) works
      against a live server and returns the child's true pid + code identity.
@@ -36,7 +36,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CHILD_CODE = r"""
 import asyncio, os, sys
 sys.path.insert(0, sys.argv[1])
-os.environ["HERMES_HOME"] = sys.argv[2]
+os.environ["X19_HOME"] = sys.argv[2]
 from gateway.control_socket import GatewayControlServer
 
 async def main():
@@ -57,7 +57,7 @@ asyncio.run(main())
 
 @pytest.fixture()
 def live_server(tmp_path: Path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
     proc = subprocess.Popen(
         [sys.executable, "-c", _CHILD_CODE, str(PROJECT_ROOT), str(home)],
@@ -96,7 +96,7 @@ def test_named_pipe_identify_status_and_fleet_consumer(live_server, monkeypatch)
     # Windows trampoline makes the spawner's view wrong (see _CHILD_CODE).
     assert ident["pid"] == server_pid
     assert ident["protocol"] == 1
-    assert ident["kind"] == "hermes-gateway"
+    assert ident["kind"] == "x19-gateway"
     assert ident["supervisor"] in {"systemd", "launchd", "desktop", "external", "manual"}
 
     status = query_gateway_control(home, "status", timeout=5.0)
@@ -104,15 +104,15 @@ def test_named_pipe_identify_status_and_fleet_consumer(live_server, monkeypatch)
     assert status["answering_pid"] == server_pid
 
     # Real fleet consumer prefers the pipe
-    import hermes_cli.update_receipt as ur
+    import x19_cli.update_receipt as ur
 
     monkeypatch.setattr(
-        "hermes_cli.build_info.get_code_identity",
+        "x19_cli.build_info.get_code_identity",
         lambda refresh=False: {"sha": ident.get("code_sha") or "X", "version": "t"},
     )
-    monkeypatch.setattr("hermes_cli.profiles._get_default_hermes_home", lambda: home)
+    monkeypatch.setattr("x19_cli.profiles._get_default_x19_home", lambda: home)
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_profiles_root", lambda: home / "no-profiles"
+        "x19_cli.profiles._get_profiles_root", lambda: home / "no-profiles"
     )
     fleet = ur.collect_fleet_versions()
     assert len(fleet) == 1, fleet
@@ -131,21 +131,21 @@ def test_pipe_gone_after_kill_falls_back(live_server, monkeypatch):
     assert identify_gateway(home, timeout=2.0) is None
 
     # Consumer falls back to the state file (live pid = this test process)
-    import hermes_cli.update_receipt as ur
+    import x19_cli.update_receipt as ur
 
     (home / "gateway_state.json").write_text(
         json.dumps(
-            {"pid": os.getpid(), "code_sha": "OLD", "kind": "hermes-gateway"}
+            {"pid": os.getpid(), "code_sha": "OLD", "kind": "x19-gateway"}
         ),
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        "hermes_cli.build_info.get_code_identity",
+        "x19_cli.build_info.get_code_identity",
         lambda refresh=False: {"sha": "NEW", "version": "t"},
     )
-    monkeypatch.setattr("hermes_cli.profiles._get_default_hermes_home", lambda: home)
+    monkeypatch.setattr("x19_cli.profiles._get_default_x19_home", lambda: home)
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_profiles_root", lambda: home / "no-profiles"
+        "x19_cli.profiles._get_profiles_root", lambda: home / "no-profiles"
     )
     fleet = ur.collect_fleet_versions()
     assert len(fleet) == 1, fleet

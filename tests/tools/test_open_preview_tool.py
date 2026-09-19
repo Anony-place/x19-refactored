@@ -21,7 +21,7 @@ def test_lives_in_the_gui_surface_toolset(monkeypatch):
     """Consolidated (#95681): this module's tool became an action of the
     single `desktop_preview` tool in desktop_ui; the old registration is gone and
     `preview` reaches a desktop client on ANY backend (no env gate)."""
-    monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+    monkeypatch.delenv("X19_DESKTOP", raising=False)
     assert registry.get_entry("open_preview") is None
     entry = registry.get_entry("desktop_preview")
     assert entry is not None

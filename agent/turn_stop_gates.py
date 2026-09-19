@@ -55,8 +55,8 @@ def _pre_verify_nudge(agent, final_response, attempt: int) -> Optional[str]:
     _edited = sorted(getattr(agent, "_turn_file_mutation_paths", set()) or [])
     try:
         from agent.verify_hooks import max_verify_nudges
-        from hermes_cli.lifecycle import has_hook
-        from hermes_cli.plugins import get_pre_verify_continue_message
+        from x19_cli.lifecycle import has_hook
+        from x19_cli.plugins import get_pre_verify_continue_message
 
         if _edited and has_hook("pre_verify") and attempt < max_verify_nudges():
             # Posture is fixed for the session — resolve once + cache.
@@ -160,7 +160,7 @@ def apply_stop_gates(
         logger.info(
             "kanban stop-loop nudge issued (attempt %d) task=%s",
             agent._kanban_stop_nudges,
-            os.environ.get("HERMES_KANBAN_TASK", ""),
+            os.environ.get("X19_KANBAN_TASK", ""),
         )
         agent._emit_diagnostic_status(
             "⚠️ Kanban worker tried to exit without "

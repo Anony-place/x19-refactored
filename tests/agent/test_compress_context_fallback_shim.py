@@ -28,7 +28,7 @@ import pytest
 
 import agent.conversation_compression as conversation_compression
 from agent.conversation_compression import CompressionCommitFence
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 def _build_agent_with_db(db: SessionDB, session_id: str, platform: str = "telegram"):

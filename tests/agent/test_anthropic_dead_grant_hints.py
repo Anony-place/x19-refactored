@@ -1,7 +1,7 @@
-"""Hermes credential hints and the Anthropic token-endpoint error shape (#113023).
+"""X19 credential hints and the Anthropic token-endpoint error shape (#113023).
 
-A dead Hermes login must be repaired with ``hermes auth add <provider>``; hints that send the user to
-an external CLI's login command do not touch Hermes' own credentials. The token endpoint's
+A dead X19 login must be repaired with ``x19 auth add <provider>``; hints that send the user to
+an external CLI's login command do not touch X19' own credentials. The token endpoint's
 ``invalid_grant`` body is surfaced as a structured, classifiable error so the pool can quarantine
 instead of benching the dead grant as transient.
 """
@@ -39,7 +39,7 @@ def test_dead_grant_is_classified_and_not_replayed_at_other_endpoints(monkeypatc
 
 
 def test_claude_code_refresher_warns_on_dead_grant(monkeypatch, caplog):
-    """The auxiliary Claude Code refresher is a sibling path of the pool: same WARNING, same Hermes hint."""
+    """The auxiliary Claude Code refresher is a sibling path of the pool: same WARNING, same X19 hint."""
     monkeypatch.setattr(ac, "read_claude_code_credentials", lambda: {"accessToken": "old", "refreshToken": "rt", "expiresAt": 1})
 
     def dead(refresh_token, *, use_json=False):
@@ -49,7 +49,7 @@ def test_claude_code_refresher_warns_on_dead_grant(monkeypatch, caplog):
     with caplog.at_level(logging.INFO, logger=ac.logger.name):
         assert ac._refresh_oauth_token({"accessToken": "old", "refreshToken": "rt"}) is None
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings) == 1 and "hermes auth add anthropic" in warnings[0]
+    assert len(warnings) == 1 and "x19 auth add anthropic" in warnings[0]
 
 
 def test_claude_code_refresher_reports_dead_grant_once_per_process(monkeypatch, caplog):
@@ -86,7 +86,7 @@ def test_claude_code_credentials_path_honours_claude_config_dir(monkeypatch, tmp
     assert ac.claude_code_credentials_path() == Path.home() / ".claude" / ".credentials.json"
 
 
-def test_anthropic_401_troubleshooting_points_at_hermes_auth(capsys):
+def test_anthropic_401_troubleshooting_points_at_x19_auth(capsys):
     from agent.turn_recovery import _print_anthropic_401_diagnostics
 
     class _Agent:
@@ -94,12 +94,12 @@ def test_anthropic_401_troubleshooting_points_at_hermes_auth(capsys):
 
     _print_anthropic_401_diagnostics(_Agent(), "sk-ant-oat01-xxxxxxxxxxxx")
     out = capsys.readouterr().out
-    assert "hermes auth add anthropic" in out and "hermes auth list anthropic" in out
+    assert "x19 auth add anthropic" in out and "x19 auth list anthropic" in out
     assert "/login" not in out
 
 
-def test_no_anthropic_credentials_message_points_at_hermes_auth():
-    from hermes_cli.runtime_provider import _NO_ANTHROPIC_CREDENTIALS_MSG
+def test_no_anthropic_credentials_message_points_at_x19_auth():
+    from x19_cli.runtime_provider import _NO_ANTHROPIC_CREDENTIALS_MSG
 
-    assert "hermes auth add anthropic" in _NO_ANTHROPIC_CREDENTIALS_MSG
+    assert "x19 auth add anthropic" in _NO_ANTHROPIC_CREDENTIALS_MSG
     assert "/login" not in _NO_ANTHROPIC_CREDENTIALS_MSG

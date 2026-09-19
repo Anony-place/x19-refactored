@@ -11,7 +11,7 @@ class TestResolveApiKey:
 
     def test_returns_api_key_from_root(self, monkeypatch):
         import plugins.memory.honcho.cli as honcho_cli
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         monkeypatch.delenv("HONCHO_API_KEY", raising=False)
         assert honcho_cli._resolve_api_key({"apiKey": "root-key"}) == "root-key"
 
@@ -19,7 +19,7 @@ class TestResolveApiKey:
     def test_rejects_garbage_base_url_without_scheme(self, monkeypatch):
         """Obvious non-URL literals in baseUrl (typos) must not pass the guard."""
         import plugins.memory.honcho.cli as honcho_cli
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         monkeypatch.delenv("HONCHO_API_KEY", raising=False)
         monkeypatch.delenv("HONCHO_BASE_URL", raising=False)
         # Boolean literals, pure digits, and bare identifiers without
@@ -39,7 +39,7 @@ class TestResolveApiKey:
 
     def test_accepts_https_base_url(self, monkeypatch):
         import plugins.memory.honcho.cli as honcho_cli
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         monkeypatch.delenv("HONCHO_API_KEY", raising=False)
         monkeypatch.delenv("HONCHO_BASE_URL", raising=False)
         assert honcho_cli._resolve_api_key({"baseUrl": "https://honcho.example.com"}) == "local"
@@ -56,7 +56,7 @@ class TestCmdSetupLocalJwt:
         monkeypatch.setattr(honcho_cli, "_read_config", lambda: dict(initial_cfg))
         monkeypatch.setattr(honcho_cli, "_local_config_path", lambda: cfg_path)
         monkeypatch.setattr(honcho_cli, "_config_path", lambda: cfg_path)
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         monkeypatch.setattr(honcho_cli, "_ensure_sdk_installed", lambda: True)
 
         written = {}
@@ -100,7 +100,7 @@ class TestCmdSetupLocalJwt:
         # Top-level apiKey must remain unset (cloud field).
         assert not cfg.get("apiKey")
         # The new local JWT belongs under the host block.
-        host_block = (cfg.get("hosts") or {}).get("hermes") or {}
+        host_block = (cfg.get("hosts") or {}).get("x19") or {}
         assert host_block.get("apiKey") == "my-local-jwt-token"
 
 
@@ -114,10 +114,10 @@ class TestCmdStatus:
         class FakeConfig:
             enabled = True
             api_key = "root-key"
-            workspace_id = "hermes"
-            host = "hermes"
+            workspace_id = "x19"
+            host = "x19"
             base_url = None
-            ai_peer = "hermes"
+            ai_peer = "x19"
             peer_name = "eri"
             recall_mode = "hybrid"
             user_observe_me = True
@@ -132,7 +132,7 @@ class TestCmdStatus:
             reasoning_heuristic = True
 
             def resolve_session_name(self):
-                return "hermes"
+                return "x19"
 
         monkeypatch.setattr(honcho_cli, "_read_config", lambda: {"apiKey": "***"})
         monkeypatch.setattr(honcho_cli, "_config_path", lambda: cfg_path)
@@ -169,9 +169,9 @@ class TestCmdStatus:
             enabled = True
             api_key = "hch-at-deadbeef"
             workspace_id = "claude-code"
-            host = "hermes"
+            host = "x19"
             base_url = None
-            ai_peer = "hermes"
+            ai_peer = "x19"
             peer_name = "eri"
             recall_mode = "hybrid"
             user_observe_me = True
@@ -186,11 +186,11 @@ class TestCmdStatus:
             reasoning_heuristic = True
             raw = {
                 "hosts": {
-                    "hermes": {
+                    "x19": {
                         "apiKey": "hch-at-deadbeef",
                         "oauth": {
                             "refreshToken": "hch-rt-x",
-                            "clientId": "hermes-agent",
+                            "clientId": "x19",
                             "tokenEndpoint": "https://api.honcho.dev/oauth/token",
                             "expiresAt": 9999999999,
                         },
@@ -199,7 +199,7 @@ class TestCmdStatus:
             }
 
             def resolve_session_name(self):
-                return "hermes"
+                return "x19"
 
         monkeypatch.setattr(honcho_cli, "_read_config", lambda: {})
         monkeypatch.setattr(honcho_cli, "_config_path", lambda: cfg_path)
@@ -216,7 +216,7 @@ class TestCmdStatus:
         honcho_cli.cmd_status(SimpleNamespace(all=False))
 
         out = capsys.readouterr().out
-        assert "Auth:           OAuth (hermes-agent" in out
+        assert "Auth:           OAuth (x19" in out
         assert "API key:" not in out
 
 
@@ -247,7 +247,7 @@ class TestCloneHonchoForProfile:
         cfg = {
             "apiKey": "***",
             "hosts": {
-                "hermes": {
+                "x19": {
                     "userPeerAliases": {"7654321": "eri", "discord-491827364": "eri"},
                     "peerName": "eri",
                 },
@@ -256,14 +256,14 @@ class TestCloneHonchoForProfile:
         honcho_cli, written = self._setup_clone_env(monkeypatch, tmp_path, cfg)
         ok = honcho_cli.clone_honcho_for_profile("coder")
         assert ok is True
-        new_block = written["cfg"]["hosts"]["hermes_coder"]
+        new_block = written["cfg"]["hosts"]["x19_coder"]
         assert new_block["userPeerAliases"] == {"7654321": "eri", "discord-491827364": "eri"}
 
     def test_runtime_peer_prefix_carries_into_cloned_profile(self, monkeypatch, tmp_path):
         cfg = {
             "apiKey": "***",
             "hosts": {
-                "hermes": {
+                "x19": {
                     "runtimePeerPrefix": "telegram_",
                     "peerName": "eri",
                 },
@@ -272,14 +272,14 @@ class TestCloneHonchoForProfile:
         honcho_cli, written = self._setup_clone_env(monkeypatch, tmp_path, cfg)
         ok = honcho_cli.clone_honcho_for_profile("coder")
         assert ok is True
-        new_block = written["cfg"]["hosts"]["hermes_coder"]
+        new_block = written["cfg"]["hosts"]["x19_coder"]
         assert new_block["runtimePeerPrefix"] == "telegram_"
 
     def test_session_ai_peer_prefix_carries_into_cloned_profile(self, monkeypatch, tmp_path):
         cfg = {
             "apiKey": "***",
             "hosts": {
-                "hermes": {
+                "x19": {
                     "sessionAiPeerPrefix": True,
                     "peerName": "eri",
                 },
@@ -288,14 +288,14 @@ class TestCloneHonchoForProfile:
         honcho_cli, written = self._setup_clone_env(monkeypatch, tmp_path, cfg)
         ok = honcho_cli.clone_honcho_for_profile("coder")
         assert ok is True
-        new_block = written["cfg"]["hosts"]["hermes_coder"]
+        new_block = written["cfg"]["hosts"]["x19_coder"]
         assert new_block["sessionAiPeerPrefix"] is True
 
     def test_legacy_pin_peer_name_migrates_to_canonical_on_clone(self, monkeypatch, tmp_path):
         cfg = {
             "apiKey": "***",
             "hosts": {
-                "hermes": {
+                "x19": {
                     "pinPeerName": True,
                     "peerName": "eri",
                 },
@@ -304,19 +304,19 @@ class TestCloneHonchoForProfile:
         honcho_cli, written = self._setup_clone_env(monkeypatch, tmp_path, cfg)
         ok = honcho_cli.clone_honcho_for_profile("coder")
         assert ok is True
-        new_block = written["cfg"]["hosts"]["hermes_coder"]
+        new_block = written["cfg"]["hosts"]["x19_coder"]
         assert new_block["pinUserPeer"] is True
         assert "pinPeerName" not in new_block
 
     def test_unset_identity_keys_do_not_appear_in_cloned_profile(self, monkeypatch, tmp_path):
         cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {"peerName": "eri"}},
+            "hosts": {"x19": {"peerName": "eri"}},
         }
         honcho_cli, written = self._setup_clone_env(monkeypatch, tmp_path, cfg)
         ok = honcho_cli.clone_honcho_for_profile("coder")
         assert ok is True
-        new_block = written["cfg"]["hosts"]["hermes_coder"]
+        new_block = written["cfg"]["hosts"]["x19_coder"]
         assert "userPeerAliases" not in new_block
         assert "runtimePeerPrefix" not in new_block
         assert "pinUserPeer" not in new_block
@@ -332,7 +332,7 @@ class TestSetupWizardDeploymentShape:
     Choice [2] (me + others, pooled) aliases the operator's own runtime IDs.
 
     These tests mock gateway detection and script the interactive _prompt
-    calls, asserting the resulting hermes_host block so the tree's routing
+    calls, asserting the resulting x19_host block so the tree's routing
     semantics stay locked even as adjacent prompts are added.
     """
 
@@ -347,7 +347,7 @@ class TestSetupWizardDeploymentShape:
         monkeypatch.setattr(honcho_cli, "_read_config", lambda: cfg)
         monkeypatch.setattr(honcho_cli, "_config_path", lambda: cfg_path)
         monkeypatch.setattr(honcho_cli, "_local_config_path", lambda: cfg_path)
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         monkeypatch.setattr(honcho_cli, "_ensure_sdk_installed", lambda: True)
         monkeypatch.setattr(honcho_cli, "_write_config", lambda *a, **k: None)
         # No network probe / environment sniffing in tests.
@@ -360,16 +360,16 @@ class TestSetupWizardDeploymentShape:
 
         # Bypass config.yaml + connection test side effects.
         monkeypatch.setattr(
-            "hermes_cli.config.load_config", lambda: {"memory": {}}, raising=False,
+            "x19_cli.config.load_config", lambda: {"memory": {}}, raising=False,
         )
         monkeypatch.setattr(
-            "hermes_cli.config.save_config", lambda c: None, raising=False,
+            "x19_cli.config.save_config", lambda c: None, raising=False,
         )
 
         class _FakeClientCfg:
             def resolve_session_name(self):
-                return "hermes-test"
-            workspace_id = "hermes"
+                return "x19-test"
+            workspace_id = "x19"
             peer_name = "eri"
             ai_peer = "hermetika"
             observation_mode = "directional"
@@ -403,7 +403,7 @@ class TestSetupWizardDeploymentShape:
         monkeypatch.setattr(honcho_cli, "_prompt", _scripted_prompt)
 
         honcho_cli.cmd_setup(SimpleNamespace())
-        return cfg["hosts"]["hermes"]
+        return cfg["hosts"]["x19"]
 
     def test_just_me_pins_and_clears_aliases(self, monkeypatch, tmp_path):
         answers = [
@@ -411,13 +411,13 @@ class TestSetupWizardDeploymentShape:
             "",                # api key (keep)
             "eri",             # peer name
             "hermetika",       # ai peer
-            "hermes",          # workspace
+            "x19",          # workspace
             "1",               # tree: just me ← key answer
             # remaining prompts fall through to defaults
         ]
         initial_cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {
+            "hosts": {"x19": {
                 "userPeerAliases": {"old": "stale"},
                 "runtimePeerPrefix": "old_",
             }},
@@ -433,7 +433,7 @@ class TestSetupWizardDeploymentShape:
             "",                # api key (keep)
             "eri",             # peer name
             "hermetika",       # ai peer
-            "hermes",          # workspace
+            "x19",          # workspace
             "3",               # tree: only other people
             "telegram_",       # runtime peer prefix
         ]
@@ -451,7 +451,7 @@ class TestSetupWizardDeploymentShape:
             "",                # api key (keep)
             "eri",             # peer name
             "hermetika",       # ai peer
-            "hermes",          # workspace
+            "x19",          # workspace
             "2",               # tree: me + other people
             "y",               # keep my memory pooled? → hybrid
             "7654321",        # telegram uid
@@ -473,14 +473,14 @@ class TestSetupWizardDeploymentShape:
         # except for the on-load migration onto the canonical key.
         initial_cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {
+            "hosts": {"x19": {
                 "pinPeerName": True,
                 "userPeerAliases": {"keep": "me"},
                 "runtimePeerPrefix": "keep_",
             }},
         }
         answers = [
-            "cloud", "", "eri", "hermetika", "hermes", "s",
+            "cloud", "", "eri", "hermetika", "x19", "s",
         ]
         host = self._run_setup(monkeypatch, tmp_path, answers=answers, initial_cfg=initial_cfg)
         assert host["pinUserPeer"] is True
@@ -495,14 +495,14 @@ class TestSetupWizardDeploymentShape:
         """
         initial_cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {"pinPeerName": True, "peerName": "eri"}},
+            "hosts": {"x19": {"pinPeerName": True, "peerName": "eri"}},
         }
         answers = [
             "cloud",           # deployment
             "",                # api key (keep)
             "eri",             # peer name
             "hermetika",       # ai peer
-            "hermes",          # workspace
+            "x19",          # workspace
             "3",               # tree: only others — triggers the orphan guard
             "y",               # pool my own memory instead? → hybrid
             "7654321",        # telegram uid
@@ -517,8 +517,8 @@ class TestSetupWizardDeploymentShape:
 
 
     def test_mapping_step_points_at_peers_map(self, monkeypatch, tmp_path, capsys):
-        self._run_setup(monkeypatch, tmp_path, answers=["cloud", "", "eri", "hermetika", "hermes", "s"])
-        assert "hermes honcho peers map" in capsys.readouterr().out
+        self._run_setup(monkeypatch, tmp_path, answers=["cloud", "", "eri", "hermetika", "x19", "s"])
+        assert "x19 honcho peers map" in capsys.readouterr().out
 
     def test_host_pin_user_peer_true_is_detected_as_single(self, monkeypatch, tmp_path):
         """Host-level ``pinUserPeer: true`` must classify as ``single``.
@@ -530,13 +530,13 @@ class TestSetupWizardDeploymentShape:
         """
         initial_cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {"pinUserPeer": True, "peerName": "eri"}},
+            "hosts": {"x19": {"pinUserPeer": True, "peerName": "eri"}},
         }
         # Exhaust the iterator before the choice prompt so the scripted
         # mock falls through to the prompt's default (the detected shape →
         # choice "1").  Scripting an explicit "" would NOT exercise that
         # fallthrough — the mock returns it literally.
-        answers = ["cloud", "", "eri", "hermetika", "hermes"]
+        answers = ["cloud", "", "eri", "hermetika", "x19"]
         host = self._run_setup(monkeypatch, tmp_path, answers=answers, initial_cfg=initial_cfg)
         # Scrub-then-write normalises onto the canonical pinUserPeer.
         assert host["pinUserPeer"] is True
@@ -550,9 +550,9 @@ class TestSetupWizardDeploymentShape:
         initial_cfg = {
             "apiKey": "***",
             "userPeerAliases": {"7654321": "eri"},
-            "hosts": {"hermes": {"peerName": "eri"}},
+            "hosts": {"x19": {"peerName": "eri"}},
         }
-        answers = ["cloud", "", "eri", "hermetika", "hermes"]
+        answers = ["cloud", "", "eri", "hermetika", "x19"]
         host = self._run_setup(monkeypatch, tmp_path, answers=answers, initial_cfg=initial_cfg)
         assert host["pinUserPeer"] is False
         # Hybrid materialises the root aliases into the host so subsequent
@@ -561,17 +561,17 @@ class TestSetupWizardDeploymentShape:
 
     @pytest.mark.parametrize("initial_cfg, expected_pin", [
         (None, True),
-        ({"apiKey": "***", "hosts": {"hermes": {}}}, True),
-        ({"apiKey": "***", "hosts": {"hermes": {"pinUserPeer": False, "peerName": "eri"}}}, False),
-        ({"apiKey": "***", "hosts": {"hermes": {"enabled": True, "workspace": "hermes", "peerName": "eri"}}}, False),
-        ({"apiKey": "***", "enabled": True, "workspace": "hermes", "peerName": "eri"}, False),
+        ({"apiKey": "***", "hosts": {"x19": {}}}, True),
+        ({"apiKey": "***", "hosts": {"x19": {"pinUserPeer": False, "peerName": "eri"}}}, False),
+        ({"apiKey": "***", "hosts": {"x19": {"enabled": True, "workspace": "x19", "peerName": "eri"}}}, False),
+        ({"apiKey": "***", "enabled": True, "workspace": "x19", "peerName": "eri"}, False),
     ], ids=["fresh-config-defaults-to-single", "empty-host-block-defaults-to-single",
             "configured-multi-keeps-multi", "existing-install-without-mapping-keys-keeps-multi",
             "legacy-root-level-install-keeps-multi"])
     def test_choice_default_follows_config(self, monkeypatch, tmp_path, initial_cfg, expected_pin):
         """Enter on a fresh config picks the pinned personal shape. An existing install, with or
         without mapping keys, keeps its detected shape so Enter never merges every account onto one peer."""
-        answers = ["cloud", "", "eri", "hermetika", "hermes"]
+        answers = ["cloud", "", "eri", "hermetika", "x19"]
         host = self._run_setup(monkeypatch, tmp_path, answers=answers, initial_cfg=initial_cfg)
         assert host["pinUserPeer"] is expected_pin
 
@@ -581,9 +581,9 @@ class TestSetupWizardDeploymentShape:
         the 'configure anyway?' prompt leaves identity mapping untouched."""
         initial_cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {"peerName": "eri"}},
+            "hosts": {"x19": {"peerName": "eri"}},
         }
-        answers = ["cloud", "", "eri", "hermetika", "hermes", "n"]
+        answers = ["cloud", "", "eri", "hermetika", "x19", "n"]
         host = self._run_setup(
             monkeypatch, tmp_path, answers=answers, initial_cfg=initial_cfg,
             gateway_platforms=[],
@@ -597,9 +597,9 @@ class TestSetupWizardDeploymentShape:
         whether the gateway is running; 'no' skips the mapping step."""
         initial_cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {"peerName": "eri"}},
+            "hosts": {"x19": {"peerName": "eri"}},
         }
-        answers = ["cloud", "", "eri", "hermetika", "hermes", "n"]
+        answers = ["cloud", "", "eri", "hermetika", "x19", "n"]
         host = self._run_setup(
             monkeypatch, tmp_path, answers=answers, initial_cfg=initial_cfg,
             gateway_platforms=None,
@@ -610,7 +610,7 @@ class TestSetupWizardDeploymentShape:
         """The [e] escape hatch lets a power user set pinUserPeer + an alias +
         prefix directly, bypassing the intent tree."""
         answers = [
-            "cloud", "", "eri", "hermetika", "hermes",
+            "cloud", "", "eri", "hermetika", "x19",
             "e",               # tree: edit raw keys
             "false",           # pinUserPeer
             "99887766=eri",    # one alias pair
@@ -635,7 +635,7 @@ class TestCloneCarriesPinUserPeer:
 
         cfg = {
             "apiKey": "***",
-            "hosts": {"hermes": {"pinUserPeer": True, "peerName": "eri"}},
+            "hosts": {"x19": {"pinUserPeer": True, "peerName": "eri"}},
         }
         cfg_path = tmp_path / "config.json"
         cfg_path.write_text("{}")
@@ -650,7 +650,7 @@ class TestCloneCarriesPinUserPeer:
 
         ok = honcho_cli.clone_honcho_for_profile("partner")
         assert ok is True
-        new_block = written["cfg"]["hosts"]["hermes_partner"]
+        new_block = written["cfg"]["hosts"]["x19_partner"]
         assert new_block["pinUserPeer"] is True
 
 
@@ -690,23 +690,23 @@ class TestCmdSetupDeviceFlow:
         monkeypatch.setattr(honcho_cli, "_read_config", lambda: cfg)
         monkeypatch.setattr(honcho_cli, "_config_path", lambda: cfg_path)
         monkeypatch.setattr(honcho_cli, "_local_config_path", lambda: cfg_path)
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         monkeypatch.setattr(honcho_cli, "_ensure_sdk_installed", lambda: True)
         monkeypatch.setattr(honcho_cli, "_write_config", lambda *a, **k: None)
         monkeypatch.setattr(honcho_cli, "_gateway_platforms", lambda: [])
         monkeypatch.setattr(honcho_cli, "_device_login_available", lambda: device_available)
         monkeypatch.setattr(honcho_cli, "_headless", lambda: headless)
         monkeypatch.setattr(
-            "hermes_cli.config.load_config", lambda: {"memory": {}}, raising=False,
+            "x19_cli.config.load_config", lambda: {"memory": {}}, raising=False,
         )
         monkeypatch.setattr(
-            "hermes_cli.config.save_config", lambda c: None, raising=False,
+            "x19_cli.config.save_config", lambda c: None, raising=False,
         )
 
         class _FakeClientCfg:
             def resolve_session_name(self):
-                return "hermes-test"
-            workspace_id = "hermes"
+                return "x19-test"
+            workspace_id = "x19"
             peer_name = "eri"
             ai_peer = "hermetika"
             observation_mode = "directional"
@@ -724,7 +724,7 @@ class TestCmdSetupDeviceFlow:
         calls: list[dict] = []
         cred = OAuthCredential(
             access_token="hch-at-x", refresh_token="hch-rt-x", expires_at=9_999_999_999,
-            client_id="hermes-agent", token_endpoint="http://x/oauth/token",
+            client_id="x19", token_endpoint="http://x/oauth/token",
             consent_peer_name="lyra",
         )
 
@@ -754,8 +754,8 @@ class TestCmdSetupDeviceFlow:
         cfg, calls, _ = self._run_setup(monkeypatch, tmp_path, answers=["cloud", "device"])
         assert len(calls) == 1
         assert calls[0]["apply_config"] is False
-        assert calls[0]["source"] == "hermes-cli"
-        host = cfg["hosts"]["hermes"]
+        assert calls[0]["source"] == "x19-cli"
+        host = cfg["hosts"]["x19"]
         assert host["apiKey"] == "hch-at-x"
         assert host["oauth"]["refreshToken"] == "hch-rt-x"
         assert host["peerName"] == "lyra"
@@ -770,7 +770,7 @@ class TestCmdSetupDeviceFlow:
         assert method_prompts[0][1] == "device"
         assert len(calls) == 1
         assert calls[0]["open_url"] is None  # never auto-open a browser headless
-        assert cfg["hosts"]["hermes"]["apiKey"] == "hch-at-x"
+        assert cfg["hosts"]["x19"]["apiKey"] == "hch-at-x"
 
     def test_denied_device_flow_aborts_without_grant(self, monkeypatch, tmp_path):
         from plugins.memory.honcho.oauth_flow import AccessDenied
@@ -780,7 +780,7 @@ class TestCmdSetupDeviceFlow:
             device_error=AccessDenied("access_denied", "user denied"),
         )
         assert len(calls) == 1
-        assert "apiKey" not in cfg.get("hosts", {}).get("hermes", {})
+        assert "apiKey" not in cfg.get("hosts", {}).get("x19", {})
 
 
 def _point_cli_at(monkeypatch, cfg_path, **attrs):
@@ -801,7 +801,7 @@ class TestWriteRefusesUnparseableStore:
     def test_command_prints_one_sentence_asks_nothing_and_writes_nothing(self, monkeypatch, tmp_path, capsys, run):
         cfg_path = tmp_path / "honcho.json"
         cfg_path.write_text("{not json", encoding="utf-8")
-        honcho_cli = _point_cli_at(monkeypatch, cfg_path, _host_key=lambda: "hermes_coder",
+        honcho_cli = _point_cli_at(monkeypatch, cfg_path, _host_key=lambda: "x19_coder",
                                    _prompt=lambda *a, **k: pytest.fail("asked a question"))
         run(honcho_cli)
         out = capsys.readouterr().out
@@ -822,8 +822,8 @@ class TestSetupApiKeyReplacesStaleGrant:
         host = {"apiKey": "hch-v3-hostkey"}
         if grant:
             host = {"apiKey": "hch-at-dead", "oauth": {"refreshToken": "hch-rt-dead", "expiresAt": 1,
-                                                       "clientId": "hermes-agent", "tokenEndpoint": "https://api.honcho.dev/oauth/token"}}
-        cfg = {"hosts": {"hermes": host}, **({"apiKey": root_key} if root_key else {})}
+                                                       "clientId": "x19", "tokenEndpoint": "https://api.honcho.dev/oauth/token"}}
+        cfg = {"hosts": {"x19": host}, **({"apiKey": root_key} if root_key else {})}
         honcho_cli = _point_cli_at(monkeypatch, tmp_path / "honcho.json", _device_login_available=lambda: False,
                                    _headless=lambda: (False, True),
                                    _prompt=lambda label, default=None, secret=False: "apikey" if "OAuth" in label else answer)
@@ -833,17 +833,17 @@ class TestSetupApiKeyReplacesStaleGrant:
         assert shown in capsys.readouterr().out
 
 
-_OAUTH_DEFAULT = {"peerName": "eri", "hosts": {"hermes": {
-    "enabled": True, "apiKey": "hch-at-live", "workspace": "hermes", "peerName": "eri", "oauth": {"refreshToken": "hch-rt-live"},
+_OAUTH_DEFAULT = {"peerName": "eri", "hosts": {"x19": {
+    "enabled": True, "apiKey": "hch-at-live", "workspace": "x19", "peerName": "eri", "oauth": {"refreshToken": "hch-rt-live"},
 }}}
-_KEYLESS_DEFAULT = {"hosts": {"hermes": {"workspace": "hermes"}}}
+_KEYLESS_DEFAULT = {"hosts": {"x19": {"workspace": "x19"}}}
 
 
 class TestEnabledRequiresACredential:
     """A host block is written with enabled: true only when it can authenticate. Named profiles do not
     inherit the default host's apiKey, so a clone of an OAuth default block has nothing to sign with."""
 
-    def _env(self, monkeypatch, tmp_path, cfg, *, env_key=None, host="hermes_dreamer", profile="dreamer"):
+    def _env(self, monkeypatch, tmp_path, cfg, *, env_key=None, host="x19_dreamer", profile="dreamer"):
         import copy
         cfg, written = copy.deepcopy(cfg), {}
         cfg_path = tmp_path / "honcho.json"
@@ -859,7 +859,7 @@ class TestEnabledRequiresACredential:
 
     @pytest.mark.parametrize("cfg, env_key, enabled", [
         (_OAUTH_DEFAULT, None, False),
-        ({"hosts": {"hermes": {"enabled": True, "apiKey": "hch-v3-hostonly", "workspace": "hermes"}}}, None, False),
+        ({"hosts": {"x19": {"enabled": True, "apiKey": "hch-v3-hostonly", "workspace": "x19"}}}, None, False),
         ({"apiKey": "hch-v3-root", **_KEYLESS_DEFAULT}, None, True),
         (_KEYLESS_DEFAULT, "hch-v3-from-env", False),
         ({"baseUrl": "http://localhost:8000", **_KEYLESS_DEFAULT}, None, True),
@@ -867,23 +867,23 @@ class TestEnabledRequiresACredential:
     def test_clone_is_enabled_only_by_an_on_disk_credential(self, monkeypatch, tmp_path, cfg, env_key, enabled):
         honcho_cli, written = self._env(monkeypatch, tmp_path, cfg, env_key=env_key)
         assert honcho_cli.clone_honcho_for_profile("dreamer") is True
-        block = written["cfg"]["hosts"]["hermes_dreamer"]
+        block = written["cfg"]["hosts"]["x19_dreamer"]
         assert block.get("enabled") is (True if enabled else None)
         assert "apiKey" not in block and "oauth" not in block
-        assert block["aiPeer"] == "dreamer" and block["workspace"] == "hermes"
+        assert block["aiPeer"] == "dreamer" and block["workspace"] == "x19"
 
     @pytest.mark.parametrize("cfg, env_key, profile, expect, enabled", [
-        ({"hosts": {"hermes_dreamer": {"workspace": "hermes"}}}, "hch-v3-from-env", "dreamer", ["setup"], False),
+        ({"hosts": {"x19_dreamer": {"workspace": "x19"}}}, "hch-v3-from-env", "dreamer", ["setup"], False),
         (_OAUTH_DEFAULT, None, "dreamer",
-         ["stays disabled", "hermes honcho setup --target-profile dreamer", "hosts.hermes_dreamer"], False),
-        ({"hosts": {"hermes_dreamer": {"enabled": True, "aiPeer": "dreamer", "workspace": "hermes"}}}, None, "dreamer",
+         ["stays disabled", "x19 honcho setup --target-profile dreamer", "hosts.x19_dreamer"], False),
+        ({"hosts": {"x19_dreamer": {"enabled": True, "aiPeer": "dreamer", "workspace": "x19"}}}, None, "dreamer",
          ["stays disabled"], False),
-        ({"hosts": {}}, None, "default", ["Run 'hermes honcho setup' to sign in"], False),
+        ({"hosts": {}}, None, "default", ["Run 'x19 honcho setup' to sign in"], False),
         ({"apiKey": "hch-v3-root", **_KEYLESS_DEFAULT}, None, "dreamer", ["Honcho enabled"], True),
     ], ids=["env key only", "empty block", "legacy enabled keyless block", "default profile hint", "root key"])
     def test_enable_writes_enabled_only_for_an_on_disk_credential(self, monkeypatch, tmp_path, capsys,
                                                                    cfg, env_key, profile, expect, enabled):
-        host = "hermes" if profile == "default" else "hermes_dreamer"
+        host = "x19" if profile == "default" else "x19_dreamer"
         honcho_cli, written = self._env(monkeypatch, tmp_path, cfg, env_key=env_key, host=host, profile=profile)
         honcho_cli.cmd_enable(SimpleNamespace())
         out = capsys.readouterr().out
@@ -901,97 +901,97 @@ class TestWriteConfigMergesOntoDisk:
 
     def _rotate_on_disk(self, cfg_path):
         disk = json.loads(cfg_path.read_text())
-        disk["hosts"]["hermes"].update(apiKey="hch-at-new", oauth={"refreshToken": "hch-rt-new"})
+        disk["hosts"]["x19"].update(apiKey="hch-at-new", oauth={"refreshToken": "hch-rt-new"})
         cfg_path.write_text(json.dumps(disk))
 
     def test_untouched_keys_take_disk_and_the_commands_edits_apply(self, monkeypatch, tmp_path):
-        disk = {"apiKey": "root", "hosts": {"hermes": {"apiKey": "hch-at-old", "oauth": {"refreshToken": "hch-rt-old"},
+        disk = {"apiKey": "root", "hosts": {"x19": {"apiKey": "hch-at-old", "oauth": {"refreshToken": "hch-rt-old"},
                                                      "recallMode": "hybrid", "runtimePeerPrefix": "tg_"}}}
         honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, disk)
         cfg = honcho_cli._read_config()
         self._rotate_on_disk(cfg_path)
-        cfg["hosts"]["hermes"]["recallMode"] = "tools"
-        cfg["hosts"]["hermes"].pop("runtimePeerPrefix")
+        cfg["hosts"]["x19"]["recallMode"] = "tools"
+        cfg["hosts"]["x19"].pop("runtimePeerPrefix")
         cfg["dialecticCadence"] = 3
         honcho_cli._write_config(cfg)
         out = json.loads(cfg_path.read_text())
-        assert out["hosts"]["hermes"] == {"apiKey": "hch-at-new", "oauth": {"refreshToken": "hch-rt-new"}, "recallMode": "tools"}
+        assert out["hosts"]["x19"] == {"apiKey": "hch-at-new", "oauth": {"refreshToken": "hch-rt-new"}, "recallMode": "tools"}
         assert out["apiKey"] == "root" and out["dialecticCadence"] == 3
 
     def test_a_credential_the_command_set_wins(self, monkeypatch, tmp_path):
-        disk = {"hosts": {"hermes": {"apiKey": "hch-at-old", "oauth": {"refreshToken": "hch-rt-old"}}}}
+        disk = {"hosts": {"x19": {"apiKey": "hch-at-old", "oauth": {"refreshToken": "hch-rt-old"}}}}
         honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, disk)
         cfg = honcho_cli._read_config()
         self._rotate_on_disk(cfg_path)
-        cfg["hosts"]["hermes"]["apiKey"] = "hch-v3-pasted"
-        cfg["hosts"]["hermes"].pop("oauth")
+        cfg["hosts"]["x19"]["apiKey"] = "hch-v3-pasted"
+        cfg["hosts"]["x19"].pop("oauth")
         honcho_cli._write_config(cfg)
-        assert json.loads(cfg_path.read_text())["hosts"]["hermes"] == {"apiKey": "hch-v3-pasted"}
+        assert json.loads(cfg_path.read_text())["hosts"]["x19"] == {"apiKey": "hch-v3-pasted"}
 
     def test_a_second_write_on_the_same_read_applies_only_the_edits_made_since_the_first(self, monkeypatch, tmp_path):
-        disk = {"hosts": {"hermes": {"apiKey": "hch-at-old", "oauth": {"refreshToken": "hch-rt-old"}, "workspace": "A"}}}
+        disk = {"hosts": {"x19": {"apiKey": "hch-at-old", "oauth": {"refreshToken": "hch-rt-old"}, "workspace": "A"}}}
         honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, disk)
         cfg = honcho_cli._read_config()
-        cfg["hosts"]["hermes"]["workspace"] = "B"
+        cfg["hosts"]["x19"]["workspace"] = "B"
         honcho_cli._write_config(cfg)
         self._rotate_on_disk(cfg_path)
-        cfg["hosts"]["hermes"]["workspace"] = "A"
+        cfg["hosts"]["x19"]["workspace"] = "A"
         honcho_cli._write_config(cfg)
-        out = json.loads(cfg_path.read_text())["hosts"]["hermes"]
+        out = json.loads(cfg_path.read_text())["hosts"]["x19"]
         assert out == {"apiKey": "hch-at-new", "oauth": {"refreshToken": "hch-rt-new"}, "workspace": "A"}
 
     def test_a_grant_the_login_installed_yields_to_a_later_rotation(self, monkeypatch, tmp_path):
         import plugins.memory.honcho.oauth as oauth
-        honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, {"hosts": {"hermes": {"peerName": "alice"}}})
-        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "hermes")
+        honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, {"hosts": {"x19": {"peerName": "alice"}}})
+        monkeypatch.setattr(honcho_cli, "_host_key", lambda: "x19")
         cfg = honcho_cli._read_config()
         grant = {"access_token": "hch-at-login", "refresh_token": "hch-rt-login", "expires_in": 3600}
-        cred = oauth.install_grant(cfg_path, "hermes", grant, client_id="c", token_endpoint="e", apply_config=False)
-        honcho_cli._apply_grant_to_host(cfg, cfg["hosts"]["hermes"], cred)
+        cred = oauth.install_grant(cfg_path, "x19", grant, client_id="c", token_endpoint="e", apply_config=False)
+        honcho_cli._apply_grant_to_host(cfg, cfg["hosts"]["x19"], cred)
         self._rotate_on_disk(cfg_path)
-        cfg["hosts"]["hermes"]["recallMode"] = "tools"
+        cfg["hosts"]["x19"]["recallMode"] = "tools"
         honcho_cli._write_config(cfg)
-        out = json.loads(cfg_path.read_text())["hosts"]["hermes"]
+        out = json.loads(cfg_path.read_text())["hosts"]["x19"]
         assert out["apiKey"] == "hch-at-new" and out["oauth"] == {"refreshToken": "hch-rt-new"}
         assert out["peerName"] == "alice" and out["recallMode"] == "tools"
 
-    _SEED = {"dialecticCadence": 3, "hosts": {"hermes": {"peerName": "alice"}}}
+    _SEED = {"dialecticCadence": 3, "hosts": {"x19": {"peerName": "alice"}}}
 
     def _seeded(self, monkeypatch, tmp_path):
         seed, local = tmp_path / "seed.json", tmp_path / "honcho.json"
         seed.write_text(json.dumps(self._SEED))
-        return _point_cli_at(monkeypatch, local, _config_path=lambda: seed, _host_key=lambda: "hermes"), local
+        return _point_cli_at(monkeypatch, local, _config_path=lambda: seed, _host_key=lambda: "x19"), local
 
     def test_a_read_seeded_from_another_file_applies_only_its_edits_onto_the_local_file(self, monkeypatch, tmp_path):
         import plugins.memory.honcho.oauth as oauth
         honcho_cli, local = self._seeded(monkeypatch, tmp_path)
         cfg = honcho_cli._read_config()
         grant = {"access_token": "hch-at-login", "refresh_token": "hch-rt-login", "expires_in": 3600}
-        cred = oauth.install_grant(local, "hermes", grant, client_id="c", token_endpoint="e", apply_config=False)
-        honcho_cli._apply_grant_to_host(cfg, cfg["hosts"]["hermes"], cred)
+        cred = oauth.install_grant(local, "x19", grant, client_id="c", token_endpoint="e", apply_config=False)
+        honcho_cli._apply_grant_to_host(cfg, cfg["hosts"]["x19"], cred)
         rotated = oauth.OAuthCredential.from_token_response(
             {"access_token": "hch-at-new", "refresh_token": "hch-rt-new", "expires_in": 3600},
             now=0.0, client_id="c", token_endpoint="e")
-        oauth._persist_credential(local, "hermes", rotated)
-        cfg["hosts"]["hermes"]["recallMode"] = "tools"
+        oauth._persist_credential(local, "x19", rotated)
+        cfg["hosts"]["x19"]["recallMode"] = "tools"
         honcho_cli._write_config(cfg)
         out = json.loads(local.read_text())
-        assert out["hosts"]["hermes"]["apiKey"] == "hch-at-new"
-        assert out["hosts"]["hermes"]["oauth"]["refreshToken"] == "hch-rt-new"
-        assert out["hosts"]["hermes"]["recallMode"] == "tools" and out["hosts"]["hermes"]["peerName"] == "alice"
+        assert out["hosts"]["x19"]["apiKey"] == "hch-at-new"
+        assert out["hosts"]["x19"]["oauth"]["refreshToken"] == "hch-rt-new"
+        assert out["hosts"]["x19"]["recallMode"] == "tools" and out["hosts"]["x19"]["peerName"] == "alice"
         assert out["dialecticCadence"] == 3
 
     def test_a_read_seeded_from_another_file_is_written_whole_while_no_local_file_exists(self, monkeypatch, tmp_path):
         honcho_cli, local = self._seeded(monkeypatch, tmp_path)
         cfg = honcho_cli._read_config()
-        cfg["hosts"]["hermes"]["recallMode"] = "tools"
+        cfg["hosts"]["x19"]["recallMode"] = "tools"
         honcho_cli._write_config(cfg)
-        assert json.loads(local.read_text()) == {"dialecticCadence": 3, "hosts": {"hermes": {"peerName": "alice", "recallMode": "tools"}}}
+        assert json.loads(local.read_text()) == {"dialecticCadence": 3, "hosts": {"x19": {"peerName": "alice", "recallMode": "tools"}}}
 
     @pytest.mark.parametrize("build", [lambda cli: {"hosts": {"other": {"apiKey": "o"}}}, lambda cli: dict(cli._read_config())],
                              ids=["never read", "rebuilt from the read"])
     def test_a_plain_dict_is_written_whole(self, monkeypatch, tmp_path, build):
-        honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, {"hosts": {"hermes": {"apiKey": "hch-at-old"}}})
+        honcho_cli, cfg_path = self._paths(monkeypatch, tmp_path, {"hosts": {"x19": {"apiKey": "hch-at-old"}}})
         cfg = build(honcho_cli)
         self._rotate_on_disk(cfg_path)
         honcho_cli._write_config(cfg)

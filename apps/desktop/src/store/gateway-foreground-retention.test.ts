@@ -14,10 +14,10 @@ const gatewayMocks = vi.hoisted(() => ({
   closed: [] as string[]
 }))
 
-vi.mock('@/hermes', async importActual => ({
+vi.mock('@/x19', async importActual => ({
   ...(await importActual<Record<string, unknown>>()),
   setApiRequestConnection: vi.fn(),
-  HermesGateway: class {
+  X19Gateway: class {
     connectionState = 'closed'
     wsUrl = ''
     connect = async (wsUrl: string): Promise<void> => {
@@ -47,7 +47,7 @@ const {
 const { $sessionTiles, foregroundSessionScopes, liveSessionScopes } = await import('./session-states')
 
 function installDesktop(): void {
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+  ;(window as unknown as { x19Desktop: unknown }).x19Desktop = {
     getConnection: vi.fn(async () => ({
       authMode: 'token',
       profile: 'default',
@@ -93,7 +93,7 @@ afterEach(() => {
   closeSecondaryGateways()
   $sessionTiles.set([])
   vi.clearAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
 })
 
 describe('foreground tile retention vs. the live-work pruner (#93892)', () => {

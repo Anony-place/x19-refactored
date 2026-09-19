@@ -137,10 +137,3 @@ def is_partial_silence_marker(text: Any) -> bool:
     )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-SILENT_REPLY_TOKEN = "NO_REPLY"
-# ---- END PLUGIN-COMPAT ----

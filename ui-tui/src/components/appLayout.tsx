@@ -1,7 +1,7 @@
 // Importing the apps barrel registers the reference widget apps at startup.
 import '../sdk/apps/index.js'
 
-import { AlternateScreen, Box, NoSelect, ScrollBox, Text } from '@hermes/ink'
+import { AlternateScreen, Box, NoSelect, ScrollBox, Text } from '@x19/ink'
 import { useStore } from '@nanostores/react'
 import { Fragment, memo, type MutableRefObject, useEffect, useMemo, useRef } from 'react'
 
@@ -33,6 +33,7 @@ import { FpsOverlay } from './fpsOverlay.js'
 import { HelpHint } from './helpHint.js'
 import { Journey } from './journey.js'
 import { MessageLine } from './messageLine.js'
+import { OrgConsole } from './orgPanel.js'
 import { PetKitty, PetSprite } from './petSprite.js'
 import { QueuedMessages } from './queuedMessages.js'
 import { LiveTodoPanel, StreamingAssistant } from './streamingAssistant.js'
@@ -367,6 +368,7 @@ const ComposerPane = memo(function ComposerPane({
         <Box height={1} onMouseDown={captureInputDrag} onMouseDrag={dragFromSpacer} onMouseUp={endInputDrag} />
       )}
 
+      <OrgConsole cols={Math.max(1, composer.cols - 2)} />
       <LiveAgentsPanel cols={Math.max(1, composer.cols - 2)} />
       <StatusRulePane at="top" composer={composer} status={status} />
       <AmbientDock placement="dock-top" />

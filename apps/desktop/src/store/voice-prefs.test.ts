@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/hermes', () => ({
-  getHermesConfigRecord: vi.fn(async () => ({})),
-  saveHermesConfig: vi.fn(async () => undefined)
+vi.mock('@/x19', () => ({
+  getX19ConfigRecord: vi.fn(async () => ({})),
+  saveX19Config: vi.fn(async () => undefined)
 }))
 
-import { saveHermesConfig } from '@/hermes'
+import { saveX19Config } from '@/x19'
 
 import { $voiceStopPhrase, applyVoiceStopPhraseFromConfig } from './voice-prefs'
 
@@ -23,14 +23,14 @@ it('keeps the desktop toggle local across config refreshes', async () => {
         })
       }
 
-      vi.mocked(saveHermesConfig).mockClear()
+      vi.mocked(saveX19Config).mockClear()
 
       try {
         await prefs.setAutoSpeakReplies(enabled)
         prefs.applyAutoSpeakFromConfig({ voice: { auto_tts: !enabled } })
         expect(prefs.$autoSpeakReplies.get()).toBe(enabled)
-        expect(saveHermesConfig).not.toHaveBeenCalled()
-        expect(localStorage.getItem('hermes.desktop.autoSpeakReplies')).toBe(fails ? null : String(enabled))
+        expect(saveX19Config).not.toHaveBeenCalled()
+        expect(localStorage.getItem('x19.desktop.autoSpeakReplies')).toBe(fails ? null : String(enabled))
       } finally {
         write.mockRestore()
       }
@@ -54,11 +54,11 @@ it('migrates the legacy preference once, not on every refresh', async () => {
 
       try {
         prefs.applyAutoSpeakFromConfig(null)
-        expect(localStorage.getItem('hermes.desktop.autoSpeakReplies')).toBeNull()
+        expect(localStorage.getItem('x19.desktop.autoSpeakReplies')).toBeNull()
         prefs.applyAutoSpeakFromConfig({ voice: { auto_tts: enabled } })
         prefs.applyAutoSpeakFromConfig({ voice: { auto_tts: !enabled } })
         expect(prefs.$autoSpeakReplies.get()).toBe(enabled)
-        expect(localStorage.getItem('hermes.desktop.autoSpeakReplies')).toBe(fails ? null : String(enabled))
+        expect(localStorage.getItem('x19.desktop.autoSpeakReplies')).toBe(fails ? null : String(enabled))
       } finally {
         write.mockRestore()
       }
@@ -76,8 +76,8 @@ describe('applyVoiceStopPhraseFromConfig', () => {
   })
 
   it('uses the first configured phrase so a custom phrase renders correctly', () => {
-    applyVoiceStopPhraseFromConfig({ voice: { stop_phrases: ['goodbye hermes', 'stop'] } })
-    expect($voiceStopPhrase.get()).toBe('goodbye hermes')
+    applyVoiceStopPhraseFromConfig({ voice: { stop_phrases: ['goodbye x19', 'stop'] } })
+    expect($voiceStopPhrase.get()).toBe('goodbye x19')
   })
 
   it('coerces a bare string like the backend does', () => {

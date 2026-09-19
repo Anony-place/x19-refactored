@@ -59,7 +59,7 @@ runs:
         command -v ffmpeg >/dev/null 2>&1 || brew install --quiet ffmpeg
 
         # until new runner image is published by github, we have to hack on screen record approvals
-        # see https://github.com/actions/runner-images/issues/14474 - as of this hermes agent commit,
+        # see https://github.com/actions/runner-images/issues/14474 - as of this x19 agent commit,
         # it's merged but the image isn't updated.
         approvalsPlist="$HOME/Library/Group Containers/group.com.apple.replayd/ScreenCaptureApprovals.plist"
         mkdir -p "$(dirname "$approvalsPlist")"

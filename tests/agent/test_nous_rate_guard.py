@@ -6,17 +6,17 @@ import time
 
 import pytest
 
-from tests.hermes_cli.anon_portal import make_jwt
+from tests.x19_cli.anon_portal import make_jwt
 
 
 @pytest.fixture
 def rate_guard_env(tmp_path, monkeypatch):
     """Isolate rate guard state to a temp directory."""
-    hermes_home = str(tmp_path / ".hermes")
-    os.makedirs(hermes_home, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", hermes_home)
+    x19_home = str(tmp_path / ".x19")
+    os.makedirs(x19_home, exist_ok=True)
+    monkeypatch.setenv("X19_HOME", x19_home)
     # Clear any cached module-level imports
-    return hermes_home
+    return x19_home
 
 
 class TestRecordNousRateLimit:
@@ -185,7 +185,7 @@ class TestAuxiliaryClientIntegration:
 class TestIsGenuineNousRateLimit:
     """Tell a real account-level 429 apart from an upstream-capacity 429.
 
-    Nous Portal multiplexes upstreams (DeepSeek, Kimi, MiMo, Hermes).
+    Nous Portal multiplexes upstreams (DeepSeek, Kimi, MiMo, X19).
     A 429 from an upstream out of capacity should NOT trip the
     cross-session breaker; a real user-quota 429 should.
     """
@@ -302,7 +302,7 @@ class TestWelcomeRouteCopy:
         return verdict, buffered, statuses
 
     def test_the_welcome_host_rate_limit_message_names_the_slash_command(self, monkeypatch):
-        from hermes_cli import anon_auth
+        from x19_cli import anon_auth
 
         verdict, buffered, statuses = self._drive_guard(
             "https://welcome-api.nousresearch.com/v1", monkeypatch

@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render as renderUi, screen, waitFor, within } 
 import type { ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { HermesGateway } from '@/hermes'
+import type { X19Gateway } from '@/x19'
 import { handleApprovalKey, releaseApprovalKey } from '@/lib/keybinds/approval-keys'
 import { $gateway } from '@/store/gateway'
 import { $approvalRequest, clearAllPrompts, sessionApprovalRequests, setApprovalRequest } from '@/store/prompts'
@@ -47,7 +47,7 @@ function liveApproval(id = 'srq-approval') {
 
 function mockGateway() {
   const request = vi.fn().mockResolvedValue({ resolved: true })
-  $gateway.set({ request } as unknown as HermesGateway)
+  $gateway.set({ request } as unknown as X19Gateway)
 
   return request
 }
@@ -194,7 +194,7 @@ describe('PendingApprovalStack', () => {
   })
 
   it('renders the stack independently of mounted tool rows', () => {
-    setRequest('rm /tmp/hermes_approval_test.txt')
+    setRequest('rm /tmp/x19_approval_test.txt')
     const { container } = render(<PendingApprovalStack />)
     const stack = container.querySelector('[data-slot="tool-approval-stack"]')
 

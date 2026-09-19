@@ -143,13 +143,13 @@ class TestSanitizeStructureNonAscii:
     def test_sanitizes_nested_dict_structure(self):
         payload = {
             "default_headers": {
-                "X-Title": "Hermes │ Agent",
-                "User-Agent": "Hermes/1.0 🤖",
+                "X-Title": "X19 │ Agent",
+                "User-Agent": "X19/1.0 🤖",
             }
         }
         assert _sanitize_structure_non_ascii(payload) is True
-        assert payload["default_headers"]["X-Title"] == "Hermes  Agent"
-        assert payload["default_headers"]["User-Agent"] == "Hermes/1.0 "
+        assert payload["default_headers"]["X-Title"] == "X19  Agent"
+        assert payload["default_headers"]["User-Agent"] == "X19/1.0 "
 
 
 class TestApiKeyClientSync:

@@ -39,7 +39,7 @@ _RETRYABLE_STATUSES = ("indeterminate", "deferred")
 
 def _hosted_room_turn_timeout_seconds() -> float:
     try:
-        agent_timeout = float(os.getenv("HERMES_AGENT_TIMEOUT", "1800"))
+        agent_timeout = float(os.getenv("X19_AGENT_TIMEOUT", "1800"))
     except (TypeError, ValueError):
         agent_timeout = 0.0
     return (agent_timeout if agent_timeout > 0 else 1800.0) + _HOSTED_ROOM_TERMINAL_GRACE_SECONDS
@@ -124,11 +124,11 @@ class HostedRoomService:
         return self.db_path.parent
 
     def local_profiles(self) -> tuple[str, ...]:
-        from hermes_constants import named_profile_has_identity, named_profile_is_deleted
+        from x19_constants import named_profile_has_identity, named_profile_is_deleted
 
         profiles, profiles_dir = {"default"}, self.root / "profiles"
         if profiles_dir.is_dir():
-            # ``profiles/.deleted/`` is the tombstone dir `hermes profile delete` leaves behind, not a
+            # ``profiles/.deleted/`` is the tombstone dir `x19 profile delete` leaves behind, not a
             # profile: feeding it to validate_roster failed plan_next_task on every cycle (#106847).
             # Marker-less dirs (cron/log side-effect shells) are not profiles either.
             profiles.update(
@@ -623,9 +623,3 @@ class _RouteStatusPeerClient:
         return tracked
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import hashlib  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

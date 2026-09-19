@@ -40,7 +40,7 @@ test.each(['done', 'manual', 'error'])('renders %s before acknowledging terminal
     if (url.startsWith('/ack/')) {
       assert.equal(options.method, 'POST')
       assert.equal(document.body.className, status === 'error' ? 'error' : 'done')
-      assert.notEqual(document.getElementById('title').textContent, 'Updating Hermes')
+      assert.notEqual(document.getElementById('title').textContent, 'Updating X19')
       return { ok: true }
     }
     return { ok: true, json: async () => ({ status, receipt, message: 'The updater result' }) }
@@ -48,7 +48,7 @@ test.each(['done', 'manual', 'error'])('renders %s before acknowledging terminal
   document = openPage(fetch)
   await vi.advanceTimersByTimeAsync(1000)
   assert.equal(document.body.className, status === 'error' ? 'error' : 'done')
-  assert.notEqual(document.getElementById('title').textContent, 'Updating Hermes')
+  assert.notEqual(document.getElementById('title').textContent, 'Updating X19')
   assert.deepEqual(requests, ['/progress', `/ack/${receipt}`])
 })
 
@@ -73,7 +73,7 @@ test.each(['disconnect', 'hung', 'hung-body', 'http', 'invalid'])('bounds %s pro
   await vi.advanceTimersByTimeAsync(20_000)
   assert.equal(document.body.className, 'disconnected')
   assert.equal(document.getElementById('title').textContent, 'Update status unavailable')
-  assert.match(document.getElementById('line').textContent, /Check Hermes/)
+  assert.match(document.getElementById('line').textContent, /Check X19/)
   assert.ok(attempts <= 4, `unbounded retry loop: ${attempts}`)
 })
 
@@ -95,6 +95,6 @@ test('continues displaying a healthy long update while progress remains reachabl
   const document = openPage(fetch)
   await vi.advanceTimersByTimeAsync(60_000)
   assert.equal(document.body.className, '')
-  assert.equal(document.getElementById('title').textContent, 'Updating Hermes')
+  assert.equal(document.getElementById('title').textContent, 'Updating X19')
   assert.equal(document.getElementById('line').textContent, 'Building Desktop')
 })

@@ -64,7 +64,7 @@ def _safe_int(value: Any) -> int | None:
 # deliberate main-model retry that must NOT re-issue the pin). The summary call is the ONLY auxiliary LLM
 # call a lean compaction attempt makes (#96603) — there are no sibling digest calls.
 _SUMMARY_ROUTE_PIN: contextvars.ContextVar[Optional[Dict[str, Any]]] = (
-    contextvars.ContextVar("hermes_summary_route_pin", default=None)
+    contextvars.ContextVar("x19_summary_route_pin", default=None)
 )
 
 # ``timeout`` is included so a fallback entry keeps its own deadline.
@@ -254,7 +254,7 @@ MICRO_COMPACT_MARKER_KEY = "_micro_compact_marker"
 # agent/chat_completion_helpers.py) strip every top-level ``_``-prefixed key before the request leaves the
 # process, so this never reaches a strict OpenAI-compatible gateway. CONTRACT (#92231): the marker asserts
 # "this dict's CONTENT is durable as written". Loaded rows are stamped at materialization time
-# (hermes_state._rows_to_conversation), so any code that mutates a loaded or flushed dict's content in place
+# (x19_state._rows_to_conversation), so any code that mutates a loaded or flushed dict's content in place
 # and needs the change persisted MUST pop the marker (and invalidate _db_flush_scan_prefix if the dict may
 # sit inside the bounded-scan prefix) — see agent/turn_finalizer.py (fill-empty-tail) and
 # agent/context_compressor.py (micro-compaction defrag) for the two canonical pop sites. Mutating without
@@ -1723,11 +1723,11 @@ def _today_for_prompt() -> str:
     """Date-only (user tz) for temporal anchoring; "" when the clock fails. Cache-safe: the summary is outside the prefix."""
     try:
         # Date-only granularity matches system_prompt.py:337 (PR #20451) and the user's configured timezone
-        # via hermes_time.now(). The compaction summary is a mid-conversation message that is NOT part of
+        # via x19_time.now(). The compaction summary is a mid-conversation message that is NOT part of
         # the cached prefix, so a date here never affects prompt-cache stability. Resolved defensively — a
         # clock failure must never block compaction.
-        from hermes_time import now as _hermes_now
-        return _hermes_now().strftime("%Y-%m-%d")
+        from x19_time import now as _x19_now
+        return _x19_now().strftime("%Y-%m-%d")
     except Exception:  # pragma: no cover - clock resolution is best-effort
         return ""
 
@@ -4740,7 +4740,7 @@ Write only the summary body. Do not include any preamble or prefix."""
             # compressed-away message dicts), which makes this the natural point to hand allocator pages
             # back to the OS. #76905's trim lifecycle covers the gateway/TUI housekeeping loops but not the
             # CLI compression path, so RSS keeps the pre-compaction high-water mark until exit. (#70782)
-            from hermes_cli.mem_trim import trim_memory
+            from x19_cli.mem_trim import trim_memory
             trim_memory(reason="post-compression")
         except Exception as exc:
             logger.debug("post-compression memory trim failed: %s: %s", type(exc).__name__, exc)
@@ -5055,23 +5055,3 @@ def is_user_originated_turn(message: Any) -> bool:
     return user_originated_turn_view(message) is not None
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'tool_result_id_variants': ('agent.message_sanitization', 'tool_result_id_variants'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

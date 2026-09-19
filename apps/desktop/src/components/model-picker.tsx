@@ -1,9 +1,9 @@
-import type { ModelOptionProvider, ModelPricing } from '@hermes/shared'
-import { fuzzyRank, modelSearchText } from '@hermes/shared'
+import type { ModelOptionProvider, ModelPricing } from '@x19/shared'
+import { fuzzyRank, modelSearchText } from '@x19/shared'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
-import { getLocalModelsStatus } from '@/hermes'
+import { getLocalModelsStatus } from '@/x19'
 import { useI18n } from '@/i18n'
 import { catalogProviderMatches, modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
 import { currentPickerSelection } from '@/lib/model-status-label'
@@ -11,9 +11,9 @@ import { foldIncludes, normalize } from '@/lib/text'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import { $localRuntimeJobs, runningModelDownloads, watchLocalRuntimeJobs } from '@/store/local-runtime-jobs'
-import type { LocalModelLoadProgress } from '@/types/hermes'
+import type { LocalModelLoadProgress } from '@/types/x19'
 
-import type { HermesGateway } from '../hermes'
+import type { X19Gateway } from '../x19'
 import { cn } from '../lib/utils'
 import { startManualOnboarding } from '../store/onboarding'
 
@@ -27,7 +27,7 @@ import { Skeleton } from './ui/skeleton'
 interface ModelPickerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  gw?: HermesGateway
+  gw?: X19Gateway
   sessionId?: string | null
   currentModel: string
   currentProvider: string
@@ -62,7 +62,7 @@ export function ModelPickerDialog({
   // Own the search term so we can filter manually. cmdk's built-in
   // shouldFilter reorders items by its fuzzy-match score (≈alphabetical with
   // an empty query), which destroys the backend's curated order. We disable
-  // it: an empty query shows the curated list verbatim (like the `hermes
+  // it: an empty query shows the curated list verbatim (like the `x19
   // model` CLI picker) and a query ranks with the shared fuzzyRank.
   const [search, setSearch] = useState('')
 

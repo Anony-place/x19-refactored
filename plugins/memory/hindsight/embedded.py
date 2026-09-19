@@ -63,7 +63,7 @@ def _export_port_health_grace_timeout(config: dict[str, Any]) -> None:
 
 def _check_local_runtime() -> tuple[bool, str | None]:
     """Whether the local embedded stack imports cleanly (older CPUs: NumPy can raise
-    at import, so Hermes degrades instead of retrying a broken backend).
+    at import, so X19 degrades instead of retrying a broken backend).
     ``sentence_transformers`` is probed too: ``hindsight`` imports fine with a broken
     embedding stack, and the daemon would then abort on every retain/recall."""
     try:
@@ -81,13 +81,13 @@ def _local_runtime_hint(reason: str | None) -> str:
 
     ``local_embedded`` imports ``from hindsight import HindsightEmbedded``, which is provided only by the
     ``hindsight-all`` package (its wheel ships the top-level ``hindsight`` module).
-    NousResearch/hermes-agent#7718.
+    Anony-place/x19-refactored#7718.
     """
     text = (reason or "").lower()
     if "no module named" in text and any(m in text for m in ("hindsight'", 'hindsight"', "hindsight_embed")):
         return (
             f" Install the embedded runtime with: uv pip install --python "
-            f"{sys.executable} hindsight-all — or run 'hermes memory setup'. "
+            f"{sys.executable} hindsight-all — or run 'x19 memory setup'. "
             "(local_embedded needs the 'hindsight-all' package, which provides the "
             "top-level 'hindsight' module; 'hindsight-client' alone only covers "
             "cloud / local_external.)"
@@ -97,7 +97,7 @@ def _local_runtime_hint(reason: str | None) -> str:
 
 def _load_simple_env(path) -> dict[str, str]:
     """Parse a KEY=VALUE env file (comments/blank lines ignored). utf-8-sig: also used
-    on the Hermes .env during post_setup, where a Notepad BOM would stick to the first key."""
+    on the X19 .env during post_setup, where a Notepad BOM would stick to the first key."""
     if not path.exists():
         return {}
     pairs = (line.split("=", 1) for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
@@ -106,7 +106,7 @@ def _load_simple_env(path) -> dict[str, str]:
 
 
 def _embedded_profile_env_path(config: dict[str, Any]) -> Path:
-    profile = str(config.get("profile", "hermes") or "hermes")
+    profile = str(config.get("profile", "x19") or "x19")
     return Path.home() / ".hindsight" / "profiles" / f"{profile}.env"
 
 

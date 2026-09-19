@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { HermesConnection } from '@/global'
+import type { X19Connection } from '@/global'
 
 import { getCronModelImpactScope, syncCronModelImpactConnection } from './cron-model-impact-scope'
 
-function connection(baseUrl: string, wsUrl: string, overrides: Partial<HermesConnection> = {}): HermesConnection {
+function connection(baseUrl: string, wsUrl: string, overrides: Partial<X19Connection> = {}): X19Connection {
   return {
     baseUrl,
     isFullscreen: false,

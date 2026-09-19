@@ -24,7 +24,7 @@ def _isolated_home(tmp_path, monkeypatch):
 
 
 _CONFIG = {
-    "profile": "hermes",
+    "profile": "x19",
     "llm_provider": "openai",
     "llm_model": "gpt-4o-mini",
 }

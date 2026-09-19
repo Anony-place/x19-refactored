@@ -1,6 +1,6 @@
-"""hermes-memory-store — holographic memory plugin (MemoryProvider): structured fact storage with entity
+"""x19-memory-store — holographic memory plugin (MemoryProvider): structured fact storage with entity
 resolution, trust scoring, and HRR-based compositional retrieval. Original plugin by dusterbloom (PR #2351).
-Config in $HERMES_HOME/config.yaml under plugins.hermes-memory-store: db_path ($HERMES_HOME/memory_store.db),
+Config in $X19_HOME/config.yaml under plugins.x19-memory-store: db_path ($X19_HOME/memory_store.db),
 auto_extract (false), default_trust (0.5), min_trust_threshold (0.3), temporal_decay_half_life (0),
 hrr_dim (1024), hrr_weight (0.3)."""
 
@@ -17,7 +17,7 @@ from tools.registry import tool_error
 from utils import is_truthy_value
 from .store import MemoryStore
 from .retrieval import FactRetriever
-from hermes_cli.config import cfg_get
+from x19_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +76,8 @@ _EXTRACT_CATEGORIES = (
 
 def _load_plugin_config() -> dict:
     try:
-        from hermes_cli.config import load_config_readonly  # canonical: managed-scope overlay + ${VAR} expansion
-        return cfg_get(load_config_readonly(), "plugins", "hermes-memory-store", default={}) or {}
+        from x19_cli.config import load_config_readonly  # canonical: managed-scope overlay + ${VAR} expansion
+        return cfg_get(load_config_readonly(), "plugins", "x19-memory-store", default={}) or {}
     except Exception:
         return {}
 
@@ -111,28 +111,28 @@ class HolographicMemoryProvider(MemoryProvider):
     def is_available(self) -> bool:
         return True  # SQLite is always available, numpy is optional
 
-    def save_config(self, values, hermes_home):
-        """Write config to config.yaml under plugins.hermes-memory-store."""
+    def save_config(self, values, x19_home):
+        """Write config to config.yaml under plugins.x19-memory-store."""
         # The canonical writer: config lock, managed-mode refusal, default stripping, atomic replace.
-        # ``merge_existing`` keeps every other section; *hermes_home* is the active profile already.
-        from hermes_cli.config import save_config
-        save_config({"plugins": {"hermes-memory-store": dict(values)}}, merge_existing=True)
+        # ``merge_existing`` keeps every other section; *x19_home* is the active profile already.
+        from x19_cli.config import save_config
+        save_config({"plugins": {"x19-memory-store": dict(values)}}, merge_existing=True)
 
     def get_config_schema(self):
-        from hermes_constants import display_hermes_home
+        from x19_constants import display_x19_home
         return [
-            {"key": "db_path", "description": "SQLite database path", "default": f"{display_hermes_home()}/memory_store.db"},
+            {"key": "db_path", "description": "SQLite database path", "default": f"{display_x19_home()}/memory_store.db"},
             {"key": "auto_extract", "description": "Auto-extract facts at session end", "default": "false", "choices": ["true", "false"]},
             {"key": "default_trust", "description": "Default trust score for new facts", "default": "0.5"},
             {"key": "hrr_dim", "description": "HRR vector dimensions", "default": "1024"},
         ]
 
     def initialize(self, session_id: str, **kwargs) -> None:
-        from hermes_constants import get_hermes_home
-        _hermes_home = str(get_hermes_home())
-        db_path = self._config.get("db_path", _hermes_home + "/memory_store.db")
-        if isinstance(db_path, str):  # expand $HERMES_HOME so paths resolve to the active profile
-            db_path = db_path.replace("$HERMES_HOME", _hermes_home).replace("${HERMES_HOME}", _hermes_home)
+        from x19_constants import get_x19_home
+        _x19_home = str(get_x19_home())
+        db_path = self._config.get("db_path", _x19_home + "/memory_store.db")
+        if isinstance(db_path, str):  # expand $X19_HOME so paths resolve to the active profile
+            db_path = db_path.replace("$X19_HOME", _x19_home).replace("${X19_HOME}", _x19_home)
         hrr_dim = int(self._config.get("hrr_dim", 1024))
         self._store = MemoryStore(db_path=db_path, default_trust=float(self._config.get("default_trust", 0.5)), hrr_dim=hrr_dim)
         self._retriever = FactRetriever(store=self._store, hrr_dim=hrr_dim, hrr_weight=float(self._config.get("hrr_weight", 0.3)),

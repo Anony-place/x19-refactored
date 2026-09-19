@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Image generation via FAL.ai (model picked in ``hermes tools``, persisted to ``image_gen.model``).
+"""Image generation via FAL.ai (model picked in ``x19 tools``, persisted to ``image_gen.model``).
 
 ``_build_fal_payload()`` / ``_build_fal_edit_payload()`` translate unified inputs into the
 ``FAL_MODELS`` payload filtered to its ``supports`` whitelist so models never receive rejected
@@ -53,7 +53,7 @@ _managed_fal_client_lock = threading.Lock()
 
 # --- Managed FAL gateway (Nous Subscription) ---
 def _resolve_managed_fal_gateway():
-    """Managed gateway config for the stored `hermes tools` selection, or ``None`` for direct FAL.
+    """Managed gateway config for the stored `x19 tools` selection, or ``None`` for direct FAL.
 
     ``"nous"`` (or legacy ``use_gateway: true``) → managed ONLY (unreachable = selection-naming
     error, never a silent FAL_KEY fallback). Other stored provider → direct ONLY (missing FAL_KEY
@@ -146,7 +146,7 @@ def _submit_fal_request(model: str, arguments: Dict[str, Any]):
                 f"Nous Subscription gateway rejected model '{model}' (HTTP {status}). This model "
                 f"may not yet be enabled on the Nous Portal's FAL proxy. Either:\n"
                 f"  • Set FAL_KEY in your environment to use FAL.ai directly, or\n"
-                f"  • Pick a different model via `hermes tools` → Image Generation."
+                f"  • Pick a different model via `x19 tools` → Image Generation."
                 f"{gateway_message}") from exc
         raise
 
@@ -155,7 +155,7 @@ def _submit_fal_request(model: str, arguments: Dict[str, Any]):
 def _read_image_gen_key(key: str) -> Optional[str]:
     """Return the stripped ``image_gen.<key>`` string from config.yaml, or None."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         cfg = load_config()
         section = cfg.get("image_gen") if isinstance(cfg, dict) else None
         value = section.get(key) if isinstance(section, dict) else None
@@ -285,8 +285,8 @@ def _upscale_image(image_url: str, original_prompt: str) -> Optional[Dict[str, A
 _CONTAINER_HOME_ENVS = {"DockerEnvironment", "SingularityEnvironment", "ModalEnvironment"}
 # No env yet: only deterministic cache roots translate side-effect free (SSH: tilde path; its
 # first sync uploads the cache file).
-_CACHE_BASE_BY_BACKEND = {"docker": "/root/.hermes", "singularity": "/root/.hermes",
-                          "modal": "/root/.hermes", "ssh": "~/.hermes"}
+_CACHE_BASE_BY_BACKEND = {"docker": "/root/.x19", "singularity": "/root/.x19",
+                          "modal": "/root/.x19", "ssh": "~/.x19"}
 
 
 def _looks_like_absolute_file_path(value: str) -> bool:
@@ -317,9 +317,9 @@ def _agent_cache_base_for_env(env: Any) -> str | None:
                 logger.debug("active env agent_visible_cache_base failed: %s", exc)
         remote_home = getattr(env, "_remote_home", None)
         if remote_home:
-            return f"{str(remote_home).rstrip('/')}/.hermes"
+            return f"{str(remote_home).rstrip('/')}/.x19"
         if env.__class__.__name__ in _CONTAINER_HOME_ENVS:
-            return "/root/.hermes"
+            return "/root/.x19"
     from tools.terminal_scope import terminal_env
     backend = (terminal_env("TERMINAL_ENV") or "local").strip().lower()
     return _CACHE_BASE_BY_BACKEND.get(backend)
@@ -393,7 +393,7 @@ def _prepare_fal_request(model_id, meta, prompt, aspect_ratio, seed, overrides, 
         raise ValueError(
             f"Model '{display}' ({model_id}) is not capable of image-to-image / editing. "
             f"Provide a text-only prompt (omit image_url), or switch to an edit-capable model "
-            f"via `hermes tools` → Image Generation.")
+            f"via `x19 tools` → Image Generation.")
     aspect_lc = (aspect_ratio or DEFAULT_ASPECT_RATIO).lower().strip()
     if aspect_lc not in VALID_ASPECT_RATIOS:
         logger.warning("Invalid aspect_ratio '%s', defaulting to '%s'", aspect_ratio, DEFAULT_ASPECT_RATIO)
@@ -511,16 +511,16 @@ def _build_no_backend_setup_message() -> str:
               "(then restart the session)"]
     if managed:
         lines.append("  2. Sign in to a Nous account that has the managed FAL gateway enabled "
-                     "(`hermes setup`)")
-    lines.append("  3. Configure a different image_gen provider via `hermes tools` → Image Generation "
-                 "(run `hermes plugins list` to see installed backends)")
+                     "(`x19 setup`)")
+    lines.append("  3. Configure a different image_gen provider via `x19 tools` → Image Generation "
+                 "(run `x19 plugins list` to see installed backends)")
     return "\n".join(lines)
 
 
 def _get_plugin_provider(name: str, *, force: bool = False):
     """Discover plugins (local import: importing this module must not trigger discovery) and return the named provider."""
     from agent.image_gen_registry import get_provider
-    from hermes_cli.plugins import _ensure_plugins_discovered
+    from x19_cli.plugins import _ensure_plugins_discovered
     if force:
         _ensure_plugins_discovered(force=True)
     else:
@@ -635,7 +635,7 @@ def _dispatch_to_plugin_provider(
     if provider is None:
         return _provider_error(
             f"image_gen.provider='{configured}' is set but no plugin registered that name. "
-            f"Run `hermes plugins list` to see available image gen backends.", "provider_not_registered")
+            f"Run `x19 plugins list` to see available image gen backends.", "provider_not_registered")
     pname = getattr(provider, "name", "?")
     kwargs: Dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio}
     try:
@@ -652,7 +652,7 @@ def _dispatch_to_plugin_provider(
             return _provider_error(
                 f"Provider '{pname}' does not support image-to-image / editing (its generate() "
                 f"signature is out of date with the image_generate schema). Omit image_url for "
-                f"text-to-image, or pick a backend that supports editing via `hermes tools` → "
+                f"text-to-image, or pick a backend that supports editing via `x19 tools` → "
                 f"Image Generation.", "modality_unsupported")
         logger.warning("Image gen provider '%s' raised%s: %s", pname,
                        " TypeError" if is_type_error else "", exc)
@@ -716,7 +716,7 @@ def _maybe_route_managed_model(
             return None
         return _provider_error(
             f"image_gen.model='{model_id}' is a Nous Portal model but the Portal image backend is not "
-            f"available. Pick another model via `hermes tools` → Image Generation.", "provider_not_registered")
+            f"available. Pick another model via `x19 tools` → Image Generation.", "provider_not_registered")
     kwargs: Dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "model": model_id}
     try:
         _add_provider_kwargs(kwargs, image_url, reference_image_urls, upscale)
@@ -896,12 +896,3 @@ registry.register(
 )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def is_krea_model(model_id: Optional[str]) -> bool:
-    """True when ``model_id`` is a native Krea plugin id (``krea-2-*``)."""
-    return _normalize_krea_model(model_id) is not None
-# ---- END PLUGIN-COMPAT ----

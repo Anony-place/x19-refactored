@@ -35,7 +35,7 @@ _SHARED_TRANSPORTS_MAX = 32
 # ``request.extensions`` key stamped by ``_SharedTransport.handle_request``;
 # the socket-abort walker in agent_runtime_helpers uses it to find only the
 # owning client's in-flight connections on a shared pool.
-HERMES_TRANSPORT_OWNER_EXT = "hermes_transport_owner"
+X19_TRANSPORT_OWNER_EXT = "x19_transport_owner"
 
 
 def _interleave_addrinfos(addrinfos: list[tuple]) -> list[tuple]:
@@ -334,7 +334,7 @@ def _shared_transport_cls():
         def handle_request(self, request: Any) -> Any:
             if self._closed:
                 raise RuntimeError("Cannot send a request, as the client has been closed.")
-            request.extensions[HERMES_TRANSPORT_OWNER_EXT] = id(self)
+            request.extensions[X19_TRANSPORT_OWNER_EXT] = id(self)
             return self._inner.handle_request(request)
 
         def close(self) -> None:

@@ -115,10 +115,3 @@ def build_retry_message(errors: List[str]) -> str:
             "CONTRACT schema from your task context. No prose, no explanations.")
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-MAX_SCHEMA_RETRIES = 1
-# ---- END PLUGIN-COMPAT ----

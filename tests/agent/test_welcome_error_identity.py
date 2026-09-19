@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from agent.error_classifier import classify_api_error
-from tests.hermes_cli.anon_portal import make_jwt
+from tests.x19_cli.anon_portal import make_jwt
 from agent.error_surface import build_error_surface_from_result
 from agent.turn_recovery import max_retries_exhausted_result, nonretryable_client_error_result
 
@@ -26,7 +26,7 @@ def agent_for(api_key, base_url):
     )
 
 
-@pytest.mark.parametrize("api_key", [make_jwt(account_tier="free", client_id="hermes-cli"), "sk-named"],
+@pytest.mark.parametrize("api_key", [make_jwt(account_tier="free", client_id="x19-cli"), "sk-named"],
                          ids=["named-free", "api-key"])
 @pytest.mark.parametrize("base_url", [NAMED, WELCOME])
 @pytest.mark.parametrize("case", ["rate_limited", "model_not_free", "403"])
@@ -68,7 +68,7 @@ def test_signing_in_does_not_inherit_anonymous_cooldown(tmp_path, monkeypatch):
     from agent.nous_rate_guard import clear_nous_rate_limit, nous_rate_limit_remaining, record_nous_rate_limit
     from agent.turn_recovery import _is_genuine_nous_rate_limit
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     guest = agent_for(make_jwt(), WELCOME)
     error = Exception("refused")
     error.status_code = 429
@@ -80,7 +80,7 @@ def test_signing_in_does_not_inherit_anonymous_cooldown(tmp_path, monkeypatch):
     assert build_error_surface_from_result(blocked.result)["code"] == "free_tier_rate_limited"
 
     # Keep the old welcome URL deliberately: the changed credential owns the boundary.
-    guest.api_key = make_jwt(account_tier="free", client_id="hermes-cli")
+    guest.api_key = make_jwt(account_tier="free", client_id="x19-cli")
     assert guard_for(guest).action == "fallthrough"
     record_nous_rate_limit(headers={"retry-after": "300"})
     named_blocked = guard_for(guest)
@@ -97,7 +97,7 @@ def test_auxiliary_anonymous_cooldown_does_not_outlive_signing_in(tmp_path, monk
     import agent.auxiliary_client as aux
     from agent.nous_rate_guard import record_nous_rate_limit
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     record_nous_rate_limit(headers={"retry-after": "600"}, anonymous=True)
     runtime = [make_jwt(), WELCOME]
     monkeypatch.setattr(aux, "_read_nous_auth", lambda: {})
@@ -109,7 +109,7 @@ def test_auxiliary_anonymous_cooldown_does_not_outlive_signing_in(tmp_path, monk
     monkeypatch.setattr(aux, "_aux_probe_active", lambda: True)
     assert aux._try_nous() == (None, None)
     assert unhealthy and all(ttl <= 60 for ttl in unhealthy)
-    runtime[:] = [make_jwt(account_tier="free", client_id="hermes-cli"), NAMED]
+    runtime[:] = [make_jwt(account_tier="free", client_id="x19-cli"), NAMED]
     assert aux._try_nous()[0] is client
 
 
@@ -121,8 +121,8 @@ def test_401_diagnostics_follow_request_identity_on_welcome_host(tier, capsys, m
     monkeypatch.setattr(loop, "_print_nous_entitlement_guidance", lambda *a: False)
     _print_nous_401_diagnostics(agent_for(make_jwt(account_tier=tier), WELCOME), Exception("unauthorized"))
     output = capsys.readouterr().out
-    assert ("Hermes couldn't start a new one" in output) == (tier == "anonymous")
-    assert ("hermes auth add nous" in output) == (tier != "anonymous")
+    assert ("X19 couldn't start a new one" in output) == (tier == "anonymous")
+    assert ("x19 auth add nous" in output) == (tier != "anonymous")
 
 
 def test_anonymous_claim_does_not_classify_other_providers_as_nous():
@@ -136,10 +136,10 @@ def test_anonymous_claim_does_not_classify_other_providers_as_nous():
 def test_named_account_on_welcome_host_gets_reconnect_copy_without_signin_card():
     """The gateway's mirror 400 keeps its reconnect copy for a signed-in user; the sign-in card would
     ask for a sign-in that already happened."""
-    message = "This endpoint serves anonymous Hermes Agent accounts only. Use https://inference-api.nousresearch.com with your API key or signed-in account."
+    message = "This endpoint serves anonymous X19 accounts only. Use https://inference-api.nousresearch.com with your API key or signed-in account."
     error = Exception(message)
     error.status_code, error.body = 400, {"status": 400, "message": message}
-    agent = agent_for(make_jwt(account_tier="free", client_id="hermes-cli"), WELCOME)
+    agent = agent_for(make_jwt(account_tier="free", client_id="x19-cli"), WELCOME)
     classified = classify_api_error(error, provider="nous", model=agent.model, base_url=WELCOME, api_key=agent.api_key)
     result = nonretryable_client_error_result(
         agent, error, classified, status_code=400, api_kwargs=None, api_messages=[], messages=[],

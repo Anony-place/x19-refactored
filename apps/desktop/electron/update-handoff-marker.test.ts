@@ -11,15 +11,15 @@ const POSIX_SCRIPT = path.join(REPO_ROOT, 'scripts', 'desktop-update', 'posix.sh
 const WINDOWS_SCRIPT = path.join(REPO_ROOT, 'scripts', 'desktop-update', 'windows.ps1')
 
 function sandbox(tag: string) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), `hermes-handoff-marker-${tag}-`))
-  const installRoot = path.join(home, 'hermes-agent')
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), `x19-handoff-marker-${tag}-`))
+  const installRoot = path.join(home, 'x19')
   fs.mkdirSync(installRoot)
 
   return { home, installRoot }
 }
 
 function markerStartedAt(home: string): number {
-  const [, startedAt] = fs.readFileSync(path.join(home, '.hermes-update-in-progress'), 'utf8').split('\n')
+  const [, startedAt] = fs.readFileSync(path.join(home, '.x19-update-in-progress'), 'utf8').split('\n')
 
   return Number.parseInt(startedAt, 10)
 }
@@ -28,9 +28,9 @@ function runPosix(installRoot: string, startedAt?: string) {
   const env = { ...process.env }
 
   if (startedAt === undefined) {
-    delete env.HERMES_UPDATE_STARTED_AT
+    delete env.X19_UPDATE_STARTED_AT
   } else {
-    env.HERMES_UPDATE_STARTED_AT = startedAt
+    env.X19_UPDATE_STARTED_AT = startedAt
   }
 
   return spawnSync('/bin/bash', [POSIX_SCRIPT, '--daemonized', '--install-root', installRoot, '--self-test-marker'], {
@@ -43,9 +43,9 @@ function runWindows(installRoot: string, startedAt?: string) {
   const env = { ...process.env }
 
   if (startedAt === undefined) {
-    delete env.HERMES_UPDATE_STARTED_AT
+    delete env.X19_UPDATE_STARTED_AT
   } else {
-    env.HERMES_UPDATE_STARTED_AT = startedAt
+    env.X19_UPDATE_STARTED_AT = startedAt
   }
 
   return spawnSync(
@@ -75,7 +75,7 @@ function assertScriptHandoff(run: (installRoot: string, startedAt?: string) => R
   assert.equal(markerStartedAt(preserved.home), acquiredAt, 'the script must preserve the Desktop acquisition time')
 
   const refreshed = sandbox('refreshed')
-  fs.writeFileSync(path.join(refreshed.home, '.hermes-update-in-progress'), '999999\n1\n')
+  fs.writeFileSync(path.join(refreshed.home, '.x19-update-in-progress'), '999999\n1\n')
   const before = Math.floor(Date.now() / 1000)
   const refreshedResult = run(refreshed.installRoot, 'malformed')
   const after = Math.floor(Date.now() / 1000)

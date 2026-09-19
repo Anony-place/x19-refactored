@@ -75,7 +75,7 @@ async function frontRoom(page: Page) {
 
 async function storedMeta(page: Page) {
   return page.evaluate(() => {
-    const meta = JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.bot-meta-v2') || '{}')
+    const meta = JSON.parse(localStorage.getItem('x19.plugin.x19-bots.bot-meta-v2') || '{}')
 
     return { bare: meta.programmer?.title ?? null, routed: meta['local::programmer']?.title ?? null }
   })
@@ -129,7 +129,7 @@ test('a re-titled member is re-labelled in the room transcript and Activity feed
   // room log still stores the profile id, not the title.
   await expect(page.getByText('You', { exact: true }).first()).toBeVisible()
   const logFrom = await page.evaluate(
-    room => (JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.group-chats') || '{}')[room]?.log || []).map((entry: any) => entry.from.name),
+    room => (JSON.parse(localStorage.getItem('x19.plugin.x19-bots.group-chats') || '{}')[room]?.log || []).map((entry: any) => entry.from.name),
     ROOM
   )
   expect(logFrom).toEqual(['You', 'programmer'])

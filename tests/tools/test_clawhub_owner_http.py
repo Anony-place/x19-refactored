@@ -57,16 +57,16 @@ def registry(*, fallback=False, mismatch=False):
     source = ClawHubSource()
     source.BASE_URL = f"http://127.0.0.1:{server.server_port}/api/v1"
     # The download path is SSRF-guarded (blocks loopback); opt in for the local fixture server.
-    prior = os.environ.get("HERMES_ALLOW_PRIVATE_URLS")
-    os.environ["HERMES_ALLOW_PRIVATE_URLS"] = "true"
+    prior = os.environ.get("X19_ALLOW_PRIVATE_URLS")
+    os.environ["X19_ALLOW_PRIVATE_URLS"] = "true"
     _reset_allow_private_cache()
     try:
         yield source, requests
     finally:
         if prior is None:
-            os.environ.pop("HERMES_ALLOW_PRIVATE_URLS", None)
+            os.environ.pop("X19_ALLOW_PRIVATE_URLS", None)
         else:
-            os.environ["HERMES_ALLOW_PRIVATE_URLS"] = prior
+            os.environ["X19_ALLOW_PRIVATE_URLS"] = prior
         _reset_allow_private_cache()
         server.shutdown()
         server.server_close()

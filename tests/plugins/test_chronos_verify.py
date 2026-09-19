@@ -183,7 +183,7 @@ def test_jwks_client_sends_explicit_http_headers(monkeypatch):
     assert captured["url"] == url
     assert captured["kwargs"].get("headers") == {
         "Accept": "application/json",
-        "User-Agent": "HermesAgent/1.0",
+        "User-Agent": "X19Agent/1.0",
     }
 
 

@@ -11,7 +11,7 @@ import {
 } from './primary-backend-startup'
 
 const bootstrapBackend = {
-  activeRoot: '/tmp/hermes-home/hermes-agent',
+  activeRoot: '/tmp/x19-home/x19',
   kind: 'bootstrap-needed',
   platform: 'linux'
 }
@@ -20,7 +20,7 @@ function startupOptions(overrides: Record<string, unknown> = {}) {
   return {
     assertCurrentAttempt: () => {},
     connectRemote: vi.fn(async remote => ({ baseUrl: remote.baseUrl, mode: 'remote' as const })),
-    ensureLocalRuntime: vi.fn(async backend => ({ ...backend, command: 'hermes' })),
+    ensureLocalRuntime: vi.fn(async backend => ({ ...backend, command: 'x19' })),
     prepareLocalBackend: vi.fn(async () => bootstrapBackend),
     resolveRemote: vi.fn(async () => null),
     waitForDecision: vi.fn(async () => 'continue-local' as const),
@@ -78,7 +78,7 @@ test('primary remote descriptor preserves the effective SSH dialing identity', (
   const ssh = {
     effectiveConfigFingerprint: 'effective-config',
     host: 'build-host',
-    remoteHermesPath: '/srv/hermes',
+    remoteX19Path: '/srv/x19',
     remoteProfile: 'default',
     user: 'alice'
   }
@@ -116,7 +116,7 @@ test('primary remote descriptor keeps legacy unregistered routes unqualified', (
 
 test('remote apply re-resolves the saved connection without ensuring a local runtime', async () => {
   const gate = createFirstRunSetupGate({ stuckAfterMs: 0 })
-  const savedRemote = { baseUrl: 'https://gateway.example.com/hermes' }
+  const savedRemote = { baseUrl: 'https://gateway.example.com/x19' }
   let configuredRemote: typeof savedRemote | null = null
 
   const options = startupOptions({
@@ -140,7 +140,7 @@ test('remote apply re-resolves the saved connection without ensuring a local run
 })
 
 test('an already-saved remote bypasses every local startup step', async () => {
-  const savedRemote = { baseUrl: 'https://gateway.example.com/hermes' }
+  const savedRemote = { baseUrl: 'https://gateway.example.com/x19' }
   const options = startupOptions({ resolveRemote: vi.fn(async () => savedRemote) })
 
   assert.deepEqual(await runPrimaryBackendStartup(options), {
@@ -168,7 +168,7 @@ test('remote apply fails clearly when no saved remote can be resolved', async ()
 
 test('continue local waits for update exclusion and ensures the prepared runtime exactly once', async () => {
   const gate = createFirstRunSetupGate({ stuckAfterMs: 0 })
-  const runtimeBackend = { ...bootstrapBackend, command: 'hermes' }
+  const runtimeBackend = { ...bootstrapBackend, command: 'x19' }
 
   const options = startupOptions({
     ensureLocalRuntime: vi.fn(async () => runtimeBackend),

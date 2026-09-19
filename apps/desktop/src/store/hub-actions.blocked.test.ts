@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   getActionStatus: vi.fn(),
   installSkillFromHub: vi.fn(),
   scanSkillHub: vi.fn(),
@@ -24,15 +24,15 @@ beforeEach(() => clearNotifications())
 // must turn it into a cause and a next step — `--force` does not exist on the
 // Desktop route, so it must never be the remedy shown.
 
-// Current CLI (`hermes_cli/skills_hub.py::_scan_block_message`): "Not installed:"
+// Current CLI (`x19_cli/skills_hub.py::_scan_block_message`): "Not installed:"
 // label + plain sentence; the "never installs unverified" clause marks the
 // hard-block (unverified source) case.
 test('the current CLI "Not installed:" tail parses into findings + trust', () => {
   const hardBlock = [
     'Scan: 3 findings. Verdict: DANGEROUS',
     "Not installed: the security scan found 3 high-risk pattern(s) in 'org/skill' (listed above). " +
-      'Hermes never installs unverified skills with high-risk findings, even with --force. ' +
-      'Review the findings or ask the author to fix them; to read the skill without installing, run `hermes skills inspect org/skill`.'
+      'X19 never installs unverified skills with high-risk findings, even with --force. ' +
+      'Review the findings or ask the author to fix them; to read the skill without installing, run `x19 skills inspect org/skill`.'
   ]
 
   expect(parseInstallBlocked(hardBlock)).toEqual({ findings: 3, unverified: true })

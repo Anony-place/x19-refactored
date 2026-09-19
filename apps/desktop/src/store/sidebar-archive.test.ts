@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { listAllProfileSessions, type SessionInfo } from '@/hermes'
+import { listAllProfileSessions, type SessionInfo } from '@/x19'
 
 import { $archivedSessions, loadArchivedSessions } from './sidebar-archive'
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   listAllProfileSessions: vi.fn()
 }))
 

@@ -32,7 +32,7 @@ class TestBuildPlanPrompt:
 
     def test_save_location_contract(self):
         prompt = build_plan_prompt("anything")
-        assert ".hermes/plans/" in prompt
+        assert ".x19/plans/" in prompt
         assert "YYYY-MM-DD_HHMMSS-<slug>.md" in prompt
 
     def test_authoring_craft_travels_with_every_prompt(self):
@@ -49,7 +49,7 @@ class TestBuildPlanPrompt:
 
 class TestPlanRegistryWiring:
     def test_plan_is_registered_and_resolves(self):
-        from hermes_cli.commands import resolve_command
+        from x19_cli.commands import resolve_command
 
         cmd = resolve_command("plan")
         assert cmd is not None
@@ -58,17 +58,17 @@ class TestPlanRegistryWiring:
     def test_plan_is_not_cli_only(self):
         # /plan must reach messaging gateways — the whole point of the
         # builtin conversion is menu visibility on Telegram/Discord.
-        from hermes_cli.commands import resolve_command
+        from x19_cli.commands import resolve_command
 
         assert not resolve_command("plan").cli_only
 
     def test_plan_reaches_gateway_dispatch(self):
-        from hermes_cli.commands import GATEWAY_KNOWN_COMMANDS
+        from x19_cli.commands import GATEWAY_KNOWN_COMMANDS
 
         assert "plan" in GATEWAY_KNOWN_COMMANDS
 
     def test_plan_in_telegram_bot_commands(self):
-        from hermes_cli.commands_platforms import telegram_bot_commands
+        from x19_cli.commands_platforms import telegram_bot_commands
 
         names = {n for n, _ in telegram_bot_commands()}
         assert "plan" in names

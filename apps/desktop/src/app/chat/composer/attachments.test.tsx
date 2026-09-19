@@ -30,7 +30,7 @@ async function renderWithI18n(ui: React.ReactNode) {
 describe('AttachmentList', () => {
   afterEach(() => {
     cleanup()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'x19Desktop')
     vi.restoreAllMocks()
   })
 
@@ -103,7 +103,7 @@ describe('AttachmentList', () => {
   it('loads a path-backed full image only when opened and releases it when closed', async () => {
     const readFileDataUrl = vi.fn(async () => DATA_URL)
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: { readFileDataUrl }
     })
@@ -140,7 +140,7 @@ describe('AttachmentList', () => {
   })
 
   it('falls back to the original host path after an image was staged for a different filesystem', async () => {
-    const stagedPath = '/root/.hermes/attachments/photo.png'
+    const stagedPath = '/root/.x19/attachments/photo.png'
     const hostPath = 'C:\\Users\\alice\\Pictures\\photo.png'
 
     const readFileDataUrl = vi.fn(async (path: string) => {
@@ -151,7 +151,7 @@ describe('AttachmentList', () => {
       throw new Error(`not readable: ${path}`)
     })
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: { readFileDataUrl }
     })
@@ -188,7 +188,7 @@ describe('AttachmentList', () => {
       path === '/tmp/old.png' ? oldRead : Promise.resolve('data:image/png;base64,replacement')
     )
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: { readFileDataUrl }
     })

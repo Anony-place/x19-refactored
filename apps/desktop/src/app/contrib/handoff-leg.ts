@@ -1,10 +1,10 @@
 /** Starts the first build in its own session. A submit that fails or is unconfirmed keeps that session:
  * it must not close the session or start a second build. */
-import { JsonRpcGatewayError } from '@hermes/shared'
+import { JsonRpcGatewayError } from '@x19/shared'
 
 import type { ClientSessionState } from '@/app/types'
 import type { HandoffPlan } from '@/components/onboarding-chat/setup-profile'
-import type { SessionMessage } from '@/types/hermes'
+import type { SessionMessage } from '@/types/x19'
 
 import { markFirstBuildSession } from './handoff-receipt'
 import type { AmbientGatewayRequest } from './session-rpc-dispatcher'

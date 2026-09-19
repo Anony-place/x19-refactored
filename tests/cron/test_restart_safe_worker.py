@@ -163,18 +163,18 @@ def test_external_worker_adopts_execution_and_runs_payload_once(
         }),
         encoding="utf-8",
     )
-    from hermes_constants import get_hermes_home
+    from x19_constants import get_x19_home
 
     observed_homes = []
     adopted = Mock(
         side_effect=lambda execution_id: (
-            observed_homes.append(get_hermes_home().resolve())
+            observed_homes.append(get_x19_home().resolve())
             or {"id": execution_id, "status": "running"}
         )
     )
     run = Mock(
         side_effect=lambda *_args, **_kwargs: (
-            observed_homes.append(get_hermes_home().resolve()) or True
+            observed_homes.append(get_x19_home().resolve()) or True
         )
     )
     monkeypatch.setattr("cron.executions.adopt_claimed_execution", adopted)
@@ -274,7 +274,7 @@ def test_scoped_wrapper_exit_without_user_bus_names_the_cause_and_invalidates_pr
     from tools.process_registry import GatewayChildDispatch
 
     job = {"id": "job-bus", "execution_id": "exec-1", "prompt": "work"}
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     monkeypatch.setattr(
         "tools.process_registry.restart_safe_gateway_child_argv",
         lambda command, **_: GatewayChildDispatch("scoped", ["systemd-run", "--", *command]),
@@ -306,7 +306,7 @@ def test_launch_external_worker_uses_restart_safe_scope_and_acknowledges(
     from tools.env_passthrough import clear_env_passthrough, register_env_passthrough
 
     job = {"id": "job-1", "execution_id": "exec-1", "prompt": "work"}
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     (tmp_path / ".env").write_text(
         "SERVICE_TOKEN=target-profile-token\n", encoding="utf-8"
     )
@@ -354,7 +354,7 @@ def test_launch_external_worker_honors_ack_within_adoption_grace(
     from tools.process_registry import GatewayChildDispatch
 
     job = {"id": "job-cold", "execution_id": "exec-cold", "prompt": "work"}
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     monkeypatch.setattr(
         "tools.process_registry.restart_safe_gateway_child_argv",
         lambda command, **_kw: GatewayChildDispatch("scoped", ["scope", "--", *command]),
@@ -419,7 +419,7 @@ def test_worker_dying_before_ack_names_its_stderr_cause(tmp_path, monkeypatch):
     import cron.scheduler as scheduler
     from tools.process_registry import GatewayChildDispatch
 
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     monkeypatch.setattr(scheduler, "mark_execution_handoff_pending", lambda execution_id: {"id": execution_id})
     monkeypatch.setattr(
         "tools.process_registry.restart_safe_gateway_child_argv",
@@ -517,7 +517,7 @@ def test_launch_external_worker_degrades_by_default_with_real_helper(
     import tools.process_registry as process_registry
 
     job = {"id": "job-1", "execution_id": "exec-1", "prompt": "work"}
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     monkeypatch.setattr(scheduler, "load_config_readonly", lambda: {})
     monkeypatch.setattr(process_registry, "_is_supervised_gateway_process", lambda: True)
     monkeypatch.setenv("INVOCATION_ID", "managed-service")
@@ -536,7 +536,7 @@ def test_launch_external_worker_degrades_by_default_with_real_helper(
 def test_launch_external_worker_pins_the_gateways_tree_on_pythonpath(
     tmp_path, monkeypatch,
 ):
-    """#112729: the worker starts in ``cron.scheduler`` (no ``hermes_cli.main`` bootstrap),
+    """#112729: the worker starts in ``cron.scheduler`` (no ``x19_cli.main`` bootstrap),
     so its import path must be explicit — a rotted editable mapping or PYTHONSAFEPATH
     otherwise kills it with "No module named 'cron'" before the ack. The spawn env carries
     the gateway's own checkout first and keeps the gateway's other PYTHONPATH entries."""
@@ -544,7 +544,7 @@ def test_launch_external_worker_pins_the_gateways_tree_on_pythonpath(
     from tools.process_registry import GatewayChildDispatch
 
     job = {"id": "job-1", "execution_id": "exec-1", "prompt": "work"}
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     monkeypatch.setattr(
         "tools.process_registry.restart_safe_gateway_child_argv",
         lambda command, **_: GatewayChildDispatch("degraded", command),
@@ -573,7 +573,7 @@ def test_launch_external_worker_pin_extends_the_sanitized_env_not_os_environ(
     from tools.process_registry import GatewayChildDispatch
 
     job = {"id": "job-1", "execution_id": "exec-1", "prompt": "work"}
-    monkeypatch.setattr(scheduler, "_get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(scheduler, "_get_x19_home", lambda: tmp_path)
     monkeypatch.setattr(
         "tools.process_registry.restart_safe_gateway_child_argv",
         lambda command, **_: GatewayChildDispatch("degraded", command),
@@ -594,8 +594,8 @@ def test_launch_external_worker_pin_extends_the_sanitized_env_not_os_environ(
     # Wheel / pipx layout: repo_root == purelib -> untouched.
     monkeypatch.setattr(worker_env_mod, "_installed_purelib", lambda: repo_root)
     untouched = {"PYTHONPATH": str(tmp_path / "kept-by-sanitizer")}
-    assert worker_env_mod.pin_hermes_tree_on_pythonpath(dict(untouched), repo_root) == untouched
-    assert "PYTHONPATH" not in worker_env_mod.pin_hermes_tree_on_pythonpath({}, repo_root)
+    assert worker_env_mod.pin_x19_tree_on_pythonpath(dict(untouched), repo_root) == untouched
+    assert "PYTHONPATH" not in worker_env_mod.pin_x19_tree_on_pythonpath({}, repo_root)
 
 
 def test_shared_run_path_hands_gateway_fire_to_external_worker(monkeypatch):
@@ -632,7 +632,7 @@ def test_worker_delivery_queue_is_keyed_by_the_delivering_jobs_own_execution(
     monkeypatch, tmp_path
 ):
     """A nested in-process dispatch inside a worker (e.g. a script running
-    ``hermes cron run <other>``) must not queue under the OUTER execution id."""
+    ``x19 cron run <other>``) must not queue under the OUTER execution id."""
     import cron.scheduler as scheduler
     import cron.scheduler_delivery as scheduler_delivery
 
@@ -660,7 +660,7 @@ def test_worker_delivery_queue_is_keyed_by_the_delivering_jobs_own_execution(
     # First call the standalone (non-queue) path makes after the guard; the
     # failure is reported as the delivery error string.
     monkeypatch.setattr("gateway.config.load_gateway_config", _standalone)
-    monkeypatch.setenv("_HERMES_CRON_EXTERNAL_WORKER", "exec-outer")
+    monkeypatch.setenv("_X19_CRON_EXTERNAL_WORKER", "exec-outer")
 
     # Own attempt: routed through the durable queue.
     assert scheduler._deliver_result(
@@ -771,7 +771,7 @@ def test_managed_gateway_restart_preserves_active_worker_and_single_side_effect(
         "print('completed')\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     with use_cron_store(home):
         job = create_job(
             prompt=None,
@@ -817,7 +817,7 @@ def test_managed_gateway_restart_preserves_active_worker_and_single_side_effect(
 
     harness = (
         "import json, os, pathlib, time\n"
-        f"os.environ['HERMES_HOME'] = {str(home)!r}\n"
+        f"os.environ['X19_HOME'] = {str(home)!r}\n"
         "os.environ['INVOCATION_ID'] = 'restart-fixture'\n"
         "from cron import scheduler\n"
         "from tools import process_registry\n"

@@ -1,4 +1,4 @@
-import { mergeTranslations, type TranslationOverride } from '@hermes/shared/i18n'
+import { mergeTranslations, type TranslationOverride } from '@x19/shared/i18n'
 
 import { en } from './en'
 import type { Translations } from './types'

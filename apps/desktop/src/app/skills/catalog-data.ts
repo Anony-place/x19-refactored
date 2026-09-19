@@ -1,4 +1,4 @@
-import { skillCatalogInstallIdentifier } from '@hermes/shared'
+import { skillCatalogInstallIdentifier } from '@x19/shared'
 import { useQuery } from '@tanstack/react-query'
 
 export type CatalogKind = 'skills' | 'plugins'
@@ -18,7 +18,7 @@ export interface CatalogEntry {
   sha: string
   subdir: string
   version: string
-  requiresHermes: string
+  requiresX19: string
   tags: string[]
   platforms: string[]
   requirements: string[]
@@ -32,10 +32,10 @@ export interface CatalogEntry {
   search: string
 }
 
-const DOCS_ORIGIN = 'https://hermes-agent.nousresearch.com'
+const DOCS_ORIGIN = 'https://anony-place.github.io/x19-refactored'
 // The public domain redirects here without CORS headers on the redirect.
 // Use the docs' actual static host, not GitHub's API or repository endpoints.
-const CATALOG_BASE = 'https://nousresearch.github.io/hermes-agent/docs/api'
+const CATALOG_BASE = 'https://nousresearch.github.io/x19/docs/api'
 const text = (value: unknown): string => typeof value === 'string' ? value : ''
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter(v => typeof v === 'string') : []
 
@@ -104,7 +104,7 @@ export function parseCatalog(kind: CatalogKind, data: unknown): CatalogEntry[] {
       sha: text(row.sha),
       subdir: text(row.subdir),
       version: text(row.version),
-      requiresHermes: text(row.requiresHermes),
+      requiresX19: text(row.requiresX19),
       tags,
       tools,
       hooks,

@@ -79,7 +79,7 @@ _IDLE_UNLOAD_CHECK_INTERVAL = 30  # seconds between idle checks
 def _load_stt_config() -> dict:
     """Load the ``stt`` section from user config, falling back to defaults."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         return load_config().get("stt") or {}
     except Exception:
         return {}
@@ -94,7 +94,7 @@ def _resolve_stt_language(
     provider_key: str, stt_config: Optional[Dict[str, Any]] = None, *, extra_keys: tuple = ()
 ) -> Optional[str]:
     """Language hint for an STT provider, first non-empty wins (never ""): ``stt.<provider>.language``
-    (plus *extra_keys* aliases, e.g. ``language_code``) > ``stt.language`` > ``HERMES_LOCAL_STT_LANGUAGE``
+    (plus *extra_keys* aliases, e.g. ``language_code``) > ``stt.language`` > ``X19_LOCAL_STT_LANGUAGE``
     env > None (provider auto-detects)."""
     if stt_config is None:
         stt_config = _load_stt_config()
@@ -123,7 +123,7 @@ def _has_openai_audio_backend() -> bool:
 
 
 def _is_local_stt_provider(provider: str, stt_config: Dict[str, Any]) -> bool:
-    """Whether *provider* is exempt from Hermes's remote upload cap."""
+    """Whether *provider* is exempt from X19's remote upload cap."""
     return (provider or "").lower().strip() in {"local", "local_command"}
 
 
@@ -166,7 +166,7 @@ def _resolve_explicit_local() -> str:
     backend = _detect_local_backend()
     if not backend:
         logger.warning("STT provider 'local' configured but unavailable "
-                       "(install faster-whisper or set HERMES_LOCAL_STT_COMMAND)")
+                       "(install faster-whisper or set X19_LOCAL_STT_COMMAND)")
     return backend or "none"
 
 
@@ -296,7 +296,7 @@ def _start_idle_unload_watcher(timeout_seconds: int) -> None:
                     _unload_local_model()
                     break
         _idle_unload_stop.clear()
-        _idle_unload_thread = threading.Thread(target=_watch, name="hermes-stt-idle-unload", daemon=True)
+        _idle_unload_thread = threading.Thread(target=_watch, name="x19-stt-idle-unload", daemon=True)
         _idle_unload_thread.start()
 
 
@@ -494,7 +494,7 @@ def _no_provider_error(provider: str, stt_config: Dict[str, Any]) -> Dict[str, A
     if "provider" in stt_config and provider_key and provider_key not in BUILTIN_STT_PROVIDERS and provider_key != "none":
         return _unregistered_stt_provider_error(provider_key)
     # An explicit openai selection flattened to "none" has a specific reason (e.g. managed gateway down).
-    # Surface it — with its `hermes tools` remediation — instead of the all-provider setup hint (#93045).
+    # Surface it — with its `x19 tools` remediation — instead of the all-provider setup hint (#93045).
     if provider_key == "none" and str(stt_config.get("provider") or "") == "openai" and _HAS_OPENAI:
         reason = _openai_audio_unavailable_reason()
         if reason is not None:
@@ -547,49 +547,3 @@ def transcribe_audio_local_fallback(file_path: str, model: Optional[str] = None)
     return _error_result("No installed local STT backend is available.", provider="local")
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import platform  # noqa: F401,E402
-import queue  # noqa: F401,E402
-import re  # noqa: F401,E402
-import shlex  # noqa: F401,E402
-import subprocess  # noqa: F401,E402
-import tempfile  # noqa: F401,E402
-from urllib.parse import urljoin  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'COMMAND_STT_OUTPUT_FORMATS': ('tools.transcription_command', 'COMMAND_STT_OUTPUT_FORMATS'),
-    'COMMON_LOCAL_BIN_DIRS': ('tools.transcription_common', 'COMMON_LOCAL_BIN_DIRS'),
-    'DEFAULT_COMMAND_STT_LANGUAGE': ('tools.transcription_command', 'DEFAULT_COMMAND_STT_LANGUAGE'),
-    'DEFAULT_COMMAND_STT_OUTPUT_FORMAT': ('tools.transcription_command', 'DEFAULT_COMMAND_STT_OUTPUT_FORMAT'),
-    'DEFAULT_COMMAND_STT_TIMEOUT_SECONDS': ('tools.transcription_command', 'DEFAULT_COMMAND_STT_TIMEOUT_SECONDS'),
-    'DEFAULT_LOCAL_STT_LANGUAGE': ('tools.transcription_common', 'DEFAULT_LOCAL_STT_LANGUAGE'),
-    'ELEVENLABS_STT_BASE_URL': ('tools.transcription_common', 'ELEVENLABS_STT_BASE_URL'),
-    'GROQ_BASE_URL': ('tools.transcription_common', 'GROQ_BASE_URL'),
-    'GROQ_MODELS': ('tools.transcription_common', 'GROQ_MODELS'),
-    'LOCAL_NATIVE_AUDIO_FORMATS': ('tools.transcription_common', 'LOCAL_NATIVE_AUDIO_FORMATS'),
-    'MAX_FILE_SIZE': ('tools.transcription_common', 'MAX_FILE_SIZE'),
-    'OPENAI_BASE_URL': ('tools.transcription_common', 'OPENAI_BASE_URL'),
-    'OPENAI_MODELS': ('tools.transcription_common', 'OPENAI_MODELS'),
-    'SUPPORTED_FORMATS': ('tools.transcription_common', 'SUPPORTED_FORMATS'),
-    'XAI_STT_BASE_URL': ('tools.transcription_common', 'XAI_STT_BASE_URL'),
-    'managed_nous_tools_enabled': ('tools.tool_backend_helpers', 'managed_nous_tools_enabled'),
-    'nous_tool_gateway_unavailable_message': ('tools.tool_backend_helpers', 'nous_tool_gateway_unavailable_message'),
-    'resolve_managed_tool_gateway': ('tools.managed_tool_gateway', 'resolve_managed_tool_gateway'),
-    'resolve_openai_audio_api_key': ('tools.tool_backend_helpers', 'resolve_openai_audio_api_key'),
-    'windows_hide_flags': ('hermes_cli._subprocess_compat', 'windows_hide_flags'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

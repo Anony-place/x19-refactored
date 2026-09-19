@@ -95,7 +95,7 @@ test('a member whose backend fails the turn is reported at once, not read as bus
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0, { timeout: 30_000 })
 
   const room = await page.evaluate(name => {
-    const rooms = JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.group-chats') || '{}')
+    const rooms = JSON.parse(localStorage.getItem('x19.plugin.x19-bots.group-chats') || '{}')
 
     return { stranded: Object.keys(rooms[name]?.stranded || {}), running: Boolean(rooms[name]?.running) }
   }, ROOM)

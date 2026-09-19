@@ -1,13 +1,13 @@
 {
-  "name": "hermes",
-  "productName": "Hermes",
+  "name": "x19",
+  "productName": "X19",
   "private": true,
   "version": "0.17.6",
-  "description": "Native desktop shell for Hermes Agent.",
+  "description": "Native desktop shell for X19.",
   "author": "Nous Research",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NousResearch/hermes-agent.git"
+    "url": "git+https://github.com/Anony-place/x19-refactored.git"
   },
   "type": "module",
   "main": "dist/electron-main.mjs",
@@ -20,12 +20,12 @@
     "clean:renderer": "tsc --build tsconfig.json --clean ",
     "clean:electron": "tsc --build tsconfig.electron.json --clean",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
-    "dev:fake-boot": "cross-env HERMES_DESKTOP_BOOT_FAKE=1 HERMES_DESKTOP_BOOT_FAKE_STEP_MS=650 npm run dev",
+    "dev:fake-boot": "cross-env X19_DESKTOP_BOOT_FAKE=1 X19_DESKTOP_BOOT_FAKE_STEP_MS=650 npm run dev",
     "dev:mock": "node ../../tests-js/scripts/mock-server.ts",
     "dev:renderer": "node scripts/assert-root-install.mjs && npm run clean:renderer && vite --host 127.0.0.1 --port 5174",
-    "dev:electron": "tsc --build tsconfig.electron.json && wait-on http://127.0.0.1:5174 && node scripts/bundle-electron-main.mjs --dev && cross-env XCURSOR_SIZE=24 HERMES_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 electron .",
-    "profile:main": "tsc --build tsconfig.electron.json && wait-on http://127.0.0.1:5174 && node scripts/bundle-electron-main.mjs --dev && cross-env XCURSOR_SIZE=24 HERMES_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 electron --inspect=9229 .",
-    "profile:main:cpu": "tsc --build tsconfig.electron.json && wait-on http://127.0.0.1:5174 && node scripts/bundle-electron-main.mjs --dev && cross-env XCURSOR_SIZE=24 NODE_OPTIONS=--cpu-prof HERMES_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 electron .",
+    "dev:electron": "tsc --build tsconfig.electron.json && wait-on http://127.0.0.1:5174 && node scripts/bundle-electron-main.mjs --dev && cross-env XCURSOR_SIZE=24 X19_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 electron .",
+    "profile:main": "tsc --build tsconfig.electron.json && wait-on http://127.0.0.1:5174 && node scripts/bundle-electron-main.mjs --dev && cross-env XCURSOR_SIZE=24 X19_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 electron --inspect=9229 .",
+    "profile:main:cpu": "tsc --build tsconfig.electron.json && wait-on http://127.0.0.1:5174 && node scripts/bundle-electron-main.mjs --dev && cross-env XCURSOR_SIZE=24 NODE_OPTIONS=--cpu-prof X19_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 electron .",
     "start": "npm run build && electron .",
     "prebuild": "node scripts/assert-root-install.mjs && npm run clean",
     "build": "node scripts/assert-root-install.mjs && node scripts/write-build-stamp.mjs && vite build && node scripts/bundle-electron-main.mjs && node scripts/stage-native-deps.mjs",
@@ -92,7 +92,7 @@
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",
-    "@hermes/shared": "file:../shared",
+    "@x19/shared": "file:../shared",
     "@icons-pack/react-simple-icons": "13.11.1",
     "@lezer/highlight": "1.2.3",
     "@nanostores/react": "1.1.0",
@@ -189,18 +189,18 @@
   },
   "build": {
     "electronVersion": "40.10.2",
-    "appId": "com.nousresearch.hermes",
-    "productName": "Hermes",
-    "executableName": "Hermes",
+    "appId": "com.nousresearch.x19",
+    "productName": "X19",
+    "executableName": "X19",
     "protocols": [
       {
-        "name": "Hermes Protocol",
+        "name": "X19 Protocol",
         "schemes": [
-          "hermes"
+          "x19"
         ]
       }
     ],
-    "artifactName": "Hermes-${version}-${os}-${arch}.${ext}",
+    "artifactName": "X19-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon",
     "directories": {
       "output": "release"
@@ -236,19 +236,19 @@
       "entitlements": "electron/entitlements.mac.plist",
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "CFBundleDisplayName": "Hermes",
-        "CFBundleExecutable": "Hermes",
-        "CFBundleName": "Hermes",
-        "NSAudioCaptureUsageDescription": "Hermes uses audio capture for voice conversations.",
-        "NSCameraUsageDescription": "Hermes uses the camera when a plugin or feature you enable requests it.",
-        "NSMicrophoneUsageDescription": "Hermes uses the microphone for voice input and voice conversations.",
-        "NSCalendarsUsageDescription": "Hermes needs access to Calendar to provide requested meeting and scheduling support.",
-        "NSCalendarsFullAccessUsageDescription": "Hermes needs full access to Calendar to read and manage events when explicitly requested.",
-        "NSRemindersUsageDescription": "Hermes needs access to Reminders to provide requested personal-assistant and scheduling support.",
-        "NSRemindersFullAccessUsageDescription": "Hermes needs full access to Reminders to read and manage reminders when explicitly requested.",
-        "NSScreenCaptureUsageDescription": "Hermes captures the screen when you ask the agent to screenshot or record it.",
-        "NSLocalNetworkUsageDescription": "Hermes connects to devices on your local network when a plugin or feature you enable requests it.",
-        "NSAppleMusicUsageDescription": "Hermes accesses your music library when a plugin or feature you enable requests it."
+        "CFBundleDisplayName": "X19",
+        "CFBundleExecutable": "X19",
+        "CFBundleName": "X19",
+        "NSAudioCaptureUsageDescription": "X19 uses audio capture for voice conversations.",
+        "NSCameraUsageDescription": "X19 uses the camera when a plugin or feature you enable requests it.",
+        "NSMicrophoneUsageDescription": "X19 uses the microphone for voice input and voice conversations.",
+        "NSCalendarsUsageDescription": "X19 needs access to Calendar to provide requested meeting and scheduling support.",
+        "NSCalendarsFullAccessUsageDescription": "X19 needs full access to Calendar to read and manage events when explicitly requested.",
+        "NSRemindersUsageDescription": "X19 needs access to Reminders to provide requested personal-assistant and scheduling support.",
+        "NSRemindersFullAccessUsageDescription": "X19 needs full access to Reminders to read and manage reminders when explicitly requested.",
+        "NSScreenCaptureUsageDescription": "X19 captures the screen when you ask the agent to screenshot or record it.",
+        "NSLocalNetworkUsageDescription": "X19 connects to devices on your local network when a plugin or feature you enable requests it.",
+        "NSAppleMusicUsageDescription": "X19 accesses your music library when a plugin or feature you enable requests it."
       },
       "gatekeeperAssess": false,
       "hardenedRuntime": true,
@@ -258,7 +258,7 @@
       ]
     },
     "dmg": {
-      "title": "Install Hermes",
+      "title": "Install X19",
       "backgroundColor": "#f5f5f7",
       "iconSize": 96,
       "window": {
@@ -280,7 +280,7 @@
       ]
     },
     "win": {
-      "legalTrademarks": "Hermes",
+      "legalTrademarks": "X19",
       "target": [
         "nsis",
         "msi"
@@ -290,7 +290,7 @@
     "linux": {
       "category": "Development",
       "maintainer": "Nous Research <support@nousresearch.com>",
-      "synopsis": "Native desktop shell for Hermes Agent.",
+      "synopsis": "Native desktop shell for X19.",
       "target": [
         "AppImage",
         "deb",
@@ -301,8 +301,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Hermes",
-      "uninstallDisplayName": "Hermes",
+      "shortcutName": "X19",
+      "uninstallDisplayName": "X19",
       "warningsAsErrors": false
     }
   }

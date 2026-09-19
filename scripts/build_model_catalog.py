@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Build the Hermes Model Catalog — a centralized JSON manifest of curated models.
+"""Build the X19 Model Catalog — a centralized JSON manifest of curated models.
 
 This script reads the in-repo hardcoded curated lists (``OPENROUTER_MODELS``,
 ``_PROVIDER_MODELS["nous"]``) and writes them to a JSON manifest that the
-Hermes CLI fetches at runtime. Publishing the catalog through the docs site
-lets maintainers update model lists without shipping a Hermes release.
+X19 CLI fetches at runtime. Publishing the catalog through the docs site
+lets maintainers update model lists without shipping a X19 release.
 
 The runtime fetcher falls back to the same in-repo hardcoded lists if the
 manifest is unreachable, so this script is a convenience for keeping the
@@ -17,7 +17,7 @@ Usage::
 Output: ``website/static/api/model-catalog.json``
 
 Live URL (after ``deploy-site.yml`` runs on merge to main):
-``https://hermes-agent.nousresearch.com/docs/api/model-catalog.json``
+``https://anony-place.github.io/x19-refactored/docs/api/model-catalog.json``
 """
 
 from __future__ import annotations
@@ -30,10 +30,10 @@ from datetime import datetime, timezone
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-# Ensure HERMES_HOME is set for imports that touch it at module level.
-os.environ.setdefault("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
+# Ensure X19_HOME is set for imports that touch it at module level.
+os.environ.setdefault("X19_HOME", os.path.join(os.path.expanduser("~"), ".x19"))
 
-from hermes_cli.models import (  # noqa: E402
+from x19_cli.models import (  # noqa: E402
     OPENROUTER_MODELS,
     PREFERRED_SILENT_DEFAULT_MODEL,
     _PROVIDER_MODELS,
@@ -63,8 +63,8 @@ def build_catalog() -> dict:
         "version": CATALOG_VERSION,
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
-            "source": "hermes-agent repo",
-            "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog",
+            "source": "x19 repo",
+            "docs": "https://anony-place.github.io/x19-refactored/docs/reference/model-catalog",
         },
         "providers": {
             "openrouter": {
@@ -73,7 +73,7 @@ def build_catalog() -> dict:
                     "note": (
                         "Descriptions drive picker badges. Live /api/v1/models "
                         "filters curated ids by tool-calling support and free pricing. "
-                        'The entry labeled "default": true is the model Hermes '
+                        'The entry labeled "default": true is the model X19 '
                         "silently lands on when the user never picked one."
                     ),
                 },
@@ -86,7 +86,7 @@ def build_catalog() -> dict:
                 "metadata": {
                     "display_name": "Nous Portal",
                     "note": (
-                        'The entry labeled "default": true is the model Hermes '
+                        'The entry labeled "default": true is the model X19 '
                         "silently lands on when the user never picked one."
                     ),
                 },

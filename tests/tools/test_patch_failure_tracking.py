@@ -15,13 +15,13 @@ import pytest
 
 
 @pytest.fixture
-def hermes_home(monkeypatch, tmp_path):
-    """Isolate HERMES_HOME and clear module-level caches afterward so the
+def x19_home(monkeypatch, tmp_path):
+    """Isolate X19_HOME and clear module-level caches afterward so the
     real shell-out side effects from _handle_patch don't leak into
     subsequent tests (see test_line_ending_preservation.py for details)."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     yield home
     try:
         from tools.file_tools import clear_file_ops_cache
@@ -53,7 +53,7 @@ def fresh_tracker():
 
 
 class TestPatchFailureEscalation:
-    def test_first_two_failures_use_normal_hint(self, hermes_home, tmp_path, fresh_tracker):
+    def test_first_two_failures_use_normal_hint(self, x19_home, tmp_path, fresh_tracker):
         from tools.file_tools import _handle_patch
 
         target = tmp_path / "f.py"
@@ -77,7 +77,7 @@ class TestPatchFailureEscalation:
 
 
     def test_different_tasks_have_independent_counters(
-        self, hermes_home, tmp_path, fresh_tracker
+        self, x19_home, tmp_path, fresh_tracker
     ):
         from tools.file_tools import _handle_patch
 

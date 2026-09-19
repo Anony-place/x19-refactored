@@ -2,9 +2,9 @@
 
 Provider profiles can live in three places:
 
-1. Bundled plugins: ``plugins/model-providers/<name>/`` (shipped with hermes-agent)
-2. User plugins: ``$HERMES_HOME/plugins/model-providers/<name>/``
-3. Pip-installed plugins: distributions exposing a ``hermes_agent.plugins``
+1. Bundled plugins: ``plugins/model-providers/<name>/`` (shipped with x19)
+2. User plugins: ``$X19_HOME/plugins/model-providers/<name>/``
+3. Pip-installed plugins: distributions exposing a ``x19_agent.plugins``
    entry point (``module:func`` callable or a self-registering ``module``)
 
 Each plugin directory contains:
@@ -57,7 +57,7 @@ def register_provider(profile: ProviderProfile) -> None:
     """Register a provider profile by name and aliases.
 
     Later registrations with the same name replace earlier ones — so user
-    plugins under ``$HERMES_HOME/plugins/model-providers/`` can override
+    plugins under ``$X19_HOME/plugins/model-providers/`` can override
     bundled profiles without editing repo code.
     """
     global _PROVIDER_LIST_CACHE
@@ -99,7 +99,7 @@ def routed_model_rejects_vision_tool_messages(provider: str, model: str) -> bool
     # Routing aggregators accept a ``vendor/model`` identifier while the request is sent
     # to the aggregator; the target provider can have stricter message-shape support than
     # the aggregator's generic OpenAI-compatible transport profile.
-    from hermes_cli.providers import is_routing_aggregator
+    from x19_cli.providers import is_routing_aggregator
     if not is_routing_aggregator(provider_name):
         return False
 
@@ -130,27 +130,27 @@ def list_providers() -> list[ProviderProfile]:
 
 
 def _user_plugins_dir() -> Path | None:
-    """Return ``$HERMES_HOME/plugins/model-providers/`` if it exists."""
+    """Return ``$X19_HOME/plugins/model-providers/`` if it exists."""
     try:
-        from hermes_constants import get_hermes_home
+        from x19_constants import get_x19_home
 
-        d = get_hermes_home() / "plugins" / "model-providers"
+        d = get_x19_home() / "plugins" / "model-providers"
         return d if d.is_dir() else None
     except Exception:
         return None
 
 
 def _installed_plugins_dir() -> Path | None:
-    """Return ``$HERMES_HOME/plugins/`` if it exists.
+    """Return ``$X19_HOME/plugins/`` if it exists.
 
-    This is where ``hermes plugins install`` clones a plugin — flat, one
+    This is where ``x19 plugins install`` clones a plugin — flat, one
     directory per plugin, NOT under ``model-providers/``. See
     :func:`_discover_installed_provider_plugins`.
     """
     try:
-        from hermes_constants import get_hermes_home
+        from x19_constants import get_x19_home
 
-        d = get_hermes_home() / "plugins"
+        d = get_x19_home() / "plugins"
         return d if d.is_dir() else None
     except Exception:
         return None
@@ -203,12 +203,12 @@ def _import_plugin_dir(plugin_dir: Path, source: str) -> None:
     # Give bundled plugins a stable import path (``plugins.model_providers.<name>``)
     # so relative imports within the plugin work. User plugins load via
     # ``importlib.util.spec_from_file_location`` with a unique module name so
-    # multiple HERMES_HOME profiles don't alias each other.
+    # multiple X19_HOME profiles don't alias each other.
     safe_name = plugin_dir.name.replace("-", "_")
     if source == "bundled":
         module_name = f"plugins.model_providers.{safe_name}"
     else:
-        module_name = f"_hermes_user_provider_{safe_name}"
+        module_name = f"_x19_user_provider_{safe_name}"
 
     if module_name in sys.modules:
         return  # already imported
@@ -230,13 +230,13 @@ def _import_plugin_dir(plugin_dir: Path, source: str) -> None:
 
 
 def _discover_entry_point_providers() -> None:
-    """Import pip-installed provider plugins via the ``hermes_agent.plugins``
+    """Import pip-installed provider plugins via the ``x19_agent.plugins``
     entry-point group so they self-register.
 
     A distribution ships::
 
-        [project.entry-points."hermes_agent.plugins"]
-        acme-inference = "acme_hermes_plugin:register"
+        [project.entry-points."x19_agent.plugins"]
+        acme-inference = "acme_x19_plugin:register"
 
     The target may be either a **callable** (``module:func`` — invoked with no
     args; typically calls ``register_provider(profile)``) or a **module**
@@ -250,14 +250,14 @@ def _discover_entry_point_providers() -> None:
       general PluginManager enforces — a pip package is never imported just
       because it is installed. An entry point whose name is not enabled is
       skipped without loading.
-    * **Provider targets only.** The ``hermes_agent.plugins`` group is shared
+    * **Provider targets only.** The ``x19_agent.plugins`` group is shared
       with general plugins whose target is ``register(ctx)``. Callables that
       require arguments are skipped here (the PluginManager owns them);
       provider registration hooks take no arguments by contract.
 
     Failures are swallowed per-entry (a broken third-party package must not
     break provider discovery) and logged at warning level. This scan runs
-    first, so filesystem plugins (bundled + ``$HERMES_HOME``) keep their
+    first, so filesystem plugins (bundled + ``$X19_HOME``) keep their
     documented override precedence via last-writer-wins in
     ``register_provider()`` — a pip package cannot hijack a first-party
     provider name.
@@ -270,7 +270,7 @@ def _discover_entry_point_providers() -> None:
     # Same opt-in gate as the general PluginManager: only entry points named
     # in ``plugins.enabled`` load, and ``plugins.disabled`` always wins.
     try:
-        from hermes_cli.plugins import _get_disabled_plugins, _get_enabled_plugins
+        from x19_cli.plugins import _get_disabled_plugins, _get_enabled_plugins
 
         enabled = _get_enabled_plugins()  # None = nothing enabled yet (opt-in default)
         disabled = _get_disabled_plugins()
@@ -279,7 +279,7 @@ def _discover_entry_point_providers() -> None:
     if not enabled:
         return
 
-    group = "hermes_agent.plugins"
+    group = "x19_agent.plugins"
     try:
         eps = _md.entry_points()
         # Python 3.10+ exposes .select(); older returns a dict-like mapping.
@@ -356,9 +356,9 @@ def _discover_providers() -> None:
 
     Order:
       1. Bundled plugins at ``<repo>/plugins/model-providers/<name>/``
-      2. User plugins at ``$HERMES_HOME/plugins/model-providers/<name>/``
-      2b. Plugins installed by ``hermes plugins install`` at
-          ``$HERMES_HOME/plugins/<name>/`` that declare ``kind: model-provider``
+      2. User plugins at ``$X19_HOME/plugins/model-providers/<name>/``
+      2b. Plugins installed by ``x19 plugins install`` at
+          ``$X19_HOME/plugins/<name>/`` that declare ``kind: model-provider``
       3. Legacy per-file modules at ``providers/<name>.py`` (back-compat)
 
     Each step imports its plugins, which call ``register_provider()`` at
@@ -369,7 +369,7 @@ def _discover_providers() -> None:
         return
     _discovered = True
 
-    # 0. Pip-installed plugins — entry points in the ``hermes_agent.plugins``
+    # 0. Pip-installed plugins — entry points in the ``x19_agent.plugins``
     #    group (the same group the general PluginManager uses). The manager
     #    records model-provider manifests for introspection but deliberately
     #    does NOT import them — provider lifecycle is owned here — so without
@@ -378,21 +378,21 @@ def _discover_providers() -> None:
     #
     #    Discovered FIRST, i.e. lowest precedence: because
     #    ``register_provider()`` is last-writer-wins, running this before the
-    #    filesystem steps means a bundled or ``$HERMES_HOME`` profile of the
+    #    filesystem steps means a bundled or ``$X19_HOME`` profile of the
     #    same name always overrides a pip-installed one. That prevents a
     #    third-party package from silently hijacking a first-party provider
     #    name (e.g. ``openrouter``) while still letting pip packages add
     #    genuinely new providers.
     _discover_entry_point_providers()
 
-    # 1. Bundled plugins — shipped with hermes-agent.
+    # 1. Bundled plugins — shipped with x19.
     if _BUNDLED_PLUGINS_DIR.is_dir():
         for child in sorted(_BUNDLED_PLUGINS_DIR.iterdir()):
             if not child.is_dir() or child.name.startswith(("_", ".")):
                 continue
             _import_plugin_dir(child, "bundled")
 
-    # 2. User plugins — under $HERMES_HOME/plugins/model-providers/<name>/.
+    # 2. User plugins — under $X19_HOME/plugins/model-providers/<name>/.
     #    These can override any bundled profile of the same name (last-writer-wins
     #    in register_provider()).
     user_dir = _user_plugins_dir()
@@ -402,8 +402,8 @@ def _discover_providers() -> None:
                 continue
             _import_plugin_dir(child, "user")
 
-    # 2b. Plugins installed by ``hermes plugins install`` / the plugin index.
-    #     Those clone into $HERMES_HOME/plugins/<name>/ — flat, NOT under
+    # 2b. Plugins installed by ``x19 plugins install`` / the plugin index.
+    #     Those clone into $X19_HOME/plugins/<name>/ — flat, NOT under
     #     model-providers/ — so step 2 never sees them. PluginManager does not
     #     import them either: it classifies ``kind: model-provider`` and routes
     #     it here on purpose. Without this step the documented install path
@@ -446,23 +446,3 @@ def _discover_providers() -> None:
     # collision — see _discover_entry_point_providers.)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'OMIT_TEMPERATURE': ('providers.base', 'OMIT_TEMPERATURE'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

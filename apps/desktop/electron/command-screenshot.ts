@@ -56,7 +56,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
   const publish = () => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send('hermes:screenshot:status', status())
+        win.webContents.send('x19:screenshot:status', status())
       }
     }
   }
@@ -68,7 +68,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
         return
       }
 
-      // Retain the last Hermes chat window when another application takes focus.
+      // Retain the last X19 chat window when another application takes focus.
       // Closing it cancels this destination; never silently pick another chat.
       const focused = BrowserWindow.getFocusedWindow()
       const recipient = focused && recipients.has(focused.webContents.id) ? focused : lastRecipient
@@ -80,7 +80,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
       const requestId = capture.request(recipient.webContents.id, window)
 
       if (requestId) {
-        recipient.webContents.send('hermes:screenshot:request', requestId)
+        recipient.webContents.send('x19:screenshot:request', requestId)
       }
     }, result => {
       if (disposed || current !== generation) {
@@ -134,7 +134,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
 
   const channels: string[] = []
   const handle = (name: string, callback: (event: IpcMainInvokeEvent, value: unknown) => unknown) => {
-    const channel = `hermes:screenshot:${name}`
+    const channel = `x19:screenshot:${name}`
     channels.push(channel)
     ipcMain.handle(channel, async (event, value) => {
       if (!trustedWindow(event)) {
@@ -191,7 +191,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
     }
     await shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${pane}`)
   })
-  ipcMain.on('hermes:screenshot:subscribe', onSubscribe)
+  ipcMain.on('x19:screenshot:subscribe', onSubscribe)
   app.on('browser-window-focus', onFocus)
 
   const dispose = () => {
@@ -202,7 +202,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
     recipients.clear()
     lastRecipient = null
     channels.forEach(channel => ipcMain.removeHandler(channel))
-    ipcMain.removeListener('hermes:screenshot:subscribe', onSubscribe)
+    ipcMain.removeListener('x19:screenshot:subscribe', onSubscribe)
     app.removeListener('browser-window-focus', onFocus)
     app.removeListener('will-quit', dispose)
   }

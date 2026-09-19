@@ -1,6 +1,6 @@
 """Canonical reasoning-effort vocabulary and wire clamping.
 
-Hermes' internal effort ladder (``VALID_REASONING_EFFORTS`` plus ``none``) is wider than any
+X19' internal effort ladder (``VALID_REASONING_EFFORTS`` plus ``none``) is wider than any
 single provider wire accepts; hand-rolled per-transport maps leaked new levels (``ultra``) to
 wires that 400 and inverted the ladder (unknown → weak default). Single source of truth:
 :data:`EFFORT_LADDER` (low→high), :func:`clamp_effort` (verbatim if supported, else the
@@ -20,7 +20,7 @@ from typing import Optional, Sequence
 _KIMI_K3_SLUG_RE = re.compile(r"(?:^|[^a-z0-9])k3(?:[^a-z0-9]|$)")
 
 # Canonical low→high ordering for nearest-level clamping. Includes "none" so an explicit
-# disable can be clamped when a provider publishes it as a level. ``ultra`` is Hermes-internal
+# disable can be clamped when a provider publishes it as a level. ``ultra`` is X19-internal
 # (the Codex product tier): no wire accepts it, every declared set stops at ``max``.
 EFFORT_LADDER: tuple[str, ...] = ("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra")
 
@@ -86,7 +86,7 @@ META_AI_EFFORTS: tuple[str, ...] = ("minimal", "low", "medium", "high", "xhigh")
 
 
 def is_astra_model(model: Optional[str]) -> bool:
-    """``gpt-6-astra`` or its Hermes-side ``-900k`` picker alias, with or without a ``vendor/`` prefix.
+    """``gpt-6-astra`` or its X19-side ``-900k`` picker alias, with or without a ``vendor/`` prefix.
     The single home for the slug set: picker gating, effort vocabulary and the request sanitizer all
     key off it, so a new Astra alias is one edit."""
     return (model or "").strip().lower().rsplit("/", 1)[-1] in ASTRA_MODEL_IDS
@@ -160,7 +160,7 @@ def clamp_reasoning_config(reasoning_config: Optional[dict], supported: Sequence
     """Return ``reasoning_config`` with its ``effort`` clamped onto ``supported`` (non-dicts and
     configs without an effort pass through untouched).
 
-    The entry clamp for an OpenAI-compatible chat-completions request builder: Hermes-internal
+    The entry clamp for an OpenAI-compatible chat-completions request builder: X19-internal
     ``ultra`` never reaches a wire (#89503 main transport, #112010 aux/MoA), while provider
     profiles with narrower vocabularies clamp again downstream. Unset stays unset.
     """
@@ -206,10 +206,3 @@ def ox_alpha_reasoning_extras(reasoning_config: Optional[dict], model: Optional[
     return ({}, {"reasoning_effort": clamped}) if clamped in OX_ALPHA_EFFORTS else ({}, {})
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-CODEX_RESPONSES_EFFORTS: tuple[str, ...] = CODEX_GPT56_EFFORTS
-# ---- END PLUGIN-COMPAT ----

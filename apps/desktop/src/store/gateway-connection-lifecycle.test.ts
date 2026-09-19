@@ -26,9 +26,9 @@ const reconnectStateMocks = vi.hoisted(() => ({
   resetTileRuntimeBindings: vi.fn()
 }))
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   setApiRequestConnection: vi.fn(),
-  HermesGateway: class {
+  X19Gateway: class {
     connectionState = 'closed'
     close = vi.fn(() => {
       this.connectionState = 'closed'
@@ -72,7 +72,7 @@ const {
 } = await import('./gateway')
 
 function installDesktop(stub: Record<string, unknown>): void {
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
+  ;(window as unknown as { x19Desktop: unknown }).x19Desktop = stub
 }
 
 function descriptorFor(connectionId: string, profile: string) {
@@ -96,7 +96,7 @@ afterEach(() => {
   gatewayMocks.instances.length = 0
   vi.clearAllMocks()
   vi.useRealTimers()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
 })
 
 describe('disposeSecondariesForConnection', () => {
@@ -495,7 +495,7 @@ describe('reconnect fail-stop on a removed connection', () => {
     // path (wake sweep, agent activation) used to make ensureActiveGatewayOpen
     // return null immediately: reconnectSecondary early-returns on
     // `reconnecting`, the socket is still closed, and the caller surfaced
-    // "Hermes gateway is not connected" on the Sessions + action. The drive
+    // "X19 gateway is not connected" on the Sessions + action. The drive
     // must ride out the in-flight activation and hand back the opened socket.
     let releaseDial: (() => void) | undefined
 
@@ -619,9 +619,9 @@ describe('secondary stalled-dial budget', () => {
       .fn()
       .mockResolvedValueOnce(descriptorFor('homelab', 'bot-a'))
       .mockRejectedValueOnce(stalled)
-      .mockRejectedValueOnce(new Error('Failed to connect to Hermes gateway'))
+      .mockRejectedValueOnce(new Error('Failed to connect to X19 gateway'))
       .mockRejectedValueOnce(stalled)
-      .mockRejectedValueOnce(new Error('Failed to connect to Hermes gateway'))
+      .mockRejectedValueOnce(new Error('Failed to connect to X19 gateway'))
       .mockRejectedValue(stalled)
 
     installDesktop({ getConnectionFor })

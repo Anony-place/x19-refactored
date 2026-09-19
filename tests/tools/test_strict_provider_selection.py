@@ -1,11 +1,11 @@
-"""Strict tool-provider selection: the `hermes tools` choice always wins.
+"""Strict tool-provider selection: the `x19 tools` choice always wins.
 
 Policy (owner decision): the provider string stored in config.yaml is what
 runs at call time. "nous" → managed Nous Tool Gateway only; a vendor name →
 that vendor direct with the user's own credentials; no key ever written →
 today's credential autodetect. Credential presence must NEVER select or
 reroute; a selected-but-broken provider produces an honest error naming the
-selection and pointing at `hermes tools`.
+selection and pointing at `x19 tools`.
 
 Per category these tests pin the three strict behaviors:
   (a) managed selection + direct key present ⇒ managed route (key ignored)
@@ -35,7 +35,7 @@ MANAGED = SimpleNamespace(
 class TestReadSelection:
     def _with_raw(self, raw):
         return patch(
-            "hermes_cli.config.read_raw_config_readonly",
+            "x19_cli.config.read_raw_config_readonly",
             return_value=raw,
         )
 
@@ -117,7 +117,7 @@ class TestImageFalStrictSelection:
             with pytest.raises(ValueError) as exc:
                 it._resolve_managed_fal_gateway()
         assert "image_gen is configured to use nous" in str(exc.value)
-        assert "hermes tools" in str(exc.value)
+        assert "x19 tools" in str(exc.value)
 
     def test_fal_selection_missing_key_errors_without_managed_call(self):
         from tools import image_generation_tool as it
@@ -130,7 +130,7 @@ class TestImageFalStrictSelection:
         gw.assert_not_called()
         assert "FAL_KEY" in str(exc.value)
         assert "image_gen is configured to use fal" in str(exc.value)
-        assert "hermes tools" in str(exc.value)
+        assert "x19 tools" in str(exc.value)
 
     def test_fal_selection_with_key_routes_direct(self):
         from tools import image_generation_tool as it
@@ -228,7 +228,7 @@ class TestSttStrictSelection:
                 tt._resolve_openai_audio_client_config()
         gw.assert_not_called()
         assert "stt is configured to use openai" in str(exc.value)
-        assert "hermes tools" in str(exc.value)
+        assert "x19 tools" in str(exc.value)
 
     def test_never_configured_keeps_legacy_ladder(self):
         from tools import transcription_tools as tt
@@ -322,7 +322,7 @@ class TestCamofoxSelection:
 
 class TestWriteProviderConfig:
     def test_managed_row_writes_nous_and_clears_legacy_flag(self):
-        from hermes_cli.tools_config import _write_provider_config
+        from x19_cli.tools_config import _write_provider_config
 
         config = {"tts": {"provider": "edge", "use_gateway": False}}
         provider = {"name": "Nous Subscription", "tts_provider": "openai"}
@@ -331,7 +331,7 @@ class TestWriteProviderConfig:
         assert "use_gateway" not in config["tts"]
 
     def test_byok_row_writes_vendor_and_clears_legacy_flag(self):
-        from hermes_cli.tools_config import _write_provider_config
+        from x19_cli.tools_config import _write_provider_config
 
         config = {"web": {"backend": "nous", "use_gateway": True}}
         provider = {"name": "Keenable", "web_backend": "keenable"}
@@ -340,7 +340,7 @@ class TestWriteProviderConfig:
         assert "use_gateway" not in config["web"]
 
     def test_managed_image_row_persists_nous_provider(self):
-        from hermes_cli.tools_config import _write_provider_config
+        from x19_cli.tools_config import _write_provider_config
 
         config = {}
         provider = {"name": "Nous Subscription", "imagegen_backend": "fal"}
@@ -351,7 +351,7 @@ class TestWriteProviderConfig:
     def test_plugin_injected_byok_row_clears_stale_use_gateway(self):
         """Plugin-injected rows are not in TOOL_CATEGORIES' hardcoded
         provider lists; the legacy clear-loop skipped them."""
-        from hermes_cli.tools_config import _write_provider_config
+        from x19_cli.tools_config import _write_provider_config
 
         config = {"stt": {"provider": "nous", "use_gateway": True}}
         provider = {"name": "Groq Whisper", "stt_provider": "groq"}

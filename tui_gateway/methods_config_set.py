@@ -6,7 +6,7 @@ Keys match exactly except ``details_mode.<section>`` (prefix) and ``_DISPLAY_TOG
 
 import os
 
-from hermes_constants import INDICATOR_STYLES
+from x19_constants import INDICATOR_STYLES
 
 from .method_ctx import HandlerRegistry, bind_module
 
@@ -110,7 +110,7 @@ def _set_model(rid, params, key, value, session):
         return _err(rid, 4002, "model value required")
     confirmed = bool(params.get("confirm_expensive_model", False))
     if session:
-        from hermes_cli.model_switch import parse_model_switch_args
+        from x19_cli.model_switch import parse_model_switch_args
         sid = params.get("session_id", "")
         parsed_flags = parse_model_switch_args(value)
         if session.get("running"):
@@ -143,7 +143,7 @@ def _set_model(rid, params, key, value, session):
         # --once keeps its specific 5001; other sessionless model sets 4001 so
         # --global cannot persist profile defaults before session.create (#106397:
         # an older Desktop client sent a fresh-draft pick this way).
-        from hermes_cli.model_switch import parse_model_switch_args
+        from x19_cli.model_switch import parse_model_switch_args
         if parse_model_switch_args(str(value)).is_once:
             result = _apply_model_switch("", {"agent": None}, value, confirm_expensive_model=confirmed)
         else:
@@ -174,7 +174,7 @@ def _set_fast(rid, params, key, value, session):
         return _err(rid, 4002, f"unknown fast mode: {value}")
     overrides = None
     if nv == "fast":
-        from hermes_cli.models import resolve_fast_mode_overrides
+        from x19_cli.models import resolve_fast_mode_overrides
         if agent is not None:
             target_model = getattr(agent, "model", None)
         else:  # a pre-build session may carry a picked model (desktop draft): validate against THAT
@@ -227,7 +227,7 @@ def _set_verbose(rid, params, key, value, session):
 
 def _set_focus(rid, params, key, value, session):
     # /focus: enabling stashes the configured tool_progress mode and pins it "off"; disabling restores.
-    from hermes_cli.focus_view import FOCUS_TOOL_PROGRESS_MODE, normalize_tool_progress_mode, resolve_focus_arg
+    from x19_cli.focus_view import FOCUS_TOOL_PROGRESS_MODE, normalize_tool_progress_mode, resolve_focus_arg
     d_f = _display_cfg()
     cur_focus = bool(d_f.get("focus_view", False))
     action, target = resolve_focus_arg(str(value or ""), cur_focus)
@@ -276,11 +276,11 @@ def _set_yolo(rid, params, key, value, session):
         (enable_session_yolo if enable else disable_session_yolo)(skey)
         _emit_session_info(params.get("session_id", ""), session)
     else:
-        enable = _BOOL_WORDS.get(raw, not is_truthy_value(os.environ.get("HERMES_YOLO_MODE")))
+        enable = _BOOL_WORDS.get(raw, not is_truthy_value(os.environ.get("X19_YOLO_MODE")))
         if enable:
-            os.environ["HERMES_YOLO_MODE"] = "1"
+            os.environ["X19_YOLO_MODE"] = "1"
         else:
-            os.environ.pop("HERMES_YOLO_MODE", None)
+            os.environ.pop("X19_YOLO_MODE", None)
     return _kv(rid, key, "1" if enable else "0", scope=scope if scope == "global" else "session")
 
 
@@ -295,7 +295,7 @@ _REASONING_DISPLAY_WORDS = (
 
 @_cfgset_guarded
 def _set_reasoning(rid, params, key, value, session):
-    from hermes_constants import parse_reasoning_effort
+    from x19_constants import parse_reasoning_effort
     arg = _word(value)
     scope = _word(params.get("scope"))
     for words, reported, fields, thinking, show in _REASONING_DISPLAY_WORDS:
@@ -429,8 +429,8 @@ def _set_prompt(rid, params, key, value, session):
 @_cfgset_guarded
 def _set_personality(rid, params, key, value, session):
     pname, new_prompt = _validate_personality(str(value or ""), _load_cfg_raw())
-    # Persists via hermes_cli.personality (single owner), never the user-owned system prompt.
-    from hermes_cli.personality import persist_personality
+    # Persists via x19_cli.personality (single owner), never the user-owned system prompt.
+    from x19_cli.personality import persist_personality
     persist_personality(pname)
     history_reset, info = _apply_personality_to_session(params.get("session_id", ""), session, new_prompt, pname)
     return _kv(rid, key, str(value or "none"), history_reset=history_reset,

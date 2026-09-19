@@ -30,7 +30,7 @@ function fakePackager(metadata) {
     get repositoryInfo() {
       return getRepositoryInfo(desktopDir, metadata, null)
     },
-    appInfo: { version: '0.0.0', channel: null, updaterCacheDirName: 'hermes' },
+    appInfo: { version: '0.0.0', channel: null, updaterCacheDirName: 'x19' },
     config: {},
     options: {}
   }
@@ -65,7 +65,7 @@ afterEach(() => {
 describe('local desktop pack stays out of the publish path', () => {
   test('the pack script pins an explicit publish policy', () => {
     // electron-builder 26 infers `onTagOrDraft` from CI when --publish is
-    // absent, and `hermes desktop` runs the pack with CI=1 (_npm_lifecycle_env).
+    // absent, and `x19 desktop` runs the pack with CI=1 (_npm_lifecycle_env).
     // v27 drops the implicit behavior, so being explicit is also forward-safe.
     const pack = desktopPkg.scripts.pack
     assert.match(pack, /--dir\b/)
@@ -89,7 +89,7 @@ describe('local desktop pack stays out of the publish path', () => {
     assert.ok(Array.isArray(configs) && configs.length > 0)
     assert.equal(configs[0].provider, 'github')
     assert.equal(configs[0].owner, 'NousResearch')
-    assert.equal(configs[0].repo, 'hermes-agent')
+    assert.equal(configs[0].repo, 'x19')
   })
 
   test('a package without the repository field is what breaks resolution', async () => {

@@ -40,7 +40,7 @@ def _spawns(captured, *needles):
 def _is_git_spawn(cmd) -> bool:
     """True only for a ``git -C <cwd> ...`` spawn.
 
-    ``bounded_git_probe`` lives in ``hermes_cli._subprocess_compat`` and both
+    ``bounded_git_probe`` lives in ``x19_cli._subprocess_compat`` and both
     probe call sites delegate to it, so these tests patch
     ``_subprocess_compat.subprocess.Popen`` — which is the shared ``subprocess``
     module singleton, i.e. a process-wide patch. Any unrelated daemon spawn
@@ -79,7 +79,7 @@ def test_bounded_git_probe_fast_path_spawn_contract_windows(monkeypatch):
     still stubbed so the expected value is a fixed constant rather than
     whatever bundle the helper currently returns.
     """
-    from hermes_cli import _subprocess_compat
+    from x19_cli import _subprocess_compat
 
     spawns = []
     monkeypatch.setattr(_subprocess_compat, "windows_hide_flags", lambda: _CREATE_NO_WINDOW)
@@ -104,7 +104,7 @@ def test_bounded_git_probe_fast_path_spawn_contract_windows(monkeypatch):
 
 
 def test_bounded_git_probe_nonzero_returncode_returns_empty(monkeypatch):
-    from hermes_cli import _subprocess_compat
+    from x19_cli import _subprocess_compat
 
     spawns = []
     monkeypatch.setattr(
@@ -128,7 +128,7 @@ def test_bounded_git_probe_nonzero_returncode_returns_empty(monkeypatch):
 
 def test_bounded_git_probe_spawn_failure_returns_empty(monkeypatch):
     """A spawn failure (git not on PATH) fails open to ""."""
-    from hermes_cli import _subprocess_compat
+    from x19_cli import _subprocess_compat
 
     def boom(cmd, **kwargs):
         raise FileNotFoundError("git not found")
@@ -243,7 +243,7 @@ def _patch_hide_flags(monkeypatch):
     ``creationflags`` — not the platform. Stubbing only the helper keeps that
     coverage on the Linux lane; no ``IS_WINDOWS`` fake is needed or wanted.
     """
-    import hermes_cli._subprocess_compat as subprocess_compat
+    import x19_cli._subprocess_compat as subprocess_compat
 
     monkeypatch.setattr(subprocess_compat, "windows_hide_flags", lambda: _CREATE_NO_WINDOW)
 
@@ -415,7 +415,7 @@ def test_suppress_platform_ver_console_stubs_syscmd_ver(monkeypatch):
     """
     import platform
 
-    from hermes_cli import _subprocess_compat
+    from x19_cli import _subprocess_compat
 
     # Register the original with monkeypatch so it gets restored after.
     monkeypatch.setattr(platform, "_syscmd_ver", platform._syscmd_ver)

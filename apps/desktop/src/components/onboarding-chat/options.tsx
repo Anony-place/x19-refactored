@@ -22,8 +22,8 @@ export const CONNECTOR_LEAD_ORDER = [
   'todoist'
 ]
 
-// Connectors are the apps Hermes reads and acts on for the user. Chat channels
-// (Discord, Telegram, WhatsApp) are how a user talks to Hermes; those live on
+// Connectors are the apps X19 reads and acts on for the user. Chat channels
+// (Discord, Telegram, WhatsApp) are how a user talks to X19; those live on
 // the Messaging page, and offering them here as if they were data sources
 // taught users the wrong thing about what "connect" does. The catalog
 // carries them for the agent's sake; the first-run picker leaves them out.

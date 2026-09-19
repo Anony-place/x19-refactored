@@ -1,6 +1,6 @@
 # Desktop Engineering Guide
 
-How to build Hermes Desktop well. This is a judgment guide, not an inventory —
+How to build X19 Desktop well. This is a judgment guide, not an inventory —
 it teaches the invariants and the reasoning behind them so a change fits the app
 even as files move. Read it with the repository `AGENTS.md` (root rules still
 apply), [`DESIGN.md`](./DESIGN.md) for the visual and interaction contract, and
@@ -30,7 +30,7 @@ change blurs a seam, that is the smell — fix the seam, don't widen it.
 The first question for any piece of state is *who is allowed to be right about
 it*, not where it is convenient to store it. Put state with its authority:
 
-- The **backend** is authoritative for anything another Hermes surface can also
+- The **backend** is authoritative for anything another X19 surface can also
   change. Treat the renderer's copy as a cache of that truth.
 - **Electron** is authoritative for machine and runtime facts.
 - The **renderer** owns only what is purely about this window's presentation.
@@ -103,7 +103,7 @@ There are three distinct switch shapes, and conflating them is the classic bug:
 - A **connection/mode apply** (local ↔ remote ↔ cloud) is the soft re-home:
   shell mounted, gateway-bound stores explicitly wiped, then reconnect. Query
   invalidation alone cannot evict live session stores — wipe them.
-- A **runtime home change** (switching the underlying `HERMES_HOME` profile) is
+- A **runtime home change** (switching the underlying `X19_HOME` profile) is
   a hard re-home: the window legitimately reloads and state resets by remount.
 - A **live profile swap** in the same window activates another profile's socket
   while background profiles keep streaming; lists merge rather than wipe, and
@@ -156,7 +156,7 @@ Two auth-flavored corollaries worth naming because they are easy to get wrong:
 ## Guest content never opens anything by itself
 
 Untrusted HTML runs in two places: sandboxed `allow-scripts` iframes (artifact
-previews) and the preview pane's `<webview>` (`persist:hermes-preview`). Neither
+previews) and the preview pane's `<webview>` (`persist:x19-preview`). Neither
 may drive the OS browser without the user's hand on it (GHSA-9f4c-93c8-jc8g):
 `setWindowOpenHandler` denies everything and never opens a URL as a side
 effect (`electron/window-open-policy.ts`), and the webview has no
@@ -166,7 +166,7 @@ A guest page's `target="_blank"` links (Streamlit's "Ask Google" traceback
 button) reach the OS browser through one explicit bridge instead:
 
 - `main.ts` installs `electron/preview-guest-preload-entry.ts` via
-  `will-attach-webview`, keyed on the `persist:hermes-preview` partition only.
+  `will-attach-webview`, keyed on the `persist:x19-preview` partition only.
   It is the app's only guest preload; a new webview does not inherit it unless
   it opts into that partition.
 - The preload runs in the isolated world, exposes nothing to the page, and
@@ -175,7 +175,7 @@ button) reach the OS browser through one explicit bridge instead:
   `dispatchEvent(click)` from page script is dropped there; page `window.open`
   stays blocked.
 - `PreviewPane` admits `http:`/`https:` only (`src/lib/preview-external.ts`)
-  and hands the URL to the existing `hermes:openExternal` IPC, which applies
+  and hands the URL to the existing `x19:openExternal` IPC, which applies
   main's URL policy. `file:` is excluded on purpose: a guest must never reach
   `shell.openPath`.
 
@@ -198,7 +198,7 @@ lean on an existing seam — before you invent a framework. The shell's internal
 registries are composition seams, not a public plugin ABI; do not build a
 universal extension system, a manifest, or a plugin adapter for a single
 consumer. Design a shared contract only once more than one real consumer proves
-its shape. "Plugin" means several unrelated things across Hermes — do not assume
+its shape. "Plugin" means several unrelated things across X19 — do not assume
 one surface's extension model runs in another.
 
 When the new capability is an **agent-callable** one — a tool that acts on this
@@ -246,9 +246,9 @@ actually run rather than inventing a command; when in doubt, read the scripts.
 ## Rehearsing the guided onboarding
 
 From `apps/desktop`, use a fresh temporary directory for each rehearsal and run
-`env -u NODE_ENV HERMES_GUEST_ONBOARDING=1 HERMES_HOME=<tmp>/.hermes HERMES_DESKTOP_USER_DATA_DIR=<tmp>/electron-user-data npm run dev`
+`env -u NODE_ENV X19_GUEST_ONBOARDING=1 X19_HOME=<tmp>/.x19 X19_DESKTOP_USER_DATA_DIR=<tmp>/electron-user-data npm run dev`
 (replace `<tmp>` with that directory). To use the portal stand-in, add
-`HERMES_PORTAL_BASE_URL=http://127.0.0.1:8765 HERMES_ANON_API_SECRET=test-secret HERMES_SHARED_AUTH_DIR=<tmp>/.hermes/shared`
+`X19_PORTAL_BASE_URL=http://127.0.0.1:8765 X19_ANON_API_SECRET=test-secret X19_SHARED_AUTH_DIR=<tmp>/.x19/shared`
 before `npm run dev`. Stop Electron and its dev server after the run.
 
 ## The taste test before you hand off
@@ -267,7 +267,7 @@ If any answer is "not sure," that's the part to go verify.
 
 ## Nous free tier: state is pulled, never latched in the renderer
 
-The free tier (a Nous identity with no account, `hermes_cli/anon_auth.py`) reaches the renderer
+The free tier (a Nous identity with no account, `x19_cli/anon_auth.py`) reaches the renderer
 through one JSON-RPC pair: `free_tier.status` (has_guest, enabled, available,
 notice_pending, model, label) read from local auth state with zero network, and
 `free_tier.ack_notice`, which persists the one-time notice flag on the identity itself. The

@@ -14,27 +14,27 @@ import {
 import { startMockServer } from '../../../tests-js/scripts/mock-server'
 import { expect, test } from './test'
 
-// Hosted Group Chat rooms live in the gateway, and the Desktop's own `hermes serve` backend runs
+// Hosted Group Chat rooms live in the gateway, and the Desktop's own `x19 serve` backend runs
 // a room worker. The room store moved from the root state.db to shared-state.db without carrying
 // the rows across, so every room from before that upgrade answered "hosted room not found"
 // (#109775). Asserted against the REAL Electron app's spawned backend over its JSON-RPC socket,
 // with the pre-upgrade layout seeded on disk by the store's own writers.
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..')
-const PYTHON = process.env.HERMES_DESKTOP_PYTHON ?? path.join(REPO_ROOT, 'venv', 'bin', 'python')
+const PYTHON = process.env.X19_DESKTOP_PYTHON ?? path.join(REPO_ROOT, 'venv', 'bin', 'python')
 
 let fixture: MockBackendFixture | null = null
 let rpc: Rpc | null = null
 
-function seedProfile(hermesHome: string, mockUrl: string, name: string): void {
-  const dir = path.join(hermesHome, 'profiles', name)
+function seedProfile(x19Home: string, mockUrl: string, name: string): void {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
 }
 
 /** Write a room + one user event into the PRE-isolation layout (root state.db) with the store's own writers. */
-function seedLegacyRoom(hermesHome: string): void {
+function seedLegacyRoom(x19Home: string): void {
   const script = `
 import sys
 from pathlib import Path
@@ -49,7 +49,7 @@ hosted_rooms.append_event(legacy, room_id="oldroom", event_id="user:u1", kind="m
     authority_gateway_id="legacy", authority_epoch=1, now=11)
 print([r["room_id"] for r in hosted_rooms.list_rooms(legacy)])
 `
-  const out = execFileSync(PYTHON, ['-c', script, hermesHome], {
+  const out = execFileSync(PYTHON, ['-c', script, x19Home], {
     cwd: REPO_ROOT,
     env: { ...process.env, PYTHONPATH: REPO_ROOT },
     encoding: 'utf8'
@@ -59,8 +59,8 @@ print([r["room_id"] for r in hosted_rooms.list_rooms(legacy)])
   }
 }
 
-/** Locate the Electron-spawned `hermes serve` backend for this sandbox: its port and session token. */
-function findBackend(hermesHome: string): { port: number; token: string; pid: number } {
+/** Locate the Electron-spawned `x19 serve` backend for this sandbox: its port and session token. */
+function findBackend(x19Home: string): { port: number; token: string; pid: number } {
   const pids = execSync(`pgrep -f "serve --host 127.0.0.1 --port 0" || true`, { encoding: 'utf8' })
     .split('\n')
     .map(s => s.trim())
@@ -74,19 +74,19 @@ function findBackend(hermesHome: string): { port: number; token: string; pid: nu
       continue
     }
     const vars = new Map(environ.split('\0').map(kv => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]))
-    if (vars.get('HERMES_HOME') !== hermesHome) {
+    if (vars.get('X19_HOME') !== x19Home) {
       continue
     }
-    const token = vars.get('HERMES_DASHBOARD_SESSION_TOKEN') ?? ''
+    const token = vars.get('X19_DASHBOARD_SESSION_TOKEN') ?? ''
     // The backend inherits Electron's remote-debugging socket fd too; the serve port is the listener
-    // that only the hermes process holds.
+    // that only the x19 process holds.
     const listen = execSync(`ss -ltnp | grep "pid=${pid}," | grep -v electron || true`, { encoding: 'utf8' })
     const port = Number(/127\.0\.0\.1:(\d+)/.exec(listen)?.[1] ?? 0)
     if (token && port) {
       return { port, token, pid }
     }
   }
-  throw new Error(`no hermes serve backend found for ${hermesHome} (pids: ${pids.join(',')})`)
+  throw new Error(`no x19 serve backend found for ${x19Home} (pids: ${pids.join(',')})`)
 }
 
 /** Minimal JSON-RPC client over the backend's /api/ws (Node's global WebSocket; no Origin header is sent,
@@ -129,12 +129,12 @@ class Rpc {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('hosted-rooms-backend')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  seedProfile(sandbox.hermesHome, mock.url, 'sentinel')
-  seedProfile(sandbox.hermesHome, mock.url, 'friday')
-  seedLegacyRoom(sandbox.hermesHome)
-  expect(fs.existsSync(path.join(sandbox.hermesHome, 'shared-state.db'))).toBe(false)
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  seedProfile(sandbox.x19Home, mock.url, 'sentinel')
+  seedProfile(sandbox.x19Home, mock.url, 'friday')
+  seedLegacyRoom(sandbox.x19Home)
+  expect(fs.existsSync(path.join(sandbox.x19Home, 'shared-state.db'))).toBe(false)
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
   fixture = {
@@ -151,7 +151,7 @@ test.beforeAll(async () => {
     }
   }
   await waitForAppReady(fixture, 120_000)
-  const backend = findBackend(sandbox.hermesHome)
+  const backend = findBackend(sandbox.x19Home)
   rpc = new Rpc(backend.port, backend.token)
 })
 
@@ -175,6 +175,6 @@ test('rooms from before the shared-state.db split are still reachable from the D
   const log = await rpc!.call('groups.log', { room_id: 'oldroom', since_seq: 0, limit: 20 })
   expect(log.result.events.map((event: any) => event.kind)).toEqual(['message.user'])
   // Storage truth: the store now lives in shared-state.db and the legacy file was left intact.
-  expect(fs.existsSync(path.join(fixture!.sandbox.hermesHome, 'shared-state.db'))).toBe(true)
-  expect(fs.existsSync(path.join(fixture!.sandbox.hermesHome, 'state.db'))).toBe(true)
+  expect(fs.existsSync(path.join(fixture!.sandbox.x19Home, 'shared-state.db'))).toBe(true)
+  expect(fs.existsSync(path.join(fixture!.sandbox.x19Home, 'state.db'))).toBe(true)
 })

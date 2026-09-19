@@ -14,25 +14,25 @@ function compilerPreset() {
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-const BACKEND = process.env.HERMES_DASHBOARD_URL ?? "http://127.0.0.1:9119";
+const BACKEND = process.env.X19_DASHBOARD_URL ?? "http://127.0.0.1:9119";
 
 /**
- * In production the Python `hermes dashboard` server injects a one-shot
- * session token into `index.html` (see `hermes_cli/web_server.py`). The
+ * In production the Python `x19 dashboard` server injects a one-shot
+ * session token into `index.html` (see `x19_cli/web_server.py`). The
  * Vite dev server serves its own `index.html`, so unless we forward that
  * token, every protected `/api/*` call 401s.
  *
  * This plugin fetches the running dashboard's `index.html` on each dev page
- * load, scrapes the `window.__HERMES_SESSION_TOKEN__` assignment, and
+ * load, scrapes the `window.__X19_SESSION_TOKEN__` assignment, and
  * re-injects it into the dev HTML. No-op in production builds.
  */
-function hermesDevToken(): Plugin {
-  const TOKEN_RE = /window\.__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"/;
+function x19DevToken(): Plugin {
+  const TOKEN_RE = /window\.__X19_SESSION_TOKEN__\s*=\s*"([^"]+)"/;
   const EMBEDDED_RE =
-    /window\.__HERMES_DASHBOARD_EMBEDDED_CHAT__\s*=\s*(true|false)/;
+    /window\.__X19_DASHBOARD_EMBEDDED_CHAT__\s*=\s*(true|false)/;
 
   return {
-    name: "hermes:dev-session-token",
+    name: "x19:dev-session-token",
     apply: "serve",
     async transformIndexHtml() {
       try {
@@ -41,8 +41,8 @@ function hermesDevToken(): Plugin {
         const match = html.match(TOKEN_RE);
         if (!match) {
           console.warn(
-            `[hermes] Could not find session token in ${BACKEND} — ` +
-              `is \`hermes dashboard\` running? /api calls will 401.`,
+            `[x19] Could not find session token in ${BACKEND} — ` +
+              `is \`x19 dashboard\` running? /api calls will 401.`,
           );
           return;
         }
@@ -53,14 +53,14 @@ function hermesDevToken(): Plugin {
             tag: "script",
             injectTo: "head",
             children:
-              `window.__HERMES_SESSION_TOKEN__="${match[1]}";` +
-              `window.__HERMES_DASHBOARD_EMBEDDED_CHAT__=${embeddedJs};`,
+              `window.__X19_SESSION_TOKEN__="${match[1]}";` +
+              `window.__X19_DASHBOARD_EMBEDDED_CHAT__=${embeddedJs};`,
           },
         ];
       } catch (err) {
         console.warn(
-          `[hermes] Dashboard at ${BACKEND} unreachable — ` +
-            `start it with \`hermes dashboard\` or set HERMES_DASHBOARD_URL. ` +
+          `[x19] Dashboard at ${BACKEND} unreachable — ` +
+            `start it with \`x19 dashboard\` or set X19_DASHBOARD_URL. ` +
             `(${(err as Error).message})`,
         );
       }
@@ -73,12 +73,12 @@ export default defineConfig({
     react(),
     babel({ presets: [compilerPreset()] }),
     tailwindcss(),
-    hermesDevToken(),
+    x19DevToken(),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@hermes/shared": path.resolve(__dirname, "../apps/shared/src"),
+      "@x19/shared": path.resolve(__dirname, "../apps/shared/src"),
     },
     // When @nous-research/ui is symlinked via `file:../../design-language`,
     // Node's module resolution would pick up shared deps from
@@ -100,7 +100,7 @@ export default defineConfig({
     ],
   },
   build: {
-    outDir: "../hermes_cli/web_dist",
+    outDir: "../x19_cli/web_dist",
     emptyOutDir: true,
     // Shell stays a bit over Vite's 500 kB default after vendor splits;
     // page/xterm chunks load on demand. Keep a modest ceiling so a true
@@ -154,7 +154,7 @@ export default defineConfig({
         target: BACKEND,
         ws: true,
       },
-      // Same host as `hermes dashboard` must serve these; Vite has no
+      // Same host as `x19 dashboard` must serve these; Vite has no
       // dashboard-plugins/* files, so without this, plugin scripts 404
       // or receive index.html in dev.
       "/dashboard-plugins": BACKEND,

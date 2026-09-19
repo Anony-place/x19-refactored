@@ -61,7 +61,7 @@ def _extract_install_sh_autostash_block() -> str:
 def test_install_sh_discards_runtime_lockfile_churn_before_stash(
     tmp_path: Path,
 ) -> None:
-    repo = tmp_path / "hermes-agent"
+    repo = tmp_path / "x19"
     repo.mkdir()
     _git(repo, "init")
     (repo / "package.json").write_text('{"dependencies":{"a":"1"}}\n')
@@ -97,7 +97,7 @@ def test_install_sh_keeps_root_lockfile_for_dirty_workspace_manifest(
 ) -> None:
     """The root lockfile spans the npm workspace graph: a dirty workspace manifest
     (apps/desktop/package.json) protects it, a manifest outside the graph does not (#112378)."""
-    repo = tmp_path / "hermes-agent"
+    repo = tmp_path / "x19"
     (repo / "apps" / "desktop").mkdir(parents=True)
     (repo / "vendor" / "foo").mkdir(parents=True)
     _git(repo, "init")

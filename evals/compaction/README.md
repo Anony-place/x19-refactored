@@ -37,7 +37,7 @@ uncompacted history. The scripts reconstruct those into eval transcripts:
 
 ```bash
 # 1. ALWAYS copy the DB first — never point at the live state.db
-cp ~/.hermes/state.db /tmp/state_copy.db
+cp ~/.x19/state.db /tmp/state_copy.db
 
 # 2. Find big lineages (sessions with parent_session_id form chains), then:
 python evals/compaction/scripts/reconstruct_lineage.py \

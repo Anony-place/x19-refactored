@@ -24,7 +24,7 @@ def sample_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
-    _git(repo, "config", "user.name", "Hermes Tests")
+    _git(repo, "config", "user.name", "X19 Tests")
     _git(repo, "config", "user.email", "tests@example.com")
 
     (repo / "src").mkdir()
@@ -191,13 +191,13 @@ def test_binary_reference_block_maps_host_attachment_to_container_path(tmp_path:
     """
     from agent.context_references import preprocess_context_references
 
-    hermes_home = tmp_path / ".hermes"
-    attachments = hermes_home / "attachments"
+    x19_home = tmp_path / ".x19"
+    attachments = x19_home / "attachments"
     attachments.mkdir(parents=True)
     payload = attachments / "archive.zip"
     payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
 
     result = preprocess_context_references(
@@ -207,8 +207,8 @@ def test_binary_reference_block_maps_host_attachment_to_container_path(tmp_path:
     )
 
     assert result.expanded
-    # Default container base for the docker backend is /root/.hermes.
-    assert "/root/.hermes/attachments/archive.zip" in result.message
+    # Default container base for the docker backend is /root/.x19.
+    assert "/root/.x19/attachments/archive.zip" in result.message
     assert "binary file, not inlined" in result.message
 
 
@@ -217,13 +217,13 @@ def test_oversized_text_reference_maps_host_attachment_to_container_path(
 ):
     from agent.context_references import preprocess_context_references
 
-    hermes_home = tmp_path / ".hermes"
-    attachments = hermes_home / "attachments"
+    x19_home = tmp_path / ".x19"
+    attachments = x19_home / "attachments"
     attachments.mkdir(parents=True)
     payload = attachments / "large.txt"
     payload.write_text("x" * 8_000, encoding="utf-8")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
 
     result = preprocess_context_references(
@@ -235,7 +235,7 @@ def test_oversized_text_reference_maps_host_attachment_to_container_path(
     assert result.expanded
     assert not result.blocked
     attached_context = result.message.split("--- Attached Context ---", 1)[1]
-    assert "/root/.hermes/attachments/large.txt" in attached_context
+    assert "/root/.x19/attachments/large.txt" in attached_context
     assert "too large to inline safely" in result.message
 
 
@@ -243,13 +243,13 @@ def test_binary_reference_block_keeps_host_path_on_local_backend(tmp_path: Path,
     """Local backend: no translation — the agent's tools run on the host."""
     from agent.context_references import preprocess_context_references
 
-    hermes_home = tmp_path / ".hermes"
-    attachments = hermes_home / "attachments"
+    x19_home = tmp_path / ".x19"
+    attachments = x19_home / "attachments"
     attachments.mkdir(parents=True)
     payload = attachments / "archive.zip"
     payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     monkeypatch.setenv("TERMINAL_ENV", "local")
 
     result = preprocess_context_references(
@@ -260,7 +260,7 @@ def test_binary_reference_block_keeps_host_path_on_local_backend(tmp_path: Path,
 
     assert result.expanded
     assert str(payload) in result.message
-    assert "/root/.hermes/attachments/" not in result.message
+    assert "/root/.x19/attachments/" not in result.message
 
 
 
@@ -284,25 +284,25 @@ async def test_blocks_canonical_read_denylist_credential_stores(tmp_path: Path, 
     The narrow in-module list historically missed the real credential stores
     (provider keys, OAuth tokens, MCP tokens, project-local .env). Because the
     gateway routes untrusted remote message text through reference expansion,
-    a chat peer could otherwise attach `@file:~/.hermes/auth.json` and read the
+    a chat peer could otherwise attach `@file:~/.x19/auth.json` and read the
     operator's keys into context. These must all be refused, with their secret
     bodies kept out of the expanded message.
     """
     from agent.context_references import preprocess_context_references_async
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
 
-    hermes_home = tmp_path / ".hermes"
-    (hermes_home).mkdir(parents=True)
+    x19_home = tmp_path / ".x19"
+    (x19_home).mkdir(parents=True)
 
-    auth_json = hermes_home / "auth.json"
+    auth_json = x19_home / "auth.json"
     auth_json.write_text('{"openai": "sk-AUTHJSON-SECRET"}\n', encoding="utf-8")
 
-    oauth = hermes_home / ".anthropic_oauth.json"
+    oauth = x19_home / ".anthropic_oauth.json"
     oauth.write_text('{"access_token": "OAUTH-SECRET"}\n', encoding="utf-8")
 
-    mcp_token = hermes_home / "mcp-tokens" / "github.json"
+    mcp_token = x19_home / "mcp-tokens" / "github.json"
     mcp_token.parent.mkdir(parents=True)
     mcp_token.write_text('{"token": "MCP-TOKEN-SECRET"}\n', encoding="utf-8")
 
@@ -311,8 +311,8 @@ async def test_blocks_canonical_read_denylist_credential_stores(tmp_path: Path, 
     project_env.write_text("DB_PASSWORD=ENV-SECRET\n", encoding="utf-8")
 
     result = await preprocess_context_references_async(
-        "inspect @file:.hermes/auth.json and @file:.hermes/.anthropic_oauth.json "
-        "and @file:.hermes/mcp-tokens/github.json and @file:project/.env",
+        "inspect @file:.x19/auth.json and @file:.x19/.anthropic_oauth.json "
+        "and @file:.x19/mcp-tokens/github.json and @file:project/.env",
         cwd=tmp_path,
         allowed_root=tmp_path,
         context_length=100_000,
@@ -343,11 +343,11 @@ async def test_canonical_guard_fails_closed_when_lookup_raises(tmp_path: Path, m
     from agent.context_references import preprocess_context_references_async
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
 
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir(parents=True)
-    auth_json = hermes_home / "auth.json"
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir(parents=True)
+    auth_json = x19_home / "auth.json"
     auth_json.write_text('{"openai": "sk-AUTHJSON-SECRET"}\n', encoding="utf-8")
 
     def _boom(_path):
@@ -356,7 +356,7 @@ async def test_canonical_guard_fails_closed_when_lookup_raises(tmp_path: Path, m
     monkeypatch.setattr("agent.file_safety.get_read_block_error", _boom)
 
     result = await preprocess_context_references_async(
-        "inspect @file:.hermes/auth.json",
+        "inspect @file:.x19/auth.json",
         cwd=tmp_path,
         allowed_root=tmp_path,
         context_length=100_000,
@@ -373,7 +373,7 @@ async def test_canonical_guard_fails_closed_when_lookup_raises(tmp_path: Path, m
     "value",
     [
         "/tmp/plain.png",
-        "/Users/me/Library/Application Support/Hermes/composer-images/a.png",
+        "/Users/me/Library/Application Support/X19/composer-images/a.png",
         r"C:\Users\John Doe\Pictures\cat.png",
         "/tmp/report (final).pdf",
         "/tmp/it's here.png",
@@ -396,7 +396,7 @@ async def test_side_thread_expansion_guards_the_served_profile_home(tmp_path: Pa
     """Inside a running loop (the gateway / TUI turn) the sync wrapper hops to a side thread; that
     thread must inherit the caller's profile scope so the credential guard checks the SERVED
     profile's home, not the launch profile's (a served profile's skill-hub cache was attachable)."""
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from x19_constants import reset_x19_home_override, set_x19_home_override
     from agent.context_references import preprocess_context_references
 
     launch_home = tmp_path / "launch"
@@ -405,15 +405,15 @@ async def test_side_thread_expansion_guards_the_served_profile_home(tmp_path: Pa
     hub_file.parent.mkdir(parents=True)
     hub_file.write_text("HUB-CACHE-BODY\n", encoding="utf-8")
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("X19_HOME", str(launch_home))
 
-    token = set_hermes_home_override(served_home)
+    token = set_x19_home_override(served_home)
     try:
         result = preprocess_context_references(
             "read @file:profiles/b/skills/.hub/injected.md", cwd=launch_home, allowed_root=launch_home,
             context_length=100_000)
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
 
     assert "HUB-CACHE-BODY" not in result.message
-    assert any("internal Hermes path" in w for w in result.warnings)
+    assert any("internal X19 path" in w for w in result.warnings)

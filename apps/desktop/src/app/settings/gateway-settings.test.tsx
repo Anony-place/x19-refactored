@@ -45,7 +45,7 @@ const localConnection = {
 beforeEach(() => {
   getConnectionConfig.mockResolvedValue(localConnection)
   saveConnectionConfig.mockResolvedValue(localConnection)
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'x19Desktop', {
     configurable: true,
     value: { getConnectionConfig, saveConnectionConfig }
   })
@@ -88,7 +88,7 @@ describe('GatewaySettings', () => {
       needsOrgSelection: true,
       orgs: [{ id: 'new-team', name: 'New team', role: 'OWNER' }]
     })
-    Object.assign(window.hermesDesktop, {
+    Object.assign(window.x19Desktop, {
       oauthLogoutConnectionConfig,
       connections: { save },
       cloud: { status: vi.fn().mockResolvedValue({ signedIn: true }), discover, agentSignIn }
@@ -120,7 +120,7 @@ describe('GatewaySettings', () => {
     }
     const agentSignIn = vi.fn()
     const applyConnectionConfig = vi.fn()
-    Object.assign(window.hermesDesktop, {
+    Object.assign(window.x19Desktop, {
       applyConnectionConfig,
       cloud: {
         status: vi.fn().mockResolvedValue({ signedIn: false }),
@@ -142,7 +142,7 @@ describe('GatewaySettings', () => {
     getConnectionConfig.mockResolvedValue({ ...localConnection, mode: 'cloud' })
     const agentSignIn = vi.fn().mockResolvedValue({ connected: true })
     const applyConnectionConfig = vi.fn().mockResolvedValue({ ...localConnection, mode: 'cloud' })
-    Object.assign(window.hermesDesktop, {
+    Object.assign(window.x19Desktop, {
       applyConnectionConfig,
       cloud: {
         status: vi.fn().mockResolvedValue({ signedIn: true }),
@@ -177,7 +177,7 @@ describe('GatewaySettings', () => {
     render(<GatewaySettings />)
     expect(await screen.findByText('Local gateway')).toBeTruthy()
     expect(
-      screen.getByText('Start a private Hermes backend on localhost. This is the default and works offline.')
+      screen.getByText('Start a private X19 backend on localhost. This is the default and works offline.')
     ).toBeTruthy()
 
     // The page manages the machine's gateway connections; it must load the

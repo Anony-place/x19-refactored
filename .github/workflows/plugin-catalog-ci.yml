@@ -4,11 +4,11 @@ name: Plugin Catalog CI
 # plugin-catalog/** so it can never go red on unrelated PRs.
 #
 # Two gates:
-#   structural            — cheap schema check, no hermes install needed
+#   structural            — cheap schema check, no x19 install needed
 #   pinned-source-validate — supply-chain gate: the pinned sha MUST be
 #                            reachable in the entry's repo, and the plugin
 #                            at that exact commit must pass
-#                            `hermes plugins validate`.
+#                            `x19 plugins validate`.
 
 on:
   pull_request:
@@ -71,7 +71,7 @@ jobs:
             echo '__EOF__'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Install hermes-agent from the PR's own checkout
+      - name: Install x19 from the PR's own checkout
         if: steps.changed.outputs.files != ''
         uses: ./.github/actions/retry
         with:
@@ -126,8 +126,8 @@ jobs:
             fi
 
             # Manifest schema + declared-vs-registered capability check.
-            if ! hermes plugins validate --install-deps "$PLUGIN_DIR"; then
-              echo "::error file=$entry::hermes plugins validate failed"
+            if ! x19 plugins validate --install-deps "$PLUGIN_DIR"; then
+              echo "::error file=$entry::x19 plugins validate failed"
               FAILED=1; echo "::endgroup::"; continue
             fi
 

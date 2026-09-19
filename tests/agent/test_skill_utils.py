@@ -35,11 +35,11 @@ def test_skill_config_helpers_share_raw_config_parse_cache(tmp_path, monkeypatch
     """Repeated skill config helpers should parse config.yaml only once."""
     from agent import skill_utils
 
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
     external = tmp_path / "external-skills"
     external.mkdir()
-    config_path = hermes_home / "config.yaml"
+    config_path = x19_home / "config.yaml"
     config_path.write_text(
         f"""
 skills:
@@ -61,7 +61,7 @@ skills:
         parse_count += 1
         return real_yaml_load(text)
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     skill_utils._external_dirs_cache_clear()
     getattr(skill_utils, "_raw_config_cache_clear", lambda: None)()
     monkeypatch.setattr(skill_utils, "yaml_load", counting_yaml_load)
@@ -75,7 +75,7 @@ skills:
 
 
 class TestParseConfigStringList:
-    """#86661: `hermes config set` and JSON-mode editor saves store lists as
+    """#86661: `x19 config set` and JSON-mode editor saves store lists as
     quoted strings (e.g. '["a","b"]'). Treating such a string as a single name
     made curated disabled lists silently filter nothing."""
 
@@ -86,7 +86,7 @@ class TestParseConfigStringList:
         ]
 
     def test_python_literal_array_string_parses(self):
-        # `hermes config set` can persist single-quoted Python-literal forms.
+        # `x19 config set` can persist single-quoted Python-literal forms.
         assert parse_config_string_list("['skill-a']") == ["skill-a"]
 
     def test_scalar_string_means_one_name(self):
@@ -117,13 +117,13 @@ class TestDisabledSkillsJsonArrayString:
     def test_get_disabled_skill_names_parses_json_array_string(
         self, tmp_path, monkeypatch
     ):
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        (hermes_home / "config.yaml").write_text(
+        x19_home = tmp_path / ".x19"
+        x19_home.mkdir()
+        (x19_home / "config.yaml").write_text(
             "skills:\n  disabled: '[\"skill-a\",\"skill-b\"]'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         from agent import skill_utils
 
         getattr(skill_utils, "_raw_config_cache_clear", lambda: None)()
@@ -133,13 +133,13 @@ class TestDisabledSkillsJsonArrayString:
     def test_get_disabled_skill_names_scalar_string_still_single_name(
         self, tmp_path, monkeypatch
     ):
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        (hermes_home / "config.yaml").write_text(
+        x19_home = tmp_path / ".x19"
+        x19_home.mkdir()
+        (x19_home / "config.yaml").write_text(
             "skills:\n  disabled: 'hidden-skill'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         from agent import skill_utils
 
         getattr(skill_utils, "_raw_config_cache_clear", lambda: None)()
@@ -153,12 +153,12 @@ def test_skill_config_home_vars_use_subprocess_home(tmp_path, monkeypatch):
     from agent import skill_utils
 
     # A backslash in the home path must not be read as a regex-replacement escape.
-    hermes_home = tmp_path / "da\\ta"
-    subprocess_home = hermes_home / "home"
+    x19_home = tmp_path / "da\\ta"
+    subprocess_home = x19_home / "home"
     subprocess_home.mkdir(parents=True)
-    (hermes_home / "config.yaml").write_text("", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    monkeypatch.setenv("HOME", str(hermes_home))
+    (x19_home / "config.yaml").write_text("", encoding="utf-8")
+    monkeypatch.setenv("X19_HOME", str(x19_home))
+    monkeypatch.setenv("HOME", str(x19_home))
     monkeypatch.setenv("TERMINAL_HOME_MODE", "profile")
     monkeypatch.setenv("PROJECT_ROOT", "/proj")
     monkeypatch.setenv("LEAF", "leaf")
@@ -336,7 +336,7 @@ class TestParseFrontmatterBOM:
         "description: Does a thing.\n"
         "platforms: [macos]\n"
         "metadata:\n"
-        "  hermes:\n"
+        "  x19:\n"
         "    config:\n"
         "      - key: my.key\n"
         "        description: A configured value\n"

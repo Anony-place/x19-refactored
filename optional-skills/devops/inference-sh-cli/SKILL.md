@@ -6,7 +6,7 @@ author: okaris
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
+  x19:
     tags: [AI, image-generation, video, LLM, search, inference, FLUX, Veo, Claude]
     related_skills: []
 ---

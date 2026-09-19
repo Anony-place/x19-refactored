@@ -1,6 +1,6 @@
-import { JsonRpcGatewayClient } from '@hermes/shared'
+import { JsonRpcGatewayClient } from '@x19/shared'
 
-import type { HermesApiRequest } from '@/global'
+import type { X19ApiRequest } from '@/global'
 
 // Desktop startup fires a burst of read-only data calls (config, profiles,
 // model info/options, cron) the moment the backend passes readiness. On a
@@ -8,7 +8,7 @@ import type { HermesApiRequest } from '@/global'
 // /api/profiles runs list_profiles(), which does a recursive skill-tree walk
 // per profile — so the 15s default (DEFAULT_FETCH_TIMEOUT_MS in hardening.ts)
 // times out a backend that is alive-but-busy, surfacing as a spurious
-// "Timed out connecting to Hermes backend" that hangs the UI (#48504).
+// "Timed out connecting to X19 backend" that hangs the UI (#48504).
 //
 // Give the boot burst a generous per-call timeout instead of raising the
 // global default: interactive/runtime calls and the liveness poll (/api/status)
@@ -25,19 +25,19 @@ const DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS = 30_000
 // ever fires when the turn itself would have been abandoned server-side.
 export const PROMPT_SUBMIT_REQUEST_TIMEOUT_MS = 1_800_000
 
-export class HermesGateway extends JsonRpcGatewayClient {
+export class X19Gateway extends JsonRpcGatewayClient {
   constructor() {
     super({
-      closedErrorMessage: 'Hermes gateway connection closed',
-      connectErrorMessage: 'Could not connect to Hermes gateway',
+      closedErrorMessage: 'X19 gateway connection closed',
+      connectErrorMessage: 'Could not connect to X19 gateway',
       createRequestId: nextId => nextId,
-      notConnectedErrorMessage: 'Hermes gateway is not connected',
+      notConnectedErrorMessage: 'X19 gateway is not connected',
       // The channel already answered -32603; surface the crash in devtools like the dial-failure sink.
       onRequestHandlerError: (error, request) =>
         console.error(`[gateway] server request handler crashed for ${request.method} (${request.id}):`, error),
       // The channel already answered -32601; note the missing registry in devtools.
       onUnhandledRequest: request =>
-        console.warn(`[gateway] Hermes Desktop has no server-request registry for ${request.method} (${request.id})`),
+        console.warn(`[gateway] X19 Desktop has no server-request registry for ${request.method} (${request.id})`),
       requestTimeoutMs: DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS
     })
   }
@@ -95,7 +95,7 @@ export function setApiRequestConnection(connectionId: null | string): void {
 // Registry connection scope for a REST request. A registered remote gateway
 // owns its own state.db — cron jobs and their run sessions live THERE — so
 // requests for gateway-owned data must carry the connection id for the main
-// process to route them to that host (hermes:api's registry branch). Null
+// process to route them to that host (x19:api's registry branch). Null
 // resolves to no tag, keeping single-source users byte-identical; explicit
 // 'local' must remain tagged when the legacy primary points elsewhere.
 export function connectionScoped(): { connectionId?: string } {
@@ -106,7 +106,7 @@ export function connectionScoped(): { connectionId?: string } {
 // store/session's setConnection (same no-store-import contract as _apiProfile)
 // so api/ helpers can name the backend an UNTAGGED request lands on without
 // importing the heavy session store — which would close a module cycle
-// through @/hermes.
+// through @/x19.
 let _apiLocalMode = false
 
 export function setApiRequestLocalMode(local: boolean): void {
@@ -130,8 +130,8 @@ export function ambientOwnerConnectionId(): string | undefined {
  *  pin — `'local'` included — so a pin always overrides the ambient tag spread
  *  underneath it. (It used to omit the key for 'local', which made the pin
  *  unable to beat the ambient tag; helpers then had to bypass this wrapper.) */
-export function hermesApi<T>(request: HermesApiRequest): Promise<T> {
-  return window.hermesDesktop.api<T>({ ...connectionScoped(), ...request })
+export function x19Api<T>(request: X19ApiRequest): Promise<T> {
+  return window.x19Desktop.api<T>({ ...connectionScoped(), ...request })
 }
 
 // ── Capability scope: (connection, profile) routing for the Capabilities

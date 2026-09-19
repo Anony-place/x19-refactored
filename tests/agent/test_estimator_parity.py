@@ -39,7 +39,7 @@ STALE_THINKING = "considering the next move carefully... " * 200  # ~2K tok
 
 def _reasoning_heavy_session(n_turns: int = 40) -> list:
     """Transcript whose bulk is stale reasoning replay (the #84371 shape)."""
-    msgs = [{"role": "system", "content": "You are Hermes."}]
+    msgs = [{"role": "system", "content": "You are X19."}]
     msgs.append({"role": "user", "content": "do the big task"})
     for i in range(n_turns):
         msgs.append(
@@ -293,7 +293,7 @@ class TestNoProgressDeadLoopBreaker:
         from unittest.mock import MagicMock
         import os
 
-        from hermes_state import SessionDB
+        from x19_state import SessionDB
         from run_agent import AIAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:

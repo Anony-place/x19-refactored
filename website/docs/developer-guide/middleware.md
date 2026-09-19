@@ -3,26 +3,26 @@ title: "Middleware"
 description: "Behavior-changing plugin middleware for LLM and tool calls: contract, execution order, examples"
 ---
 
-# Hermes Middleware
+# X19 Middleware
 
-Hermes middleware is the behavior-changing companion to observer hooks.
+X19 middleware is the behavior-changing companion to observer hooks.
 Observer hooks report what happened. Middleware can change what happens by
 rewriting a request before execution or by wrapping the execution callback
 itself.
 
 This contract is intentionally backend-neutral. A plugin can use it for local
 policy, request shaping, tracing, adaptive routing, cache control, sandbox
-selection, or handoff to runtimes such as NeMo Relay without changing Hermes'
+selection, or handoff to runtimes such as NeMo Relay without changing X19'
 planner, model provider adapters, tool registry, memory, or CLI UX.
 
 With middleware enabled, plugins can:
 
-- Rewrite LLM provider request kwargs before Hermes calls the provider.
+- Rewrite LLM provider request kwargs before X19 calls the provider.
 - Rewrite tool arguments before guardrails, approval checks, hooks, and tool
   execution see them.
-- Wrap the actual LLM execution callback while preserving Hermes retry,
+- Wrap the actual LLM execution callback while preserving X19 retry,
   streaming, interrupt, and hook behavior.
-- Wrap the actual tool execution callback while preserving Hermes guardrails,
+- Wrap the actual tool execution callback while preserving X19 guardrails,
   approval, post-tool hooks, and tool-result transformation.
 
 ## Contract
@@ -39,8 +39,8 @@ def register(ctx):
 
 Every middleware callback receives:
 
-- `telemetry_schema_version`: currently `hermes.observer.v1`
-- `middleware_schema_version`: currently `hermes.middleware.v1`
+- `telemetry_schema_version`: currently `x19.observer.v1`
+- `middleware_schema_version`: currently `x19.middleware.v1`
 - Runtime context such as `session_id`, `task_id`, `turn_id`,
   `api_request_id`, `provider`, `model`, `api_mode`, `tool_name`, and
   `tool_call_id` when applicable.
@@ -64,7 +64,7 @@ return {
 }
 ```
 
-Hermes stores those trace entries in later observer hook payloads as
+X19 stores those trace entries in later observer hook payloads as
 `middleware_trace`.
 
 Execution middleware receives a `next_call` callback. Call it to continue the
@@ -76,9 +76,9 @@ def on_tool_execution(**kwargs):
     return result
 ```
 
-If multiple plugins register the same execution middleware kind, Hermes runs
+If multiple plugins register the same execution middleware kind, X19 runs
 them as a nested chain in registration order. Middleware failures are fail-open:
-Hermes logs a warning and continues with the next middleware or the base
+X19 logs a warning and continues with the next middleware or the base
 runtime path. A callback that fails the same way on every call (typically a
 signature naming a field the middleware does not send) is reported **once** at
 WARNING — the message lists the fields it does provide — and identical repeats go
@@ -89,7 +89,7 @@ resets the report.
 
 ### LLM Calls
 
-For each provider request, Hermes applies middleware in this order:
+For each provider request, X19 applies middleware in this order:
 
 1. Build provider kwargs from the current conversation.
 2. Apply `llm_request` middleware.
@@ -104,11 +104,11 @@ request plus `next_call`.
 
 ### Tool Calls
 
-For each tool call, Hermes applies middleware in this order:
+For each tool call, X19 applies middleware in this order:
 
 1. Parse and coerce model-provided tool arguments.
 2. Apply `tool_request` middleware.
-3. Run the normal Hermes pre-execution path against the effective arguments:
+3. Run the normal X19 pre-execution path against the effective arguments:
    tool availability checks, observer block directives, guardrails, and
    approval checks.
 4. Run tool execution through `tool_execution` middleware.
@@ -124,17 +124,17 @@ rewritten path, command, or URL is the value downstream policy will evaluate.
 Middleware only runs for enabled plugins. For a bundled plugin:
 
 ```bash
-hermes plugins enable <plugin-name>
+x19 plugins enable <plugin-name>
 ```
 
-For isolated local testing, use one `HERMES_HOME` for plugin enablement and the
+For isolated local testing, use one `X19_HOME` for plugin enablement and the
 agent run:
 
 ```bash
-export HERMES_HOME=/tmp/hermes-middleware-test
-mkdir -p "$HERMES_HOME"
-hermes plugins enable <plugin-name>
-hermes chat --query 'Reply exactly ok'
+export X19_HOME=/tmp/x19-middleware-test
+mkdir -p "$X19_HOME"
+x19 plugins enable <plugin-name>
+x19 chat --query 'Reply exactly ok'
 ```
 
 For source checkouts, prefer the source command so the runtime sees plugins and
@@ -142,8 +142,8 @@ middleware from the working tree:
 
 ```bash
 uv sync
-uv run hermes plugins enable <plugin-name>
-uv run hermes chat --query 'Reply exactly ok'
+uv run x19 plugins enable <plugin-name>
+uv run x19 chat --query 'Reply exactly ok'
 ```
 
 ## Generic Plugin Examples
@@ -163,7 +163,7 @@ def register(ctx):
 def tag_llm_request(**kwargs):
     request = dict(kwargs["request"])
     extra_body = dict(request.get("extra_body") or {})
-    extra_body.setdefault("metadata", {})["hermes_middleware_demo"] = True
+    extra_body.setdefault("metadata", {})["x19_middleware_demo"] = True
     request["extra_body"] = extra_body
     return {
         "request": request,
@@ -188,7 +188,7 @@ def normalize_terminal_workdir(**kwargs):
     if kwargs.get("tool_name") != "terminal":
         return None
     args = dict(kwargs["args"])
-    args.setdefault("workdir", "/tmp/hermes-middleware-demo")
+    args.setdefault("workdir", "/tmp/x19-middleware-demo")
     return {
         "args": args,
         "source": "middleware-demo",
@@ -219,7 +219,7 @@ def time_llm_execution(**kwargs):
     return response
 ```
 
-Return the same response shape Hermes expects from the provider adapter. Do not
+Return the same response shape X19 expects from the provider adapter. Do not
 wrap the response in a plugin-specific envelope unless the rest of the runtime
 expects that envelope.
 
@@ -254,14 +254,14 @@ Relay `plugins.toml`; see
   patches.
 - Execution middleware should call `next_call(...)` exactly once unless it is
   intentionally short-circuiting execution.
-- If execution middleware raises before calling `next_call(...)`, Hermes treats
+- If execution middleware raises before calling `next_call(...)`, X19 treats
   that as middleware failure and continues with the remaining middleware chain
   and base execution.
 - If execution middleware calls `next_call(...)` successfully and then raises
-  during post-processing, Hermes preserves the downstream result and does not
+  during post-processing, X19 preserves the downstream result and does not
   run the provider or tool a second time.
 - If downstream provider or tool execution fails, middleware may let that error
-  propagate or translate it deliberately. Hermes does not convert downstream
+  propagate or translate it deliberately. X19 does not convert downstream
   failure into a successful `None` result.
 - Tool request middleware runs before approvals. If it mutates file paths,
   commands, URLs, or arguments, the mutated values are what guardrails and

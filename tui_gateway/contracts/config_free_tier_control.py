@@ -31,7 +31,7 @@ class ConfigGetParams(ProfileParams):
 
 
 class ConfigProviderRef(OpenModel):
-    """``hermes_cli/models.py::list_available_providers`` row."""
+    """``x19_cli/models.py::list_available_providers`` row."""
 
     id: str
     label: str
@@ -224,7 +224,7 @@ class ModelOptionsParams(ProfileParams):
 # TODO(common): ModelPricing / ModelCapabilities / ModelOptionProvider are also the row shape of
 # ``model.save_key``'s ``provider`` — the parent consolidates into contracts/common.py.
 class ModelPricing(Result):
-    """``hermes_cli/inventory.py::_apply_pricing`` — formatted $/Mtok strings (``""`` unknown,
+    """``x19_cli/inventory.py::_apply_pricing`` — formatted $/Mtok strings (``""`` unknown,
     ``"free"``); the sale fields are Nous Portal-only."""
 
     input: str
@@ -237,7 +237,7 @@ class ModelPricing(Result):
 
 
 class ModelCapabilities(Result):
-    """``hermes_cli/inventory.py::_apply_capabilities``."""
+    """``x19_cli/inventory.py::_apply_capabilities``."""
 
     fast: bool
     reasoning: bool
@@ -245,7 +245,7 @@ class ModelCapabilities(Result):
 
 
 class ModelOptionProvider(OpenModel):
-    """One ``hermes_cli/inventory.py::build_models_payload`` provider row (the union of every field
+    """One ``x19_cli/inventory.py::build_models_payload`` provider row (the union of every field
     the builder sets; ``pricing_pending`` / ``free_tier_pending`` mark the cached-only path)."""
 
     slug: str
@@ -357,7 +357,7 @@ method("image.generate", params=ImageGenerateParams, result=ImageGenerateResult,
 
 
 class GoalContractSnapshot(Result):
-    """``hermes_cli/goals.py::GoalContract.to_dict``."""
+    """``x19_cli/goals.py::GoalContract.to_dict``."""
 
     outcome: str = ""
     verification: str = ""

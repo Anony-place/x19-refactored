@@ -41,11 +41,11 @@ test.describe('Bots roster — profile with timestamp metadata', () => {
     test.setTimeout(300_000)
     const mock = await startMockServer()
     const sandbox = createSandbox('bot-tsmeta')
-    writeMockProviderConfig(sandbox.hermesHome, mock.url)
-    writeEnvFile(sandbox.hermesHome)
+    writeMockProviderConfig(sandbox.x19Home, mock.url)
+    writeEnvFile(sandbox.x19Home)
 
     for (const name of ['alpha', 'zeta']) {
-      const dir = path.join(sandbox.hermesHome, 'profiles', name)
+      const dir = path.join(sandbox.x19Home, 'profiles', name)
       fs.mkdirSync(dir, { recursive: true })
       writeMockProviderConfig(dir, mock.url)
       writeEnvFile(dir)
@@ -53,8 +53,8 @@ test.describe('Bots roster — profile with timestamp metadata', () => {
 
     // The trigger: an unquoted ISO-8601 timestamp — yaml.safe_load → datetime.
     fs.writeFileSync(
-      path.join(sandbox.hermesHome, 'profiles', 'zeta', 'profile.yaml'),
-      'ui_meta:\n  hermes-bots:\n    created: 2026-08-22T00:00:00Z\n',
+      path.join(sandbox.x19Home, 'profiles', 'zeta', 'profile.yaml'),
+      'ui_meta:\n  x19-bots:\n    created: 2026-08-22T00:00:00Z\n',
       'utf8'
     )
 

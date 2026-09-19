@@ -560,11 +560,11 @@ class TestFreshnessHelpers:
 
 
     def test_auto_continue_freshness_window_reads_env(self, monkeypatch):
-        monkeypatch.setenv("HERMES_AUTO_CONTINUE_FRESHNESS", "7200")
+        monkeypatch.setenv("X19_AUTO_CONTINUE_FRESHNESS", "7200")
         assert _auto_continue_freshness_window() == 7200.0
 
     def test_auto_continue_freshness_window_default_when_unset(self, monkeypatch):
-        monkeypatch.delenv("HERMES_AUTO_CONTINUE_FRESHNESS", raising=False)
+        monkeypatch.delenv("X19_AUTO_CONTINUE_FRESHNESS", raising=False)
         # Default is 1 hour
         assert _auto_continue_freshness_window() == 3600.0
 
@@ -782,7 +782,7 @@ async def test_fresh_boot_gate_stays_closed_until_warmup_completes(monkeypatch):
     runner._startup_restore_queue = []
     runner._startup_restore_tasks = []  # fresh boot: nothing to resume
 
-    monkeypatch.setenv("HERMES_STARTUP_WARMUP_TIMEOUT", "5")
+    monkeypatch.setenv("X19_STARTUP_WARMUP_TIMEOUT", "5")
 
     warmup_done = asyncio.Event()
     runner._startup_warmup_task = asyncio.create_task(warmup_done.wait())
@@ -829,7 +829,7 @@ async def test_wedged_warmup_cannot_hold_gate_shut_past_timeout(monkeypatch):
     runner._startup_restore_queue = []
     runner._startup_restore_tasks = []
 
-    monkeypatch.setenv("HERMES_STARTUP_WARMUP_TIMEOUT", "0.1")
+    monkeypatch.setenv("X19_STARTUP_WARMUP_TIMEOUT", "0.1")
 
     never = asyncio.Event()
     wedged = asyncio.create_task(never.wait())
@@ -850,7 +850,7 @@ async def test_warmup_disabled_by_nonpositive_timeout(monkeypatch):
     runner._startup_restore_queue = []
     runner._startup_restore_tasks = []
 
-    monkeypatch.setenv("HERMES_STARTUP_WARMUP_TIMEOUT", "0")
+    monkeypatch.setenv("X19_STARTUP_WARMUP_TIMEOUT", "0")
     runner._start_startup_warmup()
     assert runner._startup_warmup_task is None
 
@@ -938,7 +938,7 @@ class TestStuckLoopEscalation:
         counts_file = tmp_path / ".restart_failure_counts"
         counts_file.write_text(json.dumps({entry.session_key: 3}))
 
-        monkeypatch.setattr("gateway.run._hermes_home", tmp_path)
+        monkeypatch.setattr("gateway.run._x19_home", tmp_path)
         runner = object.__new__(GatewayRunner)
         runner.session_store = store
 
@@ -1122,7 +1122,7 @@ async def test_startup_restore_gate_releases_when_resume_turn_outlives_timeout(
     turn holds the gate — and therefore every channel's inbound queue —
     for the entire duration of that turn.
     """
-    monkeypatch.setenv("HERMES_STARTUP_RESTORE_DRAIN_TIMEOUT", "0.05")
+    monkeypatch.setenv("X19_STARTUP_RESTORE_DRAIN_TIMEOUT", "0.05")
 
     runner, adapter = make_restart_runner()
     runner._startup_restore_in_progress = True
@@ -1178,7 +1178,7 @@ async def test_startup_restore_gate_releases_when_boot_path_send_hangs(
     gate. A Telegram flood-control sleep on either call queued inbound on
     every platform for the full ``retry_after``.
     """
-    monkeypatch.setenv("HERMES_STARTUP_RESTORE_DRAIN_TIMEOUT", "0.05")
+    monkeypatch.setenv("X19_STARTUP_RESTORE_DRAIN_TIMEOUT", "0.05")
 
     runner, adapter = make_restart_runner()
     runner._startup_restore_in_progress = True
@@ -1240,7 +1240,7 @@ async def test_startup_restore_gate_releases_when_boot_path_send_hangs(
 @pytest.mark.asyncio
 async def test_startup_boot_sends_still_run_when_they_finish_quickly(monkeypatch):
     """The bound must not skip restart notification or redelivery on a fast path."""
-    monkeypatch.setenv("HERMES_STARTUP_RESTORE_DRAIN_TIMEOUT", "2")
+    monkeypatch.setenv("X19_STARTUP_RESTORE_DRAIN_TIMEOUT", "2")
 
     runner, _adapter = make_restart_runner()
     runner._background_tasks = set()

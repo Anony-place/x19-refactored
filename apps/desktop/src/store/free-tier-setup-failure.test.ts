@@ -7,7 +7,7 @@ import {
   friendlyWait,
   provisionFreeTier
 } from '@/store/free-tier'
-import type { FreeTierStatus } from '@/types/hermes'
+import type { FreeTierStatus } from '@/types/x19'
 
 const NO_IDENTITY: FreeTierStatus = {
   available: false,

@@ -57,7 +57,7 @@ vi.mock('@/i18n', () => ({
         connections: {
           noSearchResults: 'No gateways match your search.',
           searchPlaceholder: 'Search gateways…',
-          kindCloud: 'Hermes Cloud',
+          kindCloud: 'X19 Cloud',
           kindLocal: 'Local',
           kindRemote: 'Remote gateway',
           kindSsh: 'SSH',
@@ -382,7 +382,7 @@ describe('ConnectionSwitcher', () => {
 
     let onChangedCallback: ((payload: { connectionId: string; reason: string }) => void) | null = null
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = {
+    ;(window as { x19Desktop?: unknown }).x19Desktop = {
       connections: {
         list: vi.fn(async () => after),
         onChanged: vi.fn((callback: (payload: { connectionId: string; reason: string }) => void) => {
@@ -435,7 +435,7 @@ describe('ConnectionSwitcher', () => {
     } finally {
       refreshConnectionsRegistry.mockReset()
       refreshConnectionsRegistry.mockResolvedValue(null)
-      delete (window as { hermesDesktop?: unknown }).hermesDesktop
+      delete (window as { x19Desktop?: unknown }).x19Desktop
     }
   })
 })

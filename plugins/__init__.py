@@ -1,1 +1,1 @@
-# Hermes plugins package
+# X19 plugins package

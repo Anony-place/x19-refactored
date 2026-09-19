@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from hermes_cli._subprocess_compat import windows_hide_flags
+from x19_cli._subprocess_compat import windows_hide_flags
 from tools.browser_tool_origin import origin as _bt
 from tools import browser_tool_cdp as _cdp
 from tools import browser_tool_cloud as _cloud
@@ -23,7 +23,7 @@ from tools import browser_tool_lightpanda_fallback as _lp
 from tools import browser_tool_real_profile as _real_profile
 from tools import browser_tool_snapshot as _snapshot
 
-_DOCKER_PULL = "docker pull ghcr.io/nousresearch/hermes-agent:latest"
+_DOCKER_PULL = "docker pull ghcr.io/Anony-place/x19-refactored:latest"
 _CHROMIUM_INSTALL = "npx agent-browser install --with-deps (or: npx playwright install --with-deps chromium)"
 _CHROMIUM_MISSING_DOCKER_HINT = ("Chromium browser is missing. You're running in Docker — pull the latest image "
                                  f"to get the bundled Chromium: {_DOCKER_PULL}")
@@ -110,7 +110,7 @@ def _agent_browser_argv(browser_cmd: str) -> list:
 
 def _prepare_session_socket_dir(session_name: str) -> str:
     """Create the per-session socket dir (parallel workers must not share one) and claim it
-    with our PID BEFORE first use — another hermes process's orphan reaper rmtree's any
+    with our PID BEFORE first use — another x19 process's orphan reaper rmtree's any
     ownerless agent-browser-* dir in the shared tmpdir."""
     socket_dir = os.path.join(_bt._socket_safe_tmpdir(), f"agent-browser-{session_name}")
     os.makedirs(socket_dir, mode=0o700, exist_ok=True)
@@ -175,7 +175,7 @@ def _create_local_session(task_id: str, allow_real_profile: bool = True) -> Dict
             _bt.logger.info("Created real-profile local session %s for task %s", info["session_name"], task_id)
             return info
 
-    # Browser Use mode + ``browser.engine: lightpanda`` drives a Hermes-spawned
+    # Browser Use mode + ``browser.engine: lightpanda`` drives a X19-spawned
     # ``lightpanda serve`` (the built-in tools are hidden in that mode).
     if _bt._is_browser_use_cli_mode() and _lp._using_lightpanda_engine():
         return _create_lightpanda_session(task_id)

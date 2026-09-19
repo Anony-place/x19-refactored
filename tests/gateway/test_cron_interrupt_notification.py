@@ -74,15 +74,15 @@ class TestNotifyInterruptedCronJobs:
         body = adapter.sent[0]
         assert "daily-digest" in body
         assert "cut short" in body.lower()
-        assert "hermes cron run daily-digest" in body
+        assert "x19 cron run daily-digest" in body
         assert adapter.sent_calls[0][0] == "123456"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("setting", [None, False, True])
     async def test_interrupt_notice_is_a_suppressible_diagnostic(self, tmp_path, monkeypatch, setting):
         import json
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        monkeypatch.setenv("HERMES_MANAGED_DIR", str(tmp_path / "managed"))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_MANAGED_DIR", str(tmp_path / "managed"))
         cfg = {} if setting is None else {"display": {"suppress_warning_notifications": setting}}
         (tmp_path / "config.yaml").write_text(json.dumps(cfg))
         runner, adapter = make_restart_runner()

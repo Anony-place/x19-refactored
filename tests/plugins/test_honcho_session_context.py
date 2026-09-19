@@ -43,7 +43,7 @@ def _manager_with_cached_session(*, ai_observe_others=True):
     session = HonchoSession(
         key="test-session",
         user_peer_id="chris",
-        assistant_peer_id="hermes",
+        assistant_peer_id="x19",
         honcho_session_id="test-session",
     )
     fake_honcho_session = _RecordingHonchoSession()
@@ -63,7 +63,7 @@ def test_session_context_user_alias_uses_assistant_observer_when_ai_can_observe_
             "summary": True,
             "tokens": None,
             "peer_target": "chris",
-            "peer_perspective": "hermes",
+            "peer_perspective": "x19",
         }
     ]
 
@@ -78,7 +78,7 @@ def test_session_context_explicit_user_peer_matches_user_alias():
             "summary": True,
             "tokens": None,
             "peer_target": "chris",
-            "peer_perspective": "hermes",
+            "peer_perspective": "x19",
         }
     ]
 

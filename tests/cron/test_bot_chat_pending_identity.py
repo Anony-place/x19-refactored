@@ -7,8 +7,8 @@ import pytest
 
 from cron import bot_chat_delivery as queue
 from cron import scheduler_delivery as delivery
-from hermes_cli.active_sessions import try_acquire_active_session
-from hermes_state import SessionDB
+from x19_cli.active_sessions import try_acquire_active_session
+from x19_state import SessionDB
 from tools.bot_live_delivery import read_delivery_result
 
 
@@ -19,8 +19,8 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
     other = tmp_path / "other" / "profiles" / "beta"
     home.mkdir(parents=True)
     other.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(source))
-    monkeypatch.setattr("hermes_cli.profiles.get_profile_dir", lambda _: home)
+    monkeypatch.setenv("X19_HOME", str(source))
+    monkeypatch.setattr("x19_cli.profiles.get_profile_dir", lambda _: home)
     db = SessionDB(db_path=home / "state.db")
     db.create_session(session_id="chat", source="cli")
     db.set_session_title("chat", "Bot Chat")
@@ -34,7 +34,7 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
     finally:
         lease.release()
         db.close()
-    monkeypatch.setattr("hermes_cli.profiles.get_profile_dir", lambda _: other)
+    monkeypatch.setattr("x19_cli.profiles.get_profile_dir", lambda _: other)
     run = Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
     monkeypatch.setattr(delivery.subprocess, "run", run)
     if recipient == "desktop":
@@ -46,14 +46,14 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
         home.rename(home.with_name("renamed"))
     try:
         with monkeypatch.context() as changed:
-            changed.setenv("HERMES_HOME", str(tmp_path / "new-source"))
+            changed.setenv("X19_HOME", str(tmp_path / "new-source"))
             queue.drain(source / "cron" / "bot_chat_pending")
             queue.drain(source / "cron" / "bot_chat_pending")
         if recipient == "cli":
             assert run.call_count == 1
             argv = run.call_args.args[0]
             assert "-p" not in argv
-            assert Path(run.call_args.kwargs["env"]["HERMES_HOME"]) == home
+            assert Path(run.call_args.kwargs["env"]["X19_HOME"]) == home
         elif recipient == "desktop":
             run.assert_not_called()
             receipt = read_delivery_result(home, key)
@@ -69,7 +69,7 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
 
 
 def test_corrupt_record_is_retained_without_blocking_other_admissions(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     queue.defer("a" * 64, {"id": "job"}, "first", "", tmp_path)
     broken = tmp_path / "cron" / "bot_chat_pending" / "broken.json"
     broken.write_text("{", encoding="utf-8")

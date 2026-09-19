@@ -105,7 +105,7 @@ describe('PetSprite RAF scheduling', () => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     setDocumentHidden(false)
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
   })
 
   it('sleeps between visible sprite frames instead of chaining RAFs', () => {

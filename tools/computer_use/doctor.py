@@ -1,4 +1,4 @@
-"""`hermes computer-use doctor` — thin client for cua-driver's `health_report` MCP tool. cua-driver owns the health
+"""`x19 computer-use doctor` — thin client for cua-driver's `health_report` MCP tool. cua-driver owns the health
 model; we drive the stdio JSON-RPC handshake, call `health_report` and render the stable ``schema_version="1"``
 payload. cua-driver 0.10.x marks `health_report` risk-unclassified (isError=true, structuredContent
 ``{"exit_code": 1}``) — we detect that and synthesize a composite report from working probes (check_permissions,
@@ -15,7 +15,7 @@ import sys
 from contextlib import contextmanager, suppress
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
-from hermes_cli._subprocess_compat import windows_hide_flags
+from x19_cli._subprocess_compat import windows_hide_flags
 from tools.computer_use.permissions import _child_env as _sanitized_cua_env
 
 # Match the ALLOWED_STATUS_VALUES + ALLOWED_OVERALL_VALUES the cua-driver integration test pins.
@@ -74,7 +74,7 @@ def _cli_doctor_snippet(binary: str, timeout: float = 8.0) -> Optional[str]:
     return None if isinstance(cp, BaseException) else (_combined_output(cp) or None)
 
 def _build_identity(binary: str, report: Report) -> Report:
-    """Hermes-side identity block comparing resolved binary vs health_report."""
+    """X19-side identity block comparing resolved binary vs health_report."""
     def token(text: str) -> str:  # dotted version-ish token out of a free-form string
         m = text and re.search(r"(\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?)", text)
         return m.group(1) if m else text.strip().lower()
@@ -332,7 +332,7 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
     from tools.computer_use.cua_backend_driver import resolve_cua_driver_cmd
     binary = resolve_cua_driver_cmd(driver_cmd)
     if not binary:
-        print(f"cua-driver: not installed (looked for {driver_cmd or 'cua-driver (PATH and canonical install paths)'!r}).\n  Run: hermes computer-use install")
+        print(f"cua-driver: not installed (looked for {driver_cmd or 'cua-driver (PATH and canonical install paths)'!r}).\n  Run: x19 computer-use install")
         return 2
     try:  # prefer real health_report; on denial/non-schema, synthesize via probes
         try:
@@ -343,10 +343,10 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
         # The spawn itself failed (Windows: a venv interpreter denied `CreateProcess` on a binary under
         # `C:\Program Files\WindowsApps`, WinError 5). A traceback here hides the one fact the user needs.
         print(f"cua-driver could not be started from {binary!r}: {e}\n"
-              "  The Hermes runtime interpreter cannot execute this binary; the tool may still work because the\n"
+              "  The X19 runtime interpreter cannot execute this binary; the tool may still work because the\n"
               "  shell resolves a different copy on PATH. Fix: install cua-driver outside the protected directory\n"
-              "  (e.g. the upstream installer's default under your user profile) or point HERMES_CUA_DRIVER_CMD at\n"
-              "  a copy the runtime can execute, then re-run `hermes computer-use doctor`.", file=sys.stderr)
+              "  (e.g. the upstream installer's default under your user profile) or point X19_CUA_DRIVER_CMD at\n"
+              "  a copy the runtime can execute, then re-run `x19 computer-use doctor`.", file=sys.stderr)
         return 2
     except RuntimeError as e:
         print(f"cua-driver health_report failed: {e}", file=sys.stderr)
@@ -355,11 +355,11 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
     identity = _build_identity(binary, report)
     environment = _wayland_environment_context(report)
     if json_output:
-        # Additive envelope: upstream keys preserved, identity under hermes_identity (and environment under
-        # hermes_environment when present) so overall/checks parsers keep working.
-        payload = {**report, "hermes_identity": identity}
+        # Additive envelope: upstream keys preserved, identity under x19_identity (and environment under
+        # x19_environment when present) so overall/checks parsers keep working.
+        payload = {**report, "x19_identity": identity}
         if environment:
-            payload["hermes_environment"] = environment
+            payload["x19_environment"] = environment
         json.dump(payload, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")
     else:

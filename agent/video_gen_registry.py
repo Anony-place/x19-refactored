@@ -6,7 +6,7 @@ consumed by the ``video_generate`` tool. The active provider is
 fails closed. If unset, the single *available* registered provider is used
 (mirrors ``agent/image_gen_registry.py`` minus its legacy ``fal`` preference)
 so a box with credentials for only one backend auto-selects it; otherwise None
-and the tool points the user at ``hermes tools``.
+and the tool points the user at ``x19 tools``.
 """
 
 from __future__ import annotations
@@ -46,26 +46,3 @@ def get_active_provider() -> Optional[VideoGenProvider]:
     return available[0] if len(available) == 1 else None
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Dict  # noqa: F401,E402
-from typing import List  # noqa: F401,E402
-import threading  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'hermes_home_key': ('hermes_constants', 'hermes_home_key'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

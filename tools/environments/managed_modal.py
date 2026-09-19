@@ -43,7 +43,7 @@ def _result(output: str, returncode: int = 1) -> dict:
 
 
 class ManagedModalEnvironment(BaseEnvironment):
-    """Gateway-owned Modal sandbox with Hermes-compatible execute/cleanup."""
+    """Gateway-owned Modal sandbox with X19-compatible execute/cleanup."""
 
     _stdin_mode = "payload"
     _CONNECT_TIMEOUT_SECONDS = _request_timeout_env("TERMINAL_MANAGED_MODAL_CONNECT_TIMEOUT_SECONDS", 1.0)
@@ -205,9 +205,3 @@ class ManagedModalEnvironment(BaseEnvironment):
         return f"{prefix}: {text}" if text else f"{prefix}: HTTP {response.status_code}"
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from dataclasses import dataclass  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

@@ -238,11 +238,11 @@ def test_free_tier_block_gets_its_own_code_and_carries_the_sentence():
     """A free-tier refusal is never an OAuth re-login: its own ``free_tier_<kind>`` code on the
     provider layer, with the chat sentence riding along as the card body."""
     result = _failed_result("auth_permanent", error="HTTP 403: no permissions",
-                            free_tier={"kind": "disabled", "message": "Using Hermes without signing in is switched off."})
+                            free_tier={"kind": "disabled", "message": "Using X19 without signing in is switched off."})
     surface = build_error_surface_from_result(result, provider="nous", model="nous/welcome")
     assert surface["layer"] == LAYER_PROVIDER and surface["code"] == "free_tier_disabled"
     assert surface["retryable"] is False and "auth_kind" not in surface
-    assert surface["message"] == "Using Hermes without signing in is switched off."
+    assert surface["message"] == "Using X19 without signing in is switched off."
 
 
 @pytest.mark.parametrize("kind,retryable", [

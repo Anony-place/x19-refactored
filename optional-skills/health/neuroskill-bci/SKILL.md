@@ -3,10 +3,10 @@ name: neuroskill-bci
 description: "Use live BCI cognitive and mood state from NeuroSkill."
 platforms: [linux, macos, windows]
 version: 1.0.0
-author: Hermes Agent + Nous Research
+author: X19 + Nous Research
 license: MIT
 metadata:
-  hermes:
+  x19:
     tags: [BCI, neurofeedback, health, focus, EEG, cognitive-state, biometrics, neuroskill]
     category: health
     related_skills: []
@@ -14,7 +14,7 @@ metadata:
 
 # NeuroSkill BCI Integration
 
-Connect Hermes to a running [NeuroSkill](https://neuroskill.com/) instance to read
+Connect X19 to a running [NeuroSkill](https://neuroskill.com/) instance to read
 real-time brain and body metrics from a BCI wearable. Use this to give
 cognitively-aware responses, suggest interventions, and track mental performance
 over time.

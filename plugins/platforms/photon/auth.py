@@ -3,7 +3,7 @@
 Management calls hit ``https://app.photon.codes/api/...`` (OAuth 2.0 device flow, Bearer)
 like the official CLI. The dashboard project ``id`` *is* the Spectrum Cloud project id and
 Spectrum is always provisioned at create-time; the sidecar authenticates with
-``(id, projectSecret)``. Storage: runtime SDK creds -> ``~/.hermes/.env``; management
+``(id, projectSecret)``. Storage: runtime SDK creds -> ``~/.x19/.env``; management
 metadata -> ``auth.json`` under ``credential_pool.photon`` (device token), ``photon_project``
 (ids + secret for offline status) and ``photon_user`` (numbers).
 """
@@ -23,11 +23,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
     import httpx
-except ImportError:  # pragma: no cover - httpx is a hermes dependency
+except ImportError:  # pragma: no cover - httpx is a x19 dependency
     httpx = None  # type: ignore[assignment]
 
 from gateway.platforms._shared import get_scoped_secret as _get_scoped_secret
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 import contextlib
 
 logger = logging.getLogger(__name__)
@@ -38,22 +38,22 @@ class PhotonDashboardAuthError(RuntimeError):
 
 
 # Hosted Photon allowlists device clients (unregistered → 400 invalid_client); use Photon's
-# published CLI client until Hermes gets its own client_id.
+# published CLI client until X19 gets its own client_id.
 DEFAULT_CLIENT_ID = "photon-cli"
 DEFAULT_SCOPE = "openid profile email"
 DEFAULT_DASHBOARD_HOST = "https://app.photon.codes"
 DEFAULT_SPECTRUM_HOST = "https://spectrum.photon.codes"
-DEFAULT_PROJECT_NAME = "Hermes Agent"
+DEFAULT_PROJECT_NAME = "X19"
 DEFAULT_POLL_INTERVAL = 5  # RFC 8628 polling defaults; Photon's `interval` / `expires_in` win
 DEFAULT_POLL_TIMEOUT = 1800
 E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
 
 
-# -- auth.json helpers (shares the file with the rest of hermes-agent) ------------
+# -- auth.json helpers (shares the file with the rest of x19) ------------
 
 def _auth_json_path() -> Path:
-    """The active profile's ``auth.json`` (shared with the rest of hermes-agent)."""
-    return get_hermes_home() / "auth.json"
+    """The active profile's ``auth.json`` (shared with the rest of x19)."""
+    return get_x19_home() / "auth.json"
 
 
 def _load_auth() -> Dict[str, Any]:
@@ -102,7 +102,7 @@ def _pool_first(auth: Dict[str, Any], key: str) -> Any:
 
 def _store_pool_record(key: str, record: Dict[str, Any]) -> None:
     """Replace ``credential_pool.<key>`` with ``[record]`` under the cross-process lock."""
-    from hermes_cli.auth import _auth_store_lock
+    from x19_cli.auth import _auth_store_lock
     with _auth_store_lock():
         auth = _load_auth()
         auth.setdefault("credential_pool", {})[key] = [record]
@@ -200,12 +200,12 @@ def store_user_numbers(
 
 
 def _persist_runtime_env(spectrum_project_id: str, project_secret: str) -> None:
-    """Write the SDK creds to ``~/.hermes/.env`` (secret never bound to a printable local
+    """Write the SDK creds to ``~/.x19/.env`` (secret never bound to a printable local
     in a caller — CodeQL clean flow)."""
     try:
-        from hermes_cli.config import save_env_value
+        from x19_cli.config import save_env_value
     except ImportError:
-        logger.warning("photon: hermes_cli.config unavailable — skipping .env write")
+        logger.warning("photon: x19_cli.config unavailable — skipping .env write")
         return
     try:
         save_env_value("PHOTON_PROJECT_ID", spectrum_project_id)
@@ -658,7 +658,7 @@ def _configured_operator_phone() -> Optional[str]:
 
 def _get_config_env_value(key: str) -> Optional[str]:
     try:
-        from hermes_cli.config import get_env_value
+        from x19_cli.config import get_env_value
     except Exception:
         return os.getenv(key)
     return get_env_value(key)
@@ -704,57 +704,11 @@ def print_credential_summary(emit: Any = print) -> None:
         "Photon iMessage status",
         "──────────────────────",
         "  device token        : " + (
-            "✓ stored" if load_photon_token() else "✗ missing (run `hermes photon setup`)"),
+            "✓ stored" if load_photon_token() else "✗ missing (run `x19 photon setup`)"),
         "  project id          : " + (sid if sid else "✗ missing"),
         "  project secret      : " + ("✓ stored" if sec else "✗ missing"),
-        "  my number           : " + (phone if phone else "✗ missing (run `hermes photon setup --phone ...`)"),
-        "  assigned number     : " + (assigned if assigned else "✗ missing (run `hermes photon setup`)")]
+        "  my number           : " + (phone if phone else "✗ missing (run `x19 photon setup --phone ...`)"),
+        "  assigned number     : " + (assigned if assigned else "✗ missing (run `x19 photon setup`)")]
     emit("\n".join(rows))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def credential_summary() -> Dict[str, str]:
-    """Return a fully pre-formatted credential status dict (no raw secrets)."""
-    def _present_token() -> str:
-        return (
-            "✓ stored" if load_photon_token()
-            else "✗ missing (run `hermes photon setup`)"
-        )
-
-    def _present_project_id() -> str:
-        sid, _sec = load_project_credentials()
-        return sid or "✗ missing"
-
-    def _present_secret() -> str:
-        _sid, sec = load_project_credentials()
-        return "✓ stored" if sec else "✗ missing"
-
-    def _present_phone() -> str:
-        phone, _assigned = load_user_numbers()
-        return phone or "✗ missing (run `hermes photon setup --phone ...`)"
-
-    def _present_assigned_phone() -> str:
-        _phone, assigned = load_user_numbers()
-        return assigned or "✗ missing (run `hermes photon setup`)"
-
-    return {
-        "device_token": _present_token(),
-        "project_id": _present_project_id(),
-        "project_key": _present_secret(),
-        "phone_number": _present_phone(),
-        "assigned_phone_number": _present_assigned_phone(),
-    }
-
-def get_session(token: str) -> Dict[str, Any]:
-    """GET ``/api/auth/get-session`` — confirm the token + fetch the user."""
-    if httpx is None:
-        raise RuntimeError("httpx is required for Photon")
-    url = f"{_dashboard_host()}/api/auth/get-session"
-    resp = httpx.get(url, headers=_bearer(token), timeout=30.0)
-    resp.raise_for_status()
-    return resp.json() or {}
-# ---- END PLUGIN-COMPAT ----

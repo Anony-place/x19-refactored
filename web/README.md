@@ -13,7 +13,7 @@ Browser-based dashboard for managing X19 configuration, API keys, and monitoring
 ```bash
 # Start the backend API server
 cd ../
-python -m hermes_cli.main web --no-open
+python -m x19_cli.main web --no-open
 
 # In another terminal, start the Vite dev server (with HMR + API proxy)
 cd web/

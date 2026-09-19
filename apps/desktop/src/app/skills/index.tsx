@@ -1,4 +1,4 @@
-import { compactNumber } from '@hermes/shared'
+import { compactNumber } from '@x19/shared'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
@@ -25,7 +25,7 @@ import {
   profileScopeKey,
   setSkillEnabled,
   setToolsetEnabled
-} from '@/hermes'
+} from '@/x19'
 import { useI18n } from '@/i18n'
 import { isDesktopToolsetVisible } from '@/lib/desktop-toolsets'
 import { queryClient } from '@/lib/query-client'
@@ -35,7 +35,7 @@ import { useStoreSelector } from '@/lib/use-session-slice'
 import { $gateway, activeGatewayConnectionId } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
-import type { SkillInfo, ToolsetInfo } from '@/types/hermes'
+import type { SkillInfo, ToolsetInfo } from '@/types/x19'
 
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
@@ -272,8 +272,8 @@ export function SkillsView({
   // one gateway is registered. Only then is the (heavier) union agent roster
   // fetched to feed the selector — single-connection setups keep the exact
   // legacy profiles list. Both feature-detected for older Electron mains.
-  const registryBridge = window.hermesDesktop?.connections
-  const rosterBridge = window.hermesDesktop?.getAgentRoster
+  const registryBridge = window.x19Desktop?.connections
+  const rosterBridge = window.x19Desktop?.getAgentRoster
 
   const { data: registryData } = useQuery({
     queryKey: ['capabilities-connections-registry'],
@@ -583,7 +583,7 @@ export function SkillsView({
 
   // Learned/local skills are editable + archivable, mirroring the memory
   // graph (same /api/learning/node endpoints — delete archives, restorable
-  // via `hermes curator restore`).
+  // via `x19 curator restore`).
   const [skillEditor, setSkillEditor] = useState<null | { content: string; name: string }>(null)
   const [skillDraft, setSkillDraft] = useState('')
   const [skillSaving, setSkillSaving] = useState(false)
@@ -714,7 +714,7 @@ export function SkillsView({
 
     return (profilesData?.profiles ?? []).map(p => ({
       key: p.name,
-      label: p.is_default ? 'Hermes (default)' : p.name,
+      label: p.is_default ? 'X19 (default)' : p.name,
       value: p.name
     }))
   }, [multiConnection, profilesData, rosterData])

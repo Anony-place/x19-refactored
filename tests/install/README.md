@@ -28,12 +28,12 @@ The installer script is not downloaded. The install leg runs the copy from the o
 Each leg with the script drivers has these phases:
 
 1. Stage: make the bare clone, park `main` at the old release.
-2. Install: run the old release's own installer script. Make sure that the checkout is at the old commit and that `hermes --version` works.
-3. Desktop smoke: run `hermes desktop --build-only` from the installed CLI. This proves that the installed version can build the desktop app. If the installed version does not have this flag, the phase reports a skip and continues.
-4. Update: move `main` to HEAD. Apply one update method. Make sure that the checkout is at HEAD and that `hermes --version` works.
+2. Install: run the old release's own installer script. Make sure that the checkout is at the old commit and that `x19 --version` works.
+3. Desktop smoke: run `x19 desktop --build-only` from the installed CLI. This proves that the installed version can build the desktop app. If the installed version does not have this flag, the phase reports a skip and continues.
+4. Update: move `main` to HEAD. Apply one update method. Make sure that the checkout is at HEAD and that `x19 --version` works.
 5. Desktop smoke again, at HEAD.
 
-The windows GUI driver replaces phases 2 and 4 when the install method is `desktop-installer@latest`. It downloads the published `Hermes-Setup.exe`, clicks through the installer window with AutoHotkey, and clicks "Update now" in the running app with Playwright.
+The windows GUI driver replaces phases 2 and 4 when the install method is `desktop-installer@latest`. It downloads the published `X19-Setup.exe`, clicks through the installer window with AutoHotkey, and clicks "Update now" in the running app with Playwright.
 
 ## Old versions
 
@@ -47,14 +47,14 @@ A leg can install a release from months back. The driver must not assume that th
 
 - `installer-script`: the platform's one-liner (`curl | bash` on linux and macos, `irm | iex` on windows).
 - `installer-script+desktop`: the same one-liner with its desktop stage opted in (`--include-desktop` / `-IncludeDesktop`). The stage builds the desktop app during the install. On windows it also registers Start Menu and Desktop shortcuts. On linux and macos it builds the app inside the checkout and registers no OS entry point.
-- `desktop-installer@latest`: the published GUI installer (`Hermes-Setup.exe` on windows, `Hermes-Setup.dmg` on macos), driven through the real user flow.
+- `desktop-installer@latest`: the published GUI installer (`X19-Setup.exe` on windows, `X19-Setup.dmg` on macos), driven through the real user flow.
 
 ## The two app-update variants
 
 The desktop app has two launch paths, so the matrix has two app-update methods. Both click "Update now" in the running app. They differ in how the app starts:
 
 - `open-app-update`: the app starts from the installed app entry point. On Windows, both the desktop installer and `installer-script+desktop` create shortcuts, so both support this route. On Linux and macOS, the script's opt-in desktop stage builds inside the checkout without registering an OS entry point. The macOS route therefore requires a desktop-installer install; Linux has no open-app-update leg.
-- `hermes-desktop-app-update`: the app starts with the `hermes desktop` command. Every install method provides this command, on each OS that ships the desktop app. On linux this is the only app surface: no desktop installer and no packaged desktop artifact exist for linux. The driver captures the product's own launch call (argv, cwd, environment) with `e2e-assets/launch-capture/sitecustomize.py` and re-executes it under Playwright, which owns the app and clicks the update flow.
+- `x19-desktop-app-update`: the app starts with the `x19 desktop` command. Every install method provides this command, on each OS that ships the desktop app. On linux this is the only app surface: no desktop installer and no packaged desktop artifact exist for linux. The driver captures the product's own launch call (argv, cwd, environment) with `e2e-assets/launch-capture/sitecustomize.py` and re-executes it under Playwright, which owns the app and clicks the update flow.
 
 ## Skips
 
@@ -79,7 +79,7 @@ gh workflow run install-e2e.yml --ref <branch> -f route=both -f tag-count=2
 
 Cost per run, so nobody is surprised: 41 legs per sampled tag (windows 18, macos 15, linux 8), so scheduled and release-tag runs sample 2 tags for up to 82 legs. Manual dispatch defaults to 3 tags for up to 123 legs. A typical green leg finishes in 7-15 minutes; every leg is capped at 60. Route slices for cheaper reads: `update` (linux only, 8/tag), `windows-desktop` (18/tag), `macos-desktop` (15/tag). `tag-count` is validated to 1-10. GitHub's 256-job cap applies to each OS matrix separately, not to the combined leg count; at 10 tags the matrices hold 180 windows, 150 macos, and 80 linux entries. Windows would first exceed the cap at 15 tags (270).
 
-Running the drivers locally: don't, except in a disposable VM. The windows driver kills every process named Hermes during teardown and the macos driver operates on `/Applications/Hermes.app`; on a machine with a real Hermes install they will interfere with it.
+Running the drivers locally: don't, except in a disposable VM. The windows driver kills every process named X19 during teardown and the macos driver operates on `/Applications/X19.app`; on a machine with a real X19 install they will interfere with it.
 
 ## Artifacts
 

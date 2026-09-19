@@ -32,7 +32,7 @@ from agent.turn_failure_copy import (
     site_copy, stamp_failure,
 )
 from agent.turn_retry_state import TurnRetryState
-from hermes_constants import display_hermes_home
+from x19_constants import display_x19_home
 from utils import base_url_host_matches
 
 logger = logging.getLogger("agent.conversation_loop")
@@ -95,7 +95,7 @@ def _image_error_max_dimension(error: Exception) -> Optional[int]:
 def _try_refresh_nous_paid_entitlement_credentials(agent) -> bool:
     """Refresh Nous runtime credentials after a fresh paid-entitlement check."""
     try:
-        from hermes_cli.nous_account import get_nous_portal_account_info
+        from x19_cli.nous_account import get_nous_portal_account_info
 
         if get_nous_portal_account_info(force_fresh=True).paid_service_access is not True:
             return False
@@ -259,7 +259,7 @@ def _print_nous_401_diagnostics(agent: Any, api_error: Exception) -> None:
     """Nous 401 that survived a credential refresh: likely Portal OAuth expired/revoked,
     no credits, or agent key blocked."""
     from agent.conversation_loop import _print_nous_entitlement_guidance
-    from hermes_constants import display_hermes_home
+    from x19_constants import display_x19_home
     _body_text = ""
     try:
         _body = getattr(api_error, "body", None) or getattr(api_error, "response", None)
@@ -271,11 +271,11 @@ def _print_nous_401_diagnostics(agent: Any, api_error: Exception) -> None:
     if _body_text:
         _plines(agent, f"   Response: {_body_text}")
     try:
-        from hermes_cli.anon_auth import is_anonymous_agent
+        from x19_cli.anon_auth import is_anonymous_agent
         if is_anonymous_agent(agent):
             # The free tier has no credits, no agent key and no auth.json to inspect: its session
             # ended and could not be replaced. The two doors are a sign-in or another provider.
-            _plines(agent, "   Your session ended and Hermes couldn't start a new one.",
+            _plines(agent, "   Your session ended and X19 couldn't start a new one.",
                     "   Sign in with a Nous account (it's free), or switch providers with /model.")
             return
     except Exception:
@@ -285,9 +285,9 @@ def _print_nous_401_diagnostics(agent: Any, api_error: Exception) -> None:
     _plines(
         agent,
         "   Troubleshooting:",
-        "     • Re-authenticate: hermes auth add nous",
+        "     • Re-authenticate: x19 auth add nous",
         "     • Check credits / billing: https://portal.nousresearch.com",
-        f"     • Verify stored credentials: {display_hermes_home()}/auth.json",
+        f"     • Verify stored credentials: {display_x19_home()}/auth.json",
         "     • Switch providers temporarily: /model <model> --provider openrouter",
     )
 
@@ -296,7 +296,7 @@ def _print_anthropic_401_diagnostics(agent: Any, key: Any) -> None:
     """Anthropic 401 that survived a credential refresh: show auth method + fixes."""
     from agent.anthropic_credentials import _is_oauth_token
     from agent.azure_identity_adapter import is_token_provider
-    from hermes_constants import display_hermes_home
+    from x19_constants import display_x19_home
     _plines(agent, "🔐 Anthropic 401 — authentication failed.")
     if is_token_provider(key):
         # Azure Foundry Entra ID: JWT minted per-request by an httpx hook; 401 = Azure
@@ -304,7 +304,7 @@ def _print_anthropic_401_diagnostics(agent: Any, key: Any) -> None:
         _plines(
             agent,
             "   Auth method: Microsoft Entra ID (httpx event hook)",
-            "   Run `hermes doctor` for credential-chain diagnostics, or",
+            "   Run `x19 doctor` for credential-chain diagnostics, or",
             "   `az login` if your developer session expired.",
         )
     else:
@@ -314,17 +314,17 @@ def _print_anthropic_401_diagnostics(agent: Any, key: Any) -> None:
             f"   Auth method: {auth_method}",
             f"   Token prefix: {key[:12]}..." if isinstance(key, str) and len(key) > 12 else "   Token: (empty or short)",
         )
-    _dhh = display_hermes_home()
+    _dhh = display_x19_home()
     _plines(
         agent,
         "   Troubleshooting:",
-        f"     • Check ANTHROPIC_TOKEN in {_dhh}/.env for Hermes-managed OAuth/setup tokens",
+        f"     • Check ANTHROPIC_TOKEN in {_dhh}/.env for X19-managed OAuth/setup tokens",
         f"     • Check ANTHROPIC_API_KEY in {_dhh}/.env for API keys or legacy token values",
         "     • For API keys: verify at https://platform.claude.com/settings/keys",
-        "     • Hermes login (OAuth): run 'hermes auth add anthropic' to sign in again, then retry",
-        "     • Inspect what Hermes holds: hermes auth list anthropic",
-        "     • Legacy cleanup: hermes config set ANTHROPIC_TOKEN \"\"",
-        "     • Clear stale keys: hermes config set ANTHROPIC_API_KEY \"\"",
+        "     • X19 login (OAuth): run 'x19 auth add anthropic' to sign in again, then retry",
+        "     • Inspect what X19 holds: x19 auth list anthropic",
+        "     • Legacy cleanup: x19 config set ANTHROPIC_TOKEN \"\"",
+        "     • Clear stale keys: x19 config set ANTHROPIC_API_KEY \"\"",
     )
 
 
@@ -608,7 +608,7 @@ def recover_after_classification(
         _retry.reasoning_mandatory_retry_attempted = True
         agent._reasoning_disable_rejected = True
         try:
-            from hermes_cli.models_reasoning_caps import refresh_reasoning_caps_async
+            from x19_cli.models_reasoning_caps import refresh_reasoning_caps_async
             refresh_reasoning_caps_async(agent.provider)
         except Exception:
             pass
@@ -682,20 +682,20 @@ def _print_nonretryable_auth_guidance(
                 "   💡 Codex OAuth token was rejected (HTTP 401). Your token may have been",
                 "      refreshed by another client (Codex CLI, VS Code). To fix:",
                 "      1. Run `codex` in your terminal to generate fresh tokens.",
-                "      2. Then run `hermes auth` to re-authenticate.",
+                "      2. Then run `x19 auth` to re-authenticate.",
             )
         elif provider == "xai-oauth":
             _vlines(
                 agent,
                 "   💡 xAI OAuth token was rejected (HTTP 401). To fix:",
-                "      re-authenticate with xAI Grok OAuth (SuperGrok / Premium+) from `hermes model`.",
+                "      re-authenticate with xAI Grok OAuth (SuperGrok / Premium+) from `x19 model`.",
             )
         else:  # nous
             _vlines(
                 agent,
                 "   💡 Nous Portal OAuth token was rejected (HTTP 401). Your token may be",
                 "      expired, revoked, or your account may be out of credits. To fix:",
-                "      1. Re-authenticate: hermes portal",
+                "      1. Re-authenticate: x19 portal",
                 "      2. Check your portal account: https://portal.nousresearch.com",
             )
             # ``:free`` is OpenRouter slug syntax; Nous Portal will reject the model
@@ -711,7 +711,7 @@ def _print_nonretryable_auth_guidance(
     _vlines(
         agent,
         "   💡 Your API key was rejected by the provider. Check:",
-        "      • Is the key valid? Run: hermes setup",
+        "      • Is the key valid? Run: x19 setup",
         f"      • Does your account have access to {model}?",
     )
     if base_url_host_matches(str(base_url), "openrouter.ai"):
@@ -725,7 +725,7 @@ def _welcome_tier_guidance(classified: Any, *, model: Any, in_chat: bool, door: 
     refusal, route = ctx.get("welcome_refusal"), ctx.get("welcome_route")
     if not refusal and not route:
         return ""
-    from hermes_cli.anon_auth import welcome_refusal_copy, welcome_route_refusal_copy
+    from x19_cli.anon_auth import welcome_refusal_copy, welcome_route_refusal_copy
     if refusal:
         return welcome_refusal_copy(refusal, model=str(model or ""), in_chat=in_chat, door=door)
     return welcome_route_refusal_copy(str(route), in_chat=in_chat, door=door)
@@ -767,7 +767,7 @@ def _welcome_outage_copy(base_url: Any, classified: Any, *, anonymous: bool = Fa
     plain sentence (the free model is having trouble) rather than the technical summary. Empty
     for every other route and for rate limits / billing, which have their own copy."""
     try:
-        from hermes_cli.anon_auth import FREE_TIER_OUTAGE_COPY, route_is_welcome_host
+        from x19_cli.anon_auth import FREE_TIER_OUTAGE_COPY, route_is_welcome_host
         # Both: an anonymous JWT sent to a user-overridden paid host never reached the free model.
         if not anonymous or not route_is_welcome_host(base_url):
             return ""
@@ -794,7 +794,7 @@ def _missing_vendor_prefix_suggestion(api_error: Exception, provider: Any, model
     if getattr(api_error, "status_code", None) != 404:
         return None
     try:
-        from hermes_cli.model_normalize import suggest_prefixed_model_id
+        from x19_cli.model_normalize import suggest_prefixed_model_id
 
         return suggest_prefixed_model_id(str(provider or ""), str(model or ""))
     except Exception:
@@ -844,24 +844,24 @@ def nonretryable_client_error_result(
         if _prefix_suggestion:
             _vlines(agent, f"      Did you mean '{_prefix_suggestion}'? It looks like the vendor prefix is missing.")
     elif classified.reason not in _NONRETRYABLE_LABELS:
-        _vlines(agent, f"   💡 Fix: pick another model (/model), or check `{display_hermes_home()}/logs/agent.log`.")
+        _vlines(agent, f"   💡 Fix: pick another model (/model), or check `{display_x19_home()}/logs/agent.log`.")
     # Content-policy blocks: the provider refused this prompt, so recovery is a rephrase
     # or another model, not key/retry advice.
     if classified.reason == FailoverReason.content_policy_blocked:
         _vlines(
             agent,
             f"   💡 {CONTENT_POLICY_NEXT_STEPS}",
-            "      To route future blocks to another provider automatically: hermes fallback add",
+            "      To route future blocks to another provider automatically: x19 fallback add",
         )
     # TLS certificate failures are environment problems — name the knobs for each cause.
     if classified.reason == FailoverReason.ssl_cert_verification:
         _vlines(
             agent,
-            "   💡 Hermes couldn't verify the provider's security certificate. This fails the same",
+            "   💡 X19 couldn't verify the provider's security certificate. This fails the same",
             "      way on every retry — fix the environment, then try again:",
             "      • Corporate TLS-inspecting proxy? Point Python at its CA bundle:",
             "        export SSL_CERT_FILE=/path/to/corp-ca.pem  (also REQUESTS_CA_BUNDLE)",
-            "      • Missing/stale system CA store? Refresh it (in Hermes's venv: `uv pip install",
+            "      • Missing/stale system CA store? Refresh it (in X19's venv: `uv pip install",
             "        --upgrade certifi`; macOS: run 'Install Certificates.command').",
             "      • Self-signed local endpoint (llama.cpp, LM Studio, vLLM)? Use http://",
             "        for localhost, or add the server's cert to your trust store.",
@@ -930,7 +930,7 @@ def max_retries_exhausted_result(
     guidance (the latter wins), persist, build the result with ``failure_reason`` /
     ``failure_retryable`` / ``billing_block``."""
     # Result/guidance helpers stay in the loop module (tests import + patch them there).
-    from hermes_cli.anon_auth import is_anonymous_agent
+    from x19_cli.anon_auth import is_anonymous_agent
     from agent.conversation_loop import (
         _billing_block_dict, _billing_or_entitlement_message, _billing_terminal_label,
         _print_billing_or_entitlement_guidance,
@@ -1437,7 +1437,7 @@ def _is_genuine_nous_rate_limit(agent: Any, api_error: Exception, error_context:
             is_genuine_nous_rate_limit, is_long_welcome_rate_limit, record_nous_rate_limit)
         _err_resp = getattr(api_error, "response", None)
         _err_hdrs = getattr(_err_resp, "headers", None) if _err_resp else None
-        from hermes_cli.anon_auth import is_anonymous_agent
+        from x19_cli.anon_auth import is_anonymous_agent
         anonymous = is_anonymous_agent(agent)
         _classified_ctx = getattr(classified, "error_context", None) or {}
         # Only an anonymous request's fairshare body is an allowance verdict; named

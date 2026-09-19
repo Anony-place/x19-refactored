@@ -24,7 +24,7 @@ _OUTCOME_STATES = {
     "error": TargetState.failed, "failed": TargetState.failed,
 }
 
-UNAVAILABLE_HINT = "hermes mcp install {name} / hermes mcp login {name}"
+UNAVAILABLE_HINT = "x19 mcp install {name} / x19 mcp login {name}"
 
 NOTE = (
     "Settled once; do not re-ask for any target the user skipped or that timed out — continue "
@@ -34,13 +34,13 @@ NOTE = (
 
 
 def _catalog_names() -> List[str]:
-    from hermes_cli.mcp_catalog import list_catalog
+    from x19_cli.mcp_catalog import list_catalog
 
     return sorted(e.name for e in list_catalog())
 
 
 def _configured_names() -> List[str]:
-    from hermes_cli.mcp_catalog import installed_servers
+    from x19_cli.mcp_catalog import installed_servers
 
     return sorted(installed_servers())
 

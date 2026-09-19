@@ -1,4 +1,4 @@
-import type { BillingBlock } from '@hermes/shared'
+import type { BillingBlock } from '@x19/shared'
 
 import { burstVibeHearts } from '@/components/chat/vibe-hearts'
 import { reportFirstBuildTurnComplete } from '@/components/onboarding-chat/first-build'
@@ -29,7 +29,7 @@ function firstBillingLine(text: string): string {
  * A turn failed on a billing wall (out of credits / payment required). The
  * gateway forwards the structured descriptor built by `agent/billing_links.py`;
  * we cache it per-session (drives the in-chat banner) AND raise one sticky,
- * billing-specific toast — never the generic "Hermes error" — with a smart CTA
+ * billing-specific toast — never the generic "X19 error" — with a smart CTA
  * (Nous → in-app Settings → Billing, other providers → their billing page).
  */
 function surfaceBillingBlock(sessionId: string, raw: unknown): void {
@@ -344,7 +344,7 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
     const failure =
       payload?.status === 'error'
         ? {
-            error: coerceGatewayText(payload.error).trim() || finalText || 'Hermes reported an error',
+            error: coerceGatewayText(payload.error).trim() || finalText || 'X19 reported an error',
             partial: Boolean(payload.partial),
             surface: parseErrorSurface(payload.error_surface)
           }

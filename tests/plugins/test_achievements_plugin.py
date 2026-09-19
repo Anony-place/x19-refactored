@@ -1,4 +1,4 @@
-"""Tests for the bundled hermes-achievements dashboard plugin.
+"""Tests for the bundled x19-achievements dashboard plugin.
 
 These target the two behaviors that matter for official integration:
 
@@ -10,9 +10,9 @@ These target the two behaviors that matter for official integration:
   takes minutes.
 
 The upstream repo ships its own unittest suite under
-``plugins/hermes-achievements/tests/`` covering the achievement engine
+``plugins/x19-achievements/tests/`` covering the achievement engine
 internals (tier math, secret-state handling, catalog invariants). These
-tests live at the hermes-agent level and focus on the integration
+tests live at the x19 level and focus on the integration
 contract: the plugin scans ALL of your sessions, not the first 200.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ import pytest
 PLUGIN_MODULE_PATH = (
     Path(__file__).resolve().parents[2]
     / "plugins"
-    / "hermes-achievements"
+    / "x19-achievements"
     / "dashboard"
     / "plugin_api.py"
 )
@@ -37,7 +37,7 @@ PLUGIN_MODULE_PATH = (
 
 @pytest.fixture
 def plugin_api(tmp_path, monkeypatch):
-    """Load plugin_api with isolated ~/.hermes so state/snapshot files don't collide.
+    """Load plugin_api with isolated ~/.x19 so state/snapshot files don't collide.
 
     We load the module fresh per test because the plugin keeps module-level
     caches (``_SNAPSHOT_CACHE``, ``_SCAN_STATUS``, background thread handle).
@@ -51,16 +51,16 @@ def plugin_api(tmp_path, monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     # Stash monkeypatch so ``_install_fake_session_db`` can use it to
-    # swap ``sys.modules['hermes_state']`` with auto-restoration. Without
+    # swap ``sys.modules['x19_state']`` with auto-restoration. Without
     # this, a raw ``sys.modules[...] = fake`` assignment would leak the
     # fake into later tests in the same xdist worker — breaking every
-    # test that does ``from hermes_state import SessionDB``.
+    # test that does ``from x19_state import SessionDB``.
     module._test_monkeypatch = monkeypatch
     yield module
 
 
 class _FakeSessionDB:
-    """Stand-in for hermes_state.SessionDB that records scan calls."""
+    """Stand-in for x19_state.SessionDB that records scan calls."""
 
     def __init__(self, session_count: int, scan_delay: float = 0):
         self.session_count = session_count
@@ -119,12 +119,12 @@ def _install_fake_session_db(plugin_api, fake_db):
     """Inject a fake SessionDB so ``scan_sessions`` finds it via its local import.
 
     Uses the monkeypatch stashed on ``plugin_api`` by the fixture, so the
-    ``sys.modules['hermes_state']`` swap is auto-restored at test teardown
+    ``sys.modules['x19_state']`` swap is auto-restored at test teardown
     and cannot leak into unrelated tests in the same xdist worker.
     """
-    fake_module = type(sys)("hermes_state")
+    fake_module = type(sys)("x19_state")
     fake_module.SessionDB = lambda **_kw: fake_db
-    plugin_api._test_monkeypatch.setitem(sys.modules, "hermes_state", fake_module)
+    plugin_api._test_monkeypatch.setitem(sys.modules, "x19_state", fake_module)
 
 
 def test_scan_sessions_default_scans_all_history_not_first_200(plugin_api):
@@ -308,11 +308,11 @@ def test_scan_sessions_never_opens_a_writable_session_db(plugin_api, tmp_path, m
     per /rescan). A writable ``SessionDB()`` there was one more writer connection on the
     dashboard's own state.db each time — the same-process handle leak behind the
     ``N live SessionDB handles`` precursor (#100896). Real store, real open, no fakes."""
-    import hermes_state
-    from hermes_state import SessionDB
+    import x19_state
+    from x19_state import SessionDB
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", tmp_path / "state.db")
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    monkeypatch.setattr(x19_state, "DEFAULT_DB_PATH", tmp_path / "state.db")
     seed = SessionDB(db_path=tmp_path / "state.db")
     seed.create_session("s1", source="cli")
     seed.append_message("s1", "user", "hello")

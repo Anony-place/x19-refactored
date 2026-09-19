@@ -27,11 +27,11 @@ def test_media_delivery_denies_encrypted_bitwarden_cache(tmp_path, monkeypatch):
     """Encrypted Bitwarden cache is covered by the media credential guard."""
     import gateway.platforms.base as base
 
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setattr(base, "_HERMES_HOME", hermes_home)
-    monkeypatch.setattr(base, "_HERMES_ROOT", hermes_home)
-    path = hermes_home / "cache" / "bws_cache.enc.json"
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
+    monkeypatch.setattr(base, "_X19_HOME", x19_home)
+    monkeypatch.setattr(base, "_X19_ROOT", x19_home)
+    path = x19_home / "cache" / "bws_cache.enc.json"
     path.parent.mkdir()
     path.write_text("encrypted-secret-cache")
 
@@ -61,7 +61,7 @@ class TestSecretCaptureGuidance:
     def test_gateway_secret_capture_message_points_to_local_setup(self):
         message = GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE
         assert "local cli" in message.lower()
-        assert "~/.hermes/.env" in message
+        assert "~/.x19/.env" in message
 
 
 class TestSafeUrlForLog:
@@ -332,7 +332,7 @@ class TestMediaInsideSerializedJson:
     def test_media_in_embedded_serialized_reply_not_extracted(self):
         """A serialized tool result that embeds a prior reply's MEDIA: tag."""
         content = (
-            '{"content":"previous reply MEDIA:/Users/ex/.hermes/media/'
+            '{"content":"previous reply MEDIA:/Users/ex/.x19/media/'
             'generated/stale.png and more text"}'
         )
         media, _ = BasePlatformAdapter.extract_media(content)
@@ -406,7 +406,7 @@ class TestExtensionlessMediaDelivery:
             "gateway.platforms.base.MEDIA_DELIVERY_SAFE_ROOTS",
             (str(root),),
         )
-        monkeypatch.delenv("HERMES_MEDIA_DELIVERY_STRICT", raising=False)
+        monkeypatch.delenv("X19_MEDIA_DELIVERY_STRICT", raising=False)
 
     def test_extensionless_media_extracted_when_file_validates(self, tmp_path, monkeypatch):
         root = tmp_path / "output"
@@ -437,7 +437,7 @@ class TestUniversalMediaEgress:
             "gateway.platforms.base.MEDIA_DELIVERY_SAFE_ROOTS",
             (str(root),),
         )
-        monkeypatch.delenv("HERMES_MEDIA_DELIVERY_STRICT", raising=False)
+        monkeypatch.delenv("X19_MEDIA_DELIVERY_STRICT", raising=False)
 
     @pytest.mark.parametrize("name", [
         "script.py", "server.log", "notes.weirdext", "app.ts", "run.sh",
@@ -480,11 +480,11 @@ class TestMediaDeliveryPathValidation:
         # recency window + denylist). Force strict on so they keep
         # exercising the legacy path even though the public default
         # flipped to off in 2026-05.
-        monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "1")
+        monkeypatch.setenv("X19_MEDIA_DELIVERY_STRICT", "1")
         # Disable recency-based trust by default so the original allowlist
         # tests continue to exercise the strict-allowlist path. Tests that
         # specifically cover recency trust re-enable it themselves.
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_FILES", "0")
 
 
     def test_rejects_symlink_escape_from_safe_root(self, tmp_path, monkeypatch):
@@ -523,9 +523,9 @@ class TestMediaDeliveryPathValidation:
     ):
         """Strict mode trusts durable attachments without trusting scratch."""
         self._patch_roots(monkeypatch)
-        monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path / "hermes"))
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
-        board_root = tmp_path / "hermes" / "kanban" / "boards" / "research"
+        monkeypatch.setenv("X19_KANBAN_HOME", str(tmp_path / "x19"))
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_FILES", "0")
+        board_root = tmp_path / "x19" / "kanban" / "boards" / "research"
         board_root.mkdir(parents=True)
         (board_root / "kanban.db").touch()
         attachment = board_root / "attachments" / "t_12345678" / "report.pdf"
@@ -550,9 +550,9 @@ class TestMediaDeliveryPathValidation:
         ~/.ssh, ~/.aws, etc.
         """
         self._patch_roots(monkeypatch)
-        monkeypatch.delenv("HERMES_MEDIA_ALLOW_DIRS", raising=False)
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "1")
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_SECONDS", "600")
+        monkeypatch.delenv("X19_MEDIA_ALLOW_DIRS", raising=False)
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_FILES", "1")
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_SECONDS", "600")
 
         # Simulate $HOME so ~/.ssh resolves into our tmp dir.
         fake_home = tmp_path / "home"
@@ -584,8 +584,8 @@ class TestMediaDeliveryDefaultMode:
         )
         # Pin strict OFF — the public default. Tests that exercise the
         # strict path live in TestMediaDeliveryPathValidation.
-        monkeypatch.delenv("HERMES_MEDIA_DELIVERY_STRICT", raising=False)
-        monkeypatch.delenv("HERMES_MEDIA_ALLOW_DIRS", raising=False)
+        monkeypatch.delenv("X19_MEDIA_DELIVERY_STRICT", raising=False)
+        monkeypatch.delenv("X19_MEDIA_ALLOW_DIRS", raising=False)
 
     def test_accepts_stale_file_outside_allowlist(self, tmp_path, monkeypatch):
         """The motivating case — agent says ``MEDIA:/home/user/notes.md``
@@ -612,32 +612,32 @@ class TestMediaDeliveryDefaultMode:
         ],
     )
     def test_denylist_blocks_mcp_oauth_tokens(self, tmp_path, monkeypatch, rel):
-        """Live MCP OAuth tokens/client creds under ~/.hermes/mcp-tokens/ must
+        """Live MCP OAuth tokens/client creds under ~/.x19/mcp-tokens/ must
         never deliver as native media — same exfil class as auth.json/.env.
         Sibling to the pairing/ directory denylist entry.
         """
         self._patch_roots(monkeypatch)
 
         fake_home = tmp_path / "home"
-        hermes_dir = fake_home / ".hermes"
-        (hermes_dir / "mcp-tokens").mkdir(parents=True)
-        secret = hermes_dir / rel
+        x19_dir = fake_home / ".x19"
+        (x19_dir / "mcp-tokens").mkdir(parents=True)
+        secret = x19_dir / rel
         secret.write_text('{"access_token": "live-bearer-abc123"}')
         monkeypatch.setenv("HOME", str(fake_home))
         monkeypatch.setattr(
-            "gateway.platforms.base._HERMES_HOME",
-            hermes_dir,
+            "gateway.platforms.base._X19_HOME",
+            x19_dir,
         )
         monkeypatch.setattr(
-            "gateway.platforms.base._HERMES_ROOT",
-            hermes_dir,
+            "gateway.platforms.base._X19_ROOT",
+            x19_dir,
         )
 
         assert BasePlatformAdapter.validate_media_delivery_path(str(secret)) is None
 
 
     def test_denylist_blocks_google_token_default_mode(self, tmp_path, monkeypatch):
-        """Integration credentials at the HERMES_HOME root (google_token.json)
+        """Integration credentials at the X19_HOME root (google_token.json)
         must never be deliverable, even though they aren't the historically
         enumerated .env/auth.json/config.yaml files. Regression for a
         refreshed google_token.json being auto-attached to a Slack reply
@@ -646,53 +646,53 @@ class TestMediaDeliveryDefaultMode:
         self._patch_roots(monkeypatch)
 
         fake_home = tmp_path / "home"
-        hermes_dir = fake_home / ".hermes"
-        hermes_dir.mkdir(parents=True)
-        token = hermes_dir / "google_token.json"
+        x19_dir = fake_home / ".x19"
+        x19_dir.mkdir(parents=True)
+        token = x19_dir / "google_token.json"
         token.write_text('{"access_token": "***", "refresh_token": "***"}')
         monkeypatch.setenv("HOME", str(fake_home))
-        monkeypatch.setattr("gateway.platforms.base._HERMES_HOME", hermes_dir)
-        monkeypatch.setattr("gateway.platforms.base._HERMES_ROOT", hermes_dir)
+        monkeypatch.setattr("gateway.platforms.base._X19_HOME", x19_dir)
+        monkeypatch.setattr("gateway.platforms.base._X19_ROOT", x19_dir)
 
         assert BasePlatformAdapter.validate_media_delivery_path(str(token)) is None
 
 
-    def test_denylist_blocks_non_cache_file_under_hermes_home(self, tmp_path, monkeypatch):
-        """A non-credential file the agent wrote directly under ~/.hermes
+    def test_denylist_blocks_non_cache_file_under_x19_home(self, tmp_path, monkeypatch):
+        """A non-credential file the agent wrote directly under ~/.x19
         (not in a cache subdir) is still deliverable via recency trust — we
         did NOT blanket-deny the tree (per #32090/#34425). This guards against
         accidentally re-introducing the rejected whole-tree deny.
         """
         self._patch_roots(monkeypatch)  # strict mode on
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "1")
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_SECONDS", "600")
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_FILES", "1")
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_SECONDS", "600")
 
         fake_home = tmp_path / "home"
-        hermes_dir = fake_home / ".hermes"
-        hermes_dir.mkdir(parents=True)
-        artifact = hermes_dir / "adhoc_report.pdf"
+        x19_dir = fake_home / ".x19"
+        x19_dir.mkdir(parents=True)
+        artifact = x19_dir / "adhoc_report.pdf"
         artifact.write_bytes(b"%PDF-1.4")  # fresh mtime
         monkeypatch.setenv("HOME", str(fake_home))
-        monkeypatch.setattr("gateway.platforms.base._HERMES_HOME", hermes_dir)
-        monkeypatch.setattr("gateway.platforms.base._HERMES_ROOT", hermes_dir)
+        monkeypatch.setattr("gateway.platforms.base._X19_HOME", x19_dir)
+        monkeypatch.setattr("gateway.platforms.base._X19_ROOT", x19_dir)
 
         assert BasePlatformAdapter.validate_media_delivery_path(str(artifact)) == str(artifact.resolve())
 
     def test_denylist_blocks_session_stores_but_not_neighbouring_artifacts(self, tmp_path, monkeypatch):
         """The SQLite session/kanban stores (and WAL/SHM sidecars, whose mtime is always fresh),
         legacy ``sessions/`` transcripts and the copied browser cookie store hold every secret ever
-        pasted into a chat; ``MEDIA:~/.hermes/state.db`` must not exfiltrate them (#41071). Named
+        pasted into a chat; ``MEDIA:~/.x19/state.db`` must not exfiltrate them (#41071). Named
         boards keep their DB beside the ATTACHMENTS the gateway already allowlists, so the board
         attachment stays deliverable while ``kanban.db`` next to it does not."""
         self._patch_roots(monkeypatch)
 
         fake_home = tmp_path / "home"
-        hermes_dir = fake_home / ".hermes"
-        hermes_dir.mkdir(parents=True)
+        x19_dir = fake_home / ".x19"
+        x19_dir.mkdir(parents=True)
         monkeypatch.setenv("HOME", str(fake_home))
-        monkeypatch.setattr("gateway.platforms.base._HERMES_HOME", hermes_dir)
-        monkeypatch.setattr("gateway.platforms.base._HERMES_ROOT", hermes_dir)
-        board = hermes_dir / "kanban" / "boards" / "team-a"
+        monkeypatch.setattr("gateway.platforms.base._X19_HOME", x19_dir)
+        monkeypatch.setattr("gateway.platforms.base._X19_ROOT", x19_dir)
+        board = x19_dir / "kanban" / "boards" / "team-a"
         (board / "attachments").mkdir(parents=True)
 
         denied = ["state.db", "state.db-wal", "state.db-shm", "kanban.db", "kanban.db-wal",
@@ -700,26 +700,26 @@ class TestMediaDeliveryDefaultMode:
                   "kanban/boards/team-a/kanban.db", "kanban/boards/team-a/kanban.db-wal"]
         allowed = ["kanban/boards/team-a/attachments/report.pdf", "adhoc_report.pdf", "logs/agent.log"]
         for rel in denied + allowed:
-            path = hermes_dir / rel
+            path = x19_dir / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"SQLite format 3\x00")
-        assert [rel for rel in denied if BasePlatformAdapter.validate_media_delivery_path(str(hermes_dir / rel))] == []
-        assert [rel for rel in allowed if not BasePlatformAdapter.validate_media_delivery_path(str(hermes_dir / rel))] == []
+        assert [rel for rel in denied if BasePlatformAdapter.validate_media_delivery_path(str(x19_dir / rel))] == []
+        assert [rel for rel in allowed if not BasePlatformAdapter.validate_media_delivery_path(str(x19_dir / rel))] == []
 
     def test_denylist_covers_every_profile_home_not_just_the_launch_home(self, tmp_path, monkeypatch):
         """Multiplex: one process serves every ``<root>/profiles/*``. The credential denylist must
         cover each profile's ``.env`` / ``auth.json`` / ``state.db`` / transcripts whether the emitting
-        turn is the launch (default) profile's or the secondary's own (HERMES_HOME override), while
+        turn is the launch (default) profile's or the secondary's own (X19_HOME override), while
         the profile's cache artifacts and plain agent-written files stay deliverable."""
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from x19_constants import reset_x19_home_override, set_x19_home_override
 
         self._patch_roots(monkeypatch)
         fake_home = tmp_path / "home"
-        hermes_root = fake_home / ".hermes"
-        profile_b = hermes_root / "profiles" / "beta"
+        x19_root = fake_home / ".x19"
+        profile_b = x19_root / "profiles" / "beta"
         monkeypatch.setenv("HOME", str(fake_home))
-        monkeypatch.setattr("gateway.platforms.base._HERMES_HOME", hermes_root)
-        monkeypatch.setattr("gateway.platforms.base._HERMES_ROOT", hermes_root)
+        monkeypatch.setattr("gateway.platforms.base._X19_HOME", x19_root)
+        monkeypatch.setattr("gateway.platforms.base._X19_ROOT", x19_root)
 
         denied = [".env", "auth.json", "state.db", "state.db-wal", "config.yaml",
                   "sessions/20260101_abc.json", "mcp-tokens/server.json"]
@@ -730,21 +730,21 @@ class TestMediaDeliveryDefaultMode:
             path.write_bytes(b"SECRET=1\n")
 
         for scope in (None, profile_b):  # default profile's turn, then beta's own turn
-            token = set_hermes_home_override(scope)
+            token = set_x19_home_override(scope)
             try:
                 assert [rel for rel in denied if BasePlatformAdapter.validate_media_delivery_path(str(profile_b / rel))] == []
                 assert [rel for rel in allowed if not BasePlatformAdapter.validate_media_delivery_path(str(profile_b / rel))] == []
             finally:
-                reset_hermes_home_override(token)
+                reset_x19_home_override(token)
 
     def test_strict_mode_envvar_restores_legacy_behavior(self, tmp_path, monkeypatch):
-        """Setting HERMES_MEDIA_DELIVERY_STRICT=1 reactivates the older
+        """Setting X19_MEDIA_DELIVERY_STRICT=1 reactivates the older
         allowlist+recency logic. A stale file outside the allowlist is
         rejected.
         """
         self._patch_roots(monkeypatch)
-        monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "1")
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
+        monkeypatch.setenv("X19_MEDIA_DELIVERY_STRICT", "1")
+        monkeypatch.setenv("X19_MEDIA_TRUST_RECENT_FILES", "0")
 
         stale = tmp_path / "old.pdf"
         stale.write_bytes(b"%PDF-1.4")
@@ -781,8 +781,8 @@ class TestMediaDeliveryDefaultMode:
 
 
     def test_profile_scoped_cache_delivers_under_symlinked_root(self, tmp_path, monkeypatch):
-        """Reopened #31733: a profile gateway whose HERMES_HOME is symlinked
-        under a denied prefix (e.g. /opt/data -> /root/.hermes) emits
+        """Reopened #31733: a profile gateway whose X19_HOME is symlinked
+        under a denied prefix (e.g. /opt/data -> /root/.x19) emits
         profile-scoped paths (``<root>/profiles/<name>/cache/images/x.png``)
         that resolve under ``/root``. ``$HOME`` is NOT that prefix, so the
         root-home exception doesn't fire, and the top-level cache allowlist
@@ -793,8 +793,8 @@ class TestMediaDeliveryDefaultMode:
 
         # Stand-in for the literal /root deny prefix in the deployment.
         denied_root = tmp_path / "root"
-        hermes_root = denied_root / ".hermes"
-        prof_cache = hermes_root / "profiles" / "myprof" / "cache" / "images"
+        x19_root = denied_root / ".x19"
+        prof_cache = x19_root / "profiles" / "myprof" / "cache" / "images"
         prof_cache.mkdir(parents=True)
         image = prof_cache / "gen.png"
         image.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -808,7 +808,7 @@ class TestMediaDeliveryDefaultMode:
             (str(denied_root),),
         )
         monkeypatch.setattr(
-            "gateway.platforms.base._HERMES_ROOT", hermes_root
+            "gateway.platforms.base._X19_ROOT", x19_root
         )
 
         assert (
@@ -937,42 +937,42 @@ class TestDockerContainerMediaPathTranslation:
         ) == str(media.resolve())
 
     def test_cache_dir_container_path_translates_to_host_cache(self, tmp_path, monkeypatch):
-        """MEDIA:/root/.hermes/cache/images/... (the agent_visible_image path
+        """MEDIA:/root/.x19/cache/images/... (the agent_visible_image path
         under docker) must translate to the HOST cache file, not the sandbox
         home copy."""
-        hermes_home = tmp_path / ".hermes"
-        cache = hermes_home / "cache" / "images"
+        x19_home = tmp_path / ".x19"
+        cache = x19_home / "cache" / "images"
         cache.mkdir(parents=True)
         media = cache / "generated.png"
         media.write_bytes(b"\x89PNG\r\n\x1a\n")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         monkeypatch.setenv("TERMINAL_ENV", "docker")
         monkeypatch.delenv("TERMINAL_DOCKER_VOLUMES", raising=False)
 
         assert BasePlatformAdapter.validate_media_delivery_path(
-            "/root/.hermes/cache/images/generated.png"
+            "/root/.x19/cache/images/generated.png"
         ) == str(media.resolve())
 
     def test_container_credential_path_never_translates_through_home(self, tmp_path, monkeypatch):
-        """/root/.hermes/* outside a cache mount (the sandbox's credential
+        """/root/.x19/* outside a cache mount (the sandbox's credential
         surface: .env, auth.json) must NOT resolve through the persistent
         home mount — those host-side copies sit outside the credential
         denylist prefixes and would otherwise deliver."""
         sandbox = tmp_path / "sandboxes"
         home = sandbox / "docker" / "default" / "home"
-        secret = home / ".hermes"
+        secret = home / ".x19"
         secret.mkdir(parents=True)
         (secret / "auth.json").write_text('{"token": "SECRET"}')
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        x19_home = tmp_path / ".x19"
+        x19_home.mkdir()
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         monkeypatch.setenv("TERMINAL_ENV", "docker")
         monkeypatch.setenv("TERMINAL_CONTAINER_PERSISTENT", "true")
         monkeypatch.setenv("TERMINAL_SANDBOX_DIR", str(sandbox))
         monkeypatch.delenv("TERMINAL_DOCKER_VOLUMES", raising=False)
 
         assert BasePlatformAdapter.validate_media_delivery_path(
-            "/root/.hermes/auth.json"
+            "/root/.x19/auth.json"
         ) is None
 
 
@@ -1164,9 +1164,9 @@ class TestGetHumanDelay:
 
     def test_natural_mode_ignores_malformed_custom_env_vars(self):
         env = {
-            "HERMES_HUMAN_DELAY_MODE": "natural",
-            "HERMES_HUMAN_DELAY_MIN_MS": "oops",
-            "HERMES_HUMAN_DELAY_MAX_MS": "still-bad",
+            "X19_HUMAN_DELAY_MODE": "natural",
+            "X19_HUMAN_DELAY_MIN_MS": "oops",
+            "X19_HUMAN_DELAY_MAX_MS": "still-bad",
         }
         with patch.dict(os.environ, env):
             delay = BasePlatformAdapter._get_human_delay()
@@ -1175,9 +1175,9 @@ class TestGetHumanDelay:
 
     def test_custom_mode_tolerates_malformed_env_vars(self):
         env = {
-            "HERMES_HUMAN_DELAY_MODE": "custom",
-            "HERMES_HUMAN_DELAY_MIN_MS": "oops",
-            "HERMES_HUMAN_DELAY_MAX_MS": "still-bad",
+            "X19_HUMAN_DELAY_MODE": "custom",
+            "X19_HUMAN_DELAY_MIN_MS": "oops",
+            "X19_HUMAN_DELAY_MAX_MS": "still-bad",
         }
         with patch.dict(os.environ, env):
             # falls back to the custom-mode defaults instead of crashing
@@ -1275,8 +1275,8 @@ class TestMediaDeliveryDiagnosability:
     def test_rejected_path_appears_in_log(self, tmp_path, caplog):
         outside = tmp_path / "outside.ogg"
         outside.write_bytes(b"OggS")
-        with patch.dict(os.environ, {"HERMES_MEDIA_DELIVERY_STRICT": "1",
-                                     "HERMES_MEDIA_TRUST_RECENT_FILES": "0"}), \
+        with patch.dict(os.environ, {"X19_MEDIA_DELIVERY_STRICT": "1",
+                                     "X19_MEDIA_TRUST_RECENT_FILES": "0"}), \
                 patch("gateway.platforms.base.MEDIA_DELIVERY_SAFE_ROOTS", ()):
             with caplog.at_level("WARNING"):
                 out = BasePlatformAdapter.filter_media_delivery_paths([(str(outside), False)])
@@ -1295,7 +1295,7 @@ class TestMediaDeliveryDiagnosability:
         """One crafted ~\\x00 path must not drop every other attachment."""
         good = tmp_path / "good.png"
         good.write_bytes(b"\x89PNG")
-        monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "0")
+        monkeypatch.setenv("X19_MEDIA_DELIVERY_STRICT", "0")
         out = BasePlatformAdapter.filter_media_delivery_paths([
             ("~\x00evil.png", False),
             (str(good), False),
@@ -1313,7 +1313,7 @@ class _CapturingAdapter(BasePlatformAdapter):
 
     The four media-send fallbacks (send_voice, send_video, send_document,
     send_image_file) historically forwarded their *_path argument into the
-    chat text. That argument is a host filesystem path inside the Hermes
+    chat text. That argument is a host filesystem path inside the X19
     cache, so any subclass that fell back to super() — like the Telegram
     adapter on a rejected video — would leak the host's directory layout
     into the user's chat.
@@ -1349,11 +1349,11 @@ class TestMediaFallbackDoesNotLeakHostPath:
 
     Telegram, Discord, and Slack adapters all fall back to these base
     implementations on native-send failure. When they did, the user saw
-    a chat message like ``🎬 Video: /home/.../hermes/cache/video/abc.mp4``
+    a chat message like ``🎬 Video: /home/.../x19/cache/video/abc.mp4``
     — a host filesystem path with no actionable information.
     """
 
-    SENSITIVE_PATH = "/home/jayne/.hermes/cache/media/sensitive_host_path_abc123.bin"
+    SENSITIVE_PATH = "/home/jayne/.x19/cache/media/sensitive_host_path_abc123.bin"
 
 
     @pytest.mark.asyncio
@@ -1472,18 +1472,18 @@ class TestDockerProfileSandboxMediaTranslation:
         ) == str(produced.resolve())
 
     def test_home_credential_surface_still_refused(self, monkeypatch):
-        """The /root/.hermes exclusion survives profile scoping: translating
+        """The /root/.x19 exclusion survives profile scoping: translating
         the home mount must never expose the container's secret surface —
         in the profile layout AND the legacy session layout."""
         self._enable_docker(monkeypatch)
         for task in ("default", f"session:{self.SESSION_KEY}"):
-            secrets = self._sandbox_dir(task) / "home" / ".hermes"
+            secrets = self._sandbox_dir(task) / "home" / ".x19"
             secrets.mkdir(parents=True, exist_ok=True)
             (secrets / "auth.json").write_text("{}")
 
         assert (
             BasePlatformAdapter.validate_media_delivery_path(
-                "/root/.hermes/auth.json", session_key=self.SESSION_KEY
+                "/root/.x19/auth.json", session_key=self.SESSION_KEY
             )
             is None
         )

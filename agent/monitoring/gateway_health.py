@@ -176,7 +176,7 @@ def build_gateway_health_snapshot(
     base = {
         "service.instance.id": _safe_instance_id(install_id),
         "service.version": _safe_metric_value(version, limit=64),
-        "hermes.supervision_mode": mode if mode in _SUPERVISION_MODES else "unknown",
+        "x19.supervision_mode": mode if mode in _SUPERVISION_MODES else "unknown",
     }
 
     def metric(name: str, value: int | float, **extra: str) -> GatewayMetric:
@@ -187,12 +187,12 @@ def build_gateway_health_snapshot(
         return GatewayMetric(name=name, value=value, attributes=attrs)
 
     metrics: list[GatewayMetric] = [
-        metric("hermes.gateway.up", int(bool(gateway_running))),
-        metric("hermes.gateway.active_agents", active_agents),
-        metric("hermes.gateway.busy", int(bool(busy))),
-        metric("hermes.gateway.drainable", int(bool(drainable))),
-        metric("hermes.gateway.restart_requested", int(bool(runtime.get("restart_requested")))),
-        metric("hermes.gateway.state", 1, **{"hermes.gateway.state": gateway_state}),
+        metric("x19.gateway.up", int(bool(gateway_running))),
+        metric("x19.gateway.active_agents", active_agents),
+        metric("x19.gateway.busy", int(bool(busy))),
+        metric("x19.gateway.drainable", int(bool(drainable))),
+        metric("x19.gateway.restart_requested", int(bool(runtime.get("restart_requested")))),
+        metric("x19.gateway.state", 1, **{"x19.gateway.state": gateway_state}),
     ]
     fatal_count = 0
     events: list[GatewayHealthEvent | GatewayDiagnosticEvent] = []
@@ -203,9 +203,9 @@ def build_gateway_health_snapshot(
         error_code = classify_gateway_error(pdata.get("error_code") or pdata.get("error_message"))
         is_degraded = state in _FATAL_PLATFORM_STATES
         fatal_count += is_degraded
-        pattrs = {"hermes.platform": str(platform), "hermes.platform.state": state}
-        metrics.append(metric("hermes.platform.up", int(state in _RUNNING_PLATFORM_STATES), **pattrs))
-        metrics.append(metric("hermes.platform.degraded", int(is_degraded), **pattrs, **{"hermes.error_code": error_code}))
+        pattrs = {"x19.platform": str(platform), "x19.platform.state": state}
+        metrics.append(metric("x19.platform.up", int(state in _RUNNING_PLATFORM_STATES), **pattrs))
+        metrics.append(metric("x19.platform.degraded", int(is_degraded), **pattrs, **{"x19.error_code": error_code}))
         if is_degraded:
             events.append(GatewayDiagnosticEvent(
                 name="platform.fatal", subsystem=f"platform.{platform}", platform=str(platform),
@@ -222,7 +222,7 @@ def build_gateway_health_snapshot(
 
 def _safe_profile() -> str:
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from x19_cli.profiles import get_active_profile_name
         return str(get_active_profile_name() or "default")
     except Exception:
         return "default"
@@ -230,7 +230,7 @@ def _safe_profile() -> str:
 
 def _safe_version() -> str:
     try:
-        from hermes_cli import __version__
+        from x19_cli import __version__
         return str(__version__)
     except Exception:
         return "unknown"
@@ -331,22 +331,3 @@ __all__ = [
 ]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def redact_gateway_message(message: Any) -> str:
-    """Redact gateway diagnostic free text for operator-owned export.
-
-    Single scrub path: everything goes through
-    ``agent.monitoring.redaction.redact_for_export`` (unconditional
-    secrets + PII), then is length-bounded.
-    """
-    try:
-        from agent.monitoring.redaction import redact_for_export
-        redacted = redact_for_export(str(message or "")) or ""
-    except Exception:
-        redacted = "[redaction-unavailable]"
-    return redacted[:500]
-# ---- END PLUGIN-COMPAT ----

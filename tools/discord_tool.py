@@ -63,7 +63,7 @@ def _discord_request(
         url, data=None if body is None else json.dumps(body).encode("utf-8"), method=method,
         headers={
             "Authorization": f"Bot {token}", "Content-Type": "application/json",
-            "User-Agent": "Hermes-Agent (https://github.com/NousResearch/hermes-agent)"})
+            "User-Agent": "X19 (https://github.com/Anony-place/x19-refactored)"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 204:
@@ -109,8 +109,8 @@ _PERMISSIVE_CAPS = {"has_members_intent": True, "has_message_content": True, "de
 
 
 def _capability_disk_cache_path() -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / "discord_capabilities.json"
+    from x19_constants import get_x19_home
+    return get_x19_home() / "cache" / "discord_capabilities.json"
 
 
 def _token_cache_key(token: str) -> str:
@@ -427,7 +427,7 @@ def _load_allowed_actions_config() -> Optional[List[str]]:
     """``discord.server_actions`` allowlist (comma string or YAML list), or ``None`` when
     unrestricted. Unknown names are dropped with a warning."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         cfg = load_config()
     except Exception as exc:
         logger.debug("discord: could not load config (%s); allowing all actions.", exc)
@@ -633,14 +633,3 @@ for _name, _actions, _handler in (
         requires_env=["DISCORD_BOT_TOKEN"])
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import TYPE_CHECKING  # noqa: F401,E402
-from typing import Tuple  # noqa: F401,E402
-
-def get_dynamic_schema() -> Optional[Dict[str, Any]]:
-    """Backward-compat wrapper — returns core schema."""
-    return get_dynamic_schema_core()
-# ---- END PLUGIN-COMPAT ----

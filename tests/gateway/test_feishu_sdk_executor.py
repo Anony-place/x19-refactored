@@ -56,7 +56,7 @@ async def test_run_blocking_executes_on_owned_pool():
     result = await adapter._run_blocking(_work, 21)
     assert result == 42
     # Ran on the adapter-owned pool, not the default executor.
-    assert captured["thread"].startswith("hermes-feishu-sdk")
+    assert captured["thread"].startswith("x19-feishu-sdk")
     adapter._shutdown_sdk_executor()
 
 
@@ -72,7 +72,7 @@ async def test_is_duplicate_flush_survives_default_executor_teardown(
     (#111020). The flush now runs on the adapter-owned pool, mirroring the
     outbound SDK calls (#10849).
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     from gateway.config import PlatformConfig
 
     adapter = FeishuAdapter(PlatformConfig())
@@ -103,16 +103,16 @@ async def test_is_duplicate_flush_survives_default_executor_teardown(
 @pytest.mark.asyncio
 async def test_run_blocking_propagates_caller_contextvars(tmp_path, monkeypatch):
     """Call sites moved off asyncio.to_thread must keep seeing the caller's context: a
-    multiplexed profile's HERMES_HOME override is a contextvar, and a worker that lost it
+    multiplexed profile's X19_HOME override is a contextvar, and a worker that lost it
     would flush dedup state / look up threads under the wrong profile."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     from gateway.config import PlatformConfig
-    from hermes_constants import get_hermes_home_override, reset_hermes_home_override, set_hermes_home_override
+    from x19_constants import get_x19_home_override, reset_x19_home_override, set_x19_home_override
 
     adapter = FeishuAdapter(PlatformConfig())
-    token = set_hermes_home_override(str(tmp_path / "profiles" / "secondary"))
+    token = set_x19_home_override(str(tmp_path / "profiles" / "secondary"))
     try:
-        assert await adapter._run_blocking(get_hermes_home_override) == str(tmp_path / "profiles" / "secondary")
+        assert await adapter._run_blocking(get_x19_home_override) == str(tmp_path / "profiles" / "secondary")
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
         adapter._shutdown_sdk_executor()

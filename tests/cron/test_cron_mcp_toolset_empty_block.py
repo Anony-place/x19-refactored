@@ -30,13 +30,13 @@ def _run(job, tmp_path):
     (tmp_path / "config.yaml").write_text(
         "model:\n  default: test-model\nmcp_servers:\n  notion:\n    url: https://mcp.invalid\n", encoding="utf-8")
     with patch("run_agent.AIAgent") as agent_cls, \
-         patch("cron.scheduler._hermes_home", tmp_path), \
+         patch("cron.scheduler._x19_home", tmp_path), \
          patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
-         patch("hermes_cli.env_loader.load_hermes_dotenv"), \
-         patch("hermes_cli.env_loader.reset_secret_source_cache"), \
-         patch("hermes_state_registry.acquire", return_value=MagicMock()), \
+         patch("x19_cli.env_loader.load_x19_dotenv"), \
+         patch("x19_cli.env_loader.reset_secret_source_cache"), \
+         patch("x19_state_registry.acquire", return_value=MagicMock()), \
          patch("tools.mcp_tool_discovery.discover_mcp_tools", return_value=[]), \
-         patch("hermes_cli.runtime_provider.resolve_runtime_provider", return_value=dict(_RUNTIME)):
+         patch("x19_cli.runtime_provider.resolve_runtime_provider", return_value=dict(_RUNTIME)):
         agent_cls.return_value.run_conversation.return_value = {"final_response": "ok"}
         with cron_jobs.use_cron_store(tmp_path):
             cron_jobs.save_jobs([job])
@@ -57,14 +57,14 @@ def _register_notion_in_scope(scope):
 
 def test_requested_mcp_server_owned_by_other_profile_blocks_run(tmp_path):
     from agent.secret_scope import set_multiplex_active
-    from hermes_constants import hermes_home_key, reset_hermes_home_override, set_hermes_home_override
+    from x19_constants import x19_home_key, reset_x19_home_override, set_x19_home_override
 
     set_multiplex_active(True)
-    token = set_hermes_home_override(tmp_path / "other")
+    token = set_x19_home_override(tmp_path / "other")
     try:
-        undo = _register_notion_in_scope(hermes_home_key())
+        undo = _register_notion_in_scope(x19_home_key())
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
     try:
         (success, _output, _final, error), agent_built = _run(
             _job(enabled_toolsets=["terminal", "notion"]), tmp_path)

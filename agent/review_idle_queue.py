@@ -177,7 +177,7 @@ class ReviewIdleQueue:
 def _managed_server_idle() -> bool:
     """No processing slot on any loaded model of the managed router; unreachable/no state file reads idle."""
     try:
-        from hermes_cli.local_runtime.supervisor import state_path
+        from x19_cli.local_runtime.supervisor import state_path
         from urllib.parse import quote
 
         state = json.loads(state_path().read_text(encoding="utf-8"))
@@ -203,9 +203,3 @@ def _managed_server_idle() -> bool:
 QUEUE = ReviewIdleQueue()
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import List  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

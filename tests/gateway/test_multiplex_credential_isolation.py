@@ -90,7 +90,7 @@ class TestProfilePathResolutionUnderMultiplexScope:
 def test_turn_scoped_dotenv_reload_does_not_pollute_process_env(tmp_path, monkeypatch):
     """A routed profile reload must stay inside its context-local scope.
 
-    ``load_hermes_dotenv`` has several lazy-import and cron call sites beyond
+    ``load_x19_dotenv`` has several lazy-import and cron call sites beyond
     the gateway's guarded reload helper.  Any one of them can run during a
     multiplexed turn, so the loader itself must not copy the active profile's
     ``.env`` into the shared process environment.
@@ -99,8 +99,8 @@ def test_turn_scoped_dotenv_reload_does_not_pollute_process_env(tmp_path, monkey
 
     from agent.secret_scope import get_secret
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.env_loader import load_hermes_dotenv
-    from hermes_constants import get_hermes_home
+    from x19_cli.env_loader import load_x19_dotenv
+    from x19_constants import get_x19_home
 
     profile_a = tmp_path / "profiles" / "a"
     profile_b = tmp_path / "profiles" / "b"
@@ -123,14 +123,14 @@ def test_turn_scoped_dotenv_reload_does_not_pollute_process_env(tmp_path, monkey
     with _profile_runtime_scope(profile_a):
         assert get_secret("PROFILE_SCOPED_API_KEY") == "secret-a"
         assert get_secret("DISCORD_ALLOWED_CHANNELS") == "profile-a-only"
-        assert load_hermes_dotenv(hermes_home=get_hermes_home()) == []
+        assert load_x19_dotenv(x19_home=get_x19_home()) == []
         assert "PROFILE_SCOPED_API_KEY" not in os.environ
         assert os.environ["DISCORD_ALLOWED_CHANNELS"] == "all-channels"
 
     with _profile_runtime_scope(profile_b):
         assert get_secret("PROFILE_SCOPED_API_KEY") == "secret-b"
         assert get_secret("DISCORD_ALLOWED_CHANNELS") == "profile-b-only"
-        assert load_hermes_dotenv(hermes_home=get_hermes_home()) == []
+        assert load_x19_dotenv(x19_home=get_x19_home()) == []
         assert "PROFILE_SCOPED_API_KEY" not in os.environ
         assert os.environ["DISCORD_ALLOWED_CHANNELS"] == "all-channels"
 
@@ -145,7 +145,7 @@ def test_cold_profile_hydrates_external_source_without_global_env(
     from agent.secret_sources.registry import AppliedVar, ApplyReport, SourceReport
     from agent.secret_sources import registry
     from agent.secret_scope import get_secret
-    from hermes_cli import env_loader
+    from x19_cli import env_loader
     from gateway.run import _profile_runtime_scope
 
     profile = tmp_path / "profiles" / "secondary"

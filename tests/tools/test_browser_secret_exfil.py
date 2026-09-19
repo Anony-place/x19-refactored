@@ -7,8 +7,8 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _ensure_redaction_enabled(monkeypatch):
-    """Ensure redaction is active regardless of host HERMES_REDACT_SECRETS."""
-    monkeypatch.delenv("HERMES_REDACT_SECRETS", raising=False)
+    """Ensure redaction is active regardless of host X19_REDACT_SECRETS."""
+    monkeypatch.delenv("X19_REDACT_SECRETS", raising=False)
     monkeypatch.setattr("agent.redact._REDACT_ENABLED", True)
 
 
@@ -31,7 +31,7 @@ class TestBrowserSecretExfil:
     def test_cloud_browser_allows_credential_named_query_param(self):
         """Magic links / OAuth callbacks / signed assets carry ``?token=``-style params and must
         reach a cloud browser too: the browser is where the agent signs in, and it already sees the
-        session's cookies and typed passwords. Only Hermes-secret-shaped values stay blocked."""
+        session's cookies and typed passwords. Only X19-secret-shaped values stay blocked."""
         from tools.browser_tool import browser_navigate
 
         url = "https://example.com/callback?token=opaque-oauth-code&signature=abc123"
@@ -65,11 +65,11 @@ class TestBrowserSecretExfil:
         from tools.browser_tool import browser_navigate
         # Patch the actual browser command — we only care that the secret
         # check doesn't block a clean URL, not that Chrome starts in CI.
-        mock_result = {"success": True, "data": {"title": "ok", "url": "https://github.com/NousResearch/hermes-agent"}}
+        mock_result = {"success": True, "data": {"title": "ok", "url": "https://github.com/Anony-place/x19-refactored"}}
         with patch("tools.browser_tool_session._run_browser_command", return_value=mock_result), \
              patch("tools.browser_tool_session._get_session_info", return_value={"_first_nav": False}), \
              patch("tools.browser_tool_cloud._is_local_backend", return_value=True):
-            result = browser_navigate("https://github.com/NousResearch/hermes-agent")
+            result = browser_navigate("https://github.com/Anony-place/x19-refactored")
         parsed = json.loads(result)
         # Should NOT be blocked by secret detection
         assert "API key or token" not in parsed.get("error", "")
@@ -110,7 +110,7 @@ class TestWebExtractSecretExfil:
     @pytest.mark.asyncio
     async def test_allows_credential_named_query_param(self):
         """``?access_token=`` is how magic links and signed URLs look; the extract backend may fetch them.
-        Only Hermes-secret-shaped VALUES are blocked (see test_blocks_api_key_in_url)."""
+        Only X19-secret-shaped VALUES are blocked (see test_blocks_api_key_in_url)."""
         from tools.web_tools import web_extract_tool
 
         result = await web_extract_tool(urls=["https://example.com/callback?access_token=opaque-oauth-value"])
@@ -130,7 +130,7 @@ class TestWebExtractSecretExfil:
 
         for url in (
             "https://leetcode.com/problems/two-sum/?code=twosum",
-            "https://github.com/search?q=hermes&code=1",
+            "https://github.com/search?q=x19&code=1",
             "https://example.com/blog?session=summer",
         ):
             result = await web_extract_tool(urls=[url])

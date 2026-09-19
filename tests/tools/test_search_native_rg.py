@@ -71,9 +71,9 @@ def test_native_search_never_touches_the_shell_and_matches_shell_results(tree, o
         dict(pattern="needle", path=str(tree / "missing")),
     ]
     for case in cases:
-        monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+        monkeypatch.setenv("X19_NATIVE_FILE_READ", "0")
         shell = _normalized(ops_factory(tree, []).search(**case))
-        monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "1")
+        monkeypatch.setenv("X19_NATIVE_FILE_READ", "1")
         calls = []
         native = _normalized(ops_factory(tree, calls).search(**case))
         assert native == shell, case
@@ -106,7 +106,7 @@ def test_native_runner_honours_deadline_and_interrupt_while_rg_is_silent(tree, o
 
 
 def test_kill_switch_routes_search_back_to_the_shell(tree, ops_factory, monkeypatch):
-    monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+    monkeypatch.setenv("X19_NATIVE_FILE_READ", "0")
     calls = []
     result = ops_factory(tree, calls).search(pattern="needle", path=str(tree))
     assert result.total_count == 4

@@ -145,7 +145,7 @@ export function remoteHtmlPreviewDocument(dataUrl: string): string | null {
 }
 
 export async function openPreviewTargetInBrowser(target: PreviewTarget): Promise<void> {
-  const bridge = window.hermesDesktop
+  const bridge = window.x19Desktop
 
   if (!bridge?.openPreviewInBrowser) {
     throw new Error('Desktop preview browser bridge is unavailable')
@@ -262,7 +262,7 @@ export async function normalizeOrLocalPreviewTarget(
   cwd?: string | null
 ): Promise<PreviewTarget | null> {
   try {
-    const normalized = await window.hermesDesktop?.normalizePreviewTarget?.(rawTarget, cwd || undefined)
+    const normalized = await window.x19Desktop?.normalizePreviewTarget?.(rawTarget, cwd || undefined)
 
     if (normalized) {
       return enrichPreviewTarget(normalized)

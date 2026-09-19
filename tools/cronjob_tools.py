@@ -12,19 +12,19 @@ from typing import Any, Dict, List, Optional, Union
 
 import copy
 
-from hermes_constants import display_hermes_home
+from x19_constants import display_x19_home
 
 logger = logging.getLogger(__name__)
 
 # Heartbeat cadence keeping the caller's inactivity watchdog at bay while a manual
-# `cronjob(action="run")` executes in-process (comfortably below HERMES_AGENT_TIMEOUT).
+# `cronjob(action="run")` executes in-process (comfortably below X19_AGENT_TIMEOUT).
 # Mirrors the 10s cadence of tools/environments/base.py::touch_activity_if_due (delegate_task's heartbeat
-# uses 30s) — comfortably below the 1800s default HERMES_AGENT_TIMEOUT. See #76502.
+# uses 30s) — comfortably below the 1800s default X19_AGENT_TIMEOUT. See #76502.
 _CRON_RUN_HEARTBEAT_INTERVAL = 10.0
-# Hard ceiling: with HERMES_CRON_TIMEOUT=0 a truly hung run would otherwise mask the
+# Hard ceiling: with X19_CRON_TIMEOUT=0 a truly hung run would otherwise mask the
 # gateway watchdog forever; past this the heartbeat stops and the watchdog regains authority.
-# The child cron run has its own inactivity watchdog (HERMES_CRON_TIMEOUT, default 600s) that bounds a
-# wedged job, but with HERMES_CRON_TIMEOUT=0 (explicit "unlimited") a truly hung run_one_job would otherwise
+# The child cron run has its own inactivity watchdog (X19_CRON_TIMEOUT, default 600s) that bounds a
+# wedged job, but with X19_CRON_TIMEOUT=0 (explicit "unlimited") a truly hung run_one_job would otherwise
 # mask the gateway watchdog forever — pre-#76502 the parent was at least reaped at ~1800s.
 _CRON_RUN_HEARTBEAT_CEILING = 6 * 3600.0
 
@@ -111,7 +111,7 @@ def _api_server_base_url() -> str:
     except ValueError:
         port = 8642
     try:
-        from hermes_cli.config import cfg_get, load_config_readonly
+        from x19_cli.config import cfg_get, load_config_readonly
         host = str(cfg_get(load_config_readonly(), "platforms", "api_server", "extra", "host", default="") or "").strip()
     except Exception:
         host = ""
@@ -391,12 +391,12 @@ def _latest_job_output_excerpt(job_id: str, max_chars: int = 2000) -> Optional[s
 
 def _reap_stale_executions(job_name: str) -> None:
     """Reap execution rows left 'claimed'/'running' by a provably-dead owner (e.g. a prior
-    one-shot `hermes cron run` that died mid-run). The ticker does this at startup; one-shot
+    one-shot `x19 cron run` that died mid-run). The ticker does this at startup; one-shot
     invocations have no such moment, so a stale claim would block every later manual run.
     Best-effort self-heal: must not block dispatch."""
     try:
         # Reap any execution row this job (or any job) left stranded 'claimed'/ 'running' by a dead owner
-        # process -- e.g. a PRIOR one-shot `hermes cron run` invocation whose dispatched runner died with
+        # process -- e.g. a PRIOR one-shot `x19 cron run` invocation whose dispatched runner died with
         # the exiting process before writing a terminal status (issue #86721). Safe and cheap: only
         # provably-dead owners (PID gone, or PID reused by a different process per its start time) are
         # reaped; a genuinely live owner's row is left untouched.
@@ -469,7 +469,7 @@ def _try_dispatch_background_run(
     _reap_stale_executions(job_name)
 
     # Routing capture BEFORE the claim: no routable session = no durable consumer for a detached
-    # completion, so don't claim-and-dispatch (direct callers like `hermes cron run` exit right after).
+    # completion, so don't claim-and-dispatch (direct callers like `x19 cron run` exit right after).
     session_key = _background_session_key(session_id)
     # CLI path: the approval contextvar is only bound during gateway/TUI turns. The CLI drain filters
     # completions by the durable agent session id (#64240), so stamp it as the key — an empty key would fail
@@ -495,7 +495,7 @@ def _try_dispatch_background_run(
     origin_ui_session_id = ""
     try:
         from gateway.session_context import get_session_env
-        origin_ui_session_id = get_session_env("HERMES_UI_SESSION_ID", "") or ""
+        origin_ui_session_id = get_session_env("X19_UI_SESSION_ID", "") or ""
     except Exception:
         pass
 
@@ -994,7 +994,7 @@ def _cronjob_schema_overrides() -> dict:
     static schema is built once per process, but the multiplexed gateway serves every profile from
     that process, so a path baked in at import would name the launch profile's home (#95685)."""
     params = copy.deepcopy(CRONJOB_SCHEMA["parameters"])
-    params["properties"]["script"]["description"] = _script_description(display_hermes_home())
+    params["properties"]["script"]["description"] = _script_description(display_x19_home())
     return {"parameters": params}
 
 
@@ -1054,7 +1054,7 @@ Jobs run in a fresh session with no current-chat context, so prompts must be sel
             },
             "script": {
                 "type": "string",
-                "description": _script_description("the profile HERMES_HOME")
+                "description": _script_description("the profile X19_HOME")
             },
             "monitor": {
                 "type": "string",
@@ -1101,15 +1101,15 @@ def check_cronjob_requirements() -> bool:
     from gateway.session_context import get_session_env
     from utils import env_var_enabled, is_truthy_value
     return (
-        env_var_enabled("HERMES_INTERACTIVE")
-        or env_var_enabled("HERMES_GATEWAY_SESSION")
-        or env_var_enabled("HERMES_EXEC_ASK")
-        or is_truthy_value(get_session_env("HERMES_CRON_SESSION", ""))
+        env_var_enabled("X19_INTERACTIVE")
+        or env_var_enabled("X19_GATEWAY_SESSION")
+        or env_var_enabled("X19_EXEC_ASK")
+        or is_truthy_value(get_session_env("X19_CRON_SESSION", ""))
     )
 
 
 # Agent-facing arguments forwarded verbatim to cronjob(). model / provider / base_url are
-# intentionally NOT here: per-job inference pins are user-owned (dashboard, `hermes cron
+# intentionally NOT here: per-job inference pins are user-owned (dashboard, `x19 cron
 # create/edit --model`, hand-edited jobs) — the agent must not point unattended spend at a
 # different model. Programmatic callers of cronjob() itself retain the parameters.
 _HANDLER_FORWARDED_ARGS = (
@@ -1145,24 +1145,3 @@ registry.register(
 )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import re  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'effective_job_state': ('cron.jobs', 'effective_job_state'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

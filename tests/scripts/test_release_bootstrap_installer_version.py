@@ -3,7 +3,7 @@
 Tauri CFBundleShortVersionString is read from
 apps/bootstrap-installer/src-tauri/tauri.conf.json (and the sibling
 package.json). Those files were hardcoded 0.0.1 and omitted from
-update_version_files / the --publish --bump git add list, so Hermes-Setup.dmg
+update_version_files / the --publish --bump git add list, so X19-Setup.dmg
 always shipped 0.0.1. Same class as the desktop stamp (#68783 / PR #68796).
 """
 
@@ -34,7 +34,7 @@ def _json_version(path: Path) -> str:
 
 def _patch_repo(tmp_path, monkeypatch, *, with_installer: bool = True):
     repo = tmp_path
-    init_py = repo / "hermes_cli" / "__init__.py"
+    init_py = repo / "x19_cli" / "__init__.py"
     init_py.parent.mkdir(parents=True)
     init_py.write_text(
         '__version__ = "0.0.1"\n__release_date__ = "2026.1.1"\n',
@@ -58,7 +58,7 @@ def _patch_repo(tmp_path, monkeypatch, *, with_installer: bool = True):
             '{"name":"x","version":"0.0.1"}\n', encoding="utf-8"
         )
         tauri_conf.write_text(
-            '{"productName":"Hermes","version":"0.0.1"}\n', encoding="utf-8"
+            '{"productName":"X19","version":"0.0.1"}\n', encoding="utf-8"
         )
         cargo_toml.write_text('[package]\nversion = "0.0.1"\n', encoding="utf-8")
 
@@ -107,7 +107,7 @@ def test_update_version_files_skips_missing_installer_dir(tmp_path, monkeypatch)
 
 def test_update_version_files_does_not_invent_version_keys(tmp_path, monkeypatch):
     paths = _patch_repo(tmp_path, monkeypatch)
-    original = '{"name":"x","productName":"Hermes"}\n'
+    original = '{"name":"x","productName":"X19"}\n'
     paths["installer_pkg"].write_text(original, encoding="utf-8")
     paths["tauri_conf"].write_text(original, encoding="utf-8")
 

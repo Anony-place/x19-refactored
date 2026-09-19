@@ -31,7 +31,7 @@ BIZ_SERVICES = {
     )
 }
 
-HERMES_INSTANCE_ID = 17  # openclaw instance_id（固定值）
+X19_INSTANCE_ID = 17  # openclaw instance_id（固定值）
 WS_HEARTBEAT_RUNNING = 1
 WS_HEARTBEAT_FINISH = 2
 
@@ -450,7 +450,7 @@ def encode_auth_bind(
       5 env_name
     """
     dev_buf = _encode_parts([
-        (1, "s", app_version), (2, "s", operation_system), (10, "S", str(HERMES_INSTANCE_ID)), (24, "s", bot_version),
+        (1, "s", app_version), (2, "s", operation_system), (10, "S", str(X19_INSTANCE_ID)), (24, "s", bot_version),
     ])
     req_buf = _encode_parts([
         (1, "S", biz_id), (2, "m", _s(1, uid) + _s(2, source) + _s(3, token)), (3, "m", dev_buf), (5, "s", route_env),
@@ -540,79 +540,3 @@ def decode_get_group_member_list_rsp(data: bytes) -> Optional[dict]:
         return None
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import logging  # noqa: F401,E402
-
-DEBUG_MODE = False
-
-def _encode_forward_multimedia(media: dict) -> bytes:
-    buf = b""
-    for fn, key in [(1, "type"), (2, "url"), (4, "file_name"), (15, "media_id")]:
-        v = media.get(key, "")
-        if v:
-            buf += _encode_field(fn, WT_LEN, _encode_string(str(v)))
-    for fn, key in [(5, "file_size"), (6, "width"), (7, "height")]:
-        v = media.get(key, 0)
-        if v:
-            buf += _encode_field(fn, WT_VARINT, _encode_varint(int(v)))
-    return buf
-
-def _encode_forward_msg_content(content: dict) -> bytes:
-    buf = _encode_field(1, WT_VARINT, _encode_varint(int(content.get("type", 0))))
-    text = content.get("text", "")
-    if text:
-        buf += _encode_field(2, WT_LEN, _encode_string(str(text)))
-    for media in content.get("multimedia") or []:
-        buf += _encode_field(3, WT_LEN, _encode_message(_encode_forward_multimedia(media)))
-    return buf
-
-def _encode_forward_msg(msg: dict) -> bytes:
-    buf = b""
-    sender = msg.get("sender", "")
-    if sender:
-        buf += _encode_field(1, WT_LEN, _encode_string(str(sender)))
-    time_val = msg.get("time", 0)
-    if time_val:
-        buf += _encode_field(2, WT_VARINT, _encode_varint(int(time_val)))
-    plain = msg.get("plainText", "")
-    if plain:
-        buf += _encode_field(3, WT_LEN, _encode_string(str(plain)))
-    for mc in msg.get("msgContent") or []:
-        buf += _encode_field(4, WT_LEN, _encode_message(_encode_forward_msg_content(mc)))
-    return buf
-
-def encode_forward_msg_data(data: dict) -> bytes:
-    """Encode ForwardMsgData protobuf bytes (inverse of ``decode_forward_msg_data``).
-
-    Mainly used to build mock / test data; production code never needs to encode this.
-    """
-    buf = _encode_field(1, WT_VARINT, _encode_varint(int(data.get("sub_type", 0))))
-    for fn, key in [(2, "begin_time"), (3, "end_time")]:
-        v = data.get(key, 0)
-        if v:
-            buf += _encode_field(fn, WT_VARINT, _encode_varint(int(v)))
-    nick = data.get("nick_name", "")
-    if nick:
-        buf += _encode_field(4, WT_LEN, _encode_string(str(nick)))
-    for msg in data.get("msg") or []:
-        buf += _encode_field(5, WT_LEN, _encode_message(_encode_forward_msg(msg)))
-    return buf
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'logger': ('gateway.platforms.base', 'logger'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

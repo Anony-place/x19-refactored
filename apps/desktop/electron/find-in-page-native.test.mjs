@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 import { app, BrowserWindow } from 'electron'
 
-const runtimeDir = mkdtempSync(join(tmpdir(), 'hermes-find-in-page-'))
+const runtimeDir = mkdtempSync(join(tmpdir(), 'x19-find-in-page-'))
 app.setPath('userData', runtimeDir)
 app.setPath('sessionData', runtimeDir)
 

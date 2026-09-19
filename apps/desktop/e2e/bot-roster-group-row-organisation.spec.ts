@@ -19,7 +19,7 @@ import { expect, test } from './test'
 // has: right-click → Pin to top floats the room above unpinned rows and
 // persists on the room record; right-click → Move to section files the room
 // into a user-made section, with membership riding the durable group-chats
-// record rather than any bot's profile meta (hermes-agent#89813, #105544).
+// record rather than any bot's profile meta (x19#89813, #105544).
 
 type Page = MockBackendFixture['page']
 
@@ -38,8 +38,8 @@ async function capture(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(dir, `${name}.png`) })
 }
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<void> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -71,7 +71,7 @@ async function rowOrder(page: Page): Promise<string[]> {
 
 async function storedRoom(page: Page): Promise<{ pinned?: boolean; sectionId?: null | string }> {
   return page.evaluate(
-    room => JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.group-chats') || '{}')[room] || {},
+    room => JSON.parse(localStorage.getItem('x19.plugin.x19-bots.group-chats') || '{}')[room] || {},
     ROOM
   )
 }
@@ -79,11 +79,11 @@ async function storedRoom(page: Page): Promise<{ pinned?: boolean; sectionId?: n
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-group-row')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
 
   for (const name of ['alpha', 'beta']) {
-    await seedBot(sandbox.hermesHome, mock.url, name)
+    await seedBot(sandbox.x19Home, mock.url, name)
   }
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))

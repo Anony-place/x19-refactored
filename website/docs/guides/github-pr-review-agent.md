@@ -63,13 +63,13 @@ Use `deliver: "local"` to save reviews to `~/.x19/cron/output/`. Great for testi
 Make sure X19 can access GitHub. Start a chat:
 
 ```bash
-hermes
+x19
 ```
 
 Test with a simple command:
 
 ```
-Run: gh pr list --repo NousResearch/x19 --state open --limit 3
+Run: gh pr list --repo Anony-place/x19-refactored --state open --limit 3
 ```
 
 You should see a list of open PRs. If this works, you're ready.
@@ -84,7 +84,7 @@ Still in the chat, ask X19 to review a real PR:
 Review this pull request. Read the diff, check for bugs, security issues,
 and code quality. Be specific about line numbers and quote problematic code.
 
-Run: gh pr diff 3888 --repo NousResearch/x19
+Run: gh pr diff 3888 --repo Anony-place/x19-refactored
 ```
 
 X19 will:

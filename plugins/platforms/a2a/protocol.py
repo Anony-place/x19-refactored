@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from gateway.platforms._shared import coerce_port as _coerce_int
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 
 PROTOCOL_VERSION = "1.0"
 
@@ -67,7 +67,7 @@ def build_agent_card(*, name: str, url: str, description: str, skills: Optional[
         "description": description,
         "url": url,  # convenience for pre-1.0 clients; canonical is supportedInterfaces
         "version": "1.0.0",
-        "provider": {"organization": os.getenv("A2A_PROVIDER_ORG", "Hermes Agent"), "url": os.getenv("A2A_PROVIDER_URL", "") or url},
+        "provider": {"organization": os.getenv("A2A_PROVIDER_ORG", "X19"), "url": os.getenv("A2A_PROVIDER_URL", "") or url},
         "supportedInterfaces": [iface],
         "capabilities": {"streaming": streaming, "pushNotifications": push_notifications,
                          "stateTransitionHistory": False, "extendedAgentCard": False},
@@ -84,7 +84,7 @@ def skills_from_toolsets(toolsets: "list[str] | dict[str, list[str]] | None") ->
     become tags, max 10)."""
     if not isinstance(toolsets, dict):
         toolsets = {ts: [] for ts in set(toolsets or [])}
-    skills = [{"id": f"toolset.{name}", "name": name, "description": f"Hermes '{name}' capabilities",
+    skills = [{"id": f"toolset.{name}", "name": name, "description": f"X19 '{name}' capabilities",
                "tags": [name] + [str(t) for t in (toolsets[name] or [])][:10]} for name in sorted(toolsets)]
     return skills or [{"id": "general", "name": "general", "description": "General-purpose conversational agent", "tags": ["general"]}]
 
@@ -432,7 +432,7 @@ class TaskStore:
 
 def _conv_path(context_id: str) -> Path:
     safe = "".join(c for c in (context_id or "default") if c.isalnum() or c in "-_") or "default"
-    return get_hermes_home() / "a2a_conversations" / f"{safe}.jsonl"
+    return get_x19_home() / "a2a_conversations" / f"{safe}.jsonl"
 
 
 def persist_message(context_id: str, role: str, text: str, task_id: str = "") -> None:
@@ -464,51 +464,6 @@ def load_conversation(context_id: str, limit: int = 50) -> list[dict]:
 
 def list_conversations() -> list[str]:
     """Context-ids that have persisted conversations."""
-    return sorted(p.stem for p in (get_hermes_home() / "a2a_conversations").glob("*.jsonl"))
+    return sorted(p.stem for p in (get_x19_home() / "a2a_conversations").glob("*.jsonl"))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import copy  # noqa: F401,E402
-
-ERR_PUSH_NOT_SUPPORTED = -32003    # A2A spec: PushNotificationNotSupportedError
-
-STATE_AUTH_REQUIRED = "TASK_STATE_AUTH_REQUIRED"
-
-def data_part(data: Any, media_type: str = "application/json") -> dict:
-    """Build a v1.0 data Part (structured data, no ``kind`` field)."""
-    return {"data": data, "mediaType": media_type}
-
-def file_part(url: str = "", raw: str = "", filename: str = "",
-              media_type: str = "application/octet-stream") -> dict:
-    """Build a v1.0 file Part.
-
-    Either ``url`` (file reference) or ``raw`` (base64-encoded bytes) must be
-    provided. Discrimination is by member presence — no ``kind`` field.
-    """
-    part: dict[str, Any] = {"mediaType": media_type}
-    if filename:
-        part["filename"] = filename
-    if url:
-        part["url"] = url
-    elif raw:
-        part["raw"] = raw
-    return part
-
-def message_with_parts(role: str, parts: list[dict], context_id: str = "") -> dict:
-    """Build an A2A v1.0 Message with arbitrary Parts (text, file, data)."""
-    msg: dict[str, Any] = {
-        "role": role,
-        "parts": parts,
-        "messageId": uuid.uuid4().hex,
-    }
-    if context_id:
-        msg["contextId"] = context_id
-    return msg
-
-def stream_message(message: dict) -> dict:
-    """v1.0 StreamResponse with a message member."""
-    return {"message": message}
-# ---- END PLUGIN-COMPAT ----

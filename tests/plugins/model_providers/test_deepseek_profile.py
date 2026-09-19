@@ -194,7 +194,7 @@ class TestDeepSeekAuxModel:
         assert deepseek_profile.default_aux_model == "deepseek-flash"
 
     def test_fallback_models_are_current_ids(self, deepseek_profile):
-        from hermes_cli.model_normalize import _normalize_for_deepseek
+        from x19_cli.model_normalize import _normalize_for_deepseek
         # Every advertised id must survive normalization unchanged (no retired alias in the picker).
         assert all(_normalize_for_deepseek(m) == m for m in deepseek_profile.fallback_models)
 

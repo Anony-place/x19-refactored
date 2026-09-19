@@ -4,7 +4,7 @@ IANA timezone across DST.
 croniter works in the UTC *offset* of its start time, never the zone, so a ``0 9 * * *`` job
 in America/Toronto fired at 08:00 local on spring-forward day and 10:00 on fall-back day, and
 stayed an hour off for the rest of each season. The zone is configured the way production
-configures it (``HERMES_TIMEZONE``) instead of by patching ``get_timezone``, so
+configures it (``X19_TIMEZONE``) instead of by patching ``get_timezone``, so
 ``get_timezone()`` and the stored-timestamp normalization agree and these tests fail on the
 unfixed code with the real symptom. Filed from the 09:00 America/Toronto morning routine.
 """
@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 pytest.importorskip("croniter")
 
-import hermes_time
+import x19_time
 from cron.jobs import compute_next_run
 
 TORONTO = ZoneInfo("America/Toronto")
@@ -25,10 +25,10 @@ MORNING = {"kind": "cron", "expr": "0 9 * * *"}
 @pytest.fixture
 def toronto(monkeypatch):
     """Configure the active profile's zone through the real resolution path."""
-    monkeypatch.setenv("HERMES_TIMEZONE", "America/Toronto")
-    hermes_time.reset_cache()
+    monkeypatch.setenv("X19_TIMEZONE", "America/Toronto")
+    x19_time.reset_cache()
     yield
-    hermes_time.reset_cache()
+    x19_time.reset_cache()
 
 
 def _next_local(last_run_at: str) -> datetime:

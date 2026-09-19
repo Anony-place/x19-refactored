@@ -14,7 +14,7 @@ import type {
   SubscriptionTierOption,
   UsageBarData,
   UsageModelData
-} from '@hermes/shared/billing'
+} from '@x19/shared/billing'
 
 /**
  * The gateway's `billing.state` payload as THIS app reads it: the shared shape

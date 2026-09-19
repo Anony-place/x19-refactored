@@ -15,12 +15,12 @@ BASE = Path(os.environ['AUDIT_DIR'])
 REPO = Path(os.environ['AUDIT_REPO'])
 BASE.mkdir(parents=True, exist_ok=True)
 env = {'PATH': f'{BASE}/bin:/usr/bin:/bin', 'HOME': str(BASE/'home'),
-       'HERMES_HOME': str(BASE/'hermes'), 'PYTHONPATH': str(REPO),
+       'X19_HOME': str(BASE/'x19'), 'PYTHONPATH': str(REPO),
        'PYTHONDONTWRITEBYTECODE': '1', 'AUDIT_DIR': str(BASE), 'AUDIT_REPO': str(REPO)}
-for name in ('home', 'hermes', 'bin'):
+for name in ('home', 'x19', 'bin'):
     (BASE/name).mkdir(exist_ok=True)
 sys.path.insert(0, str(REPO))
-from hermes_cli import banner
+from x19_cli import banner
 
 if len(sys.argv) > 1:
     os.environ.clear()

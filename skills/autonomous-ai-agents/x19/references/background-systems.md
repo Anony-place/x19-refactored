@@ -42,7 +42,7 @@ the `cronjob` tool, the `x19 cron` CLI (`list`, `add`, `edit`,
   header/footer instead of being mirrored into the target gateway
   session (keeps role alternation intact).
 
-User docs: https://x19.nousresearch.com/docs/user-guide/features/cron
+User docs: https://anony-place.github.io/x19-refactored/docs/user-guide/features/cron
 
 ### Curator (skill lifecycle)
 
@@ -69,13 +69,13 @@ so nothing is lost.
 
 Config: `curator.*` (`enabled`, `interval_hours`, `min_idle_hours`,
 `stale_after_days`, `archive_after_days`, `backup.*`).
-User docs: https://x19.nousresearch.com/docs/user-guide/features/curator
+User docs: https://anony-place.github.io/x19-refactored/docs/user-guide/features/curator
 
 ### Kanban (multi-agent work queue)
 
 Durable SQLite board for multi-profile / multi-worker collaboration.
 Users drive it via `x19 kanban <verb>`; dispatcher-spawned workers
-see a focused `kanban_*` toolset gated by `HERMES_KANBAN_TASK`, and
+see a focused `kanban_*` toolset gated by `X19_KANBAN_TASK`, and
 orchestrator profiles can opt into the broader `kanban` toolset. Normal
 sessions still have zero `kanban_*` schema footprint unless configured.
 
@@ -95,7 +95,7 @@ sessions still have zero `kanban_*` schema footprint unless configured.
   (default 2; configurable via `kanban.failure_limit` or per-task
   `max_retries`).
 - **Isolation:** board is the hard boundary (workers get
-  `HERMES_KANBAN_BOARD` pinned in env); tenant is a soft namespace
+  `X19_KANBAN_BOARD` pinned in env); tenant is a soft namespace
   within a board for workspace-path + memory-key isolation.
 
-User docs: https://x19.nousresearch.com/docs/user-guide/features/kanban
+User docs: https://anony-place.github.io/x19-refactored/docs/user-guide/features/kanban

@@ -4,7 +4,7 @@ import math
 import os
 from collections.abc import Mapping
 
-from hermes_cli.config import DEFAULT_CONFIG
+from x19_cli.config import DEFAULT_CONFIG
 
 # EX_TEMPFAIL (sysexits.h): ask the service manager to restart after a graceful drain/reload.
 GATEWAY_SERVICE_RESTART_EXIT_CODE = 75
@@ -28,10 +28,10 @@ def map_fatal_config_exit_for_launchd(returncode: int) -> int:
         return 0
     return returncode
 
-# Set by ``hermes gateway run --external-supervisor``. Unlike systemd's INVOCATION_ID
+# Set by ``x19 gateway run --external-supervisor``. Unlike systemd's INVOCATION_ID
 # and launchd's XPC_SERVICE_NAME, this survives wrappers that replace the child
 # environment (e.g. ``sudo env -i``).
-EXTERNAL_GATEWAY_SUPERVISOR_ENV = "HERMES_GATEWAY_EXTERNAL_SUPERVISOR"
+EXTERNAL_GATEWAY_SUPERVISOR_ENV = "X19_GATEWAY_EXTERNAL_SUPERVISOR"
 
 DEFAULT_GATEWAY_RESTART_DRAIN_TIMEOUT = float(DEFAULT_CONFIG["agent"]["restart_drain_timeout"])
 DEFAULT_GATEWAY_SIGNAL_INTERRUPT_GRACE_TIMEOUT = float(DEFAULT_CONFIG["gateway"]["signal_interrupt_grace_timeout"])
@@ -78,7 +78,7 @@ def is_gateway_supervisor_process(environ: Mapping[str, str] | None = None) -> b
     """Return whether this gateway process is owned by a supervisor."""
     env = os.environ if environ is None else environ
     xpc_service = env.get("XPC_SERVICE_NAME", "")
-    return bool(env.get("INVOCATION_ID") or env.get("HERMES_S6_SUPERVISED_CHILD") or (xpc_service and xpc_service != "0")
+    return bool(env.get("INVOCATION_ID") or env.get("X19_S6_SUPERVISED_CHILD") or (xpc_service and xpc_service != "0")
                 or str(env.get(EXTERNAL_GATEWAY_SUPERVISOR_ENV, "")).strip().lower() in _TRUTHY)
 
 

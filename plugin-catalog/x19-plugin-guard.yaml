@@ -1,0 +1,14 @@
+name: x19-plugin-guard
+repo: https://github.com/mauricemohr88-debug/x19-plugin-guard
+sha: 857d881be77249c192c5fefa8254db186a7abbca
+description: Static review of candidate X19 plugins; target code is never executed.
+maintainer: mauricemohr88-debug
+tier: community
+category: tools
+docs_url: https://github.com/mauricemohr88-debug/x19-plugin-guard#readme
+capabilities:
+  provides_tools:
+  - plugin_guard_review_candidate
+  provides_hooks: []
+  provides_middleware: []
+  requires_env: []

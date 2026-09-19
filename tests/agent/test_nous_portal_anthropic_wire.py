@@ -20,9 +20,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_cli import runtime_provider as rp
-from hermes_cli import providers as _providers
-from hermes_cli.providers import nous_api_mode
+from x19_cli import runtime_provider as rp
+from x19_cli import providers as _providers
+from x19_cli.providers import nous_api_mode
 
 
 @pytest.fixture(autouse=True)
@@ -65,9 +65,9 @@ class TestApiModeRouting:
 
     def test_determine_api_mode_honors_the_model_for_nous(self):
         """Callers that skip resolve_runtime_provider (fallback, switch_model
-        empty-mode path) must still land Claude on Messages — the Hermes
+        empty-mode path) must still land Claude on Messages — the X19
         overlay alone advertises openai_chat for every Nous model."""
-        from hermes_cli.providers import determine_api_mode
+        from x19_cli.providers import determine_api_mode
 
         assert (
             determine_api_mode(
@@ -204,7 +204,7 @@ class TestClientShape:
         self, monkeypatch
     ):
         """The Anthropic SDK fills api_key from ANTHROPIC_API_KEY when the
-        constructor omits it. Hermes loads that env from ~/.hermes/.env, so
+        constructor omits it. X19 loads that env from ~/.x19/.env, so
         without an explicit clear every Portal request would dual-auth as
         X-Api-Key: sk-ant-… + Authorization: Bearer portal.jwt."""
         from agent.anthropic_adapter import build_anthropic_client
@@ -299,12 +299,12 @@ class TestPortalBodyFields:
         return build_api_kwargs(agent, [{"role": "user", "content": "hi"}])
 
     def test_portal_tags_reach_the_messages_request(self):
-        from agent.portal_tags import hermes_client_tag
+        from agent.portal_tags import x19_client_tag
 
         tags = self._build()["extra_body"]["tags"]
 
-        assert "product=hermes-agent" in tags
-        assert hermes_client_tag() in tags
+        assert "product=x19" in tags
+        assert x19_client_tag() in tags
         assert all(isinstance(tag, str) for tag in tags), (
             "Portal skips non-string tag entries unpredictably"
         )

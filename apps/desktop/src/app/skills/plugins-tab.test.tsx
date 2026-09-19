@@ -124,13 +124,13 @@ describe('PluginsTab', () => {
 
   it('renders a unified package as ONE row with a Desktop switch and an Agent switch', () => {
     $pluginRecords.set({
-      media: { id: 'media', name: 'Media Studio', kind: 'disk', status: 'loaded', packageName: 'hermes-media-studio' }
+      media: { id: 'media', name: 'Media Studio', kind: 'disk', status: 'loaded', packageName: 'x19-media-studio' }
     })
     $agentPlugins.set([
       {
         description: '',
-        key: 'hermes-media-studio',
-        name: 'hermes-media-studio',
+        key: 'x19-media-studio',
+        name: 'x19-media-studio',
         source: 'git',
         status: 'disabled',
         version: '1'
@@ -155,8 +155,8 @@ describe('PluginsTab', () => {
         name: 'Media Studio',
         kind: 'disk',
         status: 'loaded',
-        packageName: 'hermes-media-studio',
-        packageOrigin: { repo: 'https://github.com/NousResearch/hermes-media-studio.git', sha: 'abc' }
+        packageName: 'x19-media-studio',
+        packageOrigin: { repo: 'https://github.com/NousResearch/x19-media-studio.git', sha: 'abc' }
       }
     })
 
@@ -169,7 +169,7 @@ describe('PluginsTab', () => {
       expect($pluginInstallRequest.get()).toMatchObject({
         legacyHint: 'agent',
         profile: 'workbot',
-        repo: 'https://github.com/NousResearch/hermes-media-studio.git',
+        repo: 'https://github.com/NousResearch/x19-media-studio.git',
         sha: 'abc'
       })
     })
@@ -177,7 +177,7 @@ describe('PluginsTab', () => {
 
   it('disables "Install here" when the package has no known origin (hand-copied folder)', () => {
     $pluginRecords.set({
-      media: { id: 'media', name: 'Media Studio', kind: 'disk', status: 'loaded', packageName: 'hermes-media-studio' }
+      media: { id: 'media', name: 'Media Studio', kind: 'disk', status: 'loaded', packageName: 'x19-media-studio' }
     })
 
     renderPlugins({ profile: 'workbot', scopeLabel: 'workbot' })

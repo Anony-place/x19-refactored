@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generic web_search / web_extract tools over pluggable backends.
 
-Backend is selected during ``hermes tools`` (``web.backend`` in config.yaml; per
+Backend is selected during ``x19 tools`` (``web.backend`` in config.yaml; per
 capability via ``web.search_backend`` / ``web.extract_backend``). Every vendor
 implementation lives in ``plugins/web/<vendor>/provider.py`` and registers with
 ``agent.web_search_registry``; this module owns selection, safety gates,
@@ -33,15 +33,15 @@ logger = logging.getLogger(__name__)
 # ─── Backend Selection ────────────────────────────────────────────────────────
 
 def _env_value(name: str) -> str:
-    """Resolve ``name`` via the config-aware env layer (``hermes config set`` values), then process env.
+    """Resolve ``name`` via the config-aware env layer (``x19 config set`` values), then process env.
 
-    Mirrors the SearXNG provider's ``_searxng_url()`` so that values set through Hermes' config/.env layer
-    (``hermes config set``, ``hermes tools``) are honored here too — not just raw process-env exports.
+    Mirrors the SearXNG provider's ``_searxng_url()`` so that values set through X19' config/.env layer
+    (``x19 config set``, ``x19 tools``) are honored here too — not just raw process-env exports.
     Without this, a config-only ``SEARXNG_URL`` (or any provider key) leaves the backend auto-detect cascade
     and ``check_web_api_key()`` blind to it. See #34290.
     """
     try:
-        from hermes_cli.config import get_env_value
+        from x19_cli.config import get_env_value
         val = get_env_value(name)
     except Exception:
         val = None
@@ -55,7 +55,7 @@ def _has_env(name: str) -> bool:
 def _load_web_config() -> dict:
     """Load the ``web:`` section from config.yaml; always a dict (a null section yields ``{}``)."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         return load_config().get("web") or {}
     except Exception:
         return {}
@@ -248,7 +248,7 @@ def _ensure_web_plugins_loaded() -> None:
     configured and ``FIRECRAWL_API_KEY`` set. See #27580.
     """
     try:
-        from hermes_cli.plugins import _ensure_plugins_discovered
+        from x19_cli.plugins import _ensure_plugins_discovered
         _ensure_plugins_discovered()
     except Exception as exc:  # noqa: BLE001
         # Warning, not debug: a broken plugin import is otherwise invisible.
@@ -298,7 +298,7 @@ def web_search_tool(query: str, limit: int = 5) -> str:
             provider = get_active_search_provider()
 
         if provider is None:
-            fallback = "No web search provider configured. Run `hermes tools` to set one up."
+            fallback = "No web search provider configured. Run `x19 tools` to set one up."
             response_data = {"success": False, "error": _no_provider_error("search", fallback)}
         else:
             logger.info("Web search via %s: '%s' (limit: %d)", provider.name, query, limit)
@@ -411,7 +411,7 @@ def _provider_is_ready(provider) -> bool:
     """True when *provider* is keyed-available OR keyless-capable, without raising.
 
     ``get_active_*_provider()`` returns an explicitly configured backend even when ``is_available()`` is
-    False (so dispatch can emit a precise error), so readiness gates (tool check_fn, ``hermes doctor``)
+    False (so dispatch can emit a precise error), so readiness gates (tool check_fn, ``x19 doctor``)
     must probe for real. Keyless mode (Exa/Parallel free tier) is a working state, not a misconfig.
 
     See #78412.
@@ -512,38 +512,3 @@ registry.register(
 )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Dict  # noqa: F401,E402
-from typing import TYPE_CHECKING  # noqa: F401,E402
-import asyncio  # noqa: F401,E402
-import httpx  # noqa: F401,E402
-import re  # noqa: F401,E402
-import sys  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'DEFAULT_EXTRACT_CHAR_LIMIT': ('tools.web_tools_truncate', 'DEFAULT_EXTRACT_CHAR_LIMIT'),
-    'Firecrawl': ('plugins.web.firecrawl.provider', 'Firecrawl'),
-    'MAX_STORED_TEXT_CHARS': ('tools.web_tools_truncate', 'MAX_STORED_TEXT_CHARS'),
-    'build_vendor_gateway_url': ('tools.managed_tool_gateway', 'build_vendor_gateway_url'),
-    'managed_nous_tools_enabled': ('tools.tool_backend_helpers', 'managed_nous_tools_enabled'),
-    'normalize_url_for_request': ('tools.url_safety', 'normalize_url_for_request'),
-    'nous_tool_gateway_unavailable_message': ('tools.tool_backend_helpers', 'nous_tool_gateway_unavailable_message'),
-    'prefers_gateway': ('tools.tool_backend_helpers', 'prefers_gateway'),
-    'resolve_managed_tool_gateway': ('tools.managed_tool_gateway', 'resolve_managed_tool_gateway'),
-    'sensitive_query_param_name': ('tools.url_safety', 'sensitive_query_param_name'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

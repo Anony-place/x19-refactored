@@ -1,13 +1,13 @@
 name: openalex
-repo: https://github.com/Adolanium/hermes-plugin-openalex
+repo: https://github.com/Adolanium/x19-plugin-openalex
 sha: 04e673e34bfd09ea9cf20626373ce48df096f813
-description: OpenAlex for Hermes. Search 250M scholarly works, authors, journals and institutions, with
+description: OpenAlex for X19. Search 250M scholarly works, authors, journals and institutions, with
   a USD budget guard, per-call cost prediction, and response shaping that keeps a 2.8 MB paper inside
   the context window.
 maintainer: Adolanium
 tier: community
 category: tools
-docs_url: https://github.com/Adolanium/hermes-plugin-openalex#readme
+docs_url: https://github.com/Adolanium/x19-plugin-openalex#readme
 capabilities:
   provides_tools:
   - openalex_account

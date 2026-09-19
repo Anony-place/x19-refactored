@@ -78,10 +78,10 @@ def event(name: str, payload: type[Payload] | None = None, *, doc: str = "") -> 
 # Params are validated on every call: an unknown or mistyped key is the CLIENT's bug and answers
 # JSON-RPC ``4000`` with the field path, never a silent ignore. Results and payloads are OUR bug when
 # they drift, so they never break a user's turn: outside the test suite a mismatch is logged once per
-# name; under ``HERMES_TEST_ISOLATION`` (set by ``scripts/run_tests.sh`` / ``tests/conftest.py``) it
+# name; under ``X19_TEST_ISOLATION`` (set by ``scripts/run_tests.sh`` / ``tests/conftest.py``) it
 # raises, which is what makes the suite the gate.
 
-STRICT = bool(os.environ.get("HERMES_TEST_ISOLATION"))
+STRICT = bool(os.environ.get("X19_TEST_ISOLATION"))
 _reported: set[str] = set()
 
 
@@ -110,7 +110,7 @@ def validate_params(contract: MethodContract | ServerRequestContract, params: di
             if err.get("type") == "extra_forbidden":
                 loc = ".".join(str(p) for p in err.get("loc", ())) or "params"
                 return None, (f"invalid params for {contract.name}: {loc}: {err.get('msg')} — the client and "
-                              "the Hermes backend are out of sync (different versions); run `hermes update` "
+                              "the X19 backend are out of sync (different versions); run `x19 update` "
                               "and restart both")
     return params, None
 

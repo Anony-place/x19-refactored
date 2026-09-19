@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Hermes Agent CLI — interactive terminal interface (``python cli.py --help`` for usage)."""
+"""X19 CLI — interactive terminal interface (``python cli.py --help`` for usage)."""
 
-# Must be the very first import (UTF-8 stdio on Windows). Missing only mid-``hermes update``.
+# Must be the very first import (UTF-8 stdio on Windows). Missing only mid-``x19 update``.
 try:
-    import hermes_bootstrap  # noqa: F401
+    import x19_bootstrap  # noqa: F401
 except ModuleNotFoundError:
     pass
 
@@ -28,23 +28,23 @@ from typing import List, Dict, Any, Optional, Mapping
 
 logger = logging.getLogger(__name__)
 
-os.environ["HERMES_QUIET"] = "1"  # suppress our modules' startup chatter
+os.environ["X19_QUIET"] = "1"  # suppress our modules' startup chatter
 
-from hermes_cli.fallback_config import get_fallback_chain
-from hermes_cli.cli_agent_setup_mixin import CLIAgentSetupMixin
-from hermes_cli.cli_commands_mixin import CLICommandsMixin
-from hermes_cli.cli_billing_mixin import CLIBillingMixin
-from hermes_cli.cli_loops_mixin import CLILoopsMixin
-from hermes_cli.cli_info_mixin import CLIInfoMixin
-from hermes_cli.cli_terminal_mixin import CLITerminalMixin
-from hermes_cli.cli_modal_mixin import CLIModalMixin
-from hermes_cli.cli_stream_mixin import CLIStreamMixin
-from hermes_cli.cli_session_mixin import CLISessionMixin
-from hermes_cli.cli_model_switch_mixin import CLIModelSwitchMixin
-from hermes_cli.cli_voice_mixin import CLIVoiceMixin
-from hermes_cli.cli_status_bar_mixin import CLIStatusBarMixin
-from hermes_cli.cli_tui_mixin import CLITuiMixin
-from hermes_cli.cli_process_notifications import CLIProcessNotificationsMixin
+from x19_cli.fallback_config import get_fallback_chain
+from x19_cli.cli_agent_setup_mixin import CLIAgentSetupMixin
+from x19_cli.cli_commands_mixin import CLICommandsMixin
+from x19_cli.cli_billing_mixin import CLIBillingMixin
+from x19_cli.cli_loops_mixin import CLILoopsMixin
+from x19_cli.cli_info_mixin import CLIInfoMixin
+from x19_cli.cli_terminal_mixin import CLITerminalMixin
+from x19_cli.cli_modal_mixin import CLIModalMixin
+from x19_cli.cli_stream_mixin import CLIStreamMixin
+from x19_cli.cli_session_mixin import CLISessionMixin
+from x19_cli.cli_model_switch_mixin import CLIModelSwitchMixin
+from x19_cli.cli_voice_mixin import CLIVoiceMixin
+from x19_cli.cli_status_bar_mixin import CLIStatusBarMixin
+from x19_cli.cli_tui_mixin import CLITuiMixin
+from x19_cli.cli_process_notifications import CLIProcessNotificationsMixin
 from agent.interrupt_compat import request_hard_interrupt
 from agent.pet import render as pet_render
 
@@ -63,7 +63,7 @@ except (ImportError, AttributeError):
     _STEADY_CURSOR = None
 
 try:
-    from hermes_cli import pt_input_extras as _pt_extras
+    from x19_cli import pt_input_extras as _pt_extras
 
     _pt_extras.install_shift_enter_alias()
     _pt_extras.install_ctrl_enter_alias()
@@ -121,7 +121,7 @@ def _reverse_alias_for_display(model_name: str) -> str:
                 rmap[m] = alias
 
         try:
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
             cfg = load_config() or {}
             ma = cfg.get("model_aliases")
             if isinstance(ma, dict):
@@ -162,20 +162,20 @@ def format_token_count_compact(*args, **kwargs):
 
 
 realign_markdown_tables = _lazy_shim("agent.markdown_tables", "realign_markdown_tables")
-from hermes_cli.banner import format_banner_version_label
+from x19_cli.banner import format_banner_version_label
 
 _COMMAND_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
 
-# ~/.hermes/.env first, project .env as dev fallback; user env files override stale shell exports.
-from hermes_constants import get_hermes_home
-from hermes_state_ids import new_session_id
-from hermes_cli.env_loader import load_hermes_dotenv
+# ~/.x19/.env first, project .env as dev fallback; user env files override stale shell exports.
+from x19_constants import get_x19_home
+from x19_state_ids import new_session_id
+from x19_cli.env_loader import load_x19_dotenv
 from utils import base_url_host_matches, base_url_hostname, fast_safe_load, is_truthy_value
 
-_hermes_home = get_hermes_home()
+_x19_home = get_x19_home()
 _project_env = Path(__file__).parent / '.env'
-load_hermes_dotenv(hermes_home=_hermes_home, project_env=_project_env)
+load_x19_dotenv(x19_home=_x19_home, project_env=_project_env)
 
 
 _REASONING_TAGS = ("REASONING_SCRATCHPAD", "think", "thinking", "reasoning", "thought")
@@ -235,12 +235,12 @@ def _assistant_copy_text(content: Any) -> str:
 
 
 def _load_prefill_messages(file_path: str) -> List[Dict[str, Any]]:
-    """Load prefill messages (JSON array) from *file_path*; relative to ~/.hermes/; missing/empty -> []."""
+    """Load prefill messages (JSON array) from *file_path*; relative to ~/.x19/; missing/empty -> []."""
     if not file_path:
         return []
     path = Path(file_path).expanduser()
     if not path.is_absolute():
-        path = _hermes_home / path
+        path = _x19_home / path
     if not path.exists():
         logger.warning("Prefill messages file not found: %s", path)
         return []
@@ -260,7 +260,7 @@ def _resolve_prefill_messages_file(config: Dict[str, Any]) -> str:
     """Prefill file path: env, then top-level ``prefill_messages_file``, then legacy ``agent.*``."""
     agent_cfg = config.get("agent", {})
     return (
-        os.getenv("HERMES_PREFILL_MESSAGES_FILE", "").strip()
+        os.getenv("X19_PREFILL_MESSAGES_FILE", "").strip()
         or str(config.get("prefill_messages_file", "") or "").strip()
         or (str(agent_cfg.get("prefill_messages_file", "") or "").strip() if isinstance(agent_cfg, dict) else "")
     )
@@ -268,7 +268,7 @@ def _resolve_prefill_messages_file(config: Dict[str, Any]) -> str:
 
 def _parse_reasoning_config(effort) -> dict | None:
     """Parse a reasoning effort level (string or YAML bool; ``false``/``off`` = disabled)."""
-    from hermes_constants import parse_reasoning_effort
+    from x19_constants import parse_reasoning_effort
     result = parse_reasoning_effort(effort)
     if effort and str(effort).strip() and result is None:
         logger.warning("Unknown reasoning_effort '%s', using default (medium)", effort)
@@ -341,7 +341,7 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
 
     # TERMINAL_CWD is force-exported (beats stale .env) except inside a gateway process,
     # whose config bridge already set it.
-    _is_gateway = os.environ.get("_HERMES_GATEWAY") == "1"
+    _is_gateway = os.environ.get("_X19_GATEWAY") == "1"
     for config_key, env_var in _TERMINAL_ENV_MAPPINGS.items():
         if config_key not in terminal_config:
             continue
@@ -371,15 +371,15 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
     if isinstance(security_config, dict):
         redact = security_config.get("redact_secrets")
         if redact is not None:
-            os.environ["HERMES_REDACT_SECRETS"] = str(redact).lower()
+            os.environ["X19_REDACT_SECRETS"] = str(redact).lower()
 
-    # Session-search index knobs (hermes_state reads the env carriers).
+    # Session-search index knobs (x19_state reads the env carriers).
     sessions_config = defaults.get("sessions", {})
     if isinstance(sessions_config, dict):
         if "cjk_fts" in sessions_config:
-            os.environ["HERMES_CJK_FTS"] = str(sessions_config["cjk_fts"])
+            os.environ["X19_CJK_FTS"] = str(sessions_config["cjk_fts"])
         if "search_slow_ms" in sessions_config:
-            os.environ["HERMES_SEARCH_SLOW_MS"] = str(sessions_config["search_slow_ms"])
+            os.environ["X19_SEARCH_SLOW_MS"] = str(sessions_config["search_slow_ms"])
 
 
 def _cli_config_defaults():
@@ -403,11 +403,11 @@ def _cli_config_defaults():
         "agent": {
             "max_turns": 500, "verbose": False, "system_prompt": "", "prefill_messages_file": "",  # max_turns shared with subagents
             "reasoning_effort": "", "service_tier": "",
-            "personalities": {},  # user overrides merged by name over hermes_cli.personality builtins
+            "personalities": {},  # user overrides merged by name over x19_cli.personality builtins
         },
         "display": {
             "compact": False,
-            # /resume recap tuning and show_reasoning: keep in sync with hermes_cli/config.py DEFAULT_CONFIG
+            # /resume recap tuning and show_reasoning: keep in sync with x19_cli/config.py DEFAULT_CONFIG
             "resume_display": "full", "resume_exchanges": 10, "resume_max_user_chars": 300,
             "resume_max_assistant_chars": 200, "resume_max_assistant_lines": 3, "resume_skip_tool_only": True,
             "show_reasoning": True, "reasoning_full": False, "streaming": True, "busy_input_mode": "interrupt",
@@ -434,7 +434,7 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
             defaults["model"]["default"] = file_config["model"]
         elif isinstance(file_config["model"], dict):
             defaults["model"].update(file_config["model"])
-            # Promote model.model -> model.default (HermesCLI checks "default" first).
+            # Promote model.model -> model.default (X19CLI checks "default" first).
             if "model" in file_config["model"] and "default" not in file_config["model"]:
                 defaults["model"]["default"] = file_config["model"]["model"]
 
@@ -460,12 +460,12 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
 
 
 def load_cli_config() -> Dict[str, Any]:
-    """~/.hermes/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
+    """~/.x19/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
 
-    ``HERMES_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
+    ``X19_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
     """
-    config_path = _hermes_home / 'config.yaml'
-    if not config_path.exists() or os.environ.get("HERMES_IGNORE_USER_CONFIG") == "1":
+    config_path = _x19_home / 'config.yaml'
+    if not config_path.exists() or os.environ.get("X19_IGNORE_USER_CONFIG") == "1":
         config_path = Path(__file__).parent / 'cli-config.yaml'
 
     defaults = _cli_config_defaults()
@@ -476,7 +476,7 @@ def load_cli_config() -> Dict[str, Any]:
     if config_path.exists():
         try:
             with open(config_path, "r", encoding="utf-8") as f:
-                from hermes_cli.config import _normalize_root_model_keys
+                from x19_cli.config import _normalize_root_model_keys
 
                 file_config = _normalize_root_model_keys(fast_safe_load(f) or {})
 
@@ -486,12 +486,12 @@ def load_cli_config() -> Dict[str, Any]:
             logger.warning("Failed to load cli-config.yaml: %s", e)
 
     # Expand ${ENV_VAR} references before bridging to env vars.
-    from hermes_cli.config import _expand_env_vars
+    from x19_cli.config import _expand_env_vars
     defaults = _expand_env_vars(defaults)
 
     # Administrator-pinned (managed scope) values overlay LAST; cli.py builds its config
-    # independently of hermes_cli.config, so this keeps parity with `hermes config`. Fail-open.
-    from hermes_cli import managed_scope
+    # independently of x19_cli.config, so this keeps parity with `x19 config`. Fail-open.
+    from x19_cli import managed_scope
 
     defaults = managed_scope.apply_managed_overlay(defaults)
 
@@ -510,9 +510,9 @@ def _init_logging_and_display_from_config() -> None:
         return CLI_CONFIG.get("display", {}).get(key, default)
 
     for step in (
-        lambda: _im("hermes_logging").setup_logging(mode="cli"),
-        lambda: _im("hermes_cli.config").print_config_warnings(),
-        lambda: _im("hermes_cli.skin_engine").init_skin_from_config(CLI_CONFIG),
+        lambda: _im("x19_logging").setup_logging(mode="cli"),
+        lambda: _im("x19_cli.config").print_config_warnings(),
+        lambda: _im("x19_cli.skin_engine").init_skin_from_config(CLI_CONFIG),
         lambda: _im("agent.display").set_tool_preview_max_len(int(_display("tool_preview_length", 0) or 0)),
         lambda: _im("agent.display").set_friendly_tool_labels(bool(_display("friendly_tool_labels", True))),
     ):
@@ -575,7 +575,7 @@ from rich.text import Text as _RichText
 
 # Agent/tool systems load lazily: bare startup only needs the prompt.
 def get_tool_definitions(*args, **kwargs):
-    from hermes_cli.mcp_startup import wait_for_mcp_discovery
+    from x19_cli.mcp_startup import wait_for_mcp_discovery
     from model_tools import get_tool_definitions as _get_tool_definitions
 
     wait_for_mcp_discovery()
@@ -633,18 +633,18 @@ def _prepare_deferred_agent_startup() -> None:
     global _deferred_agent_startup_done
     if _deferred_agent_startup_done:
         return
-    if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+    if os.environ.get("X19_DEFER_AGENT_STARTUP") != "1":
         return
     _deferred_agent_startup_done = True
-    _accept_hooks = os.environ.get("HERMES_ACCEPT_HOOKS", "").lower() in {"1", "true", "yes", "on"}
+    _accept_hooks = os.environ.get("X19_ACCEPT_HOOKS", "").lower() in {"1", "true", "yes", "on"}
     try:
-        from hermes_cli.plugins import discover_plugins
+        from x19_cli.plugins import discover_plugins
 
         discover_plugins()
     except Exception:
         logger.warning("plugin discovery failed at deferred CLI startup", exc_info=True)
     try:
-        from hermes_cli.mcp_startup import start_background_mcp_discovery
+        from x19_cli.mcp_startup import start_background_mcp_discovery
 
         start_background_mcp_discovery(logger=logger, thread_name="termux-cli-mcp-discovery")
     except Exception:
@@ -652,7 +652,7 @@ def _prepare_deferred_agent_startup() -> None:
     try:
         from agent.shell_hooks import register_from_config
         from agent.outbound_webhooks import register_from_config as register_outbound_webhooks
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
 
         _hooks_cfg = load_config()
         register_from_config(_hooks_cfg, accept_hooks=_accept_hooks)
@@ -679,8 +679,8 @@ def _float_env(name: str, default: float) -> float:
 
 
 def _exit_watchdog_timeout() -> float:
-    """``HERMES_EXIT_WATCHDOG_S`` as a float (default 30; ``0`` disables)."""
-    return _float_env("HERMES_EXIT_WATCHDOG_S", 30.0)
+    """``X19_EXIT_WATCHDOG_S`` as a float (default 30; ``0`` disables)."""
+    return _float_env("X19_EXIT_WATCHDOG_S", 30.0)
 
 
 def _arm_exit_watchdog(timeout_s: float | None = None, *, from_signal: bool = False) -> None:
@@ -688,7 +688,7 @@ def _arm_exit_watchdog(timeout_s: float | None = None, *, from_signal: bool = Fa
 
     Backstop for a cleanup step wedged on network I/O and for interpreter teardown
     blocked joining non-daemon threads (ThreadPoolExecutor's atexit join). The daemon
-    timer survives ``Py_FinalizeEx``'s joins. ``HERMES_EXIT_WATCHDOG_S=0`` disables.
+    timer survives ``Py_FinalizeEx``'s joins. ``X19_EXIT_WATCHDOG_S=0`` disables.
 
     1. 2. Interpreter teardown blocked joining non-daemon threads — stdlib ``ThreadPoolExecutor`` workers
     are joined unconditionally by ``concurrent.futures``' atexit hook even after ``shutdown(wait=False)``,
@@ -739,7 +739,7 @@ def _arm_exit_watchdog_on_shutdown_signal() -> None:
     several wedge points BEFORE ``_run_cleanup`` arms the normal watchdog: a main thread parked in a syscall
     that never observes the unwind, a prompt_toolkit teardown that never returns, or an agent worker
     blocking the ``finally``. When that happens the process has NO backstop and a "dead" CLI lingers
-    (observed: ``hermes --tui`` alive ~47 min at 4% CPU after terminal close — the #65998 class).
+    (observed: ``x19 --tui`` alive ~47 min at 4% CPU after terminal close — the #65998 class).
     """
     global _signal_watchdog_armed
     if _signal_watchdog_armed:
@@ -853,7 +853,7 @@ def _should_emit_cleanup_session_finalize(session_id: str | None) -> bool:
 
 def _notify_session_finalize(*, session_id: str | None, platform: str = "cli", reason: str = "shutdown") -> None:
     with suppress(Exception):
-        from hermes_cli.lifecycle import finalize_session
+        from x19_cli.lifecycle import finalize_session
         finalize_session(session_id=session_id, platform=platform, reason=reason)
 
 
@@ -866,7 +866,7 @@ def _oneshot_agent_and_session(cli):
 def _invoke_interrupted_session_end(agent, session_id, reason: str, **extra) -> None:
     """Best-effort ``on_session_end`` hook for a turn cut short (never raises)."""
     with suppress(Exception):
-        from hermes_cli.lifecycle import invoke_hook as _invoke_hook
+        from x19_cli.lifecycle import invoke_hook as _invoke_hook
         _invoke_hook(
             "on_session_end", session_id=session_id, completed=False, interrupted=True,
             model=getattr(agent, "model", None), platform=getattr(agent, "platform", None) or "cli",
@@ -1031,7 +1031,7 @@ def _reset_terminal_input_modes_on_exit() -> None:
         tty.flush()
 
 
-from hermes_cli.worktree_ops import (
+from x19_cli.worktree_ops import (
     _git_quiet,
     _git_repo_root,
     _maintain_pack_health,
@@ -1061,7 +1061,7 @@ def _cleanup_worktree(info: Dict[str, str] = None) -> None:
         if _repo_is_shallow(repo_root):
             # Shallow boundary makes the unpushed verdict unreliable; the startup pruner reaps later.
             _cprint(f"\n\033[33m⚠ Shallow clone — cannot verify push state, keeping: {wt_path}\033[0m")
-            print("  The next `hermes -w` session deepens the clone and prunes merged worktrees automatically.")
+            print("  The next `x19 -w` session deepens the clone and prunes merged worktrees automatically.")
         else:
             _cprint(f"\n\033[33m⚠ Worktree has unpushed commits, keeping: {wt_path}\033[0m")
             print(f"  To clean up manually: git worktree remove --force {wt_path}")
@@ -1082,15 +1082,15 @@ def _run_state_db_auto_maintenance(session_db) -> None:
     if session_db is None:
         return
     try:
-        from hermes_cli.config import load_config as _load_full_config
-        from hermes_constants import get_hermes_home as _get_hermes_home  # lazy: tests patch it
-        _hermes_home_maint = _get_hermes_home()
+        from x19_cli.config import load_config as _load_full_config
+        from x19_constants import get_x19_home as _get_x19_home  # lazy: tests patch it
+        _x19_home_maint = _get_x19_home()
 
         # One-time repairs, each latched in state_meta once it has run.
         for meta_key, repair, done_msg, skip_msg in (
             (
                 "ghost_session_prune_v1",
-                lambda: session_db.prune_empty_ghost_sessions(sessions_dir=_hermes_home_maint / "sessions"),
+                lambda: session_db.prune_empty_ghost_sessions(sessions_dir=_x19_home_maint / "sessions"),
                 "Pruned %d empty TUI ghost sessions", "Ghost session prune skipped: %s",
             ),
             (
@@ -1124,7 +1124,7 @@ def _run_state_db_auto_maintenance(session_db) -> None:
             min_interval_hours=int(cfg.get("min_interval_hours", 24)),
             min_vacuum_interval_days=int(cfg.get("min_vacuum_interval_days", 30)),
             vacuum=bool(cfg.get("vacuum_after_prune", True)),
-            sessions_dir=_hermes_home_maint / "sessions",
+            sessions_dir=_x19_home_maint / "sessions",
         )
     except Exception as exc:
         logger.debug("state.db auto-maintenance skipped: %s", exc)
@@ -1156,7 +1156,7 @@ def _hex_to_ansi(hex_color: str, *, bold: bool = False) -> str:
 
 
 # Light/dark terminal detection (mirrors ui-tui/src/theme.ts detectLightMode()). Priority:
-# HERMES_LIGHT/HERMES_TUI_LIGHT env, HERMES_TUI_THEME, HERMES_TUI_BACKGROUND, COLORFGBG
+# X19_LIGHT/X19_TUI_LIGHT env, X19_TUI_THEME, X19_TUI_BACKGROUND, COLORFGBG
 # (bg slot 7/15 = light), OSC 11 query, default dark. Cached so the terminal is queried once.
 _LIGHT_MODE_CACHE: bool | None = None
 _TRUE_RE = re.compile(r"^(1|true|on|yes|y)$")
@@ -1283,18 +1283,18 @@ def _heal_cooked_mode_drift(fd: int) -> bool:
 
 def _detect_light_mode_uncached() -> bool:
     """The detection ladder documented above; may raise (caller maps errors to dark)."""
-    for var in ("HERMES_LIGHT", "HERMES_TUI_LIGHT"):
+    for var in ("X19_LIGHT", "X19_TUI_LIGHT"):
         v = (os.environ.get(var) or "").strip().lower()
         if _TRUE_RE.match(v):
             return True
         if _FALSE_RE.match(v):
             return False
-    theme = (os.environ.get("HERMES_TUI_THEME") or "").strip().lower()
+    theme = (os.environ.get("X19_TUI_THEME") or "").strip().lower()
     if theme == "light":
         return True
     if theme == "dark":
         return False
-    bg_lum = _luminance_from_hex(os.environ.get("HERMES_TUI_BACKGROUND") or "")
+    bg_lum = _luminance_from_hex(os.environ.get("X19_TUI_BACKGROUND") or "")
     if bg_lum is not None:
         return bg_lum >= 0.5
     last = (os.environ.get("COLORFGBG") or "").strip().split(";")[-1]
@@ -1343,10 +1343,10 @@ def _maybe_remap_for_light_mode(hex_color: str) -> str:
 def _install_skin_light_mode_hook() -> None:
     """Wrap SkinConfig.get_color so EVERY skin color read goes through the light-mode remap. Idempotent."""
     try:
-        from hermes_cli.skin_engine import SkinConfig  # type: ignore[import]
+        from x19_cli.skin_engine import SkinConfig  # type: ignore[import]
     except Exception:
         return
-    if getattr(SkinConfig, "_hermes_light_mode_hook_installed", False):
+    if getattr(SkinConfig, "_x19_light_mode_hook_installed", False):
         return
     _orig_get_color = SkinConfig.get_color
 
@@ -1358,7 +1358,7 @@ def _install_skin_light_mode_hook() -> None:
             return value
 
     SkinConfig.get_color = _wrapped_get_color  # type: ignore[method-assign]
-    SkinConfig._hermes_light_mode_hook_installed = True  # type: ignore[attr-defined]
+    SkinConfig._x19_light_mode_hook_installed = True  # type: ignore[attr-defined]
 
 
 _install_skin_light_mode_hook()
@@ -1382,7 +1382,7 @@ class _SkinAwareAnsi:
     def __str__(self) -> str:
         if self._cached is None:
             try:
-                from hermes_cli.skin_engine import get_active_skin
+                from x19_cli.skin_engine import get_active_skin
                 self._cached = _hex_to_ansi(
                     get_active_skin().get_color(self._skin_key, self._fallback_hex),
                     bold=self._bold,
@@ -1422,7 +1422,7 @@ _d = functools.partial(_tty_wrap, sgr="\x1b[2;3m")  # dim-italic when stdout is 
 def _accent_hex() -> str:
     """Return the active skin accent color for legacy CLI output lines."""
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from x19_cli.skin_engine import get_active_skin
         return get_active_skin().get_color("ui_accent", "#FFBF00")
     except Exception:
         return "#FFBF00"
@@ -1879,11 +1879,11 @@ def _should_auto_attach_clipboard_image_on_paste(pasted_text: str) -> bool:
 
 
 _strip_leaked_bracketed_paste_wrappers = _lazy_shim(
-    "hermes_cli.input_sanitize", "strip_leaked_bracketed_paste_wrappers", "_strip_leaked_bracketed_paste_wrappers"
+    "x19_cli.input_sanitize", "strip_leaked_bracketed_paste_wrappers", "_strip_leaked_bracketed_paste_wrappers"
 )
 
 
-def _hermes_call_output_screen_diff(
+def _x19_call_output_screen_diff(
     orig_osd, app, output, screen, current_pos, color_depth, previous_screen, last_style, is_done, full_screen,
     attrs_for_style_string, style_string_has_style, size, previous_width,
 ):
@@ -1923,7 +1923,7 @@ def _apply_bracketed_paste_timeout_patch() -> None:
         from prompt_toolkit.keys import Keys as _PtKeys
         from prompt_toolkit.key_binding.key_processor import KeyPress as _PtKeyPress
 
-        if getattr(_vt100_mod, "_hermes_bp_timeout_patched", False):
+        if getattr(_vt100_mod, "_x19_bp_timeout_patched", False):
             return
 
         _BP_TIMEOUT_S = 2.0
@@ -1940,19 +1940,19 @@ def _apply_bracketed_paste_timeout_patch() -> None:
                     self_parser._in_bracketed_paste = False
                     remaining = self_parser._paste_buffer[end_index + len(end_mark):]
                     self_parser._paste_buffer = ""
-                    self_parser._hermes_bp_start = None
+                    self_parser._x19_bp_start = None
                     if remaining:
                         _patched_vt100_feed(self_parser, remaining)
                 else:
-                    bp_start = getattr(self_parser, "_hermes_bp_start", None)
+                    bp_start = getattr(self_parser, "_x19_bp_start", None)
                     now = time.monotonic()
                     if bp_start is None:
-                        self_parser._hermes_bp_start = now
+                        self_parser._x19_bp_start = now
                     elif now - bp_start > _BP_TIMEOUT_S:
                         paste_content = self_parser._paste_buffer
                         self_parser._in_bracketed_paste = False
                         self_parser._paste_buffer = ""
-                        self_parser._hermes_bp_start = None
+                        self_parser._x19_bp_start = None
                         if paste_content:
                             self_parser.feed_key_callback(_PtKeyPress(_PtKeys.BracketedPaste, paste_content))
                             logger.warning(
@@ -1970,7 +1970,7 @@ def _apply_bracketed_paste_timeout_patch() -> None:
                     self_parser._input_parser.send(c)
 
         _vt100_mod.Vt100Parser.feed = _patched_vt100_feed
-        _vt100_mod._hermes_bp_timeout_patched = True
+        _vt100_mod._x19_bp_timeout_patched = True
         logger.debug("Applied Vt100Parser bracketed-paste timeout patch (#16263)")
     except Exception as exc:  # noqa: BLE001 — defensive: never break startup
         logger.debug("Bracketed-paste timeout patch skipped: %s", exc)
@@ -2046,7 +2046,7 @@ def _enable_extended_enter_keys(output=None, env: Optional[Mapping[str, str]] = 
     mode as ``ESC[<codepoint>;<mod>u`` (plus the Esc key as ``ESC[27u``), modifyOtherKeys=2 as
     ``ESC[27;<mod>;<codepoint>~``. Stock prompt_toolkit 3.x maps almost none of these, which is why the CSI
     >1u push was temporarily removed in 87074 (Ctrl+C arrived as ``ESC[99;5u`` and died, #56684).
-    ``install_modify_other_keys_aliases()`` (called at CLI startup from ``hermes_cli.pt_input_extras``) now
+    ``install_modify_other_keys_aliases()`` (called at CLI startup from ``x19_cli.pt_input_extras``) now
     populates ``ANSI_SEQUENCES`` with the full Ctrl/Alt/Shift/multi-modifier and functional-key tables under
     BOTH formats, so every existing key binding continues to fire — including Ctrl+C, which is handled by
     prompt_toolkit's ``c-c`` binding (raw mode clears ISIG, so the kernel INTR path was never in play for
@@ -2141,7 +2141,7 @@ def _terminal_may_leak_cpr() -> bool:
 
     Delayed CPR replies (``ESC[<row>;<col>R`` / visible ``^[[<row>;<col>R``) leak into the status line and
     can freeze input when the reply is slow (#13870 on SSH/slow PTYs). The same race hits local POSIX TTYs
-    under heavy subagent / status-line load — see ``tests/hermes_cli/test_cpr_local_leak.py``.
+    under heavy subagent / status-line load — see ``tests/x19_cli/test_cpr_local_leak.py``.
     """
     return os.environ.get("PROMPT_TOOLKIT_NO_CPR", "") == "1" or sys.platform != "win32"
 
@@ -2278,11 +2278,10 @@ class ChatConsole:
         yield self
 
 
-
 def _build_compact_banner() -> str:
     """Build a compact banner that fits the current terminal width."""
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from x19_cli.skin_engine import get_active_skin
         _skin = get_active_skin()
     except Exception:
         _skin = None
@@ -2295,16 +2294,16 @@ def _build_compact_banner() -> str:
     dim_color = _color("banner_dim", "#B8860B")
 
     if (getattr(_skin, "name", "default") if _skin else "default") == "default":
-        tiny_line = "☤ NOUS HERMES"
+        tiny_line = "☤ NOUS X19"
     else:
-        tiny_line = _skin.get_branding("agent_name", "Hermes Agent") if _skin else "Hermes Agent"
+        tiny_line = _skin.get_branding("agent_name", "X19") if _skin else "X19"
     line1 = f"{tiny_line} - AI Agent Framework"
 
-    if os.environ.get("HERMES_FAST_STARTUP_BANNER") == "1":
-        from hermes_cli import __release_date__ as _release_date
-        from hermes_cli import __version__ as _version
+    if os.environ.get("X19_FAST_STARTUP_BANNER") == "1":
+        from x19_cli import __release_date__ as _release_date
+        from x19_cli import __version__ as _version
 
-        version_line = f"Hermes Agent v{_version} ({_release_date})"
+        version_line = f"X19 v{_version} ({_release_date})"
     else:
         version_line = format_banner_version_label()
 
@@ -2376,7 +2375,7 @@ build_bundle_invocation_message = _lazy_shim("agent.skill_bundles", "build_bundl
 def _get_plugin_cmd_handler_names() -> set:
     """Return plugin command names (without slash prefix) for dispatch matching."""
     try:
-        from hermes_cli.plugins import get_plugin_commands
+        from x19_cli.plugins import get_plugin_commands
         return set(get_plugin_commands().keys())
     except Exception:
         return set()
@@ -2392,23 +2391,23 @@ def _parse_skills_argument(skills: str | list[str] | tuple[str, ...] | None) -> 
 
 
 def save_config_value(key_path: str, value: any) -> bool:
-    """Persist dot-separated ``key_path`` = value into HERMES_HOME/config.yaml; True on success.
+    """Persist dot-separated ``key_path`` = value into X19_HOME/config.yaml; True on success.
 
     Never the repo's cli-config.yaml: no config reader loads it, so the value would vanish.
     """
-    config_path = get_hermes_home() / 'config.yaml'
+    config_path = get_x19_home() / 'config.yaml'
 
     try:
-        from hermes_constants import mkdir_under_hermes_home
-        mkdir_under_hermes_home(config_path.parent)
+        from x19_constants import mkdir_under_x19_home
+        mkdir_under_x19_home(config_path.parent)
         from utils import atomic_roundtrip_yaml_update
         atomic_roundtrip_yaml_update(config_path, key_path, value)
         try:  # owner-only: config files contain API keys
             os.chmod(config_path, 0o600)
         except (OSError, NotImplementedError):
             pass
-        # Same unpinned-cron notice as `hermes config set` for every model switch.
-        from hermes_cli.config import warn_unpinned_cron_jobs_after_model_config_change
+        # Same unpinned-cron notice as `x19 config set` for every model switch.
+        from x19_cli.config import warn_unpinned_cron_jobs_after_model_config_change
 
         warn_unpinned_cron_jobs_after_model_config_change(key_path, value)
         return True
@@ -2421,7 +2420,7 @@ def _normalize_moa_model(model: Optional[str]) -> tuple[Optional[str], Optional[
     """``moa:<preset>`` -> ``("moa", preset)`` (same routing as ``/moa``); anything else -> ``(None, model)``.
 
     Returns ``("moa", "<preset>")`` when *model* selects the MoA virtual provider, otherwise ``(None,
-    model)`` unchanged. This gives non-interactive ``hermes chat -Q -m moa:<preset>`` the same routing the
+    model)`` unchanged. This gives non-interactive ``x19 chat -Q -m moa:<preset>`` the same routing the
     interactive ``/moa`` command and the model picker already use: ``resolve_runtime_provider`` handles
     ``requested_provider == "moa"`` and ``agent_init`` builds the MoAClient off ``provider == "moa"``.
     Without this the raw ``moa:<preset>`` string is sent to the real provider and rejected with a 401/400
@@ -2433,7 +2432,7 @@ def _normalize_moa_model(model: Optional[str]) -> tuple[Optional[str], Optional[
             return "moa", preset
     return None, model
 
-_split_model_config_default = _lazy_shim("hermes_cli.config", "split_model_config_default", "_split_model_config_default")
+_split_model_config_default = _lazy_shim("x19_cli.config", "split_model_config_default", "_split_model_config_default")
 
 
 class _VoiceInputMessage:
@@ -2521,14 +2520,14 @@ class _ChatTurn:
     stop_event: Optional[threading.Event] = None
     tts_normal_exit: bool = False
     voice_prefix: str = ""
-from hermes_cli.cli_chat_turn_mixin import CLIChatTurnMixin
+from x19_cli.cli_chat_turn_mixin import CLIChatTurnMixin
 
 
 _PASTE_REF_RE = re.compile(r'\[Pasted text #\d+: \d+ lines \u2192 (.+?)\]')
 
 
-class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin, CLITuiMixin, CLIStatusBarMixin, CLIVoiceMixin, CLIModelSwitchMixin, CLISessionMixin, CLIStreamMixin, CLIModalMixin, CLITerminalMixin, CLIInfoMixin, CLILoopsMixin, CLIChatTurnMixin):
-    """Interactive REPL for the Hermes Agent."""
+class X19CLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin, CLITuiMixin, CLIStatusBarMixin, CLIVoiceMixin, CLIModelSwitchMixin, CLISessionMixin, CLIStreamMixin, CLIModalMixin, CLITerminalMixin, CLIInfoMixin, CLILoopsMixin, CLIChatTurnMixin):
+    """Interactive REPL for the X19."""
 
     # Seeded -q first message (see _should_seed_interactive); run() re-creates
     # _pending_input, so it is enqueued only after the fresh queue exists.
@@ -2574,7 +2573,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         self._focus_saved_tool_progress = self._focus_last_counted_tool = None
         self._focus_hidden_lines = 0
         if self._focus_view_enabled:
-            from hermes_cli.focus_view import FOCUS_TOOL_PROGRESS_MODE, normalize_tool_progress_mode
+            from x19_cli.focus_view import FOCUS_TOOL_PROGRESS_MODE, normalize_tool_progress_mode
 
             self._focus_saved_tool_progress = normalize_tool_progress_mode(self.tool_progress_mode)
             self.tool_progress_mode = FOCUS_TOOL_PROGRESS_MODE
@@ -2649,10 +2648,10 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         # resume must not clobber an explicit -m with the session's stored model.
         self._explicit_model_override = bool(model)
         self.model = model or _config_model or ""
-        _cfg_provider = _model_config.get("provider") or os.getenv("HERMES_INFERENCE_PROVIDER")
+        _cfg_provider = _model_config.get("provider") or os.getenv("X19_INFERENCE_PROVIDER")
         _startup_provider_override = _startup_base_url_override = _startup_api_key_override = ""
         if self.model:
-            from hermes_cli.model_switch import resolve_startup_model_route
+            from x19_cli.model_switch import resolve_startup_model_route
 
             _startup_route = resolve_startup_model_route(
                 self.model,
@@ -2675,7 +2674,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         if self.model == "":  # auto-detect from a local server
             _base_url = _model_config.get("base_url") or ""
             if base_url_hostname(_base_url) in ("localhost", "127.0.0.1"):
-                from hermes_cli.runtime_provider import _auto_detect_local_model
+                from x19_cli.runtime_provider import _auto_detect_local_model
                 self.model = _auto_detect_local_model(_base_url) or self.model
         # Provider normalisation may silently override the default but must warn for an
         # explicit choice (a config model equal to the global fallback is NOT explicit).
@@ -2696,7 +2695,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         # Explicit `-m` still wins. See #86978.
         if not model and provider:
             try:
-                from hermes_cli.runtime_provider import _get_named_custom_provider
+                from x19_cli.runtime_provider import _get_named_custom_provider
 
                 _named_custom = _get_named_custom_provider(provider)
             except Exception as exc:
@@ -2729,10 +2728,10 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         # resolve_turn_limit() accepts "none"/"unlimited" (-> sys.maxsize) alongside ints.
         # KEEP the root-level CLI_CONFIG["max_turns"] fallback: it is never migrated on disk
         # and other config paths may bypass the load-time fold.
-        from hermes_cli.config import resolve_turn_limit as _resolve_turn_limit
+        from x19_cli.config import resolve_turn_limit as _resolve_turn_limit
         self.max_turns = _resolve_turn_limit(next(
             (v for v in (max_turns, CLI_CONFIG["agent"].get("max_turns"), CLI_CONFIG.get("max_turns")) if v is not None),
-            os.getenv("HERMES_MAX_ITERATIONS"),
+            os.getenv("X19_MAX_ITERATIONS"),
         ))
         self.run_budget_seconds = run_budget if run_budget is not None else CLI_CONFIG["agent"].get("run_budget_seconds")
 
@@ -2759,22 +2758,22 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         self.checkpoint_max_file_size_mb = cp_cfg.get("max_file_size_mb", 10)
         self.pass_session_id = pass_session_id
         # --ignore-rules: AIAgent skips context files (AGENTS.md/SOUL.md/...) and memory.
-        self.ignore_rules = ignore_rules or is_truthy_value(os.environ.get("HERMES_IGNORE_RULES"))
+        self.ignore_rules = ignore_rules or is_truthy_value(os.environ.get("X19_IGNORE_RULES"))
 
     def _init_prompt_and_reasoning(self, reasoning):
         """Ephemeral system prompt/prefill, reasoning + service tier, OpenRouter routing knobs, fallback chain."""
-        # Env var wins, then hermes_cli.personality (single owner of overlay resolution).
-        from hermes_cli.personality import available_personalities, resolve_ephemeral_system_prompt
+        # Env var wins, then x19_cli.personality (single owner of overlay resolution).
+        from x19_cli.personality import available_personalities, resolve_ephemeral_system_prompt
 
-        self.system_prompt = os.getenv("HERMES_EPHEMERAL_SYSTEM_PROMPT", "") or resolve_ephemeral_system_prompt(CLI_CONFIG)
+        self.system_prompt = os.getenv("X19_EPHEMERAL_SYSTEM_PROMPT", "") or resolve_ephemeral_system_prompt(CLI_CONFIG)
         self.personalities = available_personalities(CLI_CONFIG)
 
         self.prefill_messages = _load_prefill_messages(_resolve_prefill_messages_file(CLI_CONFIG))
 
         # Per-model override > global reasoning_effort.
         # Reasoning config (OpenRouter reasoning effort level) Per-model override > global reasoning_effort
-        # — resolved through the shared chokepoint in hermes_constants (Closes #21256).
-        from hermes_constants import resolve_reasoning_config
+        # — resolved through the shared chokepoint in x19_constants (Closes #21256).
+        from x19_constants import resolve_reasoning_config
         self.reasoning_config = resolve_reasoning_config(CLI_CONFIG, self.model)
         # --reasoning wins for this run only (never persisted); unparseable -> warn and ignore.
         if reasoning is not None and str(reasoning).strip():
@@ -2826,7 +2825,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         self.session_id = resume or new_session_id(self.session_start)
         getattr(self, "_write_terminal_breadcrumb", lambda: None)()
 
-        self._history_file = _hermes_home / ".hermes_history"
+        self._history_file = _x19_home / ".x19_history"
         self._last_invalidate: float | None = None  # throttles UI repaints (None = never; monotonic epoch is arbitrary)
         self._init_ui_state()
 
@@ -2839,7 +2838,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # path a moment later from the REPL thread, and a second writer repeats the full
             # open (the /proc-wide deleted-WAL scan, ~4k readlinks) while the render thread
             # holds the GIL — that repeat was the post-banner freeze before the first prompt.
-            from hermes_state_registry import acquire
+            from x19_state_registry import acquire
             self._session_db = acquire()
         except Exception as e:
             # Without a store the transcript is NOT persisted while the chat looks healthy,
@@ -2850,7 +2849,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # the store before relying on resume.
             self._session_db_unavailable = True
             logger.warning("Failed to initialize SessionDB — session will NOT be indexed for search: %s", e)
-            from hermes_state_user_copy import describe_storage_failure, storage_failure_details
+            from x19_state_user_copy import describe_storage_failure, storage_failure_details
             failure = describe_storage_failure(e)
             def _present_store_warning():
                 try:
@@ -2896,7 +2895,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         self._clarify_deadline = self._sudo_deadline = self._approval_deadline = self._slash_confirm_deadline = 0
         self._approval_lock = threading.Lock()
         try:  # composer placeholder chosen once so it stays stable on screen
-            from hermes_cli.tips import get_random_composer_placeholder
+            from x19_cli.tips import get_random_composer_placeholder
             self._composer_placeholder = get_random_composer_placeholder()
         except Exception:
             self._composer_placeholder = ""
@@ -2925,7 +2924,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         self._attached_images: list[Path] = []
         self._image_counter = 0
         # Ctrl+S prompt stash; in-memory only because drafts routinely contain secrets.
-        from hermes_cli.prompt_stash import PromptStash as _PromptStash
+        from x19_cli.prompt_stash import PromptStash as _PromptStash
         self._prompt_stash = _PromptStash()
         self.preloaded_skills: list[str] = []
         self._startup_skills_line_shown = False
@@ -2975,7 +2974,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         if self._active_session_lease is not None:
             return True
         try:
-            from hermes_cli.active_sessions import format_refusal_stderr, try_acquire_active_session
+            from x19_cli.active_sessions import format_refusal_stderr, try_acquire_active_session
 
             lease, message = try_acquire_active_session(
                 session_id=self.session_id,
@@ -3045,7 +3044,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
     def _show_security_advisories(self):
         """Startup banner for unacked security advisories, on stderr (piped stdout stays clean); 24h rate-limited."""
         try:
-            from hermes_cli.security_advisories import detect_compromised, startup_banner
+            from x19_cli.security_advisories import detect_compromised, startup_banner
 
             banner = startup_banner(detect_compromised())
             if banner:
@@ -3097,7 +3096,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
                 logger.warning(
                     "Unknown skill(s) requested, skipping: %s. "
                     "Continuing with: %s. "
-                    "List available skills with `hermes skills list`.",
+                    "List available skills with `x19 skills list`.",
                     missing_display,
                     ", ".join(loaded_skills),
                 )
@@ -3114,7 +3113,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # registry walk already loaded plus the pure notices module (a heavy import here races
             # importlib's module locks against the main thread).
             from model_tools import check_tool_availability
-            from hermes_cli.tool_availability_notices import (
+            from x19_cli.tool_availability_notices import (
                 current_terminal_backend, filter_to_enabled_toolsets, tool_availability_warning_lines,
             )
             from tools.terminal_tool import terminal_backend_unavailable_reason
@@ -3122,7 +3121,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
 
             _, unavailable = check_tool_availability()
             # Only toolsets this CLI session actually has. The selection is usually a composite bundle
-            # (``hermes-cli``), so expand it to tool names before matching — a raw name comparison
+            # (``x19-cli``), so expand it to tool names before matching — a raw name comparison
             # matched nothing on a default install and silently dropped the terminal notice.
             unavailable = filter_to_enabled_toolsets(unavailable, self.enabled_toolsets or [], resolve_toolset)
             lines = tool_availability_warning_lines(
@@ -3141,7 +3140,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         terminal_cwd = os.getenv("TERMINAL_CWD", os.getcwd())
         terminal_timeout = os.getenv("TERMINAL_TIMEOUT", "60")
 
-        config_path = _hermes_home / 'config.yaml'
+        config_path = _x19_home / 'config.yaml'
         if not config_path.exists():
             config_path = Path(__file__).parent / 'cli-config.yaml'
         config_status = "(loaded)" if config_path.exists() else "(not found)"
@@ -3236,15 +3235,15 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         cmd_lower = command.lower().strip()  # lowercase only for matching; args keep their case
         cmd_original = command.strip()
 
-        # Aliases resolve via the central registry (hermes_cli/commands.py).
-        from hermes_cli.commands import resolve_command as _resolve_cmd
+        # Aliases resolve via the central registry (x19_cli/commands.py).
+        from x19_cli.commands import resolve_command as _resolve_cmd
         _base_word = cmd_lower.split()[0].lstrip("/")
         _cmd_def = _resolve_cmd(_base_word)
         canonical = _cmd_def.name if _cmd_def else _base_word
 
         # Observer-only pre_command plugin hook (return values ignored; never raises).
         if _cmd_def is not None:
-            from hermes_cli.plugins import fire_pre_command_hook
+            from x19_cli.plugins import fire_pre_command_hook
             fire_pre_command_hook(
                 surface="cli", command=canonical, alias_used=_base_word, args_raw=_slash_args(cmd_original),
                 session_key=getattr(self, "session_id", None), platform="cli",
@@ -3310,7 +3309,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # shell=True is intentional (user-authored config snippets, never LLM controlled);
             # the env is sanitized because this process holds every API key.
             from tools.environments.local import build_subprocess_env
-            from hermes_cli._subprocess_compat import windows_hide_flags
+            from x19_cli._subprocess_compat import windows_hide_flags
             result = subprocess.run(
                 exec_cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace",
                 timeout=30, env=build_subprocess_env(),
@@ -3330,7 +3329,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         return True
 
     def _run_plugin_slash_command(self, base_cmd: str, user_args: str) -> None:
-        from hermes_cli.plugins import get_plugin_command_handler, resolve_plugin_command_result
+        from x19_cli.plugins import get_plugin_command_handler, resolve_plugin_command_result
 
         plugin_handler = get_plugin_command_handler(base_cmd.lstrip("/"))
         if not plugin_handler:
@@ -3386,7 +3385,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
 
     def _expand_slash_prefix(self, cmd_original: str, cmd_lower: str, skill_commands, skill_bundles) -> bool:
         """Unique-prefix expansion against built-in COMMANDS + skill commands/bundles (agrees with tab-completion)."""
-        from hermes_cli.commands import COMMANDS
+        from x19_cli.commands import COMMANDS
         typed_base = cmd_lower.split()[0]
         all_known = set(COMMANDS) | set(skill_commands) | set(skill_bundles)
         matches = [c for c in all_known if c.startswith(typed_base)]
@@ -3407,7 +3406,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             _cprint(f"{_DIM}Did you mean: {', '.join(sorted(matches))}?{_RST}")
         else:
             # Exact token with no handler (never re-dispatch the same token: recursion), or no match.
-            from hermes_cli.cli_unknown_command import unknown_command_lines
+            from x19_cli.cli_unknown_command import unknown_command_lines
             lead, pointer = unknown_command_lines(cmd_lower, all_known)
             _cprint(f"\033[1;31m{lead}{_RST}")
             _cprint(f"{_DIM}{_ACCENT}{pointer}{_RST}")
@@ -3668,10 +3667,10 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             self._display_resumed_history()
 
         _welcome_skin = None  # stays None when the skin engine failed
-        _welcome_text = "Welcome to Hermes Agent! Type your message or /help for commands."
+        _welcome_text = "Welcome to X19! Type your message or /help for commands."
         _welcome_color = "#FFF8DC"
         try:
-            from hermes_cli.skin_engine import get_active_skin
+            from x19_cli.skin_engine import get_active_skin
             _welcome_skin = get_active_skin()
             _welcome_text = _welcome_skin.get_branding("welcome", _welcome_text)
             _welcome_color = _welcome_skin.get_color("banner_text", _welcome_color)
@@ -3694,13 +3693,13 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         """Idle-window prewarms (picker cache, agent runtime imports) plus the redaction-off and OpenClaw-residue banners."""
         # Warm the /model picker cache off-thread (else its first open blocks ~1-2s).
         with suppress(Exception):
-            from hermes_cli.model_switch_providers import prewarm_picker_cache_async
+            from x19_cli.model_switch_providers import prewarm_picker_cache_async
             prewarm_picker_cache_async()
 
         # Pre-import the agent runtime (~1.5s: run_agent + OpenAI SDK) off-thread; the import
         # lock makes an early submit block on the remaining work rather than redo it.
         # Skipped when Termux defers agent startup on purpose.
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+        if os.environ.get("X19_DEFER_AGENT_STARTUP") != "1":
             def _prewarm_agent_runtime() -> None:
                 try:
                     import run_agent  # noqa: F401  (imports model_tools + tool registry)
@@ -3715,11 +3714,11 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # The redactor snapshots its state at import time so any toggle now won't affect the running
             # process — we just want the operator to see that they're running without the safety net. See
             # #17691.
-            _redact_raw = os.getenv("HERMES_REDACT_SECRETS", "true")
+            _redact_raw = os.getenv("X19_REDACT_SECRETS", "true")
             if _redact_raw.lower() not in {"1", "true", "yes", "on"}:
                 self._console_print(
                     "[bold red]⚠  Secret redaction is DISABLED[/] "
-                    f"(HERMES_REDACT_SECRETS={_redact_raw}). "
+                    f"(X19_REDACT_SECRETS={_redact_raw}). "
                     "API keys and tokens may appear verbatim in chat output, "
                     "session JSONs, and logs. Set "
                     "[cyan]security.redact_secrets: true[/] in config.yaml "
@@ -3737,7 +3736,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
                     _resid_color = "#B8860B"
                 self._console_print(f"[{_resid_color}]{openclaw_residue_hint_cli()}[/]")
                 try:
-                    from hermes_cli.config import get_config_path as _get_cfg_path_resid
+                    from x19_cli.config import get_config_path as _get_cfg_path_resid
                     mark_seen(_get_cfg_path_resid(), OPENCLAW_RESIDUE_FLAG)
                 except Exception:
                     pass  # banner fires again next session
@@ -3828,7 +3827,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             print(
                 "Error: stdin (fd 0) is not available.\n"
                 "This can happen with certain Python installations (e.g. uv-managed cPython on macOS).\n"
-                "Try reinstalling Python via pyenv or Homebrew, then re-run: hermes setup"
+                "Try reinstalling Python via pyenv or Homebrew, then re-run: x19 setup"
             )
             return False
         if sys.platform == "darwin":
@@ -3883,11 +3882,11 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             import prompt_toolkit.renderer as _pt_renderer
             from prompt_toolkit.renderer import _output_screen_diff as _orig_osd
 
-            if not getattr(_pt_renderer, "_hermes_osd_patched", False):
+            if not getattr(_pt_renderer, "_x19_osd_patched", False):
                 _pt_renderer._output_screen_diff = functools.partial(
-                    _hermes_call_output_screen_diff, _orig_osd
+                    _x19_call_output_screen_diff, _orig_osd
                 )
-                _pt_renderer._hermes_osd_patched = True
+                _pt_renderer._x19_osd_patched = True
         except Exception:
             pass
 
@@ -3948,7 +3947,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
                     f"\nError: stdin is not usable ({_stdin_err}).\n"
                     "This can happen with certain Python installations (e.g. uv-managed cPython on macOS)\n"
                     "where kqueue cannot register fd 0.\n"
-                    "Try reinstalling Python via pyenv or Homebrew, then re-run: hermes setup"
+                    "Try reinstalling Python via pyenv or Homebrew, then re-run: x19 setup"
                 )
             else:
                 raise
@@ -3958,7 +3957,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         # /update relaunch happens here, after prompt_toolkit restored terminal modes, on the
         # main thread (the process_loop thread would skip cleanup / only exit itself on Windows).
         if self._pending_relaunch:
-            from hermes_cli.relaunch import relaunch
+            from x19_cli.relaunch import relaunch
             relaunch(self._pending_relaunch, preserve_inherited=False)
 
     def _tui_shutdown(self):
@@ -4002,7 +4001,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
                 # /exit --delete: remove transcripts + SQLite history.
                 try:
                     _sid = self.agent.session_id
-                    if self._session_db.delete_session(_sid, sessions_dir=get_hermes_home() / "sessions"):
+                    if self._session_db.delete_session(_sid, sessions_dir=get_x19_home() / "sessions"):
                         _cprint(f"  {_DIM}✓ Session {_escape(_sid)} deleted{_RST}")
                     else:
                         _cprint(f"  {_DIM}✗ Session {_escape(_sid)} not found for deletion{_RST}")
@@ -4025,7 +4024,7 @@ def _int_or(value, default: int) -> int:
 
 
 def _interrupt_agent_for_signal(agent, signum) -> None:
-    """Hard-interrupt ``agent`` for a shutdown signal, then sleep ``HERMES_SIGTERM_GRACE`` (1.5 s).
+    """Hard-interrupt ``agent`` for a shutdown signal, then sleep ``X19_SIGTERM_GRACE`` (1.5 s).
 
     The grace lets the agent thread kill the tool's setsid subprocess group before the
     main thread unwinds (else an orphan child). Never raises.
@@ -4033,31 +4032,31 @@ def _interrupt_agent_for_signal(agent, signum) -> None:
     try:
         if agent is not None:
             request_hard_interrupt(agent, f"received signal {signum}")
-            _grace = _float_env("HERMES_SIGTERM_GRACE", 1.5)
+            _grace = _float_env("X19_SIGTERM_GRACE", 1.5)
             if _grace > 0:
                 time.sleep(_grace)
     except Exception:
         pass  # never block signal handling
 
 
-def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str, run_turn=None, log=None) -> None:
+def _run_kanban_goal_loop_q(cli: "X19CLI", first_response: str, run_turn=None, log=None) -> None:
     """Drive a kanban goal_mode worker through ``goals.run_kanban_goal_loop`` after its first turn.
 
     ``run_turn`` defaults to the bare ``-Q`` turn (final answer only). The ``-q`` worker path
     passes ``cli.chat`` so every follow-up turn keeps the tool activity feed that the Kanban
     worker log is made of. The caller swallows all errors: a broken loop must never wedge a worker.
     """
-    task_id = (os.environ.get("HERMES_KANBAN_TASK") or "").strip()
+    task_id = (os.environ.get("X19_KANBAN_TASK") or "").strip()
     if not task_id:
         return
-    raw_run_id = (os.environ.get("HERMES_KANBAN_RUN_ID") or "").strip()
+    raw_run_id = (os.environ.get("X19_KANBAN_RUN_ID") or "").strip()
     worker_run_id = _int_or(raw_run_id, None) if raw_run_id else None
     if raw_run_id and worker_run_id is None:
-        logger.warning("invalid HERMES_KANBAN_RUN_ID=%r", raw_run_id)
+        logger.warning("invalid X19_KANBAN_RUN_ID=%r", raw_run_id)
 
-    from hermes_cli import kanban_db as _kb
-    from hermes_cli import kanban_db_connect as _kbc
-    from hermes_cli.goals import run_kanban_goal_loop as _run_loop, DEFAULT_MAX_TURNS as _DEF_TURNS
+    from x19_cli import kanban_db as _kb
+    from x19_cli import kanban_db_connect as _kbc
+    from x19_cli.goals import run_kanban_goal_loop as _run_loop, DEFAULT_MAX_TURNS as _DEF_TURNS
 
     # Goal text = title + body (the acceptance criteria the judge evaluates against).
     with _kbc.connect_closing() as conn:
@@ -4093,7 +4092,7 @@ def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str, run_turn=None
     )
 
 
-def _run_kanban_goal_loop_chat(cli: "HermesCLI", first_response: str) -> None:
+def _run_kanban_goal_loop_chat(cli: "X19CLI", first_response: str) -> None:
     """``-q`` worker variant: follow-up turns go through ``cli.chat`` (tool feed stays on stdout,
     which is the Kanban worker log) and judge verdicts are printed there too, so a goal_mode card's
     log reads like any other worker's instead of staying blank until the final answer."""
@@ -4124,7 +4123,7 @@ def _single_query_exit_code(result) -> int:
 
     0 only when the turn completed; 130 when it was interrupted; 1 when it failed, stopped
     partway (`partial`, `completed: False`) or never ran at all (credentials / agent init
-    failed, so ``result`` is not a dict). A Kanban worker (``HERMES_KANBAN_TASK`` set) that
+    failed, so ``result`` is not a dict). A Kanban worker (``X19_KANBAN_TASK`` set) that
     failed purely on a provider rate-limit / billing wall exits ``KANBAN_RATE_LIMIT_EXIT_CODE``
     (EX_TEMPFAIL): the dispatcher books that run ``rate_limited`` and requeues the task
     WITHOUT counting a failure, so a quota window or a provider outage cannot trip the breaker.
@@ -4135,8 +4134,8 @@ def _single_query_exit_code(result) -> int:
         return 130
     if not (result.get("failed") or result.get("partial") or result.get("completed") is False):
         return 0
-    if os.environ.get("HERMES_KANBAN_TASK") and result.get("failure_reason") in _TRANSIENT_PROVIDER_REASONS:
-        from hermes_cli.kanban_db import KANBAN_RATE_LIMIT_EXIT_CODE
+    if os.environ.get("X19_KANBAN_TASK") and result.get("failure_reason") in _TRANSIENT_PROVIDER_REASONS:
+        from x19_cli.kanban_db import KANBAN_RATE_LIMIT_EXIT_CODE
         return KANBAN_RATE_LIMIT_EXIT_CODE
     return 1
 
@@ -4144,13 +4143,13 @@ def _single_query_exit_code(result) -> int:
 def _run_quiet_single_query(cli, effective_query, emitter=None):
     """Quiet (-Q) one-shot turn: run, print the response (stderr for errors/session_id), then sys.exit with the automation exit code.
     With a ``StreamJsonEmitter`` the final answer and the exit line become the terminal ``result`` JSONL record instead.
-    HERMES_TURN_AUTHOR (set only by a bot-to-bot dispatcher) is consumed here so tool subprocesses do not inherit it.
+    X19_TURN_AUTHOR (set only by a bot-to-bot dispatcher) is consumed here so tool subprocesses do not inherit it.
     Nested Bot Mode notifies bind this session's key (not the dispatcher's) and resume in-process
     before stdout is printed, so a teammate reply is the quiet run's final answer rather than a
     stranded receipt."""
     from agent.interrupt_compat import _accepts_keyword
     from agent.turn_author import take_turn_author_from_env
-    from hermes_cli.quiet_single_query import (
+    from x19_cli.quiet_single_query import (
         adopt_unanswered_turn, bind_quiet_session_key, continue_quiet_notify_completions,
         quiet_notify_linger_seconds,
     )
@@ -4220,7 +4219,7 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
 
     # Kanban goal_mode: keep working in THIS session until a judge agrees the card is
     # done, the worker terminates it, or the turn budget runs out (sticky block).
-    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1":
+    if os.environ.get("X19_KANBAN_GOAL_MODE") == "1":
         try:
             _run_kanban_goal_loop_q(cli, response)
         except Exception as _goal_exc:
@@ -4248,7 +4247,7 @@ def _route_single_query_images(cli, query, effective_query, single_query_images,
     try:
         from agent.image_routing import build_native_content_parts as _build_parts  # noqa: F811
         from agent.image_routing import decide_image_input_mode
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
 
         _img_mode = decide_image_input_mode(
             (cli.provider or "").strip(), (cli.model or "").strip(), load_config(),
@@ -4282,12 +4281,12 @@ def _route_single_query_images(cli, query, effective_query, single_query_images,
 def _collect_kanban_task_images(single_query_images):
     """Kanban workers: image paths/URLs in the task body join the first turn's attachments."""
     single_query_image_urls: list[str] = []
-    _kanban_task_id = os.environ.get("HERMES_KANBAN_TASK", "").strip()
+    _kanban_task_id = os.environ.get("X19_KANBAN_TASK", "").strip()
     if not _kanban_task_id:
         return single_query_image_urls
     try:
-        from hermes_cli import kanban_db as _kb
-        from hermes_cli import kanban_db_connect as _kbc
+        from x19_cli import kanban_db as _kb
+        from x19_cli import kanban_db_connect as _kbc
         from agent.image_routing import extract_image_refs as _extract_refs
 
         with _kbc.connect_closing() as _conn:
@@ -4332,7 +4331,7 @@ def _install_single_query_signal_handlers(cli):
         # + stdout/stderr first so the final debug trace isn't lost; SIGALRM deadman guards the flush
         # against any rare blocking-I/O case (the reporter measured flush in <1ms; the alarm is a failsafe,
         # not the common path).
-        if os.environ.get("HERMES_KANBAN_TASK"):
+        if os.environ.get("X19_KANBAN_TASK"):
             with suppress(Exception):
                 if hasattr(_signal, "SIGALRM"):
                     _signal.signal(_signal.SIGALRM, lambda *_: os._exit(0))
@@ -4354,7 +4353,7 @@ def _install_single_query_signal_handlers(cli):
 
 
 def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url, max_turns, run_budget, verbose, compact, resume, checkpoints, pass_session_id, ignore_rules, skills):
-    """Resolve the toolset list (explicit / coding posture / platform default), construct HermesCLI, and start the background skills preload."""
+    """Resolve the toolset list (explicit / coding posture / platform default), construct X19CLI, and start the background skills preload."""
     toolsets_list = None
     if isinstance(toolsets, str) and toolsets:
         toolsets_list = [t.strip() for t in toolsets.split(",")]
@@ -4371,13 +4370,13 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
         except Exception:
             toolsets_list = None
         if toolsets_list is None:
-            from hermes_cli.tools_config import _get_platform_tools
+            from x19_cli.tools_config import _get_platform_tools
             toolsets_list = sorted(_get_platform_tools(CLI_CONFIG, "cli"))
 
     parsed_skills = _parse_skills_argument(skills)
 
     try:
-        cli = HermesCLI(
+        cli = X19CLI(
             model=model,
             toolsets=toolsets_list,
             provider=provider,
@@ -4395,7 +4394,7 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
         )
     except ImportError as e:
         # Direct `python cli.py` bypasses cmd_chat's partial-update ImportError handler.
-        from hermes_constants import emit_partial_update_hint
+        from x19_constants import emit_partial_update_hint
 
         if emit_partial_update_hint(e):
             sys.exit(1)
@@ -4403,7 +4402,7 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
 
     # skills.auto_load rides the same background preload as -s; --ignore-rules skips it with
     # the rest of the auto-injected context. Resolved here (not lazily in the agent) so the
-    # session id is real for ${HERMES_SESSION_ID} and -s can dedupe against it.
+    # session id is real for ${X19_SESSION_ID} and -s can dedupe against it.
     from agent.skill_commands import build_auto_load_prompt, resolve_auto_load_skills
     auto_load_names = [] if getattr(cli, "ignore_rules", ignore_rules) else resolve_auto_load_skills(CLI_CONFIG)
     if not auto_load_names:
@@ -4433,10 +4432,10 @@ def _run_legacy_gateway():
     """Legacy `cli.py --gateway` entry: arm the startup watchdog (before importing the gateway graph), then run it."""
     import asyncio
     with suppress(Exception):
-        from hermes_startup_watchdog import arm_startup_watchdog
+        from x19_startup_watchdog import arm_startup_watchdog
         arm_startup_watchdog()
     from gateway.run import start_gateway
-    print("Starting Hermes Gateway (messaging platforms)...")
+    print("Starting X19 Gateway (messaging platforms)...")
     asyncio.run(start_gateway())
 
 
@@ -4449,7 +4448,7 @@ def _start_worktree_setup(list_tools, list_toolsets, worktree, w):
     if list_tools or list_toolsets or not (worktree or w or CLI_CONFIG.get("worktree", False)):
         return None
     # Overlap tool discovery with the I/O-bound worktree setup so show_banner() hits a warm
-    # cache (~0.4s). Only on the -w path: plain `hermes` has no I/O wait to hide.
+    # cache (~0.4s). Only on the -w path: plain `x19` has no I/O wait to hide.
     def _prewarm_tools() -> None:
         try:
             import model_tools as _mt
@@ -4525,12 +4524,12 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
     # No user can answer approval prompts: the approval gate takes the deterministic path.
     # One-shot mode: no between-turns MCP late-binding refresh, so the agent must wait the full MCP
     # cold-start bound before its first (and only) tool snapshot. See #51316.
-    # Mark single-query for the approval gate. cli.py sets HERMES_INTERACTIVE earlier for interactive sudo
+    # Mark single-query for the approval gate. cli.py sets X19_INTERACTIVE earlier for interactive sudo
     # prompts, but a -q run has NO user waiting to answer approval prompts. The gate reads this marker (via
     # gateway.session_context.get_session_env, which falls back to os.environ when the session-context layer
     # isn't engaged) and takes the deterministic approvals.single_query_mode path instead of waiting the
     # full timeout. See #86878.
-    os.environ["HERMES_SINGLE_QUERY_SESSION"] = "1"
+    os.environ["X19_SINGLE_QUERY_SESSION"] = "1"
     if not cli._claim_active_session("cli", stderr=bool(quiet)):
         sys.exit(1)
     try:
@@ -4543,7 +4542,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
             if stream_json:
                 # Built BEFORE credentials/agent init so a failed start still closes the protocol
                 # (init + result) instead of exiting 1 with an empty stdout.
-                from hermes_cli.stream_json import StreamJsonEmitter
+                from x19_cli.stream_json import StreamJsonEmitter
                 emitter = StreamJsonEmitter(model=getattr(cli, "model", "") or "", session_id=cli.session_id or "")
             if cli._ensure_runtime_credentials():
                 effective_query: Any = _route_single_query_images(
@@ -4575,7 +4574,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
         # Kanban goal_mode on the `-q` path: same judge loop as `-Q`, but each follow-up turn
         # runs through cli.chat so the worker log keeps its live tool feed (the dispatcher
         # used to force -Q here, which left goal_mode cards with a blank Worker log).
-        if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1":
+        if os.environ.get("X19_KANBAN_GOAL_MODE") == "1":
             try:
                 _run_kanban_goal_loop_chat(cli, response or "")
             except Exception as _goal_exc:
@@ -4618,7 +4617,7 @@ def main(
     ignore_rules: bool = False,
 ):
     """
-    Hermes Agent CLI - Interactive AI Assistant
+    X19 CLI - Interactive AI Assistant
     
     Args:
         query: Query to run. On a real TTY this seeds an interactive session
@@ -4647,7 +4646,7 @@ def main(
     Examples:
         python cli.py                            # Start interactive mode
         python cli.py --toolsets web,terminal    # Use specific toolsets
-        python cli.py --skills hermes-agent-dev,github-auth
+        python cli.py --skills x19-dev,github-auth
         python cli.py -q "What is Python?"       # Single query mode
         python cli.py -q "Describe this" --image ~/storage/shared/Pictures/cat.png
         python cli.py --list-tools               # List tools and exit
@@ -4657,14 +4656,10 @@ def main(
     """
     # UTF-8 stdio on Windows before any print (Rich box-drawing would UnicodeEncodeError on cp1252).
     with suppress(Exception):
-        from hermes_cli.stdio import configure_windows_stdio
+        from x19_cli.stdio import configure_windows_stdio
         configure_windows_stdio()
 
-    os.environ["HERMES_INTERACTIVE"] = "1"  # terminal_tool: interactive sudo prompts with timeout
-    # The banner names affected plugins; the raw per-name compat warnings would only duplicate it on stderr.
-    with suppress(Exception):
-        from hermes_cli.plugin_compat import quiet_for_interactive
-        quiet_for_interactive()
+    os.environ["X19_INTERACTIVE"] = "1"  # terminal_tool: interactive sudo prompts with timeout
 
     if gateway:
         _run_legacy_gateway()
@@ -4672,7 +4667,7 @@ def main(
 
     _join_worktree = _start_worktree_setup(list_tools, list_toolsets, worktree, w)
     query = query or q
-    # ``hermes chat`` already validated this; the direct Fire entry point gets the same contract.
+    # ``x19 chat`` already validated this; the direct Fire entry point gets the same contract.
     if output_format == "stream-json":
         if not query:
             raise ValueError("--format stream-json requires -q/--query")
@@ -4717,77 +4712,3 @@ if __name__ == "__main__":
     fire.Fire(main)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from prompt_toolkit.layout.menus import CompletionsMenu  # noqa: F401,E402
-from prompt_toolkit.filters import Condition  # noqa: F401,E402
-from prompt_toolkit.layout import ConditionalContainer  # noqa: F401,E402
-from prompt_toolkit.layout.processors import ConditionalProcessor  # noqa: F401,E402
-from prompt_toolkit.layout.dimension import Dimension  # noqa: F401,E402
-from prompt_toolkit.history import FileHistory  # noqa: F401,E402
-from prompt_toolkit.layout import FormattedTextControl  # noqa: F401,E402
-from prompt_toolkit.layout import HSplit  # noqa: F401,E402
-from prompt_toolkit.key_binding import KeyBindings  # noqa: F401,E402
-from prompt_toolkit.layout import Layout  # noqa: F401,E402
-from prompt_toolkit.styles import Style as PTStyle  # noqa: F401,E402
-from rich.panel import Panel  # noqa: F401,E402
-from prompt_toolkit.layout.processors import PasswordProcessor  # noqa: F401,E402
-from prompt_toolkit.layout.processors import Processor  # noqa: F401,E402
-from prompt_toolkit.widgets import TextArea  # noqa: F401,E402
-from prompt_toolkit.layout.processors import Transformation  # noqa: F401,E402
-from prompt_toolkit.layout import Window  # noqa: F401,E402
-from prompt_toolkit.layout import WindowAlign  # noqa: F401,E402
-import base64  # noqa: F401,E402
-import concurrent.futures  # noqa: F401,E402
-import copy  # noqa: F401,E402
-from rich import box as rich_box  # noqa: F401,E402
-import tempfile  # noqa: F401,E402
-
-def AIAgent(*args, **kwargs):
-    from run_agent import AIAgent as _AIAgent
-
-    return _AIAgent(*args, **kwargs)
-
-def CanonicalUsage(*args, **kwargs):
-    from agent.usage_pricing import CanonicalUsage as _CanonicalUsage
-
-    return _CanonicalUsage(*args, **kwargs)
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'DEFAULT_BROWSER_CDP_URL': ('hermes_cli.browser_connect', 'DEFAULT_BROWSER_CDP_URL'),
-    'HERMES_AGENT_LOGO': ('hermes_cli.banner', 'HERMES_AGENT_LOGO'),
-    'HERMES_CADUCEUS': ('hermes_cli.banner', 'HERMES_CADUCEUS'),
-    'SlashCommandAutoSuggest': ('hermes_cli.commands_completion', 'SlashCommandAutoSuggest'),
-    'SlashCommandCompleter': ('hermes_cli.commands_completion', 'SlashCommandCompleter'),
-    'build_welcome_banner': ('hermes_cli.banner', 'build_welcome_banner'),
-    'display_hermes_home': ('hermes_constants', 'display_hermes_home'),
-    'estimate_usage_cost': ('agent.usage_pricing', 'estimate_usage_cost'),
-    'get_all_toolsets': ('toolsets', 'get_all_toolsets'),
-    'get_job': ('cron.jobs', 'get_job'),
-    'get_toolset_for_tool': ('model_tools', 'get_toolset_for_tool'),
-    'get_toolset_info': ('toolsets', 'get_toolset_info'),
-    'init_skin_from_config': ('hermes_cli.skin_engine', 'init_skin_from_config'),
-    'is_browser_debug_ready': ('hermes_cli.browser_connect', 'is_browser_debug_ready'),
-    'is_table_divider': ('agent.markdown_tables', 'is_table_divider'),
-    'looks_like_table_row': ('agent.markdown_tables', 'looks_like_table_row'),
-    'manual_chrome_debug_command': ('hermes_cli.browser_connect', 'manual_chrome_debug_command'),
-    'print_config_warnings': ('hermes_cli.config', 'print_config_warnings'),
-    'prompt_for_secret': ('hermes_cli.callbacks', 'prompt_for_secret'),
-    'set_friendly_tool_labels': ('agent.display', 'set_friendly_tool_labels'),
-    'set_tool_preview_max_len': ('agent.display', 'set_tool_preview_max_len'),
-    'setup_logging': ('hermes_logging', 'setup_logging'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

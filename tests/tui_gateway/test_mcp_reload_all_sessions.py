@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import hermes_constants
+import x19_constants
 from tools import mcp_tool_agent as _mcp_agent
 from tools import mcp_tool_discovery as _mcp_discovery
 from tools import mcp_tool_lifecycle as _mcp_lifecycle
@@ -25,7 +25,7 @@ def reload_env(monkeypatch, tmp_path):
     discovered_homes: list[str] = []
     monkeypatch.setattr(_mcp_lifecycle, "shutdown_mcp_servers", lambda: None)
     monkeypatch.setattr(_mcp_discovery, "discover_mcp_tools",
-                        lambda: discovered_homes.append(hermes_constants.hermes_home_key()))
+                        lambda: discovered_homes.append(x19_constants.x19_home_key()))
     monkeypatch.setattr(_mcp_agent, "refresh_agent_mcp_tools",
                         lambda agent, **_kw: refreshed.append(agent.name) or set())
     monkeypatch.setattr(srv, "_compute_mcp_rev", lambda: "rev-a")
@@ -67,5 +67,5 @@ def test_reload_rediscovers_under_each_live_profile_scope(reload_env):
     regained its overlay, so it loses its MCP tools until its own reload."""
     srv._methods["reload.mcp"](1, {"session_id": "A", "confirm": True})
 
-    assert hermes_constants.hermes_home_key() in reload_env.discovered_homes
-    assert hermes_constants.hermes_home_key(reload_env.profile_b) in reload_env.discovered_homes
+    assert x19_constants.x19_home_key() in reload_env.discovered_homes
+    assert x19_constants.x19_home_key(reload_env.profile_b) in reload_env.discovered_homes

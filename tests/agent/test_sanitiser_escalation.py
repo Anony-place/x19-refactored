@@ -23,7 +23,7 @@ from agent.agent_runtime_helpers import (
     get_sanitizer_heal_stats,
     repair_empty_non_final_messages,
 )
-from hermes_logging import clear_session_context, set_session_context
+from x19_logging import clear_session_context, set_session_context
 
 
 @pytest.fixture(autouse=True)
@@ -155,7 +155,7 @@ class TestOneTimeUserNotice:
         assert notice is not None
         assert "repeated repair" in notice
         assert "/debug share" in notice
-        assert "hermes doctor" in notice
+        assert "x19 doctor" in notice
 
         # drained: never delivered twice
         assert consume_pending_sanitizer_heal_notice() is None
@@ -202,7 +202,7 @@ class TestOneTimeUserNotice:
         import agent.agent_runtime_helpers as arh
 
         monkeypatch.setattr(
-            "hermes_cli.config.load_config_readonly",
+            "x19_cli.config.load_config_readonly",
             lambda: {"agent": {"sanitizer_heal_escalation_threshold": 7}},
         )
         assert arh._heal_escalation_threshold() == 7
@@ -213,7 +213,7 @@ class TestOneTimeUserNotice:
         def _boom():
             raise RuntimeError("no config")
 
-        monkeypatch.setattr("hermes_cli.config.load_config_readonly", _boom)
+        monkeypatch.setattr("x19_cli.config.load_config_readonly", _boom)
         assert (
             arh._heal_escalation_threshold() == arh._EMPTY_HEAL_ESCALATE_AFTER
         )
@@ -237,7 +237,7 @@ class TestHealStatsSurface:
 
     def test_debug_report_includes_heal_counters(self, monkeypatch):
         import agent.agent_runtime_helpers as arh
-        from hermes_cli.debug import collect_debug_report, LogSnapshot
+        from x19_cli.debug import collect_debug_report, LogSnapshot
 
         monkeypatch.setattr(arh, "_heal_escalation_threshold", lambda: 2)
         set_session_context("sess-report")
@@ -367,7 +367,7 @@ class TestProjectionStopsReheal:
             _arh._empty_heal_user_notified.add(_live_key)
             _arh._empty_heal_pending_notice[_live_key] = (
                 "⚠️ Your session transcript required repeated repair — "
-                "run /debug share or `hermes doctor`."
+                "run /debug share or `x19 doctor`."
             )
 
         warned = []

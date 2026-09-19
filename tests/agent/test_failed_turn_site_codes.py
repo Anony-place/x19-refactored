@@ -60,11 +60,11 @@ def test_empty_response_exhaustion_has_one_text_everywhere():
 
 
 def test_persistence_failure_default_copy_is_actionable_and_profile_aware(monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", "/srv/hermes-profile")
+    monkeypatch.setenv("X19_HOME", "/srv/x19-profile")
     text = TurnExplainersMixin._format_turn_completion_explanation("session_persistence_failed", "replaced")
-    assert "hermes gateway stop" in text and "hermes doctor" in text
-    assert "~/.hermes" not in text and "/srv/hermes-profile" in text
-    assert "manifest" not in text  # the runbook stays in logger.error at hermes_state
+    assert "x19 gateway stop" in text and "x19 doctor" in text
+    assert "~/.x19" not in text and "/srv/x19-profile" in text
+    assert "manifest" not in text  # the runbook stays in logger.error at x19_state
 
 
 def test_reasoning_only_copy_gives_the_fix_before_the_scratchpad():

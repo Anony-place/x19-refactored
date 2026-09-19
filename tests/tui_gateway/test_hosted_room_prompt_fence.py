@@ -28,9 +28,9 @@ def _stub_session(monkeypatch, *, title, profile_home=None):
 
 
 def test_direct_prompt_to_hosted_group_session_is_rejected(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     hosted_rooms.create_room(
         hosted_rooms.default_db_path(),
         room_id="room-hosted",
@@ -54,9 +54,9 @@ def test_direct_prompt_to_hosted_group_session_is_rejected(tmp_path, monkeypatch
 def test_direct_prompt_to_non_hosted_group_reaches_normal_admission(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     _stub_session(monkeypatch, title="Group: local-only")
     monkeypatch.setattr(
         server,
@@ -84,9 +84,9 @@ def test_direct_prompt_to_non_hosted_group_reaches_normal_admission(
 def test_direct_prompt_to_legacy_named_group_reaches_normal_admission(
     tmp_path, monkeypatch, legacy_name
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     _stub_session(monkeypatch, title=f"Group: {legacy_name}")
     monkeypatch.setattr(
         server,
@@ -103,11 +103,11 @@ def test_direct_prompt_to_legacy_named_group_reaches_normal_admission(
 def test_direct_prompt_to_peer_reserved_group_is_rejected_until_revoke(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
     profile_home = home / "profiles" / "reviewer"
     profile_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setattr(server, "_current_profile_name", lambda: "reviewer")
     now = time.time()
     claims = {
@@ -163,9 +163,9 @@ def test_direct_prompt_to_peer_reserved_group_is_rejected_until_revoke(
 def test_direct_prompt_is_refused_when_room_authority_cannot_be_verified(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     _stub_session(monkeypatch, title="Group: room-unknown")
     monkeypatch.setattr(
         hosted_rooms,
@@ -186,9 +186,9 @@ def test_direct_prompt_is_refused_when_room_authority_cannot_be_verified(
 def test_contended_ownership_probe_fails_quickly_without_blocking_socket(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     db = hosted_rooms.default_db_path()
     hosted_rooms.create_room(
         db,

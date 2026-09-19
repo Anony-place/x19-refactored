@@ -38,7 +38,7 @@ MAX_REFERENCE_IMAGES = 7
 _REMOTE_PREFIXES = ("http://", "https://")
 _TERMINAL_POLL_STATUSES = {"done", "failed", "error", "expired", "cancelled"}
 _IMAGE_TO_VIDEO_COMPAT_MODEL_IDS = {"grok-imagine-video-1.5-preview", "grok-imagine-video-1.5-2026-05-30"}
-_AUTH_REQUIRED_MSG = ("No xAI credentials found. Sign in via `hermes auth add xai-oauth` "
+_AUTH_REQUIRED_MSG = ("No xAI credentials found. Sign in via `x19 auth add xai-oauth` "
                       "(SuperGrok / Premium+) or set XAI_API_KEY from https://console.x.ai/.")
 _PUBLIC_URL_HINT = "(e.g. the `image`/`public_url` from a prior Imagine result)"
 _MODELS: Dict[str, Dict[str, Any]] = {
@@ -76,7 +76,7 @@ def _resolve_xai_credentials() -> Tuple[str, str]:
 
 def _xai_headers(api_key: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-            "User-Agent": _xai_http("hermes_xai_user_agent", "hermes-agent/video_gen")}
+            "User-Agent": _xai_http("x19_xai_user_agent", "x19/video_gen")}
 
 
 def _xai_error(error: str, error_type: str, prompt: str, model: str = "", aspect_ratio: str = "") -> Dict[str, Any]:
@@ -85,7 +85,7 @@ def _xai_error(error: str, error_type: str, prompt: str, model: str = "", aspect
 
 def _media_ref_to_xai_url(value: str, *, kind: str, fallback_mime: str) -> str:
     """URL/data URI accepted by xAI for ``kind`` (``image``/``video``) inputs: remote URLs and matching data URIs pass
-    through; a readable local file of the right MIME class is inlined as base64 (after Hermes' read deny-list /
+    through; a readable local file of the right MIME class is inlined as base64 (after X19' read deny-list /
     credential-store guard, which fails open if unavailable); anything else is returned as-is so the caller rejects it."""
     ref = (value or "").strip()
     path = Path(ref).expanduser()
@@ -148,7 +148,7 @@ class XAIVideoGenProvider(VideoGenProvider):
         return DEFAULT_MODEL
 
     def get_setup_schema(self) -> Dict[str, Any]:
-        # Auth resolution lives in the shared ``xai_grok`` post_setup hook (hermes_cli/tools_config.py): no API-key
+        # Auth resolution lives in the shared ``xai_grok`` post_setup hook (x19_cli/tools_config.py): no API-key
         # prompt when already signed in via xAI Grok OAuth; OAuth-vs-API-key choice when neither is configured.
         storage_notice = _xai_http("xai_storage_notice_text", "", "video_gen")
         tag = ("grok-imagine-video for text/reference; grok-imagine-video-1.5 for image-to-video; edit/extend: pass the stored public "
@@ -260,7 +260,7 @@ async def _submit_xai_video_payload(api_key: str, base_url: str, endpoint: str, 
     prompt, resolved_model = payload["prompt"], payload["model"]
     try:
         from tools.xai_http import build_xai_storage_options, maybe_mark_xai_storage_notice_seen, read_xai_imagine_storage_config
-        storage_options = build_xai_storage_options("video_gen", filename_prefix="hermes-xai-video", extension="mp4")
+        storage_options = build_xai_storage_options("video_gen", filename_prefix="x19-xai-video", extension="mp4")
         storage_notice = maybe_mark_xai_storage_notice_seen("video_gen")
         storage_cfg = read_xai_imagine_storage_config("video_gen")
     except Exception:
@@ -320,61 +320,3 @@ def register(ctx) -> None:
     ctx.register_video_gen_provider(XAIVideoGenProvider())
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def run_xai_video_generation(
-    *,
-    prompt: str,
-    model: Optional[str],
-    explicit_model: bool,
-    image_url: Optional[str],
-    reference_image_urls: Optional[List[str]],
-    duration: Optional[int],
-    aspect_ratio: str,
-    resolution: str,
-) -> Dict[str, Any]:
-    return _run_xai_video_coroutine(
-        _generate_xai_video_async(
-            prompt=prompt,
-            model=model,
-            explicit_model=explicit_model,
-            image_url=image_url,
-            reference_image_urls=reference_image_urls,
-            duration=duration,
-            aspect_ratio=aspect_ratio,
-            resolution=resolution,
-        ),
-        operation_label="generation",
-        model=model,
-        prompt=prompt,
-        aspect_ratio=aspect_ratio,
-    )
-
-def _run_xai_video_coroutine(
-    coro,
-    *,
-    operation_label: str,
-    model: Optional[str],
-    prompt: str,
-    aspect_ratio: str,
-) -> Dict[str, Any]:
-    try:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
-    except Exception as exc:
-        logger.warning("xAI video %s unexpected failure: %s", operation_label, exc, exc_info=True)
-        return error_response(
-            error=f"xAI video {operation_label} failed: {exc}",
-            error_type="api_error",
-            provider="xai",
-            model=model or DEFAULT_MODEL,
-            prompt=prompt,
-            aspect_ratio=aspect_ratio,
-        )
-# ---- END PLUGIN-COMPAT ----

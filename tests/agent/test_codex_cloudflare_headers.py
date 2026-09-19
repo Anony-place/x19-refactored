@@ -1,6 +1,6 @@
 """Regression coverage for required Codex identity and account headers.
 
-The official Codex endpoint must receive Hermes' own harness identity, rather
+The official Codex endpoint must receive X19' own harness identity, rather
 than the historical first-party compatibility identity. Live endpoint
 acceptance is a separate smoke test; these tests verify request construction.
 
@@ -11,8 +11,8 @@ header set so the primary chat client (``run_agent.AIAgent.__init__`` +
 all emit the same headers.
 
 These tests pin:
-- the required Hermes originator
-- the versioned Hermes User-Agent
+- the required X19 originator
+- the versioned X19 User-Agent
 - ``ChatGPT-Account-ID`` extraction from the OAuth JWT (canonical casing,
   from codex-rs ``auth.rs``)
 - graceful handling of malformed tokens (drop the account-ID header, don't
@@ -26,7 +26,7 @@ import base64
 import json
 from unittest.mock import MagicMock, patch
 
-from hermes_cli import __version__
+from x19_cli import __version__
 
 
 # ---------------------------------------------------------------------------
@@ -57,11 +57,11 @@ def _make_codex_jwt(account_id: str = "acct-test-123") -> str:
 
 class TestCodexCloudflareHeaders:
 
-    def test_user_agent_advertises_hermes_version(self):
+    def test_user_agent_advertises_x19_version(self):
         from agent.auxiliary_client import _codex_cloudflare_headers
         headers = _codex_cloudflare_headers(_make_codex_jwt())
-        assert headers["User-Agent"] == f"HermesAgent/{__version__}"
-        assert headers["originator"] == "hermes-agent"
+        assert headers["User-Agent"] == f"X19Agent/{__version__}"
+        assert headers["originator"] == "x19"
 
 
     def test_canonical_header_casing(self):
@@ -85,7 +85,7 @@ class TestCodexCloudflareHeaders:
         payload = b64url(_json.dumps({"sub": "user-xyz", "exp": 9999999999}).encode())
         token = f"{b64url(b'{}')}.{payload}.{b64url(b'sig')}"
         headers = _codex_cloudflare_headers(token)
-        assert headers["originator"] == "hermes-agent"
+        assert headers["originator"] == "x19"
         assert "ChatGPT-Account-ID" not in headers
 
 
@@ -116,9 +116,9 @@ class TestPrimaryClientWiring:
                 "https://chatgpt.com/backend-api/codex"
             )
             headers = agent._client_kwargs.get("default_headers") or {}
-            assert headers.get("originator") == "hermes-agent"
+            assert headers.get("originator") == "x19"
             assert headers.get("ChatGPT-Account-ID") == "acct-rotation"
-            assert headers.get("User-Agent") == f"HermesAgent/{__version__}"
+            assert headers.get("User-Agent") == f"X19Agent/{__version__}"
 
     def test_apply_client_headers_clears_codex_headers_off_chatgpt(self):
         """Switching AWAY from chatgpt.com must drop the codex headers."""
@@ -172,9 +172,9 @@ class TestAuxiliaryClientWiring:
             client, model = auxiliary_client._build_codex_client("gpt-5.4")
             assert client is not None
             headers = mock_openai.call_args.kwargs.get("default_headers") or {}
-            assert headers.get("originator") == "hermes-agent"
+            assert headers.get("originator") == "x19"
             assert headers.get("ChatGPT-Account-ID") == "acct-aux-try-codex"
-            assert headers.get("User-Agent") == f"HermesAgent/{__version__}"
+            assert headers.get("User-Agent") == f"X19Agent/{__version__}"
 
     def test_resolve_provider_client_raw_codex_passes_codex_headers(self, monkeypatch):
         """The ``raw_codex=True`` branch (used by the main agent loop for direct
@@ -192,6 +192,6 @@ class TestAuxiliaryClientWiring:
             )
             assert client is not None
             headers = mock_openai.call_args.kwargs.get("default_headers") or {}
-            assert headers.get("originator") == "hermes-agent"
+            assert headers.get("originator") == "x19"
             assert headers.get("ChatGPT-Account-ID") == "acct-aux-raw-codex"
-            assert headers.get("User-Agent") == f"HermesAgent/{__version__}"
+            assert headers.get("User-Agent") == f"X19Agent/{__version__}"

@@ -15,8 +15,8 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from hermes_constants import (
-    get_hermes_home, get_skills_dir, is_wsl, reset_hermes_home_override, set_hermes_home_override,
+from x19_constants import (
+    get_x19_home, get_skills_dir, is_wsl, reset_x19_home_override, set_x19_home_override,
 )
 
 from agent.model_metadata import CHARS_PER_TOKEN
@@ -84,13 +84,13 @@ def _scan_context_content(content: str, filename: str, *, user_authored: bool = 
     "context" scope only (strict-scope SSH-backdoor/persistence/exfil patterns are too aggressive for a
     cloned repo's docs); blocking, not warning, because the file would otherwise enter the prompt verbatim.
 
-    *user_authored* (SOUL.md in the user's own HERMES_HOME): a hit is WARNED and the file still loads.
+    *user_authored* (SOUL.md in the user's own X19_HOME): a hit is WARNED and the file still loads.
     SOUL.md sits in the same trust class as config.yaml — file-tool writes to it go through the
     protected-instruction approval gate (``tools/file_tools_write_guards.py``) and project checkouts never
     supply it — so a user who *documents* "ignore previous instructions" in their security guidance
     must not lose their whole identity file to a one-line log entry (#112570). Project-dir files
-    (repo AGENTS.md / .cursorrules / .hermes.md) arrive with the checkout and keep blocking, and so does
-    a SOUL.md owned by a profile distribution (``hermes profile install <git-url>`` copies it in unscanned;
+    (repo AGENTS.md / .cursorrules / .x19.md) arrive with the checkout and keep blocking, and so does
+    a SOUL.md owned by a profile distribution (``x19 profile install <git-url>`` copies it in unscanned;
     ``load_soul_md`` passes ``user_authored=False`` when ``distribution.yaml`` owns the file).
     """
     # A leading UTF-8 BOM is a Windows-editor artifact, not an injection.
@@ -101,7 +101,7 @@ def _scan_context_content(content: str, filename: str, *, user_authored: bool = 
         return content
     if user_authored:
         logger.warning("Context file %s matched injection pattern(s) %s; loaded anyway because it is the "
-                       "user's own file in HERMES_HOME — review it if you did not write that text",
+                       "user's own file in X19_HOME — review it if you did not write that text",
                        filename, ", ".join(findings))
         return content
     logger.warning("Context file %s blocked: %s", filename, ", ".join(findings))
@@ -136,13 +136,13 @@ def _is_dir_or_denied(path: Path) -> bool:
         return False
 
 
-def _find_hermes_md(cwd: Path) -> Optional[Path]:
-    """Nearest ``.hermes.md`` / ``HERMES.md`` from *cwd* up to the git root, else None."""
+def _find_x19_md(cwd: Path) -> Optional[Path]:
+    """Nearest ``.x19.md`` / ``X19.md`` from *cwd* up to the git root, else None."""
     stop_at = _find_git_root(cwd)
     current = cwd.resolve()
     # No git root: cwd only — walking parents could pick up a file planted in /tmp, /home, etc.
     for directory in [current, *current.parents] if stop_at else [current]:
-        found = next((directory / n for n in (".hermes.md", "HERMES.md") if _is_file_or_denied(directory / n)), None)
+        found = next((directory / n for n in (".x19.md", "X19.md") if _is_file_or_denied(directory / n)), None)
         if found or directory == stop_at:
             return found
     return None
@@ -155,11 +155,11 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return (content[end + 4:].lstrip("\n") or content) if end != -1 else content
 
 
-# Hermes baseline identity — kept as clean reference, used when X19 mode disabled
-HERMES_DEFAULT_AGENT_IDENTITY = (
+# X19 baseline identity — kept as clean reference, used when X19 mode disabled
+X19_DEFAULT_AGENT_IDENTITY = (
     # A behavior spec (sizing rule, named prohibitions, earned-depth escape hatch), not a trait list — trait
     # lists change nothing. Maintainer rule: models UNDER-explore by default; never re-add an exploration-thrift line.
-    "You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of the ask "
+    "You are X19, built by Nous Research. Be direct: match the length of your reply to the weight of the ask "
     "— a one-line question gets a one-line answer, and finished work gets a short report of what changed, what's "
     "verified, and what's left, never a replay of the process. No filler (\"Great question,\" \"I'd be happy to\"), no "
     "restating the request back, no re-summarizing what you already said, no narrating tool calls the user can see. "
@@ -167,40 +167,49 @@ HERMES_DEFAULT_AGENT_IDENTITY = (
     "it. Depth is earned — give it when the user asks for detail, teaches, or the stakes demand it, not by default."
 )
 
-# X19 identity integration — proper architecture, not scattered text
-# This preserves Hermes baseline while providing X19 personality via x19/identity module
-def _get_x19_identity_for_prompt_builder() -> Optional[str]:
-    """Return X19 identity if X19 mode enabled and x19 package available, else None."""
+# X19 identity is unconditional: it is the product, not a toggleable mode.
+# The canonical text lives in x19/identity and is rendered from the live
+# organization catalog, so registering a worker updates the prompt with no
+# second copy of the org chart to keep in sync.
+def get_x19_identity_text() -> str:
+    """The X19 system identity, or the inline behaviour spec if x19 cannot import.
+
+    The fallback is the same product framing at lower fidelity — never a
+    different agent, and never a legacy identity.
+    """
     try:
-        from x19.identity import is_x19_enabled, get_x19_identity
-        if is_x19_enabled():
-            return get_x19_identity()
+        from x19.identity import get_x19_identity
+
+        identity = get_x19_identity()
+        if identity:
+            return identity
     except Exception:
-        pass
-    return None
+        logger.debug("x19 identity unavailable; using the inline behaviour spec", exc_info=True)
+    return X19_DEFAULT_AGENT_IDENTITY
 
 
-# DEFAULT_AGENT_IDENTITY now dynamically resolves to X19 when enabled, Hermes otherwise
-# This is evaluated at import time for backward compat, but _identity_parts in system_prompt.py
-# also checks dynamically per-turn (more reliable for gateway multiplexing)
-def _resolve_default_identity() -> str:
-    x19_id = _get_x19_identity_for_prompt_builder()
-    return x19_id if x19_id else HERMES_DEFAULT_AGENT_IDENTITY
+# Evaluated at import time for modules that read the constant directly; the
+# per-turn resolution in system_prompt.py::_identity_parts is authoritative.
+DEFAULT_AGENT_IDENTITY = get_x19_identity_text()
 
-
-DEFAULT_AGENT_IDENTITY = _resolve_default_identity()
-
-# Keep alias for tests that import DEFAULT_AGENT_IDENTITY expecting Hermes string
-# The actual per-turn resolution happens in system_prompt.py::_identity_parts which checks X19 dynamically
-
-HERMES_AGENT_HELP_GUIDANCE = (
-    "You run X19, an autonomous security operations product built on a proven agent runtime. "
-    "For X19 features and runtime behavior, use repository documentation and actual tool/runtime state as authoritative; "
-    "never invent capabilities or results. The live delegation rail is `delegate_task`; mission state is authoritative for status."
+# Toolset-neutral by design: this block reaches every session, including leaf
+# workers whose toolsets deliberately exclude delegation. Naming a tool here
+# would dangle in exactly those prompts (see
+# tests/agent/test_phantom_tool_references.py), so it points at the two sources
+# that are always real — the documentation and the runtime state.
+X19_AGENT_HELP_GUIDANCE = (
+    "You run X19: an executive orchestrator over a real multi-agent organization (X19 as Boss, "
+    "X22 as Manager, specialized workers executing with real tools). For X19 behavior, the "
+    "repository documentation and actual runtime state are authoritative — never invent "
+    "capabilities, agents or results. Organization and task state is authoritative for any "
+    "status question, so report what the runtime really did and say plainly when something "
+    "failed, is blocked, or has not run."
 )
 
-# Compatibility alias: internal imports/tests may retain the upstream constant name.
-HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS = HERMES_AGENT_HELP_GUIDANCE
+# Historical second variant, kept because callers import both names. The
+# guidance above names no tools, so there is nothing to degrade: both are the
+# same text and the session's toolset cannot make either one wrong.
+X19_AGENT_HELP_GUIDANCE_NO_SKILLS = X19_AGENT_HELP_GUIDANCE
 # Keep the every-session memory scope even when task knowledge cannot be saved as a skill.
 def build_memory_guidance(
     memory_enabled: bool = True, profile_enabled: bool = True, *, skill_manage_available: bool = True,
@@ -277,8 +286,8 @@ SKILLS_GUIDANCE = (
 
 KANBAN_GUIDANCE = (
     "# Kanban task execution protocol\n"
-    "You have been assigned ONE task from the shared board at `~/.hermes/kanban.db`. Your task id is in "
-    "`$HERMES_KANBAN_TASK`; your workspace is `$HERMES_KANBAN_WORKSPACE`. The `kanban_*` tools in your schema are your "
+    "You have been assigned ONE task from the shared board at `~/.x19/kanban.db`. Your task id is in "
+    "`$X19_KANBAN_TASK`; your workspace is `$X19_KANBAN_WORKSPACE`. The `kanban_*` tools in your schema are your "
     "primary coordination surface — they write directly to the shared SQLite DB and work regardless of terminal "
     "backend (local/docker/modal/ssh).\n"
     "\n"
@@ -286,7 +295,7 @@ KANBAN_GUIDANCE = (
     "1. **Orient.** Call `kanban_show()` first (no args — it defaults to your task). The response includes title, "
     "body, parent-task handoffs (summary + metadata), any prior attempts on this task if you're a retry, the full "
     "comment thread, and a pre-formatted `worker_context` you can treat as ground truth.\n"
-    "2. **Work inside the workspace.** `cd $HERMES_KANBAN_WORKSPACE` before any file operations. The workspace is "
+    "2. **Work inside the workspace.** `cd $X19_KANBAN_WORKSPACE` before any file operations. The workspace is "
     "yours for this run. Don't modify files outside it unless the task explicitly asks.\n"
     "3. **Heartbeat on long operations.** Call `kanban_heartbeat(note=...)` every few minutes during long subprocesses "
     "(training, encoding, crawling). Skip heartbeats for short tasks. **If your task may run longer than 1 hour, you "
@@ -328,9 +337,9 @@ KANBAN_GUIDANCE = (
     "card body must carry the decisions it depends on, because workers cannot see sibling context.\n"
     "\n"
     "## Reference details that change outcomes\n\n"
-    "- **Workspace.** `cd $HERMES_KANBAN_WORKSPACE` first. For a `worktree` kind with no `.git`, `git worktree add "
-    "<path> ${HERMES_KANBAN_BRANCH:-wt/$HERMES_KANBAN_TASK}` from the main repo, then cd there. For a project-linked "
-    "task the workspace is a fresh `<repo>/.worktrees/<task-id>` and `$HERMES_KANBAN_BRANCH` a deterministic "
+    "- **Workspace.** `cd $X19_KANBAN_WORKSPACE` first. For a `worktree` kind with no `.git`, `git worktree add "
+    "<path> ${X19_KANBAN_BRANCH:-wt/$X19_KANBAN_TASK}` from the main repo, then cd there. For a project-linked "
+    "task the workspace is a fresh `<repo>/.worktrees/<task-id>` and `$X19_KANBAN_BRANCH` a deterministic "
     "`<project-slug>/<task-id>` — the main repo is two levels up, so run `git worktree add` from there.\n"
     "- **Deliverables.** Files a human wants go in `kanban_complete(artifacts=[<absolute paths>])` (top-level param; "
     "paths in `metadata` are NOT uploaded). Files must exist at completion.\n"
@@ -340,11 +349,11 @@ KANBAN_GUIDANCE = (
     "- **Created cards.** List ids in `kanban_complete(created_cards=[...])` ONLY when captured from a successful "
     "`kanban_create` return — never invent or paste ids; the kernel rejects the completion on any phantom id.\n"
     "- **Orchestrating: discover profiles first.** The dispatcher SILENTLY drops a card with an unknown assignee (it "
-    "sits in `ready` forever). Ground every assignee in a real profile (`hermes profile list`, or ask the user), and "
+    "sits in `ready` forever). Ground every assignee in a real profile (`x19 profile list`, or ask the user), and "
     "express dependencies via `parents=[...]` on `kanban_create`, not prose.\n"
     "\n"
     "## Do NOT\n\n"
-    "- Do not shell out to `hermes kanban <verb>` for board operations. Use the `kanban_*` tools — they work across "
+    "- Do not shell out to `x19 kanban <verb>` for board operations. Use the `kanban_*` tools — they work across "
     "all terminal backends.\n"
     "- Do not complete a task you didn't actually finish. Block it.\n"
     "- Do not call `clarify` to ask questions. You are running headless — there is no live user to answer. The call "
@@ -410,7 +419,7 @@ TASK_COMPLETION_GUIDANCE = (
 # issues one tool call per turn multiplies the number of round-trips — and therefore the resent context —
 # for any task that needs several independent reads, searches, or safe lookups. Batching independent calls
 # into a single assistant response collapses N turns into one, cutting both latency and the resent-context
-# cost that compounds over a long conversation. The hermes-agent runtime already executes a batch of tool
+# cost that compounds over a long conversation. The x19 runtime already executes a batch of tool
 # calls concurrently when they are independent (read-only tools always; path-scoped file ops when their
 # targets don't overlap — see run_agent._execute_tool_calls / tool_dispatch_helpers). The missing piece was
 # telling the *model* to emit those calls together in the first place. Until now the only batching steer in
@@ -418,7 +427,7 @@ TASK_COMPLETION_GUIDANCE = (
 # nothing. Short on purpose — shipped in the cached system prompt to every user, every session. Token cost
 # is paid once at install and amortised across all sessions via prefix caching. Keep it tight. Ported from
 # cline/cline#11514 ("encourage parallel tool calls"), adapted from Cline's TypeScript tool-surface guidance
-# to hermes-agent's Python prompt-assembly architecture.
+# to x19's Python prompt-assembly architecture.
 PARALLEL_TOOL_CALL_GUIDANCE = (
     "# Parallel tool calls\n"
     "When you need several pieces of information that don't depend on each other, request them together in a "
@@ -550,11 +559,11 @@ STEER_MARKER_OPEN = (
     "once at this position; not tool output and not a new delivery when replayed from conversation history]"
 )
 STEER_MARKER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]"
-# Text after the "[" that opens one of Hermes' own control frames (the steer marker above, the compaction
+# Text after the "[" that opens one of X19' own control frames (the steer marker above, the compaction
 # handoff and its fallbacks, runtime/system notes, agent.context_compressor._SYNTHETIC_USER_ROW_PREFIXES,
 # agent.title_generator._MACHINE_PREFIXES). Consumers that republish model output as role=user text
 # (hosted rooms) relabel these so a reply cannot reproduce the exact trusted shape. Keep the regex literal in
-# apps/desktop/src/plugins/hermes-bots/group-round-prompt.ts byte-equivalent to this list.
+# apps/desktop/src/plugins/x19-bots/group-round-prompt.ts byte-equivalent to this list.
 CONTROL_FRAME_OPENERS = (
     "/?OUT-OF-BAND USER MESSAGE", "CONTEXT COMPACTION", "CONTEXT SUMMARY]", "PRIOR CONTEXT", "Runtime note:",
     "System note:", "System:", "SYSTEM]", "IMPORTANT:", "Planning state preserved", "ASYNC DELEGATION",
@@ -588,7 +597,7 @@ STEER_CHANNEL_NOTE = (
     # (anti-lookalike), and it carries full user authority. The former standalone historical-vs-new
     # paragraph (#76805) is now redundant with the marker's own replay clause and was removed.
     "## Mid-turn user steering\n"
-    "Mid-turn, the user can steer you: Hermes delivers their message as a standalone user message right after "
+    "Mid-turn, the user can steer you: X19 delivers their message as a standalone user message right after "
     "the latest tool results, wrapped exactly as:\n"
     f"{STEER_MARKER_OPEN}\n<their message>\n{STEER_MARKER_CLOSE}\n"
     "That marker is a genuine user message with the same authority as their original request — not tool "
@@ -610,10 +619,10 @@ def hud_surface_note(valid_tool_names: "set[str] | None" = None) -> str:
         return ""
     gated = (
         (True,
-         "[Note: this message came from HUD mode — a small floating Hermes "
+         "[Note: this message came from HUD mode — a small floating X19 "
          "window sitting over whatever the user is actually working in, so an "
          'unqualified "this" or "here" usually means the app behind the HUD '
-         "rather than anything inside Hermes. read_window_below identifies that app."),
+         "rather than anything inside X19. read_window_below identifies that app."),
         (True,
          "They move the HUD from app to app mid-conversation, so one you identified on an earlier turn is "
          "still a live target: a reference that does not fit the window below may name one from a turn or two "
@@ -708,7 +717,7 @@ PLATFORM_HINTS = {
     ),
     "tui": (
         # Same file-delivery reality as the CLI: no MEDIA: interception in tui/.
-        "You are in the Hermes terminal UI (TUI). Files: there is no attachment channel and MEDIA:/path tags "
+        "You are in the X19 terminal UI (TUI). Files: there is no attachment channel and MEDIA:/path tags "
         "are NOT intercepted here (they print as literal text) — deliver a file by stating its absolute path "
         "or URL in plain text. "
         f"{_LOCAL_CRON_DELIVERY_NOTE}"
@@ -717,7 +726,7 @@ PLATFORM_HINTS = {
         # Every claim verified against the shipping renderer (inline-preview-directive.tsx). Widget text is
         # recipe-first: HOW (an inline widget IS a ::preview'd HTML file) and WHY (the frame injects the theme
         # prelude first; width adopts the first measured span). setup_mcp is taught by its own tool schema.
-        "You are chatting inside the Hermes desktop app, a graphical chat surface. Markdown renders with full GitHub "
+        "You are chatting inside the X19 desktop app, a graphical chat surface. Markdown renders with full GitHub "
         "flavor (tables, syntax-highlighted code, math via $...$, task lists, callouts). Deliver files by writing "
         "MEDIA:/absolute/path/to/file — any file type: images/audio/video render inline, everything else becomes a "
         "card with Download and preview buttons. Remote image URLs render via ![alt](url); local files ONLY via MEDIA: "
@@ -728,8 +737,8 @@ PLATFORM_HINTS = {
         "injected before your styles — so use those vars for color and don't set your own background, font, or margins "
         "(only a standalone PAGE — mockup, poster, game — overrides them). The frame sizes itself to your content: "
         "height live, width from the content's first measured span — lay content flush left with no centering wrappers "
-        "or it measures full-bleed. Widgets talk back: data-hermes-send=\"prompt\" on any clickable element (or "
-        "window.hermes.send(\"prompt\")) sends that prompt as a hidden user turn — answer it by updating the widget's "
+        "or it measures full-bleed. Widgets talk back: data-x19-send=\"prompt\" on any clickable element (or "
+        "window.x19.send(\"prompt\")) sends that prompt as a hidden user turn — answer it by updating the widget's "
         "file, not with prose."
     ),
     "sms": (
@@ -939,7 +948,7 @@ def _run_backend_probe(env_type: str, terminal_tool) -> str:
                           if terminal_tool._is_container_backend(env_type) else None),
         task_id="prompt-backend-probe", host_cwd=config.get("host_cwd"),
         # Only ssh honors this: an isolated ControlMaster socket and no remote dir setup / file sync /
-        # snapshot. A normal SSHEnvironment would upload the whole ~/.hermes tree just to run `uname`,
+        # snapshot. A normal SSHEnvironment would upload the whole ~/.x19 tree just to run `uname`,
         # and its later __del__ would sync_back() and close the master shared with the agent's own env.
         probe_only=True,
     )
@@ -971,8 +980,8 @@ def _format_backend_probe(output: str) -> str:
 
 def _probe_remote_backend(env_type: str) -> str | None:
     """Describe the active non-local backend via a live probe; None if it failed (cached, failures included)."""
-    from hermes_constants import hermes_home_key
-    cache_key = (hermes_home_key(), env_type, _tenv_read("TERMINAL_CWD", ""))
+    from x19_constants import x19_home_key
+    cache_key = (x19_home_key(), env_type, _tenv_read("TERMINAL_CWD", ""))
     formatted = _BACKEND_PROBE_CACHE.get(cache_key)
     if formatted is None:
         formatted = ""
@@ -1026,8 +1035,8 @@ def _remote_backend_hint(backend: str) -> str:
     probe = _probe_remote_backend(backend)
     if probe:
         return lead + (
-            f"this {backend} environment — NOT on the machine where Hermes itself is running. The host OS, "
-            f"home, and cwd of the Hermes process are irrelevant; only the following backend state matters:\n{probe}"
+            f"this {backend} environment — NOT on the machine where X19 itself is running. The host OS, "
+            f"home, and cwd of the X19 process are irrelevant; only the following backend state matters:\n{probe}"
         )
     description = (
         _BACKEND_FALLBACK_DESCRIPTIONS.get(backend)
@@ -1035,7 +1044,7 @@ def _remote_backend_hint(backend: str) -> str:
         or f"a {backend} environment (likely Linux)"
     )
     return lead + (
-        f"{description} — NOT on the machine where Hermes itself runs. The backend probe didn't respond at "
+        f"{description} — NOT on the machine where X19 itself runs. The backend probe didn't respond at "
         f"prompt-build time, so the sandbox's current user, $HOME, and working directory are unknown from here. "
         f"If you need them, probe directly with a terminal call like `uname -a && whoami && pwd`."
     )
@@ -1044,7 +1053,7 @@ def _remote_backend_hint(backend: str) -> str:
 def _config_readonly(what: str) -> dict:
     """config.yaml as a dict, or {} when unreadable (logged at debug with *what* for context)."""
     try:
-        from hermes_cli.config import load_config_readonly
+        from x19_cli.config import load_config_readonly
         return load_config_readonly()
     except Exception as e:
         logger.debug("Could not read %s from config: %s", what, e)
@@ -1052,9 +1061,9 @@ def _config_readonly(what: str) -> dict:
 
 
 def _embedder_environment_hint() -> str:
-    """Embedder-supplied environment description: HERMES_ENVIRONMENT_HINT (container ENV)
+    """Embedder-supplied environment description: X19_ENVIRONMENT_HINT (container ENV)
     wins over config.yaml ``agent.environment_hint``. Read once at prompt-build time."""
-    return (os.getenv("HERMES_ENVIRONMENT_HINT") or "").strip() or str(
+    return (os.getenv("X19_ENVIRONMENT_HINT") or "").strip() or str(
         (_config_readonly("agent.environment_hint").get("agent", {}) or {}).get("environment_hint", "")).strip()
 
 
@@ -1070,8 +1079,8 @@ def build_environment_hints() -> str:
 
 
 # Marks the runtime block after project prose for persisted-prompt cwd validation.
-RUNTIME_ENVIRONMENT_HEADING = "# Hermes runtime environment"
-RUNTIME_ENVIRONMENT_END = "<!-- End Hermes runtime environment -->"
+RUNTIME_ENVIRONMENT_HEADING = "# X19 runtime environment"
+RUNTIME_ENVIRONMENT_END = "<!-- End X19 runtime environment -->"
 
 CONTEXT_FILE_MAX_CHARS = 20_000
 CONTEXT_TRUNCATE_HEAD_RATIO = 0.7
@@ -1125,7 +1134,7 @@ _SKILLS_SNAPSHOT_VERSION = 2
 
 
 def _skills_prompt_snapshot_path() -> Path:
-    return get_hermes_home() / ".skills_prompt_snapshot.json"
+    return get_x19_home() / ".skills_prompt_snapshot.json"
 
 
 def clear_skills_system_prompt_cache(*, clear_snapshot: bool = False) -> None:
@@ -1244,12 +1253,12 @@ def _skill_should_show(
 
 def _current_session_platform_hint() -> str:
     """Active platform without importing the gateway package on CLI startup."""
-    platform = os.environ.get("HERMES_PLATFORM") or os.environ.get("HERMES_SESSION_PLATFORM")
+    platform = os.environ.get("X19_PLATFORM") or os.environ.get("X19_SESSION_PLATFORM")
     if platform:
         return platform
     get_session_env = getattr(sys.modules.get("gateway.session_context"), "get_session_env", None)
     try:
-        return (get_session_env("HERMES_SESSION_PLATFORM") if get_session_env else "") or ""
+        return (get_session_env("X19_SESSION_PLATFORM") if get_session_env else "") or ""
     except Exception:
         return ""
 
@@ -1262,13 +1271,13 @@ def build_skills_system_prompt(
 
     External dirs (``skills.external_dirs``) are read-only and lose name collisions to local skills.
     ``compact_categories`` (coding posture) demotes categories to a names-only line — nothing is ever hidden.
-    ``skills_dir_override`` makes home resolution EXPLICIT: a build thread that never bound the HERMES_HOME
+    ``skills_dir_override`` makes home resolution EXPLICIT: a build thread that never bound the X19_HOME
     ContextVar would otherwise leak the default profile's skills into a bot's prompt.
     """
     _home_token = None
     if skills_dir_override is not None:
         skills_dir = Path(skills_dir_override)
-        _home_token = set_hermes_home_override(str(skills_dir.parent))
+        _home_token = set_x19_home_override(str(skills_dir.parent))
     else:
         skills_dir = get_skills_dir()
     try:
@@ -1282,7 +1291,7 @@ def build_skills_system_prompt(
             skills_dir, external_dirs, available_tools, available_toolsets, compact_categories, project_dirs)
     finally:
         if _home_token is not None:
-            reset_hermes_home_override(_home_token)
+            reset_x19_home_override(_home_token)
 
 
 def _entry_name(entry: dict) -> str:
@@ -1503,41 +1512,41 @@ def _truncate_content(
     return content[:head_chars] + marker + content[-tail_chars:]
 
 
-def _get_x19_soul_md_if_enabled() -> Optional[str]:
-    """Return X19 SOUL.md content if X19 mode enabled, else None. Used as fallback when no SOUL.md file."""
+def _get_x19_soul_md() -> Optional[str]:
+    """The X19 SOUL text, used when the operator has no SOUL.md of their own."""
     try:
-        from x19.identity import is_x19_enabled, get_x19_soul_md
-        if is_x19_enabled():
-            return get_x19_soul_md()
+        from x19.identity import get_x19_soul_md
+
+        return get_x19_soul_md() or None
     except Exception:
-        pass
-    return None
+        logger.debug("x19 identity unavailable; no default SOUL text", exc_info=True)
+        return None
 
 
 def load_soul_md(context_length: Optional[int] = None, home_override: "Path | None" = None) -> Optional[str]:
-    """SOUL.md from HERMES_HOME (identity slot #1), or None.
+    """SOUL.md from X19_HOME (identity slot #1), or None.
 
     Callers must pass ``skip_soul=True`` to ``build_context_files_prompt`` so it isn't injected twice.
-    ``home_override`` pins the profile home (a thread that lost the HERMES_HOME ContextVar reads the wrong one).
+    ``home_override`` pins the profile home (a thread that lost the X19_HOME ContextVar reads the wrong one).
 
     ``home_override`` scopes the read to an explicit profile home (the agent knows its own home from its
-    session_db path). Without it, resolution is ambient — which on a thread that lost the HERMES_HOME
+    session_db path). Without it, resolution is ambient — which on a thread that lost the X19_HOME
     ContextVar falls back to the launch home and reads the wrong profile's SOUL.md (#50233, same class as
     the skills-index leak fixed in #86313).
 
-    X19 extension: if no SOUL.md file exists but X19 mode enabled, returns X19 SOUL.md as fallback.
-    This implements X19 identity through Hermes' actual SOUL mechanism.
+    When no SOUL.md file exists, returns the X19 SOUL text (rendered from the live
+    organization catalog) so identity never depends on the operator creating a file.
     """
     try:
-        from hermes_cli.config import ensure_hermes_home
-        ensure_hermes_home()
+        from x19_cli.config import ensure_x19_home
+        ensure_x19_home()
     except Exception as e:
-        logger.debug("Could not ensure HERMES_HOME before loading SOUL.md: %s", e)
-    soul_path = (Path(home_override) if home_override is not None else get_hermes_home()) / "SOUL.md"
+        logger.debug("Could not ensure X19_HOME before loading SOUL.md: %s", e)
+    soul_path = (Path(home_override) if home_override is not None else get_x19_home()) / "SOUL.md"
     if not soul_path.exists():
-        # X19 fallback: if no SOUL.md but X19 enabled, return X19 SOUL template
-        # This allows X19 repo to have identity without requiring user to create SOUL.md
-        x19_soul = _get_x19_soul_md_if_enabled()
+        # No operator persona on disk: fall back to the X19 SOUL text so identity
+        # exists without requiring the user to create a file.
+        x19_soul = _get_x19_soul_md()
         if x19_soul:
             return _truncate_content(
                 _scan_context_content(x19_soul, "SOUL.md (X19 default)", user_authored=False),
@@ -1555,11 +1564,11 @@ def load_soul_md(context_length: Optional[int] = None, home_override: "Path | No
             content = strip_legacy_protocol(content).strip()
         if not content:
             return None
-        # `hermes profile install <git-url>` / `profile update` plant a third-party SOUL.md into a
-        # distribution profile (hermes_cli/profile_distribution.py, DEFAULT_DIST_OWNED) with no scan and no
+        # `x19 profile install <git-url>` / `profile update` plant a third-party SOUL.md into a
+        # distribution profile (x19_cli/profile_distribution.py, DEFAULT_DIST_OWNED) with no scan and no
         # approval gate, so it is NOT the user's own file: when distribution.yaml owns SOUL.md (a manifest
         # with no `distribution_owned` list owns the whole payload) a scanner hit keeps BLOCKING.
-        from hermes_cli.profile_distribution import read_manifest
+        from x19_cli.profile_distribution import read_manifest
         try:
             manifest = read_manifest(soul_path.parent)
             user_authored = manifest is None or (bool(manifest.distribution_owned)
@@ -1591,9 +1600,9 @@ def _context_section(content: str, label: str, warn_name: str, path: Path, conte
     return _truncate_content(body, warn_name, context_length=context_length, read_path=str(path))
 
 
-def _hermes_md_candidates(cwd_path: Path) -> list[tuple[str, Path, str]]:
-    """.hermes.md / HERMES.md — nearest match walking up to the git root."""
-    path = _find_hermes_md(cwd_path)
+def _x19_md_candidates(cwd_path: Path) -> list[tuple[str, Path, str]]:
+    """.x19.md / X19.md — nearest match walking up to the git root."""
+    path = _find_x19_md(cwd_path)
     if path is None:
         return []
     label = str(path.relative_to(cwd_path)) if path.is_relative_to(cwd_path) else path.name
@@ -1655,7 +1664,7 @@ def _cursorrules_candidates(cwd_path: Path) -> list[tuple[str, Path, str]]:
 # shadowed. Both the prompt build (loaders below) and the /context manifest
 # (``agent/context_file_sources.py``) enumerate files through these finders, so the two cannot drift.
 _CONTEXT_FILE_CANDIDATES = {
-    "hermes_md": _hermes_md_candidates,
+    "x19_md": _x19_md_candidates,
     "agents_md": _agents_md_candidates,
     "claude_md": _claude_md_candidates,
     "cursorrules": _cursorrules_candidates,
@@ -1670,20 +1679,20 @@ def discover_context_files(cwd_path: Path) -> list[tuple[str, str, Path, str]]:
 
 
 def _project_context_suppressed(cwd: Optional[str], cwd_path: Path, allow_install_tree_fallback: bool) -> bool:
-    """A FALLBACK-picked cwd inside the Hermes install tree must not gain system-prompt authority (the desktop
+    """A FALLBACK-picked cwd inside the X19 install tree must not gain system-prompt authority (the desktop
     default would load this repo's contributor AGENTS.md). An explicitly configured cwd is honored verbatim —
-    the Hermes tree is a legitimate workspace when the user deliberately points a session at it — and
+    the X19 tree is a legitimate workspace when the user deliberately points a session at it — and
     CLI-style surfaces pass allow_install_tree_fallback=True because their launch dir IS the user's shell cwd
-    (developing Hermes in-tree). See #64590."""
+    (developing X19 in-tree). See #64590."""
     from agent.runtime_cwd import _is_install_tree
     return cwd is None and not allow_install_tree_fallback and _is_install_tree(cwd_path)
 
 
-def _load_hermes_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
-    """.hermes.md / HERMES.md — nearest match walking up to the git root."""
-    for label, path, content in _hermes_md_candidates(cwd_path):
+def _load_x19_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
+    """.x19.md / X19.md — nearest match walking up to the git root."""
+    for label, path, content in _x19_md_candidates(cwd_path):
         if content:
-            return _context_section(_strip_yaml_frontmatter(content), label, ".hermes.md", path, context_length)
+            return _context_section(_strip_yaml_frontmatter(content), label, ".x19.md", path, context_length)
     return ""
 
 
@@ -1737,19 +1746,19 @@ def build_context_files_prompt(
 ) -> str:
     """Discover and load context files for the system prompt (each capped, see ``_get_context_file_max_chars``).
 
-    Only ONE project context type loads, first found wins: .hermes.md/HERMES.md (walk to git root) →
+    Only ONE project context type loads, first found wins: .x19.md/X19.md (walk to git root) →
     AGENTS.md chain (git root → cwd) → CLAUDE.md (cwd) → .cursorrules + .cursor/rules/*.mdc (cwd). SOUL.md
-    from HERMES_HOME is independent and always included unless *skip_soul* (already the identity slot).
+    from X19_HOME is independent and always included unless *skip_soul* (already the identity slot).
     """
     cwd_path = Path(cwd if cwd is not None else os.getcwd()).resolve()
     if _project_context_suppressed(cwd, cwd_path, allow_install_tree_fallback):
         logger.warning(
-            "skipping project-context discovery: working-directory resolution fell back to the Hermes "
+            "skipping project-context discovery: working-directory resolution fell back to the X19 "
             "install tree (%s) — set terminal.cwd to your project directory", cwd_path,
         )
         sections = []
     else:
-        sections = [_load_hermes_md(cwd_path, context_length) or _load_agents_md(cwd_path, context_length)
+        sections = [_load_x19_md(cwd_path, context_length) or _load_agents_md(cwd_path, context_length)
                     or _load_claude_md(cwd_path, context_length) or _load_cursorrules(cwd_path, context_length)]
     if not skip_soul:
         sections.append(load_soul_md(context_length, home_override=home_override))
@@ -1760,24 +1769,3 @@ def build_context_files_prompt(
             + "\n".join(sections))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import List  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'org_id_of_path': ('agent.skill_utils', 'org_id_of_path'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

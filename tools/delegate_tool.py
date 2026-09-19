@@ -35,6 +35,11 @@ from tools.delegate_tool_config import (  # noqa: F401
     _subagent_auto_approve, _subagent_auto_deny,
 )
 from tools.delegate_tool_dispatch import _Batch, _announce_batch, _capture_origin, _run_batch
+# X19 organization observation: the engine's real child lifecycle feeds the task
+# graph, so the org state records what actually ran. Best-effort, never raises.
+from tools.delegate_tool_org import (  # noqa: F401
+    observe_child_result as _observe_org_result, observe_child_started as _observe_org_started,
+)
 from tools.delegate_tool_progress import (  # noqa: F401
     DelegateEvent, SUBAGENT_FAILURE_STATUSES, _batch_prefix, _build_child_progress_callback,
     _build_child_system_prompt, _clean_error_text, _emit_parent_console, _quiet, _resolve_workspace_hint,
@@ -100,7 +105,7 @@ def _open_child_session_db(parent_agent) -> Any:
     if parent_session_db is None:
         return None
     with _quiet("subagent: failed to open dedicated SessionDB; child persistence disabled", exc_info=True):
-        from hermes_state_registry import acquire
+        from x19_state_registry import acquire
         _parent_db_path = getattr(parent_session_db, "db_path", None)
         return acquire(_parent_db_path) if _parent_db_path is not None else acquire()
     return None
@@ -250,7 +255,7 @@ def _build_child_agent(
             # No child close() will ever run: release the dedicated handle here.
             if child_session_db is not None:
                 with _quiet(None):
-                    from hermes_state_registry import release_or_close
+                    from x19_state_registry import release_or_close
                     release_or_close(child_session_db)
             raise
     child._print_fn = getattr(parent_agent, "_print_fn", None)
@@ -284,7 +289,7 @@ def _build_child_agent(
     # saturated — then the subagent_start lifecycle hook.
     _safe_progress(child_progress_cb, "subagent.spawn_requested", preview=goal)
     with _quiet("subagent_start hook invocation failed", exc_info=True):
-        from hermes_cli.lifecycle import invoke_hook as _invoke_hook
+        from x19_cli.lifecycle import invoke_hook as _invoke_hook
         _invoke_hook(
             "subagent_start", parent_session_id=parent_sid,
             parent_turn_id=getattr(parent_agent, "_current_turn_id", "") or "", parent_subagent_id=parent_subagent_id,
@@ -321,6 +326,8 @@ def _run_single_child(
         child, parent_agent, goal, owner_session_id=owner_session_id, owner_transport=owner_transport,
         owner_session_record=owner_session_record,
     )
+    if _subagent_id:
+        _observe_org_started(child, goal, subagent_id=_subagent_id)
     run = _ChildRun(child, parent_agent, task_index, goal, _subagent_id, child_progress_cb, heartbeat=heartbeat)
     # Set when a timed-out Future still owns the child: closing it from this
     # thread before the worker settles races the conversation's finally path.
@@ -331,6 +338,7 @@ def _run_single_child(
         run.seed_workspace()
         result, failure_entry, _child_close_deferred = run.await_child()
         if failure_entry is not None:
+            _observe_org_result(child, goal, failure_entry, subagent_id=_subagent_id)
             return failure_entry
 
         schema = _validate_child_output_schema(child, result, task_index, run.child_task_id, run.relay_text)
@@ -345,14 +353,17 @@ def _run_single_child(
         run.append_sibling_write_reminder(entry)
         run.account_background_processes(entry)
         run.emit_complete(result, entry, duration)
+        _observe_org_result(child, goal, entry, subagent_id=_subagent_id)
         return run.attach_worktree(entry)
     except Exception as exc:
         # Close steer acceptance before any completion callback (see _merge_late_steer).
         _late_pending_steer = run.close_steering()
         logging.exception(f"[subagent-{task_index}] failed")
         # Entry status "error" (contract), progress event status "failed" (UI vocabulary).
+        _err_entry = _fabricated_entry(task_index, "error", str(exc), child, run.elapsed())
+        _observe_org_result(child, goal, _err_entry, subagent_id=_subagent_id)
         return run.finish_failed(
-            _fabricated_entry(task_index, "error", str(exc), child, run.elapsed()), _late_pending_steer,
+            _err_entry, _late_pending_steer,
             preview=str(exc), summary=str(exc), status="failed",
         )
     finally:
@@ -609,7 +620,7 @@ DELEGATE_TASK_SCHEMA = {
     "name": "delegate_task",
     # description / tasks.description are placeholders: the real text is built per get_definitions() call by
     # _build_dynamic_schema_overrides() so the model sees the user's actual max_concurrent_children / max_spawn_depth.
-    # Lazy (not at import) so cli.CLI_CONFIG isn't forced to load before the test conftest redirects HERMES_HOME.
+    # Lazy (not at import) so cli.CLI_CONFIG isn't forced to load before the test conftest redirects X19_HOME.
     "description": (
         "Spawn one or more subagents in isolated contexts. "
         "Description is rebuilt at every get_definitions() call to reflect the user's current delegation limits."
@@ -725,39 +736,3 @@ registry.register(
 )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from concurrent.futures import TimeoutError as FuturesTimeoutError  # noqa: F401,E402
-import contextvars  # noqa: F401,E402
-import enum  # noqa: F401,E402
-import json  # noqa: F401,E402
-import os  # noqa: F401,E402
-import re  # noqa: F401,E402
-import threading  # noqa: F401,E402
-from urllib.parse import urlsplit  # noqa: F401,E402
-from urllib.parse import urlunsplit  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'DEFAULT_CHILD_TIMEOUT': ('tools.delegate_tool_config', 'DEFAULT_CHILD_TIMEOUT'),
-    'DEFAULT_MAX_SUMMARY_CHARS': ('tools.delegate_tool_results', 'DEFAULT_MAX_SUMMARY_CHARS'),
-    'DEFAULT_TOOLSETS': ('tools.delegate_tool_toolsets', 'DEFAULT_TOOLSETS'),
-    'MAX_DEPTH': ('tools.delegate_tool_config', 'MAX_DEPTH'),
-    'TOOLSETS': ('toolsets', 'TOOLSETS'),
-    'base_url_hostname': ('utils', 'base_url_hostname'),
-    'file_state': ('tools', 'file_state'),
-    'request_hard_interrupt': ('agent.interrupt_compat', 'request_hard_interrupt'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

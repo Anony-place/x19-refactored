@@ -307,6 +307,6 @@ class TestElisionNoticeWiring:
         assert content.startswith("<untrusted_tool_result")
         assert content.rstrip().endswith("</untrusted_tool_result>")
         assert "INCOMPLETE" in content
-        assert content.index("hermes note") < content.index("</untrusted_tool_result>")
+        assert content.index("x19 note") < content.index("</untrusted_tool_result>")
         # Exactly one notice.
-        assert content.count("hermes note") == 1
+        assert content.count("x19 note") == 1

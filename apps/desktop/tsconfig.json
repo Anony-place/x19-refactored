@@ -17,13 +17,13 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/*"],
-      "@hermes/plugin-sdk": ["./src/sdk/index.ts"],
-      "@hermes/shared/ansi": ["../shared/src/ansi.ts"],
-      "@hermes/shared/billing": ["../shared/src/billing-types.ts"],
-      "@hermes/shared/color": ["../shared/src/color.ts"],
-      "@hermes/shared/i18n": ["../shared/src/i18n.ts"],
-      "@hermes/shared/translucency": ["../shared/src/translucency.ts"],
-      "@hermes/shared": ["../shared/src/index.ts"]
+      "@x19/plugin-sdk": ["./src/sdk/index.ts"],
+      "@x19/shared/ansi": ["../shared/src/ansi.ts"],
+      "@x19/shared/billing": ["../shared/src/billing-types.ts"],
+      "@x19/shared/color": ["../shared/src/color.ts"],
+      "@x19/shared/i18n": ["../shared/src/i18n.ts"],
+      "@x19/shared/translucency": ["../shared/src/translucency.ts"],
+      "@x19/shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src", "../shared/src"],

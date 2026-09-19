@@ -170,7 +170,7 @@ class OpenRouterVideoGenProvider(VideoGenProvider):
 
     def _headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self._api_key()}", "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/NousResearch/hermes-agent", "X-Title": "Hermes Agent"}
+                "HTTP-Referer": "https://github.com/Anony-place/x19-refactored", "X-Title": "X19"}
 
     def _session(self) -> Any:
         import requests
@@ -205,7 +205,7 @@ class OpenRouterVideoGenProvider(VideoGenProvider):
 
     def _configured_model(self) -> str:
         try:
-            from hermes_cli.config import cfg_get, load_config
+            from x19_cli.config import cfg_get, load_config
             value = cfg_get(load_config(), "video_gen", "model")
         except Exception as exc:  # noqa: BLE001
             logger.debug("Could not read video_gen.model: %s", exc)

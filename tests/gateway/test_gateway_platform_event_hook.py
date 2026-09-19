@@ -39,7 +39,7 @@ if _repo not in sys.path:
 from plugins.platforms.telegram.adapter import TelegramAdapter  # noqa: E402
 from gateway.run import GatewayRunner  # noqa: E402
 from gateway.profile_routing import ProfileRoute  # noqa: E402
-from hermes_cli.plugins import (  # noqa: E402
+from x19_cli.plugins import (  # noqa: E402
     VALID_HOOKS,
     PluginContext,
     PluginManager,
@@ -65,7 +65,7 @@ def _adapter(extra=None) -> TelegramAdapter:
 @pytest.fixture(autouse=True)
 def _observer_available(monkeypatch):
     """Most fire-site tests exercise the subscribed path explicitly."""
-    monkeypatch.setattr("hermes_cli.lifecycle.has_hook", lambda _name: True)
+    monkeypatch.setattr("x19_cli.lifecycle.has_hook", lambda _name: True)
 
 
 def _reaction(*, emoji=None, custom_emoji_id=None):
@@ -138,7 +138,7 @@ class TestRunnerDispatch:
             "payload": {"chat_id": "123", "message_id": "456", "emojis": ["x"]},
         }
 
-        with patch("hermes_cli.lifecycle.invoke_hook", invoke):
+        with patch("x19_cli.lifecycle.invoke_hook", invoke):
             asyncio.run(runner._handle_gateway_platform_event(event, source))
 
         invoke.assert_called_once_with("gateway_platform_event", **event)
@@ -151,7 +151,7 @@ class TestRunnerDispatch:
             _auth_reaction_update(user_id=777)
         )
 
-        with patch("hermes_cli.lifecycle.invoke_hook", invoke):
+        with patch("x19_cli.lifecycle.invoke_hook", invoke):
             asyncio.run(runner._handle_gateway_platform_event(
                 {"platform": "telegram", "event_type": "reaction", "payload": {}},
                 source,
@@ -168,8 +168,8 @@ class TestRunnerDispatch:
             _auth_reaction_update(user_id=777)
         )
 
-        with patch("hermes_cli.lifecycle.has_hook", return_value=False), patch(
-            "hermes_cli.lifecycle.invoke_hook", invoke
+        with patch("x19_cli.lifecycle.has_hook", return_value=False), patch(
+            "x19_cli.lifecycle.invoke_hook", invoke
         ):
             asyncio.run(runner._handle_gateway_platform_event(
                 {"platform": "telegram", "event_type": "reaction", "payload": {}},
@@ -187,7 +187,7 @@ class TestRunnerDispatch:
             _auth_reaction_update(user_id=777)
         )
 
-        with patch("hermes_cli.lifecycle.invoke_hook", invoke):
+        with patch("x19_cli.lifecycle.invoke_hook", invoke):
             asyncio.run(runner._handle_gateway_platform_event(
                 {"platform": "telegram", "event_type": "reaction", "payload": {}},
                 source,
@@ -422,7 +422,7 @@ class TestOnPlatformUpdate:
         handler = AsyncMock()
         a.set_platform_event_handler(handler)
 
-        with patch("hermes_cli.lifecycle.has_hook", return_value=False):
+        with patch("x19_cli.lifecycle.has_hook", return_value=False):
             asyncio.run(a._on_platform_update(MagicMock(), context=MagicMock()))
 
         a._normalize_platform_event.assert_not_called()
@@ -592,7 +592,7 @@ class TestProfileScopedPlatformEventHandler:
 
         runner._handle_gateway_platform_event = dispatch
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_profile_dir", lambda name: None,
+            "x19_cli.profiles.get_profile_dir", lambda name: None,
         )
         handler = runner._make_profile_platform_event_handler("work")
         source = _adapter()._source_from_reaction_for_auth(
@@ -621,7 +621,7 @@ class TestFixturePluginObservationPath:
         adapter = _adapter()
         adapter.set_platform_event_handler(runner._handle_gateway_platform_event)
 
-        with patch("hermes_cli.plugins.get_plugin_manager", return_value=manager):
+        with patch("x19_cli.plugins.get_plugin_manager", return_value=manager):
             asyncio.run(adapter._on_platform_update(
                 _auth_reaction_update(user_id=777), context=MagicMock(),
             ))

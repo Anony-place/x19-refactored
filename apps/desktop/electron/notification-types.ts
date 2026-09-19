@@ -1,4 +1,4 @@
-export interface HermesNotification {
+export interface X19Notification {
   title?: string
   body?: string
   silent?: boolean

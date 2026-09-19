@@ -272,7 +272,7 @@ def test_init_feasibility_check_uses_aux_context_override_from_config():
     mock_client.api_key = "sk-custom"
 
     with (
-        patch("hermes_cli.config.load_config", return_value=cfg), patch("hermes_cli.config.load_config_readonly", return_value=cfg),
+        patch("x19_cli.config.load_config", return_value=cfg), patch("x19_cli.config.load_config_readonly", return_value=cfg),
         patch("model_tools.get_tool_definitions", return_value=[]),
         patch("model_tools.check_toolset_requirements", return_value={}),
         patch("agent.process_bootstrap.OpenAI"),

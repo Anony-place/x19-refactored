@@ -10,7 +10,7 @@ from plugins.memory.honcho import HonchoMemoryProvider
 
 @pytest.fixture
 def honcho_json(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     path = tmp_path / "honcho.json"
 
     def _write(**values):
@@ -21,7 +21,7 @@ def honcho_json(tmp_path, monkeypatch):
 
 
 def test_signature_uses_neutral_keys(honcho_json):
-    honcho_json(workspace="team", peerName="eri", aiPeer="hermes", pinUserPeer=True, runtimePeerPrefix="tg_",
+    honcho_json(workspace="team", peerName="eri", aiPeer="x19", pinUserPeer=True, runtimePeerPrefix="tg_",
                 userPeerAliases={"222": "bob", "111": "alice"}, sessionPeerPrefix=True, a2aSessions=False)
 
     sig = HonchoMemoryProvider().identity_signature()
@@ -29,7 +29,7 @@ def test_signature_uses_neutral_keys(honcho_json):
     assert sig == {
         "workspace": "team",
         "user_identity": "eri",
-        "agent_identity": "hermes",
+        "agent_identity": "x19",
         "pin_user_identity": True,
         "runtime_identity_prefix": "tg_",
         "user_identity_aliases": [("111", "alice"), ("222", "bob")],

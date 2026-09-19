@@ -35,8 +35,8 @@ class TestAgentConfigSignature:
 
         runtime = {"api_key": "sk-test12345678", "base_url": "https://openrouter.ai/api/v1",
                     "provider": "openrouter"}
-        sig1 = GatewayRunner._agent_config_signature("claude-sonnet-4", runtime, ["hermes-telegram"], "")
-        sig2 = GatewayRunner._agent_config_signature("claude-opus-4.6", runtime, ["hermes-telegram"], "")
+        sig1 = GatewayRunner._agent_config_signature("claude-sonnet-4", runtime, ["x19-telegram"], "")
+        sig2 = GatewayRunner._agent_config_signature("claude-opus-4.6", runtime, ["x19-telegram"], "")
         assert sig1 != sig2
 
     def test_same_token_prefix_different_full_token_changes_signature(self):
@@ -57,8 +57,8 @@ class TestAgentConfigSignature:
         }
 
         assert rt1["api_key"][:8] == rt2["api_key"][:8]
-        sig1 = GatewayRunner._agent_config_signature("gpt-5.3-codex", rt1, ["hermes-telegram"], "")
-        sig2 = GatewayRunner._agent_config_signature("gpt-5.3-codex", rt2, ["hermes-telegram"], "")
+        sig1 = GatewayRunner._agent_config_signature("gpt-5.3-codex", rt1, ["x19-telegram"], "")
+        sig2 = GatewayRunner._agent_config_signature("gpt-5.3-codex", rt2, ["x19-telegram"], "")
         assert sig1 != sig2
 
     def test_provider_change_different_signature(self):
@@ -66,8 +66,8 @@ class TestAgentConfigSignature:
 
         rt1 = {"api_key": "sk-test12345678", "base_url": "https://openrouter.ai/api/v1", "provider": "openrouter"}
         rt2 = {"api_key": "sk-test12345678", "base_url": "https://api.anthropic.com", "provider": "anthropic"}
-        sig1 = GatewayRunner._agent_config_signature("claude-sonnet-4", rt1, ["hermes-telegram"], "")
-        sig2 = GatewayRunner._agent_config_signature("claude-sonnet-4", rt2, ["hermes-telegram"], "")
+        sig1 = GatewayRunner._agent_config_signature("claude-sonnet-4", rt1, ["x19-telegram"], "")
+        sig2 = GatewayRunner._agent_config_signature("claude-sonnet-4", rt2, ["x19-telegram"], "")
         assert sig1 != sig2
 
     def test_capability_change_different_signature(self):
@@ -84,7 +84,7 @@ class TestAgentConfigSignature:
     def test_default_gateway_runtime_forwards_filtered_capabilities(self, monkeypatch):
         """Configured provider capabilities must reach a newly created gateway agent."""
         from gateway.run import _resolve_runtime_agent_kwargs
-        from hermes_cli import runtime_provider
+        from x19_cli import runtime_provider
 
         monkeypatch.setattr(
             runtime_provider,
@@ -166,7 +166,7 @@ class TestExtractCacheBustingConfig:
                     "micro_compact_defrag_threshold_tokens": 4000,
                     "target_ratio": 0.3,
                     "protect_last_n": 25,
-                    "codex_app_server_auto": "hermes",
+                    "codex_app_server_auto": "x19",
                     "some_other_key": "ignored",
                 }
             }
@@ -183,7 +183,7 @@ class TestExtractCacheBustingConfig:
         assert out["compression.micro_compact_defrag_threshold_tokens"] == 4000
         assert out["compression.target_ratio"] == 0.3
         assert out["compression.protect_last_n"] == 25
-        assert out["compression.codex_app_server_auto"] == "hermes"
+        assert out["compression.codex_app_server_auto"] == "x19"
 
 
     def test_missing_keys_yield_none(self):
@@ -304,7 +304,7 @@ class TestAgentCacheLifecycle:
         session_key = "telegram:12345"
         runtime = {"api_key": "test", "base_url": "https://openrouter.ai/api/v1",
                     "provider": "openrouter", "api_mode": "chat_completions"}
-        sig = runner._agent_config_signature("anthropic/claude-sonnet-4", runtime, ["hermes-telegram"], "")
+        sig = runner._agent_config_signature("anthropic/claude-sonnet-4", runtime, ["x19-telegram"], "")
 
         # First message — create and cache
         agent1 = AIAgent(
@@ -825,10 +825,10 @@ class TestAgentConfigSignatureUserId:
         from gateway.run import GatewayRunner
         runtime = {"provider": "anthropic", "api_key": "k", "base_url": "", "api_mode": "chat_completions"}
         sig_implicit = GatewayRunner._agent_config_signature(
-            "claude-sonnet-4", runtime, ["hermes-telegram"], "",
+            "claude-sonnet-4", runtime, ["x19-telegram"], "",
         )
         sig_explicit_none = GatewayRunner._agent_config_signature(
-            "claude-sonnet-4", runtime, ["hermes-telegram"], "",
+            "claude-sonnet-4", runtime, ["x19-telegram"], "",
             user_id=None, user_id_alt=None,
         )
         assert sig_implicit == sig_explicit_none
@@ -851,7 +851,7 @@ class TestAgentCacheMessageCountRebaseline:
     """
 
     def _runner_with_db(self, db):
-        from hermes_state import AsyncSessionDB
+        from x19_state import AsyncSessionDB
 
         runner = _make_runner()
         # The gateway holds the async facade; the production refresh awaits it.
@@ -886,7 +886,7 @@ class TestAgentCacheMessageCountRebaseline:
         """After the re-baseline, a DIFFERENT process appending to the same
         session must still flip the guard to rebuild (the #45966 fix holds).
         """
-        from hermes_state import SessionDB
+        from x19_state import SessionDB
 
         db = SessionDB(db_path=tmp_path / "sessions.db")
         db.create_session("s1", source="telegram")
@@ -932,7 +932,7 @@ class TestAgentCacheMessageCountRebaseline:
         cache-hit guard, which reads ``get_session(session_id)`` with the same
         ``session_id`` the recursive ``_run_agent`` call is given.
         """
-        from hermes_state import SessionDB
+        from x19_state import SessionDB
 
         db = SessionDB(db_path=tmp_path / "sessions.db")
         db.create_session("s1", source="telegram")

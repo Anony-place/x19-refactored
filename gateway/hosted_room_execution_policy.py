@@ -75,8 +75,8 @@ def execution_policy_mapping(*, target_profile: str, config: Mapping[str, Any] |
         config = _load_gateway_config()
     if not isinstance(config, Mapping):
         raise RoomExecutionPolicyError("gateway config is invalid")
-    from hermes_cli.config import resolve_turn_limit
-    from hermes_cli.tools_config import _get_platform_tools
+    from x19_cli.config import resolve_turn_limit
+    from x19_cli.tools_config import _get_platform_tools
     from tools.approval import _YOLO_MODE_FROZEN
     from tools.approval_context import _normalize_approval_mode
     toolsets = sorted({*_get_platform_tools(dict(config), "api_server"), "bot_room"})
@@ -112,10 +112,3 @@ __all__ = [
     "reset_room_execution_policy"]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-import re  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

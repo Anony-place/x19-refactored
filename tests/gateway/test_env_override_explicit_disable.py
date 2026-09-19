@@ -7,7 +7,7 @@ homeassistant, email, sms, dingtalk, feishu, wecom, wecom_callback, bluebubbles,
 qqbot, yuanbao) force-set ``enabled = True`` unconditionally, while Telegram /
 Discord / Slack routed through ``_enable_from_env`` and honored the
 ``_enabled_explicit`` marker.  These tests drive the real ``load_gateway_config``
-against a temp HERMES_HOME — real YAML I/O, no mocks of the code under test.
+against a temp X19_HOME — real YAML I/O, no mocks of the code under test.
 """
 
 import logging
@@ -68,19 +68,19 @@ def _isolate(monkeypatch, tmp_path, env):
     for key in list(os.environ):
         if key.startswith(_PLATFORM_ENV_PREFIXES):
             monkeypatch.delenv(key, raising=False)
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     for k, v in env.items():
         monkeypatch.setenv(k, v)
-    return hermes_home
+    return x19_home
 
 
 @pytest.mark.parametrize("platform", sorted(CRED_ENV))
 def test_yaml_explicit_disable_survives_env_credentials(platform, tmp_path, monkeypatch):
     """``platforms.<x>.enabled: false`` + credentials in env -> stays disabled."""
-    hermes_home = _isolate(monkeypatch, tmp_path, CRED_ENV[platform])
-    (hermes_home / "config.yaml").write_text(
+    x19_home = _isolate(monkeypatch, tmp_path, CRED_ENV[platform])
+    (x19_home / "config.yaml").write_text(
         f"platforms:\n  {platform}:\n    enabled: false\n", encoding="utf-8"
     )
 
@@ -97,8 +97,8 @@ def test_yaml_explicit_disable_survives_env_credentials(platform, tmp_path, monk
 @pytest.mark.parametrize("platform", sorted(CRED_ENV))
 def test_env_credentials_still_enable_without_yaml_opinion(platform, tmp_path, monkeypatch):
     """No ``enabled`` key in YAML + credentials in env -> env-only setup still works."""
-    hermes_home = _isolate(monkeypatch, tmp_path, CRED_ENV[platform])
-    (hermes_home / "config.yaml").write_text("platforms: {}\n", encoding="utf-8")
+    x19_home = _isolate(monkeypatch, tmp_path, CRED_ENV[platform])
+    (x19_home / "config.yaml").write_text("platforms: {}\n", encoding="utf-8")
 
     config = load_gateway_config()
 
@@ -111,8 +111,8 @@ def test_env_credentials_still_enable_without_yaml_opinion(platform, tmp_path, m
 def test_env_credentials_still_populate_extra_when_yaml_disables(tmp_path, monkeypatch):
     """The disable only gates ``enabled``; credentials are still wired through
     (mirrors the Slack/API-server contract so send-only tooling keeps working)."""
-    hermes_home = _isolate(monkeypatch, tmp_path, CRED_ENV["weixin"])
-    (hermes_home / "config.yaml").write_text(
+    x19_home = _isolate(monkeypatch, tmp_path, CRED_ENV["weixin"])
+    (x19_home / "config.yaml").write_text(
         "platforms:\n  weixin:\n    enabled: false\n", encoding="utf-8"
     )
 
@@ -138,8 +138,8 @@ def test_explicit_disable_with_env_credentials_warns_once(platform, tmp_path, mo
     """Users who relied on 'creds in .env = platform on' must be told why it went
     dark: one WARNING naming the platform, the winning config key, and the env
     credential(s) — emitted once per process, not on every config reload."""
-    hermes_home = _isolate(monkeypatch, tmp_path, CRED_ENV[platform])
-    (hermes_home / "config.yaml").write_text(
+    x19_home = _isolate(monkeypatch, tmp_path, CRED_ENV[platform])
+    (x19_home / "config.yaml").write_text(
         f"platforms:\n  {platform}:\n    enabled: false\n", encoding="utf-8"
     )
 
@@ -161,8 +161,8 @@ def test_explicit_disable_with_env_credentials_warns_once(platform, tmp_path, mo
 
 @pytest.mark.usefixtures("_fresh_warn_dedup")
 def test_no_warning_when_yaml_has_no_opinion_or_is_enabled(tmp_path, monkeypatch, caplog):
-    hermes_home = _isolate(monkeypatch, tmp_path, {**CRED_ENV["weixin"], **CRED_ENV["homeassistant"]})
-    (hermes_home / "config.yaml").write_text(
+    x19_home = _isolate(monkeypatch, tmp_path, {**CRED_ENV["weixin"], **CRED_ENV["homeassistant"]})
+    (x19_home / "config.yaml").write_text(
         "platforms:\n  homeassistant:\n    enabled: true\n", encoding="utf-8"
     )
 
@@ -177,8 +177,8 @@ def test_no_warning_when_yaml_has_no_opinion_or_is_enabled(tmp_path, monkeypatch
 @pytest.mark.usefixtures("_fresh_warn_dedup")
 def test_no_warning_when_disabled_and_no_env_credentials(tmp_path, monkeypatch, caplog):
     """The notice is about credentials being IGNORED; a plain disable is silent."""
-    hermes_home = _isolate(monkeypatch, tmp_path, {})
-    (hermes_home / "config.yaml").write_text(
+    x19_home = _isolate(monkeypatch, tmp_path, {})
+    (x19_home / "config.yaml").write_text(
         "platforms:\n  weixin:\n    enabled: false\n", encoding="utf-8"
     )
 

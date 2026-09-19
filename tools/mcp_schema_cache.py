@@ -1,5 +1,5 @@
 """Persistent MCP tool-schema cache for lazy server startup: per-server tool manifests on
-disk so Hermes can register MCP tools into the agent snapshot without spawning the stdio
+disk so X19 can register MCP tools into the agent snapshot without spawning the stdio
 child at idle dashboard startup. Entries are keyed by server name + a fingerprint of the
 connection config (command/args/url/tools filters)."""
 
@@ -20,8 +20,8 @@ _cache_lock = threading.Lock()
 
 
 def _cache_path() -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / _CACHE_FILENAME
+    from x19_constants import get_x19_home
+    return get_x19_home() / "cache" / _CACHE_FILENAME
 
 
 def config_fingerprint(config: dict) -> str:
@@ -109,18 +109,3 @@ def utility_tools_from_cache_entry(entry: dict) -> List[dict]:
     return _list_field(entry, "utility_tools")
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def clear_cache_entry(server_name: str) -> None:
-    with _cache_lock:
-        data = _load_all()
-        if server_name in data:
-            del data[server_name]
-            _save_all(data)
-
-def has_cached_entry(server_name: str, fingerprint: str) -> bool:
-    return get_cached_entry(server_name, fingerprint) is not None
-# ---- END PLUGIN-COMPAT ----

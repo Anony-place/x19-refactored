@@ -17,7 +17,7 @@ import { expect, test } from './test'
 
 // Right-click a bot row → "Open recent session" opens the bot's most recently
 // active ordinary session as a tab in its workspace, while the row's left click
-// keeps landing on the canonical Bot Chat (hermes-agent#93054).
+// keeps landing on the canonical Bot Chat (x19#93054).
 
 type Page = MockBackendFixture['page']
 
@@ -41,10 +41,10 @@ const RECENT_TITLE = 'Deploy notes'
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-recent-session')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
 
-  const dir = path.join(sandbox.hermesHome, 'profiles', 'alpha')
+  const dir = path.join(sandbox.x19Home, 'profiles', 'alpha')
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mock.url)
   writeEnvFile(dir)

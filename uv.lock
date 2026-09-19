@@ -1729,7 +1729,7 @@ wheels = [
 ]
 
 [[package]]
-name = "hermes-agent"
+name = "x19"
 version = "0.21.3"
 source = { editable = "." }
 dependencies = [
@@ -2028,25 +2028,25 @@ requires-dist = [
     { name = "google-auth-oauthlib", marker = "extra == 'google'", specifier = "==1.3.1" },
     { name = "google-auth-oauthlib", marker = "extra == 'google-chat'", specifier = "==1.3.1" },
     { name = "google-cloud-pubsub", marker = "extra == 'google-chat'", specifier = "==2.39.0" },
-    { name = "hermes-agent", extras = ["acp"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["acp"], marker = "extra == 'termux'" },
-    { name = "hermes-agent", extras = ["cron"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["cron"], marker = "extra == 'termux'" },
-    { name = "hermes-agent", extras = ["google"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["google"], marker = "extra == 'termux-all'" },
-    { name = "hermes-agent", extras = ["homeassistant"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["homeassistant"], marker = "extra == 'termux-all'" },
-    { name = "hermes-agent", extras = ["honcho"], marker = "extra == 'termux'" },
-    { name = "hermes-agent", extras = ["mcp"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["mcp"], marker = "extra == 'termux'" },
-    { name = "hermes-agent", extras = ["pty"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["pty"], marker = "extra == 'termux-all'" },
-    { name = "hermes-agent", extras = ["sms"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["sms"], marker = "extra == 'termux-all'" },
-    { name = "hermes-agent", extras = ["termux"], marker = "extra == 'termux-all'" },
-    { name = "hermes-agent", extras = ["web"], marker = "extra == 'all'" },
-    { name = "hermes-agent", extras = ["web"], marker = "extra == 'termux-all'" },
-    { name = "hermes-agent", extras = ["youtube"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["acp"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["acp"], marker = "extra == 'termux'" },
+    { name = "x19", extras = ["cron"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["cron"], marker = "extra == 'termux'" },
+    { name = "x19", extras = ["google"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["google"], marker = "extra == 'termux-all'" },
+    { name = "x19", extras = ["homeassistant"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["homeassistant"], marker = "extra == 'termux-all'" },
+    { name = "x19", extras = ["honcho"], marker = "extra == 'termux'" },
+    { name = "x19", extras = ["mcp"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["mcp"], marker = "extra == 'termux'" },
+    { name = "x19", extras = ["pty"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["pty"], marker = "extra == 'termux-all'" },
+    { name = "x19", extras = ["sms"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["sms"], marker = "extra == 'termux-all'" },
+    { name = "x19", extras = ["termux"], marker = "extra == 'termux-all'" },
+    { name = "x19", extras = ["web"], marker = "extra == 'all'" },
+    { name = "x19", extras = ["web"], marker = "extra == 'termux-all'" },
+    { name = "x19", extras = ["youtube"], marker = "extra == 'all'" },
     { name = "hindsight-client", marker = "extra == 'hindsight'", specifier = "==0.6.1" },
     { name = "honcho-ai", marker = "extra == 'honcho'", specifier = "==2.2.0" },
     { name = "httplib2", marker = "extra == 'google'", specifier = "==0.32.0" },

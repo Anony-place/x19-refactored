@@ -31,6 +31,6 @@ def test_inert_heredoc_body_script_path_still_read(tmp_path):
     """Masking hides the body from the *executed* view only: a lifecycle script named inside a
     Python body is still handed to ``os.system`` at runtime, so its contents must still be read."""
     script = tmp_path / "restart.sh"
-    script.write_text("#!/bin/sh\nhermes gateway restart\n")
+    script.write_text("#!/bin/sh\nx19 gateway restart\n")
     command = f"python3 - <<'PY'\nimport os\nos.system('{script}')\nPY"
     assert guard(command, cwd=str(tmp_path)) is True

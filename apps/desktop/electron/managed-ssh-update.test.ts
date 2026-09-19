@@ -264,8 +264,8 @@ test('POSIX managed launcher is detached, correlation-scoped, and never publishe
     {
       ssh: { exec: async () => '' },
       platform: 'Linux',
-      hermesPath: '~/.local/bin/hermes',
-      hermesHome: '~/.hermes'
+      x19Path: '~/.local/bin/x19',
+      x19Home: '~/.x19'
     },
     CORRELATION
   )
@@ -273,7 +273,7 @@ test('POSIX managed launcher is detached, correlation-scoped, and never publishe
   assert.match(command, /setsid/)
   assert.match(command, /update --yes/)
   assert.doesNotMatch(command, /update --yes --gateway/)
-  assert.match(command, new RegExp(`HERMES_UPDATE_CORRELATION_ID=.*${CORRELATION}`))
+  assert.match(command, new RegExp(`X19_UPDATE_CORRELATION_ID=.*${CORRELATION}`))
   assert.match(command, /\[ "\$rc" -ne 75 \]/)
   assert.match(command, new RegExp(`\\.update_exit_code\\.${CORRELATION}`))
   assert.match(command, new RegExp(`\\.update_launch_intent\\.${CORRELATION}`))
@@ -281,15 +281,15 @@ test('POSIX managed launcher is detached, correlation-scoped, and never publishe
 })
 
 test('POSIX managed launcher executes the updater command and atomically publishes its status', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'hermes-managed-launch-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'x19-managed-launch-'))
 
   try {
     const command = buildPosixManagedUpdateLaunch(
       {
         ssh: { exec: async () => '' },
         platform: 'Linux',
-        hermesPath: '/bin/true',
-        hermesHome: home
+        x19Path: '/bin/true',
+        x19Home: home
       },
       CORRELATION
     )
@@ -318,9 +318,9 @@ test('Windows managed launcher starts a hidden child and leaves exit 75 to the e
     {
       ssh: { exec: async () => '' },
       platform: 'Windows',
-      hermesPath: 'C:\\Hermes\\hermes.exe',
-      hermesHome: 'C:\\Users\\alice\\.hermes',
-      pythonPath: 'C:\\Hermes\\python.exe'
+      x19Path: 'C:\\X19\\x19.exe',
+      x19Home: 'C:\\Users\\alice\\.x19',
+      pythonPath: 'C:\\X19\\python.exe'
     },
     CORRELATION
   )
@@ -335,9 +335,9 @@ test('Windows managed launcher starts a hidden child and leaves exit 75 to the e
 
   assert.match(wrapper, /update --yes/)
   assert.doesNotMatch(wrapper, /update --yes --gateway/)
-  assert.match(wrapper, /HERMES_UPDATE_WINDOWS_DETACHED/)
-  assert.match(wrapper, /HERMES_UPDATE_TAURI_READY_PATH/)
-  assert.match(wrapper, /HERMES_UPDATE_TAURI_OUTCOME_PATH/)
+  assert.match(wrapper, /X19_UPDATE_WINDOWS_DETACHED/)
+  assert.match(wrapper, /X19_UPDATE_TAURI_READY_PATH/)
+  assert.match(wrapper, /X19_UPDATE_TAURI_OUTCOME_PATH/)
   assert.match(wrapper, /\$rc -ne 75/)
   assert.match(wrapper, /\$handoffAccepted=/)
   assert.match(wrapper, new RegExp(`update_launch_intent\\.${CORRELATION}`))
@@ -360,7 +360,7 @@ test('remote observation rejects a receipt for another correlation', () => {
 })
 
 test('POSIX observer reads the exact correlation receipt and terminal marker from disk', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'hermes-managed-update-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'x19-managed-update-'))
 
   try {
     const receipts = path.join(home, 'logs', 'update_receipts')
@@ -382,8 +382,8 @@ test('POSIX observer reads the exact correlation receipt and terminal marker fro
       {
         ssh: { exec: async () => '' },
         platform: 'Linux',
-        hermesPath: '/opt/hermes/hermes',
-        hermesHome: home
+        x19Path: '/opt/x19/x19',
+        x19Home: home
       },
       CORRELATION
     )
@@ -402,19 +402,19 @@ test('POSIX observer reads the exact correlation receipt and terminal marker fro
 })
 
 test('managed observer unwraps a named profile home for the install-wide marker', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'hermes-managed-profile-marker-'))
+  const root = await mkdtemp(path.join(os.tmpdir(), 'x19-managed-profile-marker-'))
   const profileHome = path.join(root, 'profiles', 'research')
 
   try {
     await mkdir(profileHome, { recursive: true })
-    await writeFile(path.join(root, '.hermes-update-in-progress'), `${process.pid}\n1\n`)
+    await writeFile(path.join(root, '.x19-update-in-progress'), `${process.pid}\n1\n`)
 
     const command = buildRemoteUpdateObservationCommand(
       {
         ssh: { exec: async () => '' },
         platform: 'Linux',
-        hermesPath: '/opt/hermes/hermes',
-        hermesHome: profileHome
+        x19Path: '/opt/x19/x19',
+        x19Home: profileHome
       },
       CORRELATION
     )
@@ -453,9 +453,9 @@ test('Windows coordinator handoff is pending until its marker clears and correla
 
   const target = {
     platform: 'Windows' as const,
-    hermesPath: 'C:\\Hermes\\hermes.exe',
-    hermesHome: 'C:\\Users\\alice\\.hermes',
-    pythonPath: 'C:\\Hermes\\python.exe',
+    x19Path: 'C:\\X19\\x19.exe',
+    x19Home: 'C:\\Users\\alice\\.x19',
+    pythonPath: 'C:\\X19\\python.exe',
     ssh: {
       exec: async () => {
         const reply = replies[Math.min(calls, replies.length - 1)]
@@ -481,8 +481,8 @@ test('terminal status without its durable receipt fails instead of claiming succ
 
   const target = {
     platform: 'Linux' as const,
-    hermesPath: '~/.local/bin/hermes',
-    hermesHome: '~/.hermes',
+    x19Path: '~/.local/bin/x19',
+    x19Home: '~/.x19',
     ssh: { exec: async () => observation({ marker: 'absent', exitCode: 0 }) }
   }
 
@@ -504,8 +504,8 @@ test('live or malformed remote markers fail actionably at bounded update and rec
 
     const target = {
       platform: 'Linux' as const,
-      hermesPath: '~/.local/bin/hermes',
-      hermesHome: '~/.hermes',
+      x19Path: '~/.local/bin/x19',
+      x19Home: '~/.x19',
       ssh: { exec: async () => observation({ marker, ...(marker === 'live' ? { markerPid: 44 } : {}) }) }
     }
 
@@ -529,8 +529,8 @@ test('a journaled launch requires correlated terminal proof or an observed live-
 
   const target = {
     platform: 'Linux' as const,
-    hermesPath: '~/.local/bin/hermes',
-    hermesHome: '~/.hermes',
+    x19Path: '~/.local/bin/x19',
+    x19Home: '~/.x19',
     ssh: { exec: async () => observation({ marker: 'absent' }) }
   }
 
@@ -563,8 +563,8 @@ test('remote launch intent fences crash recovery even before the local journal r
 
   const target = {
     platform: 'Linux' as const,
-    hermesPath: '~/.local/bin/hermes',
-    hermesHome: '~/.hermes',
+    x19Path: '~/.local/bin/x19',
+    x19Home: '~/.x19',
     ssh: { exec: async () => observation({ marker: 'absent', launchIntent: 'present' }) }
   }
 

@@ -1,4 +1,4 @@
-import type { ConnectionRequestPayload, ConnectionUpdatePayload, GatewayEvent } from '@hermes/shared'
+import type { ConnectionRequestPayload, ConnectionUpdatePayload, GatewayEvent } from '@x19/shared'
 
 import { pendingClarifyToolPayload } from '@/app/session/hooks/use-session-actions/restore-pending-clarify'
 import { connectionRequestToolPayload } from '@/app/session/hooks/use-session-actions/restore-pending-connection'

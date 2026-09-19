@@ -36,7 +36,7 @@ def _save_video(url: str, **kwargs):
 
 
 def test_save_url_forwards_headers_and_streams_to_cache(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     calls = []
 
     def fake_get(url, **kwargs):
@@ -66,7 +66,7 @@ def test_save_url_forwards_headers_and_streams_to_cache(monkeypatch, tmp_path):
 
 
 def test_save_url_strict_content_type_rejects_non_video(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     monkeypatch.setattr(
         "requests.get",
         lambda *_args, **_kwargs: _Response("text/html", [b"not a video"]),

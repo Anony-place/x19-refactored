@@ -48,7 +48,7 @@ class FakeTransport:
         # Phase 1.5 multi-platform: per-platform negotiated descriptors and
         # the handshaked identity set (fronts_platform reads _identities).
         self._descriptors_by_platform = descriptors_by_platform or {}
-        self._identities = identities or [("slack", "hermes")]
+        self._identities = identities or [("slack", "x19")]
 
     def descriptor_for_platform(self, platform):
         return self._descriptors_by_platform.get(platform)
@@ -230,7 +230,7 @@ class TestMultiPlatformResolution:
                     supports_block_formatting=discord_capable,
                 ),
             },
-            identities=[("slack", "hermes"), ("discord", "hermes")],
+            identities=[("slack", "x19"), ("discord", "x19")],
         )
 
     @pytest.mark.asyncio

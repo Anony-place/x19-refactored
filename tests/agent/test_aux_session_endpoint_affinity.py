@@ -46,7 +46,7 @@ def test_named_provider_defaults_compose_under_task_overrides(monkeypatch, tmp_p
     (tmp_path / "config.yaml").write_text(
         "model:\n  provider: openai\n  default: gpt-5.4\n"
         "providers:\n  openai:\n    api: https://named.example/v1\n    key_env: NAMED_KEY\n")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     def route(**overrides):
         aux._client_cache.clear()
         client, _ = aux.resolve_provider_client("openai", "gpt-5.4-mini", **overrides)

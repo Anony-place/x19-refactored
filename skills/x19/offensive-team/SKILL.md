@@ -23,14 +23,14 @@ toolsets:
   - todo
   - memory
 metadata:
-  hermes:
+  x19:
     tags: [Security, X19, Autonomous, Offensive, BugBounty, Pentest]
     related_skills: [web-pentest]
 ---
 
 # X19 Autonomous Offensive Team
 
-Fully autonomous security operations agent built on Hermes foundation. Hierarchical team, evidence-driven, bug-bounty methodology.
+Fully autonomous security operations agent built on X19 foundation. Hierarchical team, evidence-driven, bug-bounty methodology.
 
 ## Team Model
 
@@ -226,11 +226,11 @@ Boss: [Generates evidence-based report from real findings, no mock]
 
 ## Implementation
 
-- Uses Hermes' existing delegation (`delegate_task` tool), not second framework
+- Uses X19' existing delegation (`delegate_task` tool), not second framework
 - Boss/Managers are orchestrator role (can delegate), Specialists are leaf (cannot delegate)
 - Knowledge base and datasets loaded from `knowledge/` and `datasets/bug_bounty/` with metadata
 - Payloads from public knowledge, witness minimal proof, not destructive
-- Mission state persisted via `x19/orchestration/mission_state.py` (file JSON, similar to hermes_state pattern)
+- Mission state persisted via `x19/orchestration/mission_state.py` (file JSON, similar to x19_state pattern)
 - Real-time status from runtime via `x19/mission/status.py`, no mock
 - Autonomous loop via `x19/loop/loop.py` SCOPE→...→REASSESS
 - Anti-loop via `x19/safety/anti_loop.py`

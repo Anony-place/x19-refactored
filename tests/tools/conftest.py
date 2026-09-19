@@ -115,7 +115,7 @@ def grant_computer_use_approvals(monkeypatch):
     """
     from tools.computer_use import tool as cu_tool
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("X19_INTERACTIVE", "1")
     cu_tool.set_approval_callback(lambda command, description, **kw: "once")
     yield
     cu_tool.set_approval_callback(None)

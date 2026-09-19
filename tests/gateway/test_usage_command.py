@@ -1,4 +1,4 @@
-from hermes_state import AsyncSessionDB
+from x19_state import AsyncSessionDB
 """Tests for gateway /usage command — agent cache lookup and output fields."""
 
 import threading

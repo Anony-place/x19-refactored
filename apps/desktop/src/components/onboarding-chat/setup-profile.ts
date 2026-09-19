@@ -1,9 +1,9 @@
 /**
  * The welcome chat that guided onboarding runs in, and the seed prompts for the first build session.
  *
- * The chat belongs to a persistent `hermes-setup` profile, so it survives onboarding and can be found again. `setup`
+ * The chat belongs to a persistent `x19-setup` profile, so it survives onboarding and can be found again. `setup`
  * is the internal name throughout this module (the profile key, the atoms, the hidden `[setup]` notes); the user sees
- * only Hermes and the title `Welcome to Hermes`.
+ * only X19 and the title `Welcome to X19`.
  *
  * This module holds the pure pieces: names, souls, seed prompts, and the handoff request atom. The side effects
  * (profiles.create, session.create, the chat switch) run in the wiring's kickoff and handoff effects, which hold the
@@ -25,11 +25,11 @@ import { FIRST_USE_GUIDANCE, PLAIN_SPEECH } from '@/store/onboarding-script'
 import { getSessionOwnerHint } from '@/store/session'
 
 /** Profile name of the onboarding guide. Prefixed so it cannot collide with a profile the user named "setup". */
-export const SETUP_PROFILE = 'hermes-setup'
+export const SETUP_PROFILE = 'x19-setup'
 
 /** Title of the welcome chat, and the row the user sees in the sessions list. Kickoff re-finds the chat by exact
  *  title after a relaunch, so this string is also a lookup key. */
-export const SETUP_CHAT_TITLE = 'Welcome to Hermes'
+export const SETUP_CHAT_TITLE = 'Welcome to X19'
 
 export type SetupHandoffPhase = 'done' | 'error' | 'opening' | 'pending'
 
@@ -127,11 +127,11 @@ export function firstTaskTitle(task: string): string {
 /** SOUL.md for the welcome profile. It applies to the welcome chat and to every later check-in. */
 export function composeSetupSoul(): string {
   return [
-    '# Hermes',
+    '# X19',
     '',
-    'You are Hermes, and this profile is where you met this user for the first time and stay reachable afterwards. You are the person at the front desk of somewhere good: pleased they came in, and not performing it. Quick, unhurried, never flustered, never in the way. You showed them around on their first run and you keep a loose eye on how they are getting on.',
+    'You are X19, and this profile is where you met this user for the first time and stay reachable afterwards. You are the person at the front desk of somewhere good: pleased they came in, and not performing it. Quick, unhurried, never flustered, never in the way. You showed them around on their first run and you keep a loose eye on how they are getting on.',
     '',
-    '- Never introduce yourself as "Setup", "the setup assistant", or "the onboarding guide". You are Hermes.',
+    '- Never introduce yourself as "Setup", "the setup assistant", or "the onboarding guide". You are X19.',
     '- Warmth is in paying attention, not in adjectives. Remember what they told you and use it. Do not thank them for answering, do not praise their choices, do not ask if they are ready.',
     '- Offer an opinion lightly when you have one. "Most people wire that one up first" is worth more than a neutral menu.',
     '- You are training wheels: useful early, ignorable later. Never guilt-trip, never nag. If the user asks you to stop checking in, stop.',
@@ -153,7 +153,7 @@ export function buildFirstTaskRunbook(
   const tools = [...new Set(answers.connectors ?? [])].filter(slug => /^[a-z0-9][a-z0-9_-]*$/.test(slug))
 
   return [
-    `You are Hermes. The user's welcome chat just opened this session so one task can have room to run: ${task.trim()}.`,
+    `You are X19. The user's welcome chat just opened this session so one task can have room to run: ${task.trim()}.`,
     'This message is invisible to the user — never reference it or the mechanics described here.',
     name ? `The user is called ${name} — you already know that, so never introduce yourself or ask who they are.` : '',
     context
@@ -205,12 +205,12 @@ const MACHINE_SETUP_RUNBOOK = [
 
 /** The plugin runbook. The save-time reload it promises is implemented in src/contrib/runtime-loader.ts. */
 const pluginRunbook = (root: string) => [
-  'THIS IS A PLUGIN JOB: the thing you are building is a piece of the Hermes app itself, and it will appear in the window the user is looking at right now. That is the whole point — do not let it become a script in a folder.',
-  `A plugin is ONE file: \`${root}/<name>/plugin.js\`. Plain ESM, no build step, no package.json, no install. It imports from \`@hermes/plugin-sdk\` and calls \`jsx()\` from \`react/jsx-runtime\` directly (there is no JSX compiler in this path — writing \`<div>\` will not work). It default-exports \`{ id, name, register(ctx) }\` and \`register\` calls \`ctx.register({ id, area, order, render })\`. The runtime loads it the moment you save, and reloads it on every later save, so there is no restart to ask them for.`,
-  'LOOK BEFORE YOU WRITE. Read the `building-hermes-desktop-plugins` skill first — it has the SDK surface, the areas you can render into, and the traps. If the machine has a checkout of NousResearch/plugins, read a plugin close to what you are making; those thirteen are reviewed and show the real shapes (a statusbar chip, a composer action, a full pane).',
+  'THIS IS A PLUGIN JOB: the thing you are building is a piece of the X19 app itself, and it will appear in the window the user is looking at right now. That is the whole point — do not let it become a script in a folder.',
+  `A plugin is ONE file: \`${root}/<name>/plugin.js\`. Plain ESM, no build step, no package.json, no install. It imports from \`@x19/plugin-sdk\` and calls \`jsx()\` from \`react/jsx-runtime\` directly (there is no JSX compiler in this path — writing \`<div>\` will not work). It default-exports \`{ id, name, register(ctx) }\` and \`register\` calls \`ctx.register({ id, area, order, render })\`. The runtime loads it the moment you save, and reloads it on every later save, so there is no restart to ask them for.`,
+  'LOOK BEFORE YOU WRITE. Read the `building-x19-desktop-plugins` skill first — it has the SDK surface, the areas you can render into, and the traps. If the machine has a checkout of NousResearch/plugins, read a plugin close to what you are making; those thirteen are reviewed and show the real shapes (a statusbar chip, a composer action, a full pane).',
   'START SMALL AND VISIBLE. The first save should put something on screen even if it only renders a label — a chip that says the right word beats a half-written dashboard, because they SEE it work and everything after that is refinement they are watching. Build up from there in passes.',
   'Say what you are doing in one short line per pass, and tell them where to look the first time it appears ("bottom right of the status bar" / "it is in the right pane now"). A plugin that loaded silently reads as nothing having happened.',
-  'Never ask them to restart the app, never edit anything outside their plugin folder, and never touch the Hermes install itself. If the plugin errors on load, the app toasts it and keeps running — read the error, fix the file, save again.'
+  'Never ask them to restart the app, never edit anything outside their plugin folder, and never touch the X19 install itself. If the plugin errors on load, the app toasts it and keeps running — read the error, fix the file, save again.'
 ]
 
 /** A new HandoffPlan takes effect only once it has a case here. */
@@ -249,7 +249,7 @@ export async function buildFirstTaskSeedMessages(
   plan: HandoffPlan = 'build',
   scope?: ProfileScope
 ): Promise<{ content: string; display_kind?: 'hidden'; role: 'assistant' | 'user' }[]> {
-  const root = plan === 'plugin' ? await window.hermesDesktop?.desktopPluginsRoot?.() : undefined
+  const root = plan === 'plugin' ? await window.x19Desktop?.desktopPluginsRoot?.() : undefined
 
   const capabilities = plan === 'machine-setup' ? '' : await readOnboardingCapabilities(scope, {
     apps: answers.connectors,
@@ -270,7 +270,7 @@ export function buildHandoffCompleteNote(task: string): string {
 export async function ensureSetupProfile(request: GatewayRequest): Promise<void> {
   try {
     await request('profiles.create', {
-      description: 'Where Hermes met you — walks your first run, then checks in as you find your feet.',
+      description: 'Where X19 met you — walks your first run, then checks in as you find your feet.',
       name: SETUP_PROFILE,
       clone_from: 'default',
       no_alias: true,

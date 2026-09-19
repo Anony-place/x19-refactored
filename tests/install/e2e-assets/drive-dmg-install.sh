@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Drive the Hermes-Setup dmg bootstrap through its first-run GUI.
+# Drive the X19-Setup dmg bootstrap through its first-run GUI.
 #
 # The Setup app is Tauri (Rust + system webview), so Playwright/Electron
 # attach never works. Launch the binary bare in the background (it inherits
-# the redirect env), click "Install Hermes ->" with native input, then watch
+# the redirect env), click "Install X19 ->" with native input, then watch
 # the install land on disk: checkout + venv console script.
 #
 # Usage:
@@ -55,7 +55,7 @@ command -v cliclick >/dev/null 2>&1 || brew install --quiet cliclick
 window_geometry() {
   osascript <<'OSA' 2>/dev/null
 tell application "System Events"
-  set procs to (every process whose name contains "Hermes")
+  set procs to (every process whose name contains "X19")
   if (count of procs) = 0 then return "no-process"
   set p to item 1 of procs
   if (count of windows of p) = 0 then return "no-window"
@@ -92,22 +92,22 @@ click_install() {
   echo "clicked ${cx},${cy} (window ${x},${y} ${wd}x${ht})"
 }
 
-HERMES_BIN="$INSTALL_DIR/venv/bin/hermes"
+X19_BIN="$INSTALL_DIR/venv/bin/x19"
 # The bootstrap runs 11 stages; checkout + venv land in the first few and
 # the desktop app build is near the end, so success requires all three or
 # the EXIT trap kills the installer mid-build.
 installed_app() {
   local cand
   for cand in \
-    "$INSTALL_DIR/apps/desktop/release/mac-arm64/Hermes.app" \
-    "$INSTALL_DIR/apps/desktop/release/mac/Hermes.app" \
-    "/Applications/Hermes.app"; do
+    "$INSTALL_DIR/apps/desktop/release/mac-arm64/X19.app" \
+    "$INSTALL_DIR/apps/desktop/release/mac/X19.app" \
+    "/Applications/X19.app"; do
     [ -d "$cand" ] && return 0
   done
   return 1
 }
 install_complete() {
-  [ -d "$INSTALL_DIR/.git" ] && [ -x "$HERMES_BIN" ] && installed_app
+  [ -d "$INSTALL_DIR/.git" ] && [ -x "$X19_BIN" ] && installed_app
 }
 # The bootstrap parks on an error screen instead of exiting when a stage
 # fails (e.g. a transient 429 downloading install.sh), with a Retry button
@@ -115,7 +115,7 @@ install_complete() {
 # watch for new failure lines, let the regular click drive the retry, and
 # give up after a few so a persistent failure reports the real error
 # instead of burning the whole install timeout.
-BOOTSTRAP_LOG="$HOME/.hermes/logs/bootstrap-installer.log"
+BOOTSTRAP_LOG="$HOME/.x19/logs/bootstrap-installer.log"
 bootstrap_error() {
   [ -f "$BOOTSTRAP_LOG" ] || return 0
   # Match REAL failure shapes only: the structured stage log's state=Failed,
@@ -134,7 +134,7 @@ FIRST_SHOT=0
 CLICKS=0
 while :; do
   if install_complete; then
-    log "install landed: checkout + venv console script + Hermes.app present"
+    log "install landed: checkout + venv console script + X19.app present"
     shot "02-install-landed"
     break
   fi
@@ -144,7 +144,7 @@ while :; do
     sleep 5
     install_complete && continue
     shot "ERROR-setup-exited"
-    log "Hermes-Setup exited (pid $SETUP_PID) before the install landed"
+    log "X19-Setup exited (pid $SETUP_PID) before the install landed"
     exit 1
   fi
   err="$(bootstrap_error)"

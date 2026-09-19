@@ -6,10 +6,10 @@ description: Run models entirely on your own machine — no account, no API key,
 
 # Local Models
 
-Hermes can run open models entirely on your own machine. It downloads and
+X19 can run open models entirely on your own machine. It downloads and
 manages the inference engine (llama.cpp), picks the right build of each
 model for your hardware, and handles memory so you never configure context
-sizes, GPU layers, or quantization. You pick a model; Hermes does the rest.
+sizes, GPU layers, or quantization. You pick a model; X19 does the rest.
 
 Nothing leaves your computer: no account, no API key, and no network access
 after a model is downloaded.
@@ -18,17 +18,17 @@ after a model is downloaded.
 
 1. Open **Settings → Providers → Local Models** (or choose **Run models
    locally** during onboarding).
-2. Click **Install runtime**. Hermes downloads the official llama.cpp
+2. Click **Install runtime**. X19 downloads the official llama.cpp
    build for your hardware (a few hundred MB), verifies it, and keeps it
    updated.
 3. Pick a model from the catalog and click **Download**.
 4. Click **Use**. New chats now run on the local model.
 
-That's the whole flow. The server starts and stops with Hermes, restarts
+That's the whole flow. The server starts and stops with X19, restarts
 survive app restarts, and switching back to a cloud provider is one click
 in the model picker.
 
-## How Hermes picks what to download
+## How X19 picks what to download
 
 Every model in the catalog is priced against **your machine** before you
 download anything. Each row shows:
@@ -40,10 +40,10 @@ download anything. Each row shows:
   grow to.
 - The download size of the build selected for your hardware.
 
-Models ship in several quality grades (quantizations). Hermes picks the
+Models ship in several quality grades (quantizations). X19 picks the
 highest-quality build that runs fully on your GPU; machines with less
 memory get a more compact build of the same model with the same
-guarantees. Below 4-bit the quality loss is too severe, so Hermes never
+guarantees. Below 4-bit the quality loss is too severe, so X19 never
 offers builds smaller than that — a machine that can't run the 4-bit
 build spilled to system RAM simply can't run that model.
 
@@ -52,7 +52,7 @@ what a hardware upgrade would unlock.
 
 ## How memory management works
 
-Local models live or die by memory placement, so Hermes manages it
+Local models live or die by memory placement, so X19 manages it
 end-to-end and exposes no knobs:
 
 - **Models start at a context window that fully fits your GPU** and grow
@@ -60,18 +60,18 @@ end-to-end and exposes no knobs:
   may see "Context window grown" in the status feed during long sessions
   — that's the window expanding, not an error.
 - **Every recommended model gets at least a 64K context window.** When a
-  model is larger than your GPU's memory, Hermes deliberately places the
+  model is larger than your GPU's memory, X19 deliberately places the
   overflow in system RAM in the order that hurts least (expert weights
   first, never the attention cache), trading some speed to protect the
   context guarantee.
 - **Memory fit includes the launch configuration**, not just the model file:
   context state, runtime buffers, the vision projector, and MTP buffers all
-  count. For multi-token prediction (MTP), Hermes uses smaller batches when
+  count. For multi-token prediction (MTP), X19 uses smaller batches when
   larger batches would spill at the same context window. MTP stays enabled.
   The same calculation runs when a grown window is restored after restart.
 - **Conversation compression follows a growth check.** If a larger window
   cannot fit, generation is too slow, or the native maximum is reached,
-  Hermes compresses instead of claiming a window the server did not receive.
+  X19 compresses instead of claiming a window the server did not receive.
 - Idle models are unloaded after 15 minutes to free GPU memory; they
   reload automatically on the next message.
 
@@ -89,7 +89,7 @@ models** section on the same page searches all of Hugging Face:
 - Results show download counts and a per-file fit check sized to your
   machine, so you know before downloading whether a build runs fully on
   your GPU.
-- Anything you download behaves exactly like a catalog model — Hermes
+- Anything you download behaves exactly like a catalog model — X19
   reads the model file itself to pick its context window and memory
   placement. The only difference: community models don't carry our
   "validated" testing badge.
@@ -99,12 +99,12 @@ models** section on the same page searches all of Hugging Face:
 
 ## Using your own llama-server
 
-If a llama-server is already running on your machine, Hermes detects it
+If a llama-server is already running on your machine, X19 detects it
 and uses it instead of starting its own. Point a custom endpoint at any
 OpenAI-compatible server for full manual control — the managed runtime is
 a default, not a requirement. For manual setups (Ollama, MLX, custom
 builds, headless CLI machines), see
-[Run Hermes Locally with Ollama](/guides/local-ollama-setup) and
+[Run X19 Locally with Ollama](/guides/local-ollama-setup) and
 [Run Local LLMs on Mac](/guides/local-llm-on-mac).
 
 ## Configuration
@@ -115,14 +115,14 @@ documented for CLI and headless use:
 
 ```yaml
 local_runtime:
-  enabled: false     # true = start the managed server with Hermes.
+  enabled: false     # true = start the managed server with X19.
                      # The desktop "Use" button sets this automatically.
   backend: auto      # auto | cuda | metal | vulkan | hip | cpu
-  tag: b10362        # pinned llama.cpp release; Hermes updates it with
+  tag: b10362        # pinned llama.cpp release; X19 updates it with
                      # each release after re-validation
 ```
 
-Models and runtime builds live under the Hermes home directory
+Models and runtime builds live under the X19 home directory
 (`models/` and `runtimes/llamacpp/`). Selecting a local model as your
 main model uses the standard `model.provider: llamacpp` +
 `model.default` settings — the same shape as every other provider.

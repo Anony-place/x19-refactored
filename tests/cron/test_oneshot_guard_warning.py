@@ -20,7 +20,7 @@ from cron.jobs import (
     load_jobs,
     mark_job_run,
     save_jobs,
-    _hermes_now,
+    _x19_now,
 )
 
 
@@ -37,7 +37,7 @@ def temp_home(tmp_path, monkeypatch):
 def test_guard_warns_on_rearmed_consumed_record(temp_home, caplog):
     job = create_job(
         prompt="x",
-        schedule=(_hermes_now() + timedelta(hours=1)).isoformat(),
+        schedule=(_x19_now() + timedelta(hours=1)).isoformat(),
         name="warn-guard",
         deliver="local",
     )
@@ -51,7 +51,7 @@ def test_guard_warns_on_rearmed_consumed_record(temp_home, caplog):
         if j["id"] == jid:
             j["enabled"] = True
             j["state"] = "scheduled"
-            j["next_run_at"] = (_hermes_now() - timedelta(seconds=5)).isoformat()
+            j["next_run_at"] = (_x19_now() - timedelta(seconds=5)).isoformat()
     save_jobs(jobs)
 
     with caplog.at_level(logging.INFO, logger="cron"):
@@ -71,7 +71,7 @@ def test_guard_stays_info_for_never_ran_stale_record(temp_home, caplog):
     """The dead-tick recovery case (no last_run_at) keeps its quiet INFO."""
     job = create_job(
         prompt="x",
-        schedule=(_hermes_now() + timedelta(hours=1)).isoformat(),
+        schedule=(_x19_now() + timedelta(hours=1)).isoformat(),
         name="quiet-guard",
         deliver="local",
     )
@@ -82,7 +82,7 @@ def test_guard_stays_info_for_never_ran_stale_record(temp_home, caplog):
         if j["id"] == jid:
             j["repeat"] = {"times": 1, "completed": 1}
             j["last_run_at"] = None
-            j["next_run_at"] = (_hermes_now() - timedelta(seconds=5)).isoformat()
+            j["next_run_at"] = (_x19_now() - timedelta(seconds=5)).isoformat()
     save_jobs(jobs)
 
     with caplog.at_level(logging.INFO, logger="cron"):

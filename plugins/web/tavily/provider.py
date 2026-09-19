@@ -3,7 +3,7 @@
 Env: ``TAVILY_API_KEY`` (https://app.tavily.com/home, optional), ``TAVILY_BASE_URL``.
 Keyed requests use ``Authorization: Bearer``; without a key the request is
 keyless (``X-Tavily-Access-Mode: keyless``). Tavily is NOT in the zero-config
-keyless ring — keyless access is opt-in by selecting Tavily in ``hermes tools``.
+keyless ring — keyless access is opt-in by selecting Tavily in ``x19 tools``.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from plugins.web._common import (
 
 logger = logging.getLogger(__name__)
 
-_CLIENT_NAME = "hermes-agent"
+_CLIENT_NAME = "x19"
 
 _SEARCH_PAYLOAD = {"include_raw_content": False, "include_images": False}
 
@@ -73,7 +73,7 @@ def _failed_document(url: str, error: str) -> Dict[str, Any]:
 
 
 def _missing_key_error(action: str) -> str:
-    return f"TAVILY_API_KEY is not set. Get a key at https://app.tavily.com/home or select Tavily in `hermes tools` for opt-in keyless {action}."
+    return f"TAVILY_API_KEY is not set. Get a key at https://app.tavily.com/home or select Tavily in `x19 tools` for opt-in keyless {action}."
 
 
 def _auth(action: str) -> tuple[Optional[str], Optional[str], str]:
@@ -124,23 +124,3 @@ class TavilyWebSearchProvider(BaseWebSearchProvider):
         )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'WebSearchProvider': ('agent.web_search_provider', 'WebSearchProvider'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

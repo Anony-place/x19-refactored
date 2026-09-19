@@ -100,15 +100,15 @@ def _check_frontmatter(frontmatter: Dict[str, Any], skill_dir: Optional[Path]) -
         if key not in frontmatter:
             yield _warn("missing-metadata", f"frontmatter is missing '{key}'; every peer skill has it.")
     meta = frontmatter.get("metadata")
-    hermes_meta = meta.get("hermes") if isinstance(meta, dict) else None
-    if not isinstance(hermes_meta, dict):
-        yield _warn("missing-metadata", "frontmatter is missing metadata.hermes.{tags, related_skills}.")
-    elif "tags" not in hermes_meta:
-        yield _warn("missing-metadata", "metadata.hermes.tags is missing.")
+    x19_meta = meta.get("x19") if isinstance(meta, dict) else None
+    if not isinstance(x19_meta, dict):
+        yield _warn("missing-metadata", "frontmatter is missing metadata.x19.{tags, related_skills}.")
+    elif "tags" not in x19_meta:
+        yield _warn("missing-metadata", "metadata.x19.tags is missing.")
     author = str(frontmatter.get("author", ""))
-    if author and author.strip().lower() in ("hermes", "agent", "hermes agent") and (
-        author != "Hermes Agent"):
-        yield _warn("author-caps", f"author '{author}' should be 'Hermes Agent' (proper caps) "
+    if author and author.strip().lower() in ("x19", "agent", "x19 agent") and (
+        author != "X19"):
+        yield _warn("author-caps", f"author '{author}' should be 'X19' (proper caps) "
                     f"or a real contributor name.")
     platforms = frontmatter.get("platforms")
     if platforms:
@@ -205,15 +205,3 @@ def lint_skill(skill_md_path: Path) -> List[LintFinding]:
     return lint_content(content, skill_dir=skill_md_path.parent)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def format_findings(findings: List[LintFinding]) -> str:
-    """Render findings as a newline-joined human-readable block."""
-    return "\n".join(f.format() for f in findings)
-
-def has_errors(findings: List[LintFinding]) -> bool:
-    return any(f.severity == ERROR for f in findings)
-# ---- END PLUGIN-COMPAT ----

@@ -10,14 +10,14 @@ covers the operational concerns: starting them all together, viewing logs
 across profiles, preventing the host from sleeping, and recovering from common
 launchd/systemd quirks.
 
-If you only run one Hermes agent, you don't need this page — see
+If you only run one X19, you don't need this page — see
 [Profiles](./profiles.md) for the basics. And if your instances live on
 *different* machines that one desktop app should reach simultaneously, see
-[Connecting Desktop to Many Hermes Instances](./multi-connection-desktop.md).
+[Connecting Desktop to Many X19 Instances](./multi-connection-desktop.md).
 
 ## When to use this
 
-You want this setup when you have two or more Hermes agents that should all
+You want this setup when you have two or more X19s that should all
 be online at the same time. Common reasons:
 
 - A personal assistant on one Telegram bot and a coding agent on another
@@ -27,20 +27,20 @@ be online at the same time. Common reasons:
   memory and skills
 
 Every profile already gets its own per-platform supervisor entry: a LaunchAgent
-(`ai.hermes.gateway-<name>.plist`), a systemd user service
-(`hermes-gateway-<name>.service`), a systemd **system** service when installed with
-`sudo hermes gateway install --system` (runs as the invoking user via `User=`), a
+(`ai.x19.gateway-<name>.plist`), a systemd user service
+(`x19-gateway-<name>.service`), a systemd **system** service when installed with
+`sudo x19 gateway install --system` (runs as the invoking user via `User=`), a
 Windows Scheduled Task, or an s6/Docker service — and the Desktop app spawns its own
-per-profile `hermes serve` backend. This guide adds the patterns for managing them
+per-profile `x19 serve` backend. This guide adds the patterns for managing them
 collectively.
 
 ## Quick start
 
 ```bash
 # Create profiles (once)
-hermes profile create coder
-hermes profile create personal-bot
-hermes profile create research
+x19 profile create coder
+x19 profile create personal-bot
+x19 profile create research
 
 # Configure each
 coder setup
@@ -70,14 +70,14 @@ inbound process and serves messages for *every* profile on the box.
 Multiplexing is **on by default** (`gateway.multiplex_profiles` defaults to
 `true`), with one safety rule: an *unset* flag is a request the default gateway
 settles at boot, never a verdict. Each start it runs the same preflight as
-[`hermes gateway migrate --multiplex`](#migrating-from-per-profile-gateways) and
+[`x19 gateway migrate --multiplex`](#migrating-from-per-profile-gateways) and
 multiplexes only when the fold would have been safe — the default profile, two
 or more profiles, no secondary still running its own gateway (live process or
 installed service), no duplicate bot credential, no port-binding platform
 without a `/p/<profile>/` ingress, and a host the migration understands (not an
 s6 container or Windows Scheduled Tasks). Otherwise it comes up exactly as
 before — serving the default profile only — and logs the blocker plus the
-`hermes gateway migrate --multiplex` one-liner. Nothing is changed on disk.
+`x19 gateway migrate --multiplex` one-liner. Nothing is changed on disk.
 
 An **explicit** value is never second-guessed:
 
@@ -88,7 +88,7 @@ An **explicit** value is never second-guessed:
   every behavior below is inert.
 - `GATEWAY_MULTIPLEX_PROFILES` in the process environment overrides both.
 
-Other processes (`hermes -p <name> gateway start`, the dashboard, `hermes gateway
+Other processes (`x19 -p <name> gateway start`, the dashboard, `x19 gateway
 migrate`) never guess how an unset flag was settled: they read the running
 default gateway's `served_profiles` record, and fall back to the explicit flag
 only when no gateway runs.
@@ -112,11 +112,11 @@ gateway — `true` forces multiplexing even where the boot preflight would have
 held back, `false` opts out durably:
 
 ```bash
-hermes config set gateway.multiplex_profiles true    # or false
-hermes gateway restart
+x19 config set gateway.multiplex_profiles true    # or false
+x19 gateway restart
 ```
 
-Equivalently, in the default profile's `~/.hermes/config.yaml`:
+Equivalently, in the default profile's `~/.x19/config.yaml`:
 
 ```yaml
 gateway:
@@ -130,7 +130,7 @@ credentials, and routes each inbound message to the profile it belongs to. Each
 turn resolves the routed profile's config, skills, memory, SOUL, **and provider
 keys** — credentials are never shared across profiles.
 
-You do **not** run `hermes gateway start` for the secondary profiles — the
+You do **not** run `x19 gateway start` for the secondary profiles — the
 default gateway serves them. See the contract changes below.
 
 ### What changes when multiplexing is on
@@ -140,7 +140,7 @@ moment the flag is off.
 
 #### 1. Secondary profiles must not start their own gateway
 
-With a multiplexer running, a named-profile `hermes gateway run`, `start`,
+With a multiplexer running, a named-profile `x19 gateway run`, `start`,
 `install` or `restart` is a **hard error** (exit code 78), pointing you back at
 the multiplexer:
 
@@ -151,9 +151,9 @@ profile 'coder'. ...
 
 The refusal happens in the CLI before any service manager is touched, so a served
 profile never ends up with a permanently failed systemd unit or a launchd respawn
-loop. `hermes -p coder gateway stop` refuses the same way (exit 78) when coder has no
+loop. `x19 -p coder gateway stop` refuses the same way (exit 78) when coder has no
 gateway of its own — there is nothing to stop but the multiplexer, which
-`hermes gateway stop` on the default profile takes down for every served profile.
+`x19 gateway stop` on the default profile takes down for every served profile.
 The dashboard and Desktop app follow the CLI: for a served profile the "Start" and
 "Stop" gateway actions answer `409` with the same explanation (rendered as an inline
 notice on the System page), and "Restart" restarts the multiplexer (the process that
@@ -169,8 +169,8 @@ default home's `gateway_state.json`), so it stays correct when the multiplexer w
 enabled only through `GATEWAY_MULTIPLEX_PROFILES` in the default profile's
 environment, or when profiles were added after the gateway started.
 
-The setup flows follow the same rule: `hermes -p coder setup gateway`, `hermes -p coder setup`,
-`hermes -p coder gateway setup` and `hermes -p coder import` configure the profile's bots but
+The setup flows follow the same rule: `x19 -p coder setup gateway`, `x19 -p coder setup`,
+`x19 -p coder gateway setup` and `x19 -p coder import` configure the profile's bots but
 skip the "install the gateway background service" step for a served profile, printing
 *"Profile 'coder' is already served by the default multiplexer"* instead of registering a
 stray unit or plist that could only sit dead. Add the bot token and the running multiplexer
@@ -217,14 +217,14 @@ no API server is enabled); it serves three kinds of profile-prefixed paths:
   default profile (their inbound is routed to profiles via `profile_routes`), or
   disable them in the secondary. The gateway logs one INFO line per skipped
   secondary platform, and if **no** profile runs it a WARNING says the platform
-  is not being served; `hermes gateway status --profile work` shows
+  is not being served; `x19 gateway status --profile work` shows
   `whatsapp: not served under multiplex (shared ingress owned by default)`.
 
 Authentication follows the profile named in the URL. Unprefixed endpoints keep
 using the default listener's existing credentials.
 
 - `/p/coder/...` API-server requests must use `API_SERVER_KEY` from
-  `~/.hermes/profiles/coder/.env`; the default listener key is rejected. Under
+  `~/.x19/profiles/coder/.env`; the default listener key is rejected. Under
   the multiplexer that key only authenticates the prefix — it does not turn on a
   second `api_server` listener in the secondary profile, so you do not need to
   pin `platforms.api_server.enabled: false` in the secondary's `config.yaml`.
@@ -234,9 +234,9 @@ using the default listener's existing credentials.
   `/p/coder/webhooks/<route>` and is rejected on every other profile prefix.
 - Webhook routes without `profile` remain default-profile routes and are not
   reachable through a named profile prefix. Dynamic subscriptions bind the same
-  way: `hermes webhook subscribe <name> --route-profile coder` writes
+  way: `x19 webhook subscribe <name> --route-profile coder` writes
   `profile: coder` into the default gateway's `webhook_subscriptions.json` and
-  prints the `/p/coder/webhooks/<name>` URL (`hermes webhook ls` shows the
+  prints the `/p/coder/webhooks/<name>` URL (`x19 webhook ls` shows the
   binding). Use `--route-profile`, not the global `-p coder`: `-p` would write
   the subscription into coder's own subscriptions file, which the default
   gateway's webhook adapter never reads.
@@ -259,7 +259,7 @@ silently dropping the unsafe profile.
 
 #### Inbound-port platforms under the multiplexer
 
-A standalone `hermes -p coder gateway run` binds coder's Twilio, LINE, Teams,
+A standalone `x19 -p coder gateway run` binds coder's Twilio, LINE, Teams,
 … webhook servers on their own ports. Under the multiplexer those adapters are
 still coder's — same credentials from `profiles/coder/.env`, same
 `config.yaml`, replies sent through coder's channel — but they bind **no port**.
@@ -295,16 +295,16 @@ and every status surface repeats it, so you know what to paste into the vendor
 console:
 
 ```
-$ hermes -p coder gateway status
+$ x19 -p coder gateway status
 ✓ Gateway is running via the default-profile multiplexer
-  Manage it from the default profile: hermes gateway status
+  Manage it from the default profile: x19 gateway status
 
 Inbound callback URLs on the shared listener:
   line: http://127.0.0.1:8642/p/coder/line/webhook
   sms: http://127.0.0.1:8642/p/coder/webhooks/twilio
 ```
 
-`hermes gateway status` and `hermes status` on the default profile list the same
+`x19 gateway status` and `x19 status` on the default profile list the same
 URLs per served profile, and the dashboard's Channels page and the Desktop
 Messaging page show them as each platform's `ingress_url` when viewing that
 profile. The default's own `api_server` and `webhook` are reported the same way
@@ -354,9 +354,9 @@ parent conversation.
 #### 5. One PID/lock and one status surface
 
 There is a single process-level PID and lock (the multiplexer, under the default
-home). `hermes status` on the default profile reports the multiplexer and lists
-the profiles it serves (`Serves: coder, research`); `hermes -p coder status`,
-`hermes -p coder gateway status` and `hermes -p coder cron status` all report
+home). `x19 status` on the default profile reports the multiplexer and lists
+the profiles it serves (`Serves: coder, research`); `x19 -p coder status`,
+`x19 -p coder gateway status` and `x19 -p coder cron status` all report
 "running via the default-profile multiplexer" instead of "stopped", and the
 dashboard's `/api/status?profile=coder` / Channels page report the multiplexer as
 coder's running gateway (with coder's own adapters as its platforms). The single
@@ -419,14 +419,14 @@ Tool and memory-provider credentials follow the same rule. Hosted OCR
 (`FIRECRAWL_API_KEY`), Modal / Browser Use cloud gates, the mem0 OSS OpenAI
 key, xAI video, and every memory-provider identity (`MEM0_USER_ID`,
 `SUPERMEMORY_CONTAINER_TAG`, `RETAINDB_PROJECT`, `OPENVIKING_ACCOUNT/USER`,
-`HINDSIGHT_BANK_ID`, `HERMES_HONCHO_HOST`) are read from the routed profile's
+`HINDSIGHT_BANK_ID`, `X19_HONCHO_HOST`) are read from the routed profile's
 `.env`, so a secondary profile's memories land in **its** account/bank/project
 (or the provider's per-profile default), never the default profile's. Custom
 endpoints travel with their keys — `OPENAI_BASE_URL`, `XAI_BASE_URL`,
 `NOUS_INFERENCE_BASE_URL`, `GATEWAY_PROXY_URL`, Firecrawl / Browserbase /
 RetainDB / Supermemory / Honcho / Hindsight URLs — so a profile's key is never
 sent to another profile's proxy or self-hosted server. `WEIXIN_HOME_CHANNEL`,
-`HERMES_LANGUAGE` and `display.language`, and `hooks.outbound[].secret_env` are
+`X19_LANGUAGE` and `display.language`, and `hooks.outbound[].secret_env` are
 likewise per profile, and end-of-session memory extraction for an evicted
 secondary session runs under that profile's scope.
 
@@ -440,7 +440,7 @@ launched under. The same holds for per-profile state files (`processes.json`,
 `checkpoints/`, sandbox snapshot stores, Feishu comment rules/pairing) and for
 gateway hooks: each profile's `hooks/` directory is loaded on its own and fires
 only for that profile's events. Shell hooks run with the routed profile's
-`HERMES_HOME`, without the default profile's secrets in their environment, and
+`X19_HOME`, without the default profile's secrets in their environment, and
 their stdin payload carries a `profile` field naming the profile that fired them.
 
 #### What is isolated per profile
@@ -451,7 +451,7 @@ profile and never shares with the default or any sibling:
 | Concern | Resolved from | Behaviour when the profile lacks it |
 |---|---|---|
 | Provider keys, bot tokens, `${VAR}` refs in `config.yaml` | The profile's own `.env` (its secret scope) | Unresolved / no adapter — never the default profile's value |
-| Provider logins and the credential pool (`auth.json`: OAuth tokens, `hermes auth add` keys) | The profile's own `auth.json` | "Not connected to any AI provider" with the `hermes -p <name> model` hint — never the default profile's login, and a refresh never writes to the root store |
+| Provider logins and the credential pool (`auth.json`: OAuth tokens, `x19 auth add` keys) | The profile's own `auth.json` | "Not connected to any AI provider" with the `x19 -p <name> model` hint — never the default profile's login, and a refresh never writes to the root store |
 | Authorization (`GATEWAY_ALLOW_ALL_USERS`, `GATEWAY_ALLOWED_USERS`, per-platform allowlists and allow-all opt-ins) | The owning profile's `.env` and `config.yaml` | Closed — a default-profile opt-in never opens a secondary's bot |
 | HTTP endpoints (`/p/<profile>/api/...`, `/p/<profile>/webhooks/...`, platform event callbacks) | The named profile's `API_SERVER_KEY`, `profile:`-bound webhook routes, and its own adapter | `401`/`404`; delivery without an adapter is `502`/`503`, never another profile's bot |
 | Inbound-port platforms (`/p/<profile>/webhooks/twilio`, `/p/<profile>/line/webhook`, `/p/<profile>/api/messages`, …) | The named profile's own adapter and its secret (Twilio auth token, LINE channel secret, Teams app, BlueBubbles password, …); replies leave through that adapter | `401`/`403` on a wrong secret, `404` when the profile has no such adapter — never the default profile's adapter |
@@ -470,10 +470,10 @@ profile and never shares with the default or any sibling:
 | Platform proxies (`TELEGRAM_PROXY`, `DISCORD_PROXY`, `HTTPS_PROXY`, …) | The profile's own `.env` | Direct connection — never the default profile's proxy |
 | MCP discovery in the Desktop/dashboard backend | Once per served profile home | A profile selected after another has already built an agent still discovers its own `mcp_servers` |
 | MCP connections in the Desktop/dashboard backend and the per-profile cron ticker | Keyed per served profile even with `gateway.multiplex_profiles` off — same rule as the multiplexer | A same-named `mcp_servers` entry with other credentials is its own connection; a served profile never calls a server as another profile |
-| Dashboard actions (`hermes -p <name> …` spawned by the Desktop/dashboard) | A scrubbed child env pinned to that profile's `HERMES_HOME` | The child loads its own `.env`; the dashboard profile's tokens and ports are not inherited |
+| Dashboard actions (`x19 -p <name> …` spawned by the Desktop/dashboard) | A scrubbed child env pinned to that profile's `X19_HOME` | The child loads its own `.env`; the dashboard profile's tokens and ports are not inherited |
 | Every child that acts for a served profile (slash worker, Bot Chat delivery, A2A forward, `key_cmd` helper, browser driver) | That profile's own `.env` + secret sources over a credential-scrubbed base — with or without `gateway.multiplex_profiles` (the Desktop/dashboard `?profile=` route counts) | Absent from the child — a key that reached the launch process only through systemd / Compose / the shell is never inherited by another profile's child |
-| The launch (default) profile's own credentials in a `hermes serve` / dashboard process that also serves another profile | Its `.env` + secret sources over the process env **frozen the moment the first other profile is served**; not re-read afterwards | A credential rotated only in the process env (`systemctl set-environment`, a refreshed `op run` wrapper that did not re-exec) is not picked up until the process restarts — put rotating keys in `.env` or a secret source, or restart after rotating |
-| Cron `.env` tuning (`HERMES_CRON_TIMEOUT`, `HERMES_MODEL` fallback, `HERMES_CRON_MAX_PARALLEL`, prefill file), worker / Bot Chat child env | The profile's own `.env`; children never inherit the default profile's `.env` settings or bridged `TERMINAL_*` policy | Cron defaults / model refusal, exactly as a standalone `hermes -p <name> gateway run` |
+| The launch (default) profile's own credentials in a `x19 serve` / dashboard process that also serves another profile | Its `.env` + secret sources over the process env **frozen the moment the first other profile is served**; not re-read afterwards | A credential rotated only in the process env (`systemctl set-environment`, a refreshed `op run` wrapper that did not re-exec) is not picked up until the process restarts — put rotating keys in `.env` or a secret source, or restart after rotating |
+| Cron `.env` tuning (`X19_CRON_TIMEOUT`, `X19_MODEL` fallback, `X19_CRON_MAX_PARALLEL`, prefill file), worker / Bot Chat child env | The profile's own `.env`; children never inherit the default profile's `.env` settings or bridged `TERMINAL_*` policy | Cron defaults / model refusal, exactly as a standalone `x19 -p <name> gateway run` |
 | Kanban workers and notifications for a profile's tasks | The assignee's `.env` + `config.yaml` (toolset pin, terminal backend, media policy, display language) | — |
 | `/loop` ticks, `background_process_notifications` gate, `notice_delivery`, background-process checkpoint recovery | The owning profile's `state.db` / `config.yaml` / `processes.json` | — |
 
@@ -487,7 +487,7 @@ on the default profile).
 live named profile under `profiles/` — there is no per-profile opt-out list.
 (The former `gateway.multiplex_profile_allowlist` key is retired; a config
 migration removes it from `config.yaml`, and a profile you do not want served is
-archived or deleted instead — `hermes profile delete <name>`, or move the
+archived or deleted instead — `x19 profile delete <name>`, or move the
 directory out of `profiles/`.) Deleted profiles leave a tombstone and are never
 enumerated; a profile whose directory is gone is never recreated by a served
 turn, the cron ticker or log routing.
@@ -498,19 +498,19 @@ scheduler ticks (the Desktop backend's ticker re-enumerates the same set on
 every cycle — a profile created or deleted while Desktop runs joins or leaves
 the ticked set without a restart — and stands down for any profile a running
 multiplexer or its own gateway already serves). A
-multiplexer started as `hermes -p <name> gateway run` always ticks its own
+multiplexer started as `x19 -p <name> gateway run` always ticks its own
 profile's cron store as well.
 
 The served set is **live**. A profile created while the multiplexer is running
-(`hermes profile create`, the dashboard, Desktop or the TUI) is served at once:
+(`x19 profile create`, the dashboard, Desktop or the TUI) is served at once:
 the creator pings the multiplexer over its control socket, and the multiplexer
 also rescans `profiles/` every 30 seconds as a safety net. The new profile's
 adapters are built the moment its `config.yaml`/`.env` carries a bot token
 (creators usually create first, then add the token), `served_profiles` in the
-default profile's `gateway_state.json` is updated, and `hermes -p <name> gateway
+default profile's `gateway_state.json` is updated, and `x19 -p <name> gateway
 status` reports it as served — no restart, and the other profiles' adapters and
 in-flight turns are untouched. Deleting a profile stops and unroutes its
-adapters the same way, and `hermes profile rename` unroutes the old name before
+adapters the same way, and `x19 profile rename` unroutes the old name before
 the directory moves and hot-serves the new one (the old name is not resurrected
 by the adapters or the cron ticker that were still bound to it). The
 one-credential-one-poller rule still applies: a
@@ -616,7 +616,7 @@ authorization comes from the route, not from the satellite's config.
 
 The CLI ships with single-profile lifecycle commands. To act across every
 profile, wrap them in a shell loop. Put the snippet below in
-`~/.local/bin/hermes-gateways` and `chmod +x` it:
+`~/.local/bin/x19-gateways` and `chmod +x` it:
 
 ```sh
 #!/bin/sh
@@ -626,16 +626,16 @@ set -eu
 profiles="default coder personal-bot research"
 
 usage() {
-  echo "Usage: hermes-gateways {start|stop|restart|status|list}"
+  echo "Usage: x19-gateways {start|stop|restart|status|list}"
 }
 
 run_for_profile() {
   profile="$1"
   action="$2"
   if [ "$profile" = "default" ]; then
-    hermes gateway "$action"
+    x19 gateway "$action"
   else
-    hermes -p "$profile" gateway "$action"
+    x19 -p "$profile" gateway "$action"
   fi
 }
 
@@ -648,7 +648,7 @@ case "$action" in
     done
     ;;
   list)
-    hermes gateway list
+    x19 gateway list
     ;;
   *)
     usage
@@ -660,16 +660,16 @@ esac
 Then:
 
 ```bash
-hermes-gateways start      # start every configured profile
-hermes-gateways stop       # stop every configured profile
-hermes-gateways restart    # restart all
-hermes-gateways status     # status across all
-hermes-gateways list       # delegates to `hermes gateway list`
+x19-gateways start      # start every configured profile
+x19-gateways stop       # stop every configured profile
+x19-gateways restart    # restart all
+x19-gateways status     # status across all
+x19-gateways list       # delegates to `x19 gateway list`
 ```
 
 :::tip
-The `default` profile is targeted with `hermes gateway <action>` (no `-p`),
-not `hermes -p default gateway <action>`. The wrapper above handles both forms.
+The `default` profile is targeted with `x19 gateway <action>` (no `-p`),
+not `x19 -p default gateway <action>`. The wrapper above handles both forms.
 :::
 
 ## Manage one profile
@@ -686,7 +686,7 @@ coder gateway install    # create the LaunchAgent / systemd unit
 coder gateway uninstall  # remove the service file
 ```
 
-These are equivalent to `hermes -p coder gateway <action>` — useful if a
+These are equivalent to `x19 -p coder gateway <action>` — useful if a
 profile alias is not on `PATH` or if you target profiles dynamically from a
 script.
 
@@ -697,11 +697,11 @@ never clash:
 
 | Platform | Path                                                              |
 | -------- | ----------------------------------------------------------------- |
-| macOS    | `~/Library/LaunchAgents/ai.hermes.gateway-<profile>.plist`        |
-| Linux    | `~/.config/systemd/user/hermes-gateway-<profile>.service`         |
+| macOS    | `~/Library/LaunchAgents/ai.x19.gateway-<profile>.plist`        |
+| Linux    | `~/.config/systemd/user/x19-gateway-<profile>.service`         |
 
-The default profile keeps the historical names: `ai.hermes.gateway.plist` /
-`hermes-gateway.service`.
+The default profile keeps the historical names: `ai.x19.gateway.plist` /
+`x19-gateway.service`.
 
 ## Viewing logs
 
@@ -709,35 +709,35 @@ Each profile writes to its own log files:
 
 ```bash
 # Default profile
-tail -f ~/.hermes/logs/gateway.log
-tail -f ~/.hermes/logs/gateway.error.log
+tail -f ~/.x19/logs/gateway.log
+tail -f ~/.x19/logs/gateway.error.log
 
 # Named profile
-tail -f ~/.hermes/profiles/<name>/logs/gateway.log
-tail -f ~/.hermes/profiles/<name>/logs/gateway.error.log
+tail -f ~/.x19/profiles/<name>/logs/gateway.log
+tail -f ~/.x19/profiles/<name>/logs/gateway.error.log
 ```
 
 Stream every profile's log simultaneously:
 
 ```bash
-tail -f ~/.hermes/logs/gateway.log ~/.hermes/profiles/*/logs/gateway.log
+tail -f ~/.x19/logs/gateway.log ~/.x19/profiles/*/logs/gateway.log
 ```
 
 The CLI also has a structured log viewer:
 
 ```bash
-hermes logs -f                  # follow default profile
-hermes -p coder logs -f         # follow one profile
-hermes logs --help              # filters, levels, JSON output
+x19 logs -f                  # follow default profile
+x19 -p coder logs -f         # follow one profile
+x19 logs --help              # filters, levels, JSON output
 ```
 
 ## Identify what's actually running
 
 ```bash
-hermes profile list             # profiles + model + gateway state
-hermes-gateways status          # full status across every profile
-launchctl list | grep hermes    # macOS — PIDs and labels
-systemctl --user list-units 'hermes-gateway-*'   # Linux — units
+x19 profile list             # profiles + model + gateway state
+x19-gateways status          # full status across every profile
+launchctl list | grep x19    # macOS — PIDs and labels
+systemctl --user list-units 'x19-gateway-*'   # Linux — units
 ```
 
 ## Editing configuration
@@ -745,18 +745,18 @@ systemctl --user list-units 'hermes-gateway-*'   # Linux — units
 Every profile keeps its config inside its own directory:
 
 ```
-~/.hermes/profiles/<name>/
+~/.x19/profiles/<name>/
 ├── .env              # API keys, bot tokens (chmod 600)
 ├── config.yaml       # model, provider, toolsets, gateway settings
 └── SOUL.md           # personality / system prompt
 ```
 
-The default profile uses `~/.hermes/` directly with the same three files.
+The default profile uses `~/.x19/` directly with the same three files.
 
 Edit them with any editor or via the CLI:
 
 ```bash
-hermes config set model.model anthropic/claude-sonnet-4    # default profile
+x19 config set model.model anthropic/claude-sonnet-4    # default profile
 coder config set model.model openai/gpt-5                  # named profile
 ```
 
@@ -765,7 +765,7 @@ After editing `.env` or `config.yaml`, restart the affected gateway:
 ```bash
 coder gateway restart
 # or, for everything:
-hermes-gateways restart
+x19-gateways restart
 ```
 
 ## Keeping the host awake
@@ -780,7 +780,7 @@ to sleep when idle. Two patterns:
 ```bash
 caffeinate -dis                    # block display, idle, and system sleep
 caffeinate -dis -t 28800           # same, auto-exit after 8 hours
-caffeinate -i -w $(cat ~/.hermes/gateway.pid) &   # awake while default gateway runs
+caffeinate -i -w $(cat ~/.x19/gateway.pid) &   # awake while default gateway runs
 
 # Persistent: run in background and forget
 nohup caffeinate -dis >/dev/null 2>&1 &
@@ -811,7 +811,7 @@ use a third-party tool.
 
 ```bash
 # Inhibit suspend while a command runs
-systemd-inhibit --what=idle:sleep --who=hermes --why="gateways running" \
+systemd-inhibit --what=idle:sleep --who=x19 --why="gateways running" \
   sleep infinity &
 
 # Allow user services to keep running after logout (recommended)
@@ -819,7 +819,7 @@ sudo loginctl enable-linger "$USER"
 ```
 
 After enabling lingering, your systemd user units (including
-`hermes-gateway-<profile>.service`) continue running across SSH disconnects
+`x19-gateway-<profile>.service`) continue running across SSH disconnects
 and reboots.
 
 ## Token-conflict safety
@@ -835,7 +835,7 @@ To audit:
 
 ```bash
 grep -H 'TELEGRAM_BOT_TOKEN\|DISCORD_BOT_TOKEN' \
-     ~/.hermes/.env ~/.hermes/profiles/*/.env
+     ~/.x19/.env ~/.x19/profiles/*/.env
 ```
 
 ## Migrating from per-profile gateways
@@ -848,33 +848,33 @@ Standalone per-profile gateways remain fully supported; this is an optional
 migration, not a removal.
 
 ```bash
-hermes gateway migrate --multiplex --dry-run   # print the plan and any blockers; changes nothing
-hermes gateway migrate --multiplex             # apply (asks for confirmation on a TTY; -y skips)
-hermes gateway migrate --standalone            # roll back to per-profile gateways
+x19 gateway migrate --multiplex --dry-run   # print the plan and any blockers; changes nothing
+x19 gateway migrate --multiplex             # apply (asks for confirmation on a TTY; -y skips)
+x19 gateway migrate --standalone            # roll back to per-profile gateways
 ```
 
-### What `hermes update` does
+### What `x19 update` does
 
 After a successful update, when the install has two or more profiles, at least
 one secondary profile runs its own gateway (a live process or an installed
-service) and `gateway.multiplex_profiles` is off, `hermes update` runs the same
+service) and `gateway.multiplex_profiles` is off, `x19 update` runs the same
 preflight:
 
 - **Nothing blocks it** → the migration runs automatically (the same code path
-  as `hermes gateway migrate --multiplex --yes`) and prints what it did. This
+  as `x19 gateway migrate --multiplex --yes`) and prints what it did. This
   is deterministic and never prompts, so it also runs on headless/cron updates.
 - **Something blocks it** → a warning block lists each blocker with its exact
   fix and the one-liner to run later. Nothing is changed.
 
 Single-profile installs are never migrated (there is nothing to gain), and an
-install that is already multiplexing is left alone. `hermes update` also does
+install that is already multiplexing is left alone. `x19 update` also does
 nothing when no secondary profile runs its own gateway — it never flips modes
 on an install where nothing was running.
 
-### Boundaries `hermes update` never crosses on its own
+### Boundaries `x19 update` never crosses on its own
 
 The unattended hook only folds profiles that share **one UNIX user, one service
-domain and one `profiles/` tree** — the shape `hermes profile create` produces.
+domain and one `profiles/` tree** — the shape `x19 profile create` produces.
 A standalone secondary behind any of these boundaries stops the automatic path:
 
 | boundary | example |
@@ -882,14 +882,14 @@ A standalone secondary behind any of these boundaries stops the automatic path:
 | different service manager or scope | default on user systemd, a secondary on **system** systemd (or launchd), or the default detached with a service-managed secondary |
 | more than one installed unit on a profile | a user **and** a system unit for the same profile (the explicit command removes both) |
 | different UNIX user | a system unit with its own `User=`, or a live gateway owned by another uid; a system unit whose `User=` this host cannot resolve — on the secondary **or** on the default — counts as unknown, never as "same user" |
-| `HERMES_HOME` outside `<default home>/profiles/` | a unit pinning `HERMES_HOME=/opt/hermes/profiles/emma` |
+| `X19_HOME` outside `<default home>/profiles/` | a unit pinning `X19_HOME=/opt/x19/profiles/emma` |
 
-In that case `hermes update` prints the boundary it found plus
-`hermes gateway migrate --multiplex`, and changes nothing — no unit is removed
+In that case `x19 update` prints the boundary it found plus
+`x19 gateway migrate --multiplex`, and changes nothing — no unit is removed
 and `gateway.multiplex_profiles` stays off. Collapsing such a fleet replaces a
 kernel-enforced boundary (file ownership, `User=`) with in-process isolation,
 which is an operator's decision. The explicit command still makes it: the same
-findings appear as **notices** in `hermes gateway migrate --multiplex --dry-run`
+findings appear as **notices** in `x19 gateway migrate --multiplex --dry-run`
 so you can read them first, and `--multiplex` proceeds when you confirm.
 
 ### Opting out of the automatic migration
@@ -898,20 +898,20 @@ Set `gateway.auto_multiplex_migration: false` on the **default** profile to keep
 the automatic fold from ever running on this install:
 
 ```bash
-hermes config set gateway.auto_multiplex_migration false
+x19 config set gateway.auto_multiplex_migration false
 ```
 
-`hermes update` then leaves per-profile gateways exactly as they are, with no
+`x19 update` then leaves per-profile gateways exactly as they are, with no
 output and no changes, however eligible the install looks. The setting lives in
 config, so it survives updates — the decision is made once rather than
 re-litigated on every release. It is read from the effective config like every
-other setting, so a value pinned in the managed scope (`/etc/hermes/config.yaml`)
+other setting, so a value pinned in the managed scope (`/etc/x19/config.yaml`)
 wins over the profile's own file. It governs the **automatic** path only:
-`hermes gateway migrate --multiplex` is an explicit request and still migrates
+`x19 gateway migrate --multiplex` is an explicit request and still migrates
 (and is the supported way to opt back in). Absent or `true` keeps the default
 behaviour described above.
 
-The explicit command is different: `hermes gateway migrate --multiplex` with
+The explicit command is different: `x19 gateway migrate --multiplex` with
 two or more profiles and **no** standalone secondary gateway still applies the
 one remaining step — it sets `gateway.multiplex_profiles: true`, (re)starts the
 default gateway and writes the same rollback manifest (with an empty
@@ -919,17 +919,17 @@ default gateway and writes the same rollback manifest (with an empty
 get multiplex.
 
 :::tip Clones do not carry channels
-`hermes profile create --clone` leaves the source's bot tokens and allowlists
+`x19 profile create --clone` leaves the source's bot tokens and allowlists
 behind (see [Profiles → messaging channels are never cloned](./profiles.md#messaging-channels-are-never-cloned---clone-channels-to-opt-in)),
 so a fleet of clones no longer trips the duplicate-credential blocker below.
-Older clones that still carry them are flagged by `hermes profile list`.
+Older clones that still carry them are flagged by `x19 profile list`.
 :::
 
 ### What the migration does
 
 1. Stops each secondary profile's standalone gateway and uninstalls its
    service (systemd user/system unit or launchd agent). What was removed is
-   recorded in `~/.hermes/gateway_migration.json` for rollback.
+   recorded in `~/.x19/gateway_migration.json` for rollback.
 2. Sets `gateway.multiplex_profiles: true` in the **default** profile's
    `config.yaml`.
 3. Restarts the default gateway — or installs and starts it on the same service
@@ -943,7 +943,7 @@ Older clones that still carry them are flagged by `hermes profile list`.
 | Blocker | Why | Fix |
 |---|---|---|
 | Two profiles configure the same platform credential (e.g. the same `TELEGRAM_BOT_TOKEN`) | Under one process a bot token can only be polled once; the multiplexer would park the duplicate and that profile's bot would go silent | Remove the token from the second profile, or keep it in `default` and route that profile's chats with [`profile_routes`](#routing-shared-bot-chats-to-profiles-profile_routes) |
-| A secondary profile enables a port-binding platform that has **no** `/p/<profile>/` ingress on the default listener | The multiplexer skips that whole profile (see [rule 2](#2-http-inbound-platforms-are-reached-via-a-pprofile-url-prefix)) | Disable the platform in that profile (`platforms.<name>.enabled: false`), or keep the profile on a standalone gateway with `hermes -p <name> gateway start --force` |
+| A secondary profile enables a port-binding platform that has **no** `/p/<profile>/` ingress on the default listener | The multiplexer skips that whole profile (see [rule 2](#2-http-inbound-platforms-are-reached-via-a-pprofile-url-prefix)) | Disable the platform in that profile (`platforms.<name>.enabled: false`), or keep the profile on a standalone gateway with `x19 -p <name> gateway start --force` |
 
 The credential check reuses the gateway's own conflict detection, so its verdict
 matches what the multiplexer does at startup. Which port-binding platforms have
@@ -969,14 +969,14 @@ prefixed URL; nothing else about the key changes.
 ### Profiles created after the migration
 
 A profile created while the multiplexer runs is served without a restart (see
-above). `hermes profile create` confirms this when the live multiplexer picked the
-profile up; it prints the `hermes gateway restart` reminder only when it could not
+above). `x19 profile create` confirms this when the live multiplexer picked the
+profile up; it prints the `x19 gateway restart` reminder only when it could not
 reach the multiplexer (for example, a gateway started from an older build).
 
 ### Rollback
 
 ```bash
-hermes gateway migrate --standalone
+x19 gateway migrate --standalone
 ```
 
 reads `gateway_migration.json`, sets `gateway.multiplex_profiles` back to its
@@ -991,28 +991,28 @@ per-profile gateway is stopped. Anything that fails after the manifest is
 written — the flag write, a later secondary's stop or unit removal, the
 default's install or start — rolls back through the manifest on the spot, so no
 profile is left without a gateway. Should the process die anywhere in that
-window, the next `hermes gateway migrate --multiplex` sees the flag on, the
+window, the next `x19 gateway migrate --multiplex` sees the flag on, the
 manifest, and no live multiplexer serving the migrated profiles (an installed
 but stopped default unit does not count) and resumes from the manifest instead
 of reporting "already multiplexed".
 If no manifest exists (you enabled multiplexing by hand), leave multiplex mode
-with `hermes config set gateway.multiplex_profiles false && hermes gateway restart`
+with `x19 config set gateway.multiplex_profiles false && x19 gateway restart`
 and reinstall the per-profile services you want.
 
 Not covered automatically: s6-supervised containers (set the flag on the
 default profile and restart the container) and Windows Scheduled Tasks (set the
-flag, stop the per-profile tasks, `hermes gateway restart`). The dashboard's
+flag, stop the per-profile tasks, `x19 gateway restart`). The dashboard's
 System page offers the same migration as a button when the preflight finds an
 eligible install.
 
 ## Updating the code
 
-`hermes update` pulls the latest code once and syncs new bundled skills into
+`x19 update` pulls the latest code once and syncs new bundled skills into
 every profile:
 
 ```bash
-hermes update
-hermes-gateways restart
+x19 update
+x19-gateways restart
 ```
 
 Running gateways are restarted by the update itself; on an install that still
@@ -1026,7 +1026,7 @@ User-modified skills are never overwritten.
 
 ### "Could not find service in domain for user gui: 501"
 
-You ran `hermes gateway start` after a previous `hermes gateway stop`. The
+You ran `x19 gateway start` after a previous `x19 gateway stop`. The
 CLI's `stop` does a full `launchctl unload`, which removes the service from
 launchd's registry. The CLI catches this specific error on `start` and
 automatically re-loads the plist (`↻ launchd job was unloaded; reloading
@@ -1037,8 +1037,8 @@ service definition`). The service starts normally. Nothing to fix.
 If a profile's gateway shows `not running` but a process is still alive:
 
 ```bash
-ps -ef | grep "hermes_cli.*-p <profile>"
-cat ~/.hermes/profiles/<profile>/gateway.pid
+ps -ef | grep "x19_cli.*-p <profile>"
+cat ~/.x19/profiles/<profile>/gateway.pid
 kill -TERM <pid>          # graceful
 kill -KILL <pid>          # if that fails after a few seconds
 <profile> gateway start
@@ -1048,16 +1048,16 @@ kill -KILL <pid>          # if that fails after a few seconds
 
 ```bash
 # macOS
-launchctl unload ~/Library/LaunchAgents/ai.hermes.gateway-<profile>.plist
-launchctl load   ~/Library/LaunchAgents/ai.hermes.gateway-<profile>.plist
+launchctl unload ~/Library/LaunchAgents/ai.x19.gateway-<profile>.plist
+launchctl load   ~/Library/LaunchAgents/ai.x19.gateway-<profile>.plist
 
 # Linux
-systemctl --user restart hermes-gateway-<profile>.service
+systemctl --user restart x19-gateway-<profile>.service
 ```
 
 ### Health check
 
 ```bash
-hermes doctor                  # default profile
-hermes -p <profile> doctor     # one profile
+x19 doctor                  # default profile
+x19 -p <profile> doctor     # one profile
 ```

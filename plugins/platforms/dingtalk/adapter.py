@@ -402,7 +402,7 @@ class DingTalkAdapter(BasePlatformAdapter):
                 return result
             logger.warning("[%s] AI Card send failed, falling back to webhook", self.name)
         logger.debug("[%s] Sending via webhook", self.name)
-        payload = {"msgtype": "markdown", "markdown": {"title": "Hermes", "text": self._normalize_markdown(content[: self.MAX_MESSAGE_LENGTH])}}
+        payload = {"msgtype": "markdown", "markdown": {"title": "X19", "text": self._normalize_markdown(content[: self.MAX_MESSAGE_LENGTH])}}
         try:
             resp = await self._http_client.post(session_webhook, json=payload, timeout=15.0)
             if resp.status_code < 300:
@@ -452,7 +452,7 @@ class DingTalkAdapter(BasePlatformAdapter):
             token = await self._get_access_token()
             if not token:
                 return None
-            out_track_id, models = f"hermes_{uuid.uuid4().hex[:12]}", dingtalk_card_models
+            out_track_id, models = f"x19_{uuid.uuid4().hex[:12]}", dingtalk_card_models
             is_group = str(getattr(message, "conversation_type", "1")) == "2"
             sender_staff_id = getattr(message, "sender_staff_id", "") or ""
             create_request = models.CreateCardRequest(
@@ -651,10 +651,10 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
 
 def interactive_setup() -> None:
     """Configure DingTalk — QR scan (recommended) or manual credential entry."""
-    from hermes_cli.config import save_env_value
-    from hermes_cli.setup import prompt_choice
-    from hermes_cli.cli_output import prompt, print_header, print_success, print_warning
-    from hermes_cli.setup_platforms import declines_reconfigure
+    from x19_cli.config import save_env_value
+    from x19_cli.setup import prompt_choice
+    from x19_cli.cli_output import prompt, print_header, print_success, print_warning
+    from x19_cli.setup_platforms import declines_reconfigure
     print_header("DingTalk")
     if declines_reconfigure("DingTalk", "Reconfigure DingTalk?", "DINGTALK_CLIENT_ID"):
         return
@@ -662,7 +662,7 @@ def interactive_setup() -> None:
     result = None
     if prompt_choice("Choose setup method", choices, default=0) == 0:
         try:
-            from hermes_cli.dingtalk_auth import dingtalk_qr_auth
+            from x19_cli.dingtalk_auth import dingtalk_qr_auth
             result = dingtalk_qr_auth()
             if result is None:
                 print_warning("QR auth incomplete, falling back to manual input.")
@@ -714,15 +714,13 @@ def _apply_yaml_config(yaml_cfg: dict, dingtalk_cfg: dict) -> dict | None:
     return _apply_yaml_bridge(cfg, _YAML_BRIDGE)
 
 
-
 def _is_connected(config) -> bool:
     """Connected when client_id + client_secret are present (PlatformConfig.extra first, then env)."""
     return all(_credentials(getattr(config, "extra", {})))
 
 
-
 def register(ctx) -> None:
-    """Plugin entry point — called by the Hermes plugin system."""
+    """Plugin entry point — called by the X19 plugin system."""
     ctx.register_platform(
         name="dingtalk", label="DingTalk", adapter_factory=DingTalkAdapter, check_fn=dingtalk_deps_present,
         ensure_deps_fn=ensure_dingtalk_deps, is_connected=_is_connected, validate_config=_is_connected,
@@ -733,42 +731,3 @@ def register(ctx) -> None:
     )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-EXT_MAP = {
-    "pdf": "application/pdf",
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "gif": "image/gif",
-    "webp": "image/webp",
-    "doc": "application/msword",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "xls": "application/vnd.ms-excel",
-    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "md": "text/markdown",
-    "txt": "text/plain",
-    "csv": "text/csv",
-    "zip": "application/zip",
-    "mp4": "video/mp4",
-}
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'DINGTALK_TYPE_MAPPING': ('plugins.platforms.dingtalk.inbound', 'DINGTALK_TYPE_MAPPING'),
-    'MessageType': ('gateway.platforms.event', 'MessageType'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

@@ -27,11 +27,11 @@ export function skillCatalogInstallIdentifier(skill: SkillCatalogTarget): string
 export function skillCatalogInstallUrl(skill: SkillCatalogTarget): string | null {
   const identifier = skillCatalogInstallIdentifier(skill)
 
-  return identifier ? `hermes://skill/install?${new URLSearchParams({ identifier })}` : null
+  return identifier ? `x19://skill/install?${new URLSearchParams({ identifier })}` : null
 }
 
 export function pluginCatalogInstallUrl(plugin: { name: string; repo: string; subdir?: string; sha: string }): string {
-  return `hermes://plugin/install?${new URLSearchParams({
+  return `x19://plugin/install?${new URLSearchParams({
     repo: plugin.subdir ? `${plugin.repo}#${plugin.subdir}` : plugin.repo,
     catalog_name: plugin.name,
     sha: plugin.sha,

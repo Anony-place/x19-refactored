@@ -65,11 +65,11 @@ def main():
         (p / '.env').write_text('OPENAI_API_KEY=local-fixture\n')
         (p / 'SOUL.md').write_text('You are a deterministic test assistant.\n')
         (p / '.no-bundled-skills').touch()
-    (profile / 'profile.yaml').write_text('name: worker\nui_meta:\n  hermes-bots:\n    title: Worker\n')
-    env = {k: v for k, v in os.environ.items() if not (k.startswith('HERMES_') or 'API_KEY' in k or 'TOKEN' in k or k in ('PYTHONPATH', 'PYTEST_PLUGINS'))}
-    env.update(HERMES_HOME=str(home), HOME=str(home / 'os-home'), HERMES_DASHBOARD_SESSION_TOKEN='persistence-fixture-token', HERMES_IGNORE_RULES='1', PYTHONPATH=str(args.repo), OPENAI_API_KEY='local-fixture')
+    (profile / 'profile.yaml').write_text('name: worker\nui_meta:\n  x19-bots:\n    title: Worker\n')
+    env = {k: v for k, v in os.environ.items() if not (k.startswith('X19_') or 'API_KEY' in k or 'TOKEN' in k or k in ('PYTHONPATH', 'PYTEST_PLUGINS'))}
+    env.update(X19_HOME=str(home), HOME=str(home / 'os-home'), X19_DASHBOARD_SESSION_TOKEN='persistence-fixture-token', X19_IGNORE_RULES='1', PYTHONPATH=str(args.repo), OPENAI_API_KEY='local-fixture')
     log = (args.out / 'serve.log').open('w')
-    cmd = [sys.executable, '-m', 'hermes_cli.main', 'serve', '--isolated', '--port', str(args.port)]
+    cmd = [sys.executable, '-m', 'x19_cli.main', 'serve', '--isolated', '--port', str(args.port)]
     if observe:
         cmd = [sys.executable, str(Path(__file__).with_name('rebuild_observer.py')),
                'serve', '--isolated', '--port', str(args.port)]
@@ -141,7 +141,7 @@ def main():
                     result['expected_failure'] = str(exc)
                 result['launch_config_unchanged'] = (home / 'config.yaml').read_bytes() == launch_before
                 sys.path.insert(0, str(args.repo))
-                from hermes_cli.config import read_user_config_raw
+                from x19_cli.config import read_user_config_raw
                 result['worker_tools'] = read_user_config_raw(profile / 'config.yaml')['platform_toolsets']['cli']
             else:
                 (profile / 'SOUL.md').write_text('Capabilities changed for the worker.\n')

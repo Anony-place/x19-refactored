@@ -1,7 +1,7 @@
 """Stale-code cron tick yield gate.
 
 A long-lived process whose checkout was updated underneath it (hot git pull /
-interrupted ``hermes update``) serves mixed ``sys.modules``; when such a
+interrupted ``x19 update``) serves mixed ``sys.modules``; when such a
 process races a fresh gateway for the cron tick lock and wins, every agent
 job it dispatches can die on ImportErrors whose real cause is staleness.
 
@@ -163,7 +163,7 @@ class TestYieldedTickIsAFailedTick:
             t.join(timeout=5)
 
         assert not t.is_alive(), "ticker must keep yielding, not die"
-        assert errors, "yield reason must be persisted for `hermes cron status`"
+        assert errors, "yield reason must be persisted for `x19 cron status`"
         assert "CronTickYielded" in errors[0] or "yielded" in errors[0]
         assert beats[-1] is False, "a yielded tick is not a successful tick"
         clear.assert_not_called()
@@ -222,9 +222,9 @@ class TestYieldedTickIsAFailedTick:
         prov = InProcessCronScheduler()
 
         def _tick(*args, **kwargs):
-            from hermes_constants import get_hermes_home
+            from x19_constants import get_x19_home
 
-            home = str(get_hermes_home())
+            home = str(get_x19_home())
             ticked.append(home)
             if home == home_a:
                 # Profile A: stale process, fresh foreign gateway → yield.
@@ -233,14 +233,14 @@ class TestYieldedTickIsAFailedTick:
             return 0
 
         def _beat(success=False):
-            from hermes_constants import get_hermes_home
+            from x19_constants import get_x19_home
 
-            per_home_beats[str(get_hermes_home())].append(success)
+            per_home_beats[str(get_x19_home())].append(success)
 
         def _err(msg):
-            from hermes_constants import get_hermes_home
+            from x19_constants import get_x19_home
 
-            per_home_errors[str(get_hermes_home())].append(msg)
+            per_home_errors[str(get_x19_home())].append(msg)
 
         with patch("cron.scheduler.tick", side_effect=_tick), patch(
             "cron.jobs.record_ticker_heartbeat", side_effect=_beat
@@ -282,7 +282,7 @@ class TestGatewayLockOwnershipProbe:
     def test_ownership_follows_acquire_and_release(self, tmp_path, monkeypatch):
         from gateway import status as gateway_status
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         assert gateway_status.owns_gateway_runtime_lock() is False
         assert gateway_status.acquire_gateway_runtime_lock() is True
         try:
@@ -301,15 +301,15 @@ class TestGatewayLockOwnershipProbe:
         a multiplex profile-home override the probe must still resolve the
         launch home's lock, not the overridden profile's."""
         from gateway import status as gateway_status
-        from hermes_constants import (
-            reset_hermes_home_override,
-            set_hermes_home_override,
+        from x19_constants import (
+            reset_x19_home_override,
+            set_x19_home_override,
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         other_profile = tmp_path / "profiles" / "other"
         other_profile.mkdir(parents=True)
-        token = set_hermes_home_override(str(other_profile))
+        token = set_x19_home_override(str(other_profile))
         try:
             assert gateway_status.acquire_gateway_runtime_lock() is True
             try:
@@ -320,4 +320,4 @@ class TestGatewayLockOwnershipProbe:
             finally:
                 gateway_status.release_gateway_runtime_lock()
         finally:
-            reset_hermes_home_override(token)
+            reset_x19_home_override(token)

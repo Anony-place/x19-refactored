@@ -106,7 +106,7 @@ class ReloadEnvResult(Result):
 
 
 method("reload.env", params=ReloadEnvParams, result=ReloadEnvResult,
-       doc="Re-read ~/.hermes/.env (CLI /reload parity); built agents keep their pool until /new.")
+       doc="Re-read ~/.x19/.env (CLI /reload parity); built agents keep their pool until /new.")
 
 
 class ReloadMcpParams(Params):
@@ -164,7 +164,7 @@ class SkillHubHit(Result):
 
 
 class SkillBrowseItem(OpenModel):
-    """``hermes_cli.skills_hub.browse_skills`` row."""
+    """``x19_cli.skills_hub.browse_skills`` row."""
 
     name: str = ""
     description: str = ""
@@ -174,7 +174,7 @@ class SkillBrowseItem(OpenModel):
 
 
 class SkillInspectInfo(OpenModel):
-    """``hermes_cli.skills_hub.inspect_skill``; ``{}`` when the identifier resolves nowhere."""
+    """``x19_cli.skills_hub.inspect_skill``; ``{}`` when the identifier resolves nowhere."""
 
     name: str | None = None
     description: str | None = None
@@ -611,7 +611,7 @@ class AgentPluginRow(Result):
 
 class PluginsManageResult(Result):
     """``list`` → ``plugins`` + counts; ``toggle`` → ``ok``/``unchanged``/``name``/``plugin``;
-    ``install`` → ``hermes_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` →
+    ``install`` → ``x19_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` →
     ``ok``/``unchanged``/``sha``."""
 
     plugins: list[AgentPluginRow] | None = None

@@ -5,7 +5,7 @@ import { __resetBackendSkinSync, ingestBackendSkin } from './backend-sync'
 import { getBaseColors, skinPref, ThemeProvider, useTheme } from './context'
 import { BUILTIN_THEME_LIST, everforestTheme } from './presets'
 
-// The live-authoring loop: Hermes writes/edits one skin file and every surface
+// The live-authoring loop: X19 writes/edits one skin file and every surface
 // repaints. An in-place edit keeps the NAME — only the palette moves.
 const bloomberg = (foreground: string) => ({
   name: 'bloomberg',
@@ -74,7 +74,7 @@ describe('ThemeProvider ← backend skin sync', () => {
   // name, flattened it to the default, and the connect-time seed (apply: false,
   // by design) never repainted — so the theme "didn't stick" until `/skin`.
   it('paints a persisted backend skin once the connect-time seed makes it resolvable', () => {
-    window.localStorage.setItem('hermes-desktop-theme-v2', 'bloomberg')
+    window.localStorage.setItem('x19-desktop-theme-v2', 'bloomberg')
 
     render(
       <ThemeProvider>
@@ -165,7 +165,7 @@ describe('ThemeProvider highlight preview', () => {
 // `--dt-primary-solid` is the loud brand fill of every shipped preset. The
 // desktop's original ensureContrast ladder (5 rungs of 0.2 toward the pole
 // opposite the background, re-mixed from the ORIGINAL colour) is reproduced
-// here as a reference implementation; the shared @hermes/shared/color ladder
+// here as a reference implementation; the shared @x19/shared/color ladder
 // must land byte-identical for every preset in every mode, or presets change
 // colour under users on an "only math moved" refactor.
 describe('ThemeProvider --dt-primary-solid preset parity', () => {

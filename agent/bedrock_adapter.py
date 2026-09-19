@@ -51,11 +51,11 @@ _AWS_SCOPED_CREDENTIAL_VARS: Tuple[Tuple[str, str], ...] = (
 def scoped_aws_session_kwargs() -> Dict[str, str]:
     """``boto3.session.Session`` kwargs from the routed profile's secret scope, ``{}`` when unscoped.
 
-    Under a HERMES_HOME override the process env holds the LAUNCH profile's ``AWS_*`` (or nothing), so
+    Under a X19_HOME override the process env holds the LAUNCH profile's ``AWS_*`` (or nothing), so
     every Bedrock client for a served profile must be built from that profile's own ``.env`` values.
     """
-    from hermes_constants import get_hermes_home_override
-    if get_hermes_home_override() is None:
+    from x19_constants import get_x19_home_override
+    if get_x19_home_override() is None:
         return {}
     from agent.secret_scope import current_secret_scope
     scope = current_secret_scope() or {}
@@ -82,7 +82,7 @@ def _require_boto3():
         raise ImportError(
             "The 'boto3' package is required for the AWS Bedrock provider. "
             "Install it with: pip install boto3\n"
-            "Or install Hermes with Bedrock support: pip install -e '.[bedrock]'"
+            "Or install X19 with Bedrock support: pip install -e '.[bedrock]'"
         )
     try:
         version = tuple(int(x) for x in boto3.__version__.split(".")[:3])
@@ -100,12 +100,12 @@ def _cached_client(cache: Dict[str, Any], service: str, region: str):
     """Get or create a per-region boto3 client. Unscoped: the default credential chain, one client per
     region. Routed profile: one client per (home, service, region), built from that profile's scoped
     ``AWS_*`` (falling back to the default chain only for what the profile does not set)."""
-    from hermes_constants import get_hermes_home_override, hermes_home_key
-    if get_hermes_home_override() is None:
+    from x19_constants import get_x19_home_override, x19_home_key
+    if get_x19_home_override() is None:
         if region not in cache:
             cache[region] = _require_boto3().client(service, region_name=region)
         return cache[region]
-    key = (hermes_home_key(), service, region)
+    key = (x19_home_key(), service, region)
     client = _bedrock_clients_by_home.get(key)
     if client is None:
         boto3 = _require_boto3()
@@ -131,11 +131,10 @@ def reset_client_cache():
 
 def invalidate_runtime_client(region: str) -> bool:
     """Evict one region's cached ``bedrock-runtime`` client (stale HTTP pool); True if evicted."""
-    from hermes_constants import get_hermes_home_override, hermes_home_key
-    if get_hermes_home_override() is not None:
-        return _bedrock_clients_by_home.pop((hermes_home_key(), "bedrock-runtime", region), None) is not None
+    from x19_constants import get_x19_home_override, x19_home_key
+    if get_x19_home_override() is not None:
+        return _bedrock_clients_by_home.pop((x19_home_key(), "bedrock-runtime", region), None) is not None
     return _bedrock_runtime_client_cache.pop(region, None) is not None
-
 
 
 # --- Bedrock Mantle / OpenAI Responses support ---
@@ -334,7 +333,7 @@ def resolve_bedrock_runtime_region(config: Optional[Dict[str, Any]] = None) -> s
     endpoint must use this so auxiliary calls never leave the primary runtime's region. *config* skips disk."""
     if config is None:
         with suppress(Exception):
-            from hermes_cli.config import load_config_readonly
+            from x19_cli.config import load_config_readonly
             config = load_config_readonly()
     cfg_region = str(((config or {}).get("bedrock") or {}).get("region") or "").strip()
     return cfg_region or resolve_bedrock_region()
@@ -351,7 +350,7 @@ def bedrock_guardrail_config(config: Optional[Dict[str, Any]] = None) -> Optiona
     if config is None:
         config = {}
         with suppress(Exception):
-            from hermes_cli.config import load_config_readonly
+            from x19_cli.config import load_config_readonly
             config = load_config_readonly()
     gr = ((config or {}).get("bedrock") or {}).get("guardrail") or {}
     if not (gr.get("guardrail_identifier") and gr.get("guardrail_version")):
@@ -1011,10 +1010,10 @@ def discover_bedrock_models(region: str, provider_filter: Optional[List[str]] = 
     by name; [] when the client cannot be built."""
     # The list is account-scoped (whichever credentials the control client signs with), so a routed
     # profile gets its own entry; unscoped keeps the region:filter key byte-for-byte.
-    from hermes_constants import get_hermes_home_override, hermes_home_key
+    from x19_constants import get_x19_home_override, x19_home_key
     cache_key = f"{region}:{','.join(sorted(provider_filter or []))}"
-    if get_hermes_home_override() is not None:
-        cache_key = f"{hermes_home_key()}|{cache_key}"
+    if get_x19_home_override() is not None:
+        cache_key = f"{x19_home_key()}|{cache_key}"
     cached = _discovery_cache.get(cache_key)
     if cached and (time.time() - cached["timestamp"]) < _DISCOVERY_CACHE_TTL_SECONDS:
         return cached["models"]
@@ -1119,107 +1118,3 @@ def get_bedrock_context_length(model_id: str, region: str = "", probe: bool = Tr
     return BEDROCK_CONTEXT_LENGTHS[max(matches, key=len)] if matches else BEDROCK_DEFAULT_CONTEXT_LENGTH
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-CONTEXT_OVERFLOW_PATTERNS = [
-    re.compile(r"ValidationException.*(?:input is too long|max input token|input token.*exceed)", re.IGNORECASE),
-    re.compile(r"ValidationException.*(?:exceeds? the (?:maximum|max) (?:number of )?(?:input )?tokens)", re.IGNORECASE),
-    re.compile(r"ModelStreamErrorException.*(?:Input is too long|too many input tokens)", re.IGNORECASE),
-]
-
-OVERLOAD_PATTERNS = [
-    re.compile(r"ModelNotReadyException", re.IGNORECASE),
-    re.compile(r"ModelTimeoutException", re.IGNORECASE),
-    re.compile(r"InternalServerException", re.IGNORECASE),
-]
-
-THROTTLE_PATTERNS = [
-    re.compile(r"ThrottlingException", re.IGNORECASE),
-    re.compile(r"Too many concurrent requests", re.IGNORECASE),
-    re.compile(r"ServiceQuotaExceededException", re.IGNORECASE),
-]
-
-def call_converse_stream(
-    region: str,
-    model: str,
-    messages: List[Dict],
-    tools: Optional[List[Dict]] = None,
-    max_tokens: Optional[int] = 4096,
-    temperature: Optional[float] = None,
-    top_p: Optional[float] = None,
-    stop_sequences: Optional[List[str]] = None,
-    guardrail_config: Optional[Dict] = None,
-) -> SimpleNamespace:
-    """Call Bedrock ConverseStream API and return an OpenAI-compatible response.
-
-    Consumes the full stream and returns the assembled response. For true
-    streaming with delta callbacks, use ``iter_converse_stream()`` instead.
-    """
-    client = _get_bedrock_runtime_client(region)
-    kwargs = build_converse_kwargs(
-        model=model,
-        messages=messages,
-        tools=tools,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-        stop_sequences=stop_sequences,
-        guardrail_config=guardrail_config,
-    )
-
-    try:
-        response = client.converse_stream(**kwargs)
-    except Exception as exc:
-        retry_kwargs = recover_from_cache_point_rejection(exc, kwargs)
-        if retry_kwargs is not None:
-            return normalize_converse_stream_events(
-                client.converse_stream(**retry_kwargs)
-            )
-        if is_streaming_access_denied_error(exc):
-            # IAM allows bedrock:InvokeModel but not
-            # InvokeModelWithResponseStream — permanent for this session.
-            # Fall back to the non-streaming converse() path.
-            logger.info(
-                "bedrock: converse_stream denied by IAM on (region=%s, model=%s) — "
-                "falling back to non-streaming converse().",
-                region, model,
-            )
-            return normalize_converse_response(client.converse(**kwargs))
-        if is_stale_connection_error(exc):
-            logger.warning(
-                "bedrock: stale-connection error on converse_stream(region=%s, "
-                "model=%s): %s — evicting cached client so the next call reconnects.",
-                region, model, type(exc).__name__,
-            )
-            invalidate_runtime_client(region)
-        raise
-    return normalize_converse_stream_events(response)
-
-def is_context_overflow_error(error_message: str) -> bool:
-    """Return True if the error indicates the input context was too large.
-
-    When this returns True, the agent should compress context and retry
-    rather than treating it as a fatal error.
-    """
-    return any(p.search(error_message) for p in CONTEXT_OVERFLOW_PATTERNS)
-
-def classify_bedrock_error(error_message: str) -> str:
-    """Classify a Bedrock error for retry/failover decisions.
-
-    Returns:
-      - ``"context_overflow"`` — input too long, compress and retry
-      - ``"rate_limit"`` — throttled, backoff and retry
-      - ``"overloaded"`` — model temporarily unavailable, retry with delay
-      - ``"unknown"`` — unclassified error
-    """
-    if is_context_overflow_error(error_message):
-        return "context_overflow"
-    if any(p.search(error_message) for p in THROTTLE_PATTERNS):
-        return "rate_limit"
-    if any(p.search(error_message) for p in OVERLOAD_PATTERNS):
-        return "overloaded"
-    return "unknown"
-# ---- END PLUGIN-COMPAT ----

@@ -31,7 +31,7 @@ Tool Gateway 仅对 **[付费](https://portal.nousresearch.com/manage-subscripti
 检查当前状态：
 
 ```bash
-hermes status
+x19 status
 ```
 
 在输出中找到 **Nous Tool Gateway** 小节：会标明哪些工具经订阅网关启用、哪些使用直连 Key、哪些尚未配置。
@@ -40,7 +40,7 @@ hermes status
 
 ### 在模型配置流程中
 
-运行 `hermes model` 并选择 Nous Portal 作为提供商时，Hermes 会主动询问是否启用 Tool Gateway：
+运行 `x19 model` 并选择 Nous Portal 作为提供商时，X19 会主动询问是否启用 Tool Gateway：
 
 ```
 Your Nous subscription includes the Tool Gateway.
@@ -62,12 +62,12 @@ Your Nous subscription includes the Tool Gateway.
 
 若 `.env` 中已有部分直连 API Key，提示会相应变化：可为全部工具启用网关（直连 Key 仍保留在 `.env` 但运行时不用）、仅为未配置项启用，或完全跳过。
 
-### 通过 `hermes tools`
+### 通过 `x19 tools`
 
 也可在交互式工具配置中逐项启用：
 
 ```bash
-hermes tools
+x19 tools
 ```
 
 选择工具类别（Web、Browser、Image Generation、TTS），再将提供商选为 **Nous Subscription**。这会把该类别的选择键写为 `nous`（例如 `image_gen.provider: nous`）。
@@ -102,24 +102,24 @@ browser:
 3. **TTS** — `text_to_speech` 走网关的 OpenAI Audio 端点  
 4. **浏览器** — `browser_navigate` 等走网关的 Browser Use 端点  
 
-网关使用 Nous Portal 凭据认证（在 `hermes model` 完成后写入 `~/.hermes/auth.json`）。
+网关使用 Nous Portal 凭据认证（在 `x19 model` 完成后写入 `~/.x19/auth.json`）。
 
 ### 优先级
 
 运行时**始终使用已保存的选择**，凭据是否存在不会影响路由：
 
 - **选择为 `nous`** → 走网关，即使 `.env` 里仍有直连 Key（例如 `FAL_KEY` 会被忽略）
-- **选择为具体厂商**（如 `fal`、`firecrawl`）→ 直连；若对应 Key 缺失则报错并提示运行 `hermes tools`，**不会**静默回退到网关
+- **选择为具体厂商**（如 `fal`、`firecrawl`）→ 直连；若对应 Key 缺失则报错并提示运行 `x19 tools`，**不会**静默回退到网关
 - **从未配置过的类别** → 按可用凭据自动检测（行为不变）；但一旦存在选择，仅往 `.env` 加 Key 不会改变路由
 
-（旧版的 `use_gateway` 布尔键已废弃：不再写入，读取时 `use_gateway: true` 等同于 `nous`。请改用 `hermes tools` 选择提供商。）
+（旧版的 `use_gateway` 布尔键已废弃：不再写入，读取时 `use_gateway: true` 等同于 `nous`。请改用 `x19 tools` 选择提供商。）
 
 ## 切回直连 Key
 
 对单个工具停用网关：
 
 ```bash
-hermes tools    # 选择该工具 → 选直连提供商
+x19 tools    # 选择该工具 → 选直连提供商
 ```
 
 或在配置中把选择键改回具体厂商：
@@ -129,12 +129,12 @@ web:
   backend: firecrawl  # 此时使用 .env 中的 FIRECRAWL_API_KEY
 ```
 
-在 `hermes tools` 中选择非网关提供商时，选择键会被改写为该厂商名（旧的 `use_gateway` 键若存在会被一并移除），避免配置自相矛盾。
+在 `x19 tools` 中选择非网关提供商时，选择键会被改写为该厂商名（旧的 `use_gateway` 键若存在会被一并移除），避免配置自相矛盾。
 
 ## 查看状态
 
 ```bash
-hermes status
+x19 status
 ```
 
 **Nous Tool Gateway** 小节示例：
@@ -153,7 +153,7 @@ hermes status
 
 ## 进阶：自建网关
 
-若使用自建或自定义网关，可在 `~/.hermes/.env` 中用环境变量覆盖端点：
+若使用自建或自定义网关，可在 `~/.x19/.env` 中用环境变量覆盖端点：
 
 ```bash
 TOOL_GATEWAY_DOMAIN=nousresearch.com     # 网关路由基础域名
@@ -168,7 +168,7 @@ FIRECRAWL_GATEWAY_URL=https://...         # 单独覆盖 Firecrawl 端点
 
 ### 需要删掉已有的 API Key 吗？
 
-不需要。类别选择为 **Nous Subscription**（`nous`）时，运行时会忽略该类别的直连 Key；Key 仍保留在 `.env`。之后在 `hermes tools` 里改回直连提供商，Key 即恢复生效。
+不需要。类别选择为 **Nous Subscription**（`nous`）时，运行时会忽略该类别的直连 Key；Key 仍保留在 `.env`。之后在 `x19 tools` 里改回直连提供商，Key 即恢复生效。
 
 ### 能否部分工具走网关、部分走直连？
 
@@ -176,7 +176,7 @@ FIRECRAWL_GATEWAY_URL=https://...         # 单独覆盖 Firecrawl 端点
 
 ### 订阅到期会怎样？
 
-经网关路由的工具会停止工作，直到你 [续订](https://portal.nousresearch.com/manage-subscription) 或通过 `hermes tools` 改回直连 Key。
+经网关路由的工具会停止工作，直到你 [续订](https://portal.nousresearch.com/manage-subscription) 或通过 `x19 tools` 改回直连 Key。
 
 ### 与「消息网关」（各聊天平台）是否冲突？
 
@@ -184,4 +184,4 @@ FIRECRAWL_GATEWAY_URL=https://...         # 单独覆盖 Firecrawl 端点
 
 ### Modal 算在 Tool Gateway 里吗？
 
-Modal（无服务器终端后端）可作为 Nous 订阅的可选附加能力，但**不会**由 Tool Gateway 安装向导一并打开——请单独通过 `hermes setup terminal` 或在 `config.yaml` 中配置。
+Modal（无服务器终端后端）可作为 Nous 订阅的可选附加能力，但**不会**由 Tool Gateway 安装向导一并打开——请单独通过 `x19 setup terminal` 或在 `config.yaml` 中配置。

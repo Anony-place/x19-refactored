@@ -17,7 +17,7 @@ Drive the desktop background-first; escalate on signal.
 | Source | Bundled (installed by default) |
 | Path | `skills/autonomous-ai-agents\computer-use` |
 | Version | `2.0.0` |
-| Author | Francesco Bonacci (f-trycua), Hermes Agent |
+| Author | Francesco Bonacci (f-trycua), X19 |
 | License | MIT |
 | Platforms | macos, windows, linux |
 | Tags | `computer-use`, `desktop`, `automation`, `gui`, `cross-platform` |
@@ -25,7 +25,7 @@ Drive the desktop background-first; escalate on signal.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Computer Use (universal, any-model, cross-platform)
@@ -40,12 +40,12 @@ Everything here works with any tool-capable model — Claude, GPT, Gemini,
 or an open model on a local OpenAI-compatible endpoint. There is no
 Anthropic-native schema to learn.
 
-Hermes drives [cua-driver](https://github.com/trycua/cua) under the hood.
-This wrapper skill teaches the Hermes `computer_use` workflow and action
+X19 drives [cua-driver](https://github.com/trycua/cua) under the hood.
+This wrapper skill teaches the X19 `computer_use` workflow and action
 vocabulary. Call the actions documented below instead of raw cua-driver MCP
 tools. For driver internals and platform-specific behavior, follow the Cua
-skill installed by `cua-driver skills install`. Hermes autodetection is a
-planned cua-driver follow-up, so currently point Hermes at the resulting
+skill installed by `cua-driver skills install`. X19 autodetection is a
+planned cua-driver follow-up, so currently point X19 at the resulting
 `~/.cua-driver/skills/cua-driver` directory or symlink it into your skill space.
 
 ## The canonical workflow
@@ -295,13 +295,13 @@ in your conversation context.
 
 | Symptom | Likely cause + remedy |
 |---|---|
-| `cua-driver not installed` | Run `hermes computer-use install`, or `hermes tools` and enable Computer Use |
-| Captures consistently return empty / "no on-screen window" | On Linux: DISPLAY may not be set (X11) or you're on pure Wayland — ask the user to run `hermes computer-use doctor`. On Windows: you may be in Session 0 (SSH session) instead of the interactive desktop — see the cua-driver `WINDOWS.md` deep-dive |
+| `cua-driver not installed` | Run `x19 computer-use install`, or `x19 tools` and enable Computer Use |
+| Captures consistently return empty / "no on-screen window" | On Linux: DISPLAY may not be set (X11) or you're on pure Wayland — ask the user to run `x19 computer-use doctor`. On Windows: you may be in Session 0 (SSH session) instead of the interactive desktop — see the cua-driver `WINDOWS.md` deep-dive |
 | Element index stale ("Element N not in cache") | SOM indices are only valid until the next `capture`. Re-capture before clicking. The wrapper carries opaque `element_token`s for stale-detection; you'll see an explicit error rather than a wrong click |
 | Click had no effect | Read the structured verdict. `effect:"unverifiable"` → fresh capture/state before retry, even with an escalation hint. `effect:"suspected_noop"` or a structured refusal → climb the recommended ladder: coordinate (px), then foreground. Browser chrome/native prompts remain native; page content is a separate toolset. Don't conclude the app is undrivable |
-| Type text disappears into a terminal emulator | cua-driver detects terminals (Ghostty, iTerm2, Terminal.app, Windows Terminal, mintty, etc.) and routes through key-event synthesis — should "just work" on a recent cua-driver. If it doesn't, ask the user to run `hermes computer-use doctor` |
+| Type text disappears into a terminal emulator | cua-driver detects terminals (Ghostty, iTerm2, Terminal.app, Windows Terminal, mintty, etc.) and routes through key-event synthesis — should "just work" on a recent cua-driver. If it doesn't, ask the user to run `x19 computer-use doctor` |
 | `blocked pattern in type text` | You tried to `type` a shell command matching the dangerous-pattern block list (`curl ... \| bash`, `sudo rm -rf`, etc.). Break the command up or reconsider |
-| Anything else weird | **First action: ask the user to run `hermes computer-use doctor`.** It runs the cua-driver `health_report` MCP tool and prints a structured per-check matrix. Their output tells you (and them) exactly what's wrong |
+| Anything else weird | **First action: ask the user to run `x19 computer-use doctor`.** It runs the cua-driver `health_report` MCP tool and prints a structured per-check matrix. Their output tells you (and them) exactly what's wrong |
 
 ## When NOT to use `computer_use`
 
@@ -318,7 +318,7 @@ in your conversation context.
 
 ## Going deeper — read the cua-driver skill pack
 
-Hermes intentionally keeps THIS skill focused on the Hermes-side
+X19 intentionally keeps THIS skill focused on the X19-side
 `computer_use` action vocabulary. The platform-specific deep dives
 (macOS no-foreground contract, Windows UIA + Session 0, Linux AT-SPI +
 X11/Wayland nuances, recording trajectory + video, browser-page
@@ -350,6 +350,6 @@ These are platform deep dives, not duplicates — when the user reports
 `WINDOWS.md` for the UIA / UWP context that explains why and what to
 do differently.
 
-Hermes autodetection is a planned follow-up in trycua/cua. For now, the command
-installs the pack under `~/.cua-driver/skills/cua-driver`; point Hermes at that
+X19 autodetection is a planned follow-up in trycua/cua. For now, the command
+installs the pack under `~/.cua-driver/skills/cua-driver`; point X19 at that
 directory or symlink it into the user's skill space.

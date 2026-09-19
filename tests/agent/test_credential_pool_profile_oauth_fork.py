@@ -1,7 +1,7 @@
 """Single-use Anthropic OAuth grants never fork across profiles (#100339) and are never
 inherited from the root (#111724).
 
-Real imports, real temp HERMES_HOME root + named profile, real auth.json I/O.
+Real imports, real temp X19_HOME root + named profile, real auth.json I/O.
 The Anthropic token endpoint is replaced at the ``urllib.request.urlopen``
 boundary with genuine single-use semantics (a refresh token redeems once;
 a second POST returns ``invalid_grant``).
@@ -20,8 +20,8 @@ import pytest
 
 @pytest.fixture
 def fleet(tmp_path, monkeypatch):
-    """Root HERMES_HOME with an expired-but-refreshable Anthropic pool row."""
-    root = tmp_path / "hermes-root"
+    """Root X19_HOME with an expired-but-refreshable Anthropic pool row."""
+    root = tmp_path / "x19-root"
     root.mkdir()
     (tmp_path / "fakehome").mkdir()
     # Keep host ~/.claude and host auth.json out of the picture.
@@ -29,9 +29,9 @@ def fleet(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "fakehome"))
     for var in ("ANTHROPIC_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    import hermes_constants
-    hermes_constants._default_hermes_root_memo = None  # type: ignore[attr-defined]
+    monkeypatch.setenv("X19_HOME", str(root))
+    import x19_constants
+    x19_constants._default_x19_root_memo = None  # type: ignore[attr-defined]
 
     expired = int((time.time() - 3600) * 1000)
     store = {
@@ -40,7 +40,7 @@ def fleet(tmp_path, monkeypatch):
         "credential_pool": {
             "anthropic": [{
                 "id": "abc123", "label": "team-grant", "auth_type": "oauth",
-                "priority": 0, "source": "manual:hermes_pkce",
+                "priority": 0, "source": "manual:x19_pkce",
                 "access_token": "sk-ant-oat01-AT0", "refresh_token": "sk-ant-ort-RT0",
                 "expires_at_ms": expired, "base_url": "https://api.anthropic.com",
             }],
@@ -90,8 +90,8 @@ def fleet(tmp_path, monkeypatch):
 
     def use(home):
         """Switch the process to *home* (root or a profile dir)."""
-        monkeypatch.setenv("HERMES_HOME", str(home))
-        hermes_constants._default_hermes_root_memo = None  # type: ignore[attr-defined]
+        monkeypatch.setenv("X19_HOME", str(home))
+        x19_constants._default_x19_root_memo = None  # type: ignore[attr-defined]
 
     def pool_rows(home):
         p = home / "auth.json"
@@ -103,7 +103,7 @@ def fleet(tmp_path, monkeypatch):
 
 
 def _profile(fleet, name, **kw):
-    from hermes_cli.profiles import create_profile
+    from x19_cli.profiles import create_profile
     fleet["use"](fleet["root"])
     return create_profile(name, **kw)
 
@@ -122,7 +122,7 @@ def test_clone_all_strips_oauth_grant_but_keeps_api_keys(fleet):
 
 
 def test_strip_helper_drops_device_code_blocks_and_reports(tmp_path):
-    from hermes_cli.auth import strip_cloned_single_use_oauth_grants
+    from x19_cli.auth import strip_cloned_single_use_oauth_grants
     pdir = tmp_path / "p"
     pdir.mkdir()
     (pdir / "auth.json").write_text(json.dumps({
@@ -146,7 +146,7 @@ def test_strip_helper_drops_device_code_blocks_and_reports(tmp_path):
 
 
 def test_strip_helper_is_a_noop_without_credentials(tmp_path):
-    from hermes_cli.auth import strip_cloned_single_use_oauth_grants
+    from x19_cli.auth import strip_cloned_single_use_oauth_grants
     assert strip_cloned_single_use_oauth_grants(tmp_path) == {"pool": [], "providers": [], "files": []}
 
 
@@ -160,7 +160,7 @@ def test_strip_helper_is_a_noop_without_credentials(tmp_path):
 )
 def test_strip_helper_leaves_shared_root_auth_store_unchanged(fleet, link):
     """A shared auth store is one grant, not a cloned credential copy."""
-    from hermes_cli.auth import strip_cloned_single_use_oauth_grants
+    from x19_cli.auth import strip_cloned_single_use_oauth_grants
 
     root = fleet["root"]
     _seed_codex_grant(root)
@@ -175,8 +175,8 @@ def test_strip_helper_leaves_shared_root_auth_store_unchanged(fleet, link):
 
 def test_strip_helper_fails_closed_when_root_store_cannot_be_resolved(fleet, monkeypatch):
     """Credential hygiene must not mutate auth when store identity is unknown."""
-    from hermes_cli.auth import strip_cloned_single_use_oauth_grants
-    import hermes_constants
+    from x19_cli.auth import strip_cloned_single_use_oauth_grants
+    import x19_constants
 
     root = fleet["root"]
     _seed_codex_grant(root)
@@ -184,7 +184,7 @@ def test_strip_helper_fails_closed_when_root_store_cannot_be_resolved(fleet, mon
     shared = _shared_profile(
         fleet, "shared", link=lambda target, alias: alias.symlink_to(target))
     monkeypatch.setattr(
-        hermes_constants, "get_default_hermes_root",
+        x19_constants, "get_default_x19_root",
         lambda: (_ for _ in ()).throw(OSError("root unavailable")))
 
     assert strip_cloned_single_use_oauth_grants(shared) == {
@@ -195,7 +195,7 @@ def test_strip_helper_fails_closed_when_root_store_cannot_be_resolved(fleet, mon
 
 def test_strip_helper_fails_closed_when_store_identity_check_errors(fleet, monkeypatch):
     """A transient stat failure must not be interpreted as two stores."""
-    from hermes_cli.auth import strip_cloned_single_use_oauth_grants
+    from x19_cli.auth import strip_cloned_single_use_oauth_grants
 
     root = fleet["root"]
     _seed_codex_grant(root)
@@ -243,7 +243,7 @@ def test_profile_auth_add_owns_only_its_own_rows(fleet):
     pool = load_pool("anthropic")
     pool.add_entry(PooledCredential(
         provider="anthropic", id="own001", label="mine", auth_type=AUTH_TYPE_OAUTH,
-        priority=0, source="manual:hermes_pkce", access_token="sk-ant-oat01-MINE",
+        priority=0, source="manual:x19_pkce", access_token="sk-ant-oat01-MINE",
         refresh_token="rt-mine",
     ))
     assert [e["id"] for e in fleet["rows"](kid)] == ["own001"]

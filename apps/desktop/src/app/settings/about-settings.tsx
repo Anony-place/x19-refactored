@@ -21,8 +21,8 @@ import {
 import { ListRow, SectionHeading, SettingsContent } from './primitives'
 import { UninstallSection } from './uninstall-section'
 
-const RELEASE_NOTES_URL = 'https://github.com/NousResearch/hermes-agent/releases'
-const INSTALLER_URL = 'https://hermes-agent.nousresearch.com/'
+const RELEASE_NOTES_URL = 'https://github.com/Anony-place/x19-refactored/releases'
+const INSTALLER_URL = 'https://anony-place.github.io/x19-refactored/'
 
 function relativeTime(ms: number | undefined, a: Translations['settings']['about']) {
   if (!ms) {
@@ -123,7 +123,7 @@ export function AboutSettings() {
                     <p className="mt-1 text-xs text-muted-foreground">{a.bundleSwapPendingDesc}</p>
                     <Button
                       className="mt-2"
-                      onClick={() => void window.hermesDesktop?.relaunchApp?.()}
+                      onClick={() => void window.x19Desktop?.relaunchApp?.()}
                       size="sm"
                       variant="textStrong"
                     >
@@ -140,7 +140,7 @@ export function AboutSettings() {
                         href={INSTALLER_URL}
                         onClick={event => {
                           event.preventDefault()
-                          void window.hermesDesktop?.openExternal?.(INSTALLER_URL)
+                          void window.x19Desktop?.openExternal?.(INSTALLER_URL)
                         }}
                         rel="noreferrer"
                         target="_blank"
@@ -210,7 +210,7 @@ export function AboutSettings() {
                 href={RELEASE_NOTES_URL}
                 onClick={event => {
                   event.preventDefault()
-                  void window.hermesDesktop?.openExternal?.(RELEASE_NOTES_URL)
+                  void window.x19Desktop?.openExternal?.(RELEASE_NOTES_URL)
                 }}
                 rel="noreferrer"
                 target="_blank"

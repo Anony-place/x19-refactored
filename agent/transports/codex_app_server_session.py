@@ -1,6 +1,6 @@
 """Session adapter for codex app-server runtime.
 
-Owns one Codex thread per Hermes session: drives ``turn/start``, consumes
+Owns one Codex thread per X19 session: drives ``turn/start``, consumes
 streaming notifications via CodexEventProjector, bridges server-initiated
 approval requests, translates cancellation, and returns a TurnResult that
 AIAgent.run_conversation() splices into ``messages``. Synchronous: the client's
@@ -21,16 +21,16 @@ from agent.codex_responses_adapter import _format_responses_error
 from agent.redact import redact_sensitive_text
 from agent.transports.codex_app_server import CodexAppServerClient, CodexAppServerError
 from agent.transports.codex_event_projector import CodexEventProjector, ProjectionResult
-from agent.transports.hermes_tools_mcp_server import HERMES_TOOLS_MCP_SERVER_NAME
+from agent.transports.x19_tools_mcp_server import X19_TOOLS_MCP_SERVER_NAME
 
 logger = logging.getLogger(__name__)
 
 
 _STDERR_TAIL_LINES = 12  # stderr tail on generic errors: legible, yet enough for a config/auth diagnostic
 
-# Hermes' tools.terminal.security_mode -> Codex permissions profile id.
+# X19' tools.terminal.security_mode -> Codex permissions profile id.
 # Missing config -> workspace-write (Codex's own default).
-_HERMES_TO_CODEX_PERMISSION_PROFILE = {
+_X19_TO_CODEX_PERMISSION_PROFILE = {
     "auto": "workspace-write", "approval-required": "read-only-with-approval",
     "unrestricted": "full-access", "yolo": "full-access",  # yolo: backstop alias used by some skills/tests
 }
@@ -147,7 +147,7 @@ class _ServerRequestRouting:
 
 
 class CodexAppServerSession:
-    """One Codex thread per Hermes session, lifetime owned by AIAgent. Not thread-safe: one caller at a time."""
+    """One Codex thread per X19 session, lifetime owned by AIAgent. Not thread-safe: one caller at a time."""
 
     def __init__(
         self, *, cwd: Optional[str] = None, codex_bin: str = "codex",
@@ -160,8 +160,8 @@ class CodexAppServerSession:
         self._cwd = cwd or os.getcwd()
         self._codex_bin = codex_bin
         self._codex_home = codex_home
-        self._permission_profile = permission_profile or _HERMES_TO_CODEX_PERMISSION_PROFILE.get(
-            os.environ.get("HERMES_TERMINAL_SECURITY_MODE", "auto"), "workspace-write"
+        self._permission_profile = permission_profile or _X19_TO_CODEX_PERMISSION_PROFILE.get(
+            os.environ.get("X19_TERMINAL_SECURITY_MODE", "auto"), "workspace-write"
         )
         self._approval_callback = approval_callback
         self._on_event = on_event  # Display hook (kawaii spinner ticks etc.)
@@ -184,7 +184,7 @@ class CodexAppServerSession:
             return self._thread_id
         if self._client is None:
             self._client = self._client_factory(codex_bin=self._codex_bin, codex_home=self._codex_home)
-        self._client.initialize(client_name="hermes", client_title="Hermes Agent", client_version=_get_hermes_version())
+        self._client.initialize(client_name="x19", client_title="X19", client_version=_get_x19_version())
         # Permissions are NOT sent on thread/start: codex gates ``thread/start.permissions``
         # behind experimentalApi + a matching ``[permissions]`` table in ~/.codex/config.toml.
         result = self._client.request("thread/start", {"cwd": self._cwd}, timeout=15)
@@ -553,7 +553,7 @@ class CodexAppServerSession:
             logger.warning("turn/interrupt timed out")
 
     def _handle_server_request(self, req: dict) -> None:
-        """Answer a codex server request (approval / elicitation) via Hermes' approval flow.
+        """Answer a codex server request (approval / elicitation) via X19' approval flow.
 
         Permission escalations are always declined (the user chose their profile in
         ~/.codex/config.toml); unknown methods get a JSON-RPC error so codex doesn't hang.
@@ -571,9 +571,9 @@ class CodexAppServerSession:
         self._client.respond(rid, handler(self, params))
 
     def _respond_elicitation(self, params: dict) -> dict:
-        """MCP elicitation: auto-accept our own hermes-tools server (opted in by enabling the runtime;
+        """MCP elicitation: auto-accept our own x19-tools server (opted in by enabling the runtime;
         exposes nothing codex's shell can't do); decline others so the user opts in via codex's own flow."""
-        action = "accept" if (params.get("serverName") or "") == HERMES_TOOLS_MCP_SERVER_NAME else "decline"
+        action = "accept" if (params.get("serverName") or "") == X19_TOOLS_MCP_SERVER_NAME else "decline"
         return {"action": action, "content": None, "_meta": None}
 
     _SERVER_REQUEST_HANDLERS: dict[str, Callable[..., dict]] = {
@@ -680,13 +680,13 @@ def _apply_accounting_notification(result: TurnResult, note: dict) -> None:
         result.turn_id = params.get("turnId") or result.turn_id
 
 
-# Hermes approval choice -> codex decision (app-server-protocol v2). "deny" and
+# X19 approval choice -> codex decision (app-server-protocol v2). "deny" and
 # "timeout" both decline — codex has no "prompt expired" wire value.
 _APPROVAL_CHOICE_TO_DECISION = {"once": "accept", "session": "acceptForSession", "always": "acceptForSession"}
 
 
 def _approval_choice_to_codex_decision(choice: str) -> str:
-    """Map a Hermes approval choice onto codex's approval decision wire value."""
+    """Map a X19 approval choice onto codex's approval decision wire value."""
     return _APPROVAL_CHOICE_TO_DECISION.get(choice, "decline")
 
 
@@ -695,11 +695,11 @@ def _has_turn_aborted_marker(text: str) -> bool:
     return bool(text) and any(marker in text for marker in _TURN_ABORTED_MARKERS)
 
 
-def _get_hermes_version() -> str:
-    """Best-effort Hermes version string for codex's userAgent line."""
+def _get_x19_version() -> str:
+    """Best-effort X19 version string for codex's userAgent line."""
     try:
         from importlib.metadata import version
 
-        return version("hermes-agent")
+        return version("x19")
     except Exception:  # pragma: no cover
         return "0.0.0"

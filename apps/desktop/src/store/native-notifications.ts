@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import { type HermesOpenTarget, resolveHermesOpenPath } from '@/lib/hermes-open-target'
+import { type X19OpenTarget, resolveX19OpenPath } from '@/lib/x19-open-target'
 import { persistString, storedString } from '@/lib/storage'
 
 import { $gateway } from './gateway'
@@ -16,7 +16,7 @@ import { isSessionGone, isSessionGoneForBackgroundPolling, markSessionGone } fro
 import { $activeSessionId } from './session'
 import { storedSessionIdForRuntimeId } from './session-states'
 
-export type { HermesOpenTarget }
+export type { X19OpenTarget }
 
 // Native OS notifications (Electron `Notification`), separate from the in-app
 // toast feed in `notifications.ts`. Each kind toggles independently.
@@ -41,7 +41,7 @@ export interface NativeNotificationPrefs {
   kinds: Record<NativeNotificationKind, boolean>
 }
 
-const STORAGE_KEY = 'hermes:native-notifications'
+const STORAGE_KEY = 'x19:native-notifications'
 
 const DEFAULT_PREFS: NativeNotificationPrefs = {
   enabled: true,
@@ -121,7 +121,7 @@ function throttled(key: string, now: number): boolean {
   return false
 }
 
-// "Backgrounded" = the user isn't on Hermes. `document.hidden` only flips when
+// "Backgrounded" = the user isn't on X19. `document.hidden` only flips when
 // minimized/occluded; an alt-tabbed window is visible-but-unfocused, so we also
 // check `document.hasFocus()`.
 function isBackgrounded(): boolean {
@@ -185,7 +185,7 @@ export interface NativeNotificationInput {
   icon?: string
   /**
    * Resolved hash-router path to open on body click when there is no
-   * `sessionId` (plugins). Same vocabulary as `hermes://index-network/intent/1`.
+   * `sessionId` (plugins). Same vocabulary as `x19://index-network/intent/1`.
    */
   activate?: string
   /** Renderer-side handle so click/action can invoke registered callbacks. */
@@ -214,7 +214,7 @@ export function dispatchNativeNotification(input: NativeNotificationInput): bool
     return false
   }
 
-  void window.hermesDesktop?.notify({
+  void window.x19Desktop?.notify({
     actions: input.actions,
     activate: input.activate,
     body: input.body,
@@ -236,8 +236,8 @@ export function dispatchNativeNotification(input: NativeNotificationInput): bool
 export interface PluginNotificationAction {
   id: string
   label: string
-  /** Navigate here on button press (path or `hermes://index-network/intent/1`). */
-  activate?: HermesOpenTarget
+  /** Navigate here on button press (path or `x19://index-network/intent/1`). */
+  activate?: X19OpenTarget
   /** Renderer callback — only `id` crosses IPC; this stays in-process. */
   onAction?: () => void
 }
@@ -250,10 +250,10 @@ export interface PluginNativeNotificationInput {
   icon?: string
   /**
    * Where body-click should land. Accepts a plugin deep link
-   * (`hermes://index-network/intent/1`), a hash path (`/index-network/intent/1`),
+   * (`x19://index-network/intent/1`), a hash path (`/index-network/intent/1`),
    * or `{ path, params }` — all resolve through the same helper as OS deep links.
    */
-  activate?: HermesOpenTarget
+  activate?: X19OpenTarget
   /** Extra work on body click (runs in addition to `activate` navigation). */
   onActivate?: () => void
   actions?: PluginNotificationAction[]
@@ -311,14 +311,14 @@ export function clearPluginNotifyHandlers(notifyId?: string): void {
 /** Native OS notification on behalf of a plugin. One "Plugin notifications"
  *  preference gates all plugins; the plugin id keys throttling/dedupe so two
  *  plugins can't collapse each other's notifications. Fires only while the
- *  user is away from Hermes — the in-app toast (`host.notify`) covers the
+ *  user is away from X19 — the in-app toast (`host.notify`) covers the
  *  foreground case. */
 export function dispatchPluginNativeNotification(pluginId: string, input: PluginNativeNotificationInput): void {
-  const activate = resolveHermesOpenPath(input.activate) ?? undefined
+  const activate = resolveX19OpenPath(input.activate) ?? undefined
   const notifyId = input.onActivate || input.actions?.some(a => a.onAction) ? mintNotifyId(pluginId) : undefined
 
   const actions: NativeNotificationAction[] | undefined = input.actions?.map(action => ({
-    activate: resolveHermesOpenPath(action.activate) ?? undefined,
+    activate: resolveX19OpenPath(action.activate) ?? undefined,
     id: action.id,
     text: action.label
   }))
@@ -397,7 +397,7 @@ export async function respondToApprovalAction(sessionId: null | string, actionId
 // Settings "send test" — bypasses gating. Returns whether the OS accepted it so
 // the panel can flag a silent permission failure instead of looking dead.
 export async function sendTestNativeNotification(title: string, body: string): Promise<boolean> {
-  const bridge = window.hermesDesktop
+  const bridge = window.x19Desktop
 
   if (!bridge?.notify) {
     return false

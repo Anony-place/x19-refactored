@@ -24,7 +24,7 @@ import { FirstRunRemoteForm } from './first-run-remote-form'
 /**
  * DesktopInstallOverlay
  *
- * Renders the first-launch install progress for Hermes Agent. Mounted always;
+ * Renders the first-launch install progress for X19. Mounted always;
  * shows itself only when main.ts reports an in-flight bootstrap (state.active)
  * OR an error from a completed-failed bootstrap (state.error). When the
  * bootstrap finishes successfully the overlay fades out and the rest of the
@@ -313,7 +313,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
       return
     }
 
-    const desktop = window.hermesDesktop
+    const desktop = window.x19Desktop
 
     if (!desktop || typeof desktop.onBootstrapEvent !== 'function') {
       return
@@ -443,7 +443,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                 setLocalStart({ root: activeRoot, starting: true, error: null })
 
                 try {
-                  const desktop = window.hermesDesktop
+                  const desktop = window.x19Desktop
 
                   if (!desktop || typeof desktop.continueBootstrapLocal !== 'function') {
                     throw new Error(copy.localStartUnavailable)
@@ -485,7 +485,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
   }
 
   // Unsupported-platform branch: macOS/Linux packaged builds hit this when
-  // there's no Hermes Agent installed yet and we can't drive install.sh
+  // there's no X19 installed yet and we can't drive install.sh
   // (no stage protocol equivalent yet). Show a copy-paste install command
   // and the docs URL; user runs it from Terminal and relaunches the app.
   if (state.unsupportedPlatform) {
@@ -515,7 +515,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
               </Button>
               <Button
                 onClick={() => {
-                  window.hermesDesktop?.openExternal?.(ups.docsUrl)
+                  window.x19Desktop?.openExternal?.(ups.docsUrl)
                 }}
                 size="sm"
                 variant="ghost"
@@ -672,7 +672,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                   setCancelling(true)
 
                   try {
-                    await window.hermesDesktop?.cancelBootstrap?.()
+                    await window.x19Desktop?.cancelBootstrap?.()
                   } catch {
                     // ignore -- the failed/cancelled event will surface the result
                   }
@@ -693,11 +693,11 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">
                 {copy.transcriptSaved}{' '}
-                <code className="font-mono text-(--ui-text-secondary)">%LOCALAPPDATA%\hermes\logs\</code>
+                <code className="font-mono text-(--ui-text-secondary)">%LOCALAPPDATA%\x19\logs\</code>
               </span>
               <div className="flex gap-2">
                 <Button
-                  onClick={() => void window.hermesDesktop?.revealLogs?.().catch(() => undefined)}
+                  onClick={() => void window.x19Desktop?.revealLogs?.().catch(() => undefined)}
                   size="sm"
                   variant="ghost"
                 >
@@ -731,7 +731,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                     // and main short-circuits to the latched error without
                     // re-running install.ps1.
                     try {
-                      await window.hermesDesktop?.resetBootstrap?.()
+                      await window.x19Desktop?.resetBootstrap?.()
                     } catch {
                       // best-effort -- continue with reload regardless
                     }

@@ -1,62 +1,62 @@
 # Session Storage
 
-Hermes Agent uses a SQLite database (`~/.hermes/state.db`) to persist session
+X19 uses a SQLite database (`~/.x19/state.db`) to persist session
 metadata, full message history, and model configuration across CLI and gateway
 sessions. This replaces the earlier per-session JSONL file approach.
 
-Source files: `hermes_state.py` (facade) plus the `hermes_state_*.py` siblings (schema, fts, search, compression, portability, gateway, ...)
+Source files: `x19_state.py` (facade) plus the `x19_state_*.py` siblings (schema, fts, search, compression, portability, gateway, ...)
 
-## Hermes home and profile isolation
+## X19 home and profile isolation
 
-`get_hermes_home()` is the authoritative filesystem resolver for state and
-configuration. It uses a context-local override first, then the `HERMES_HOME`
-environment variable, and finally the platform default (`~/.hermes` on macOS
-and Linux; `%LOCALAPPDATA%/hermes` on Windows). Consequently, the default
-database is always `get_hermes_home() / "state.db"`, not a path that callers
-should hard-code as `~/.hermes/state.db`.
+`get_x19_home()` is the authoritative filesystem resolver for state and
+configuration. It uses a context-local override first, then the `X19_HOME`
+environment variable, and finally the platform default (`~/.x19` on macOS
+and Linux; `%LOCALAPPDATA%/x19` on Windows). Consequently, the default
+database is always `get_x19_home() / "state.db"`, not a path that callers
+should hard-code as `~/.x19/state.db`.
 
 Named profiles are isolated directories: a profile named `coder`, for example,
-uses `<default Hermes root>/profiles/coder/` and therefore has its own
+uses `<default X19 root>/profiles/coder/` and therefore has its own
 `state.db`, configuration, logs, and other profile-scoped state. A process that
 creates a database, reads configuration, or starts a child process for a
-profile must retain or pass that profile's `HERMES_HOME`; falling back to the
+profile must retain or pass that profile's `X19_HOME`; falling back to the
 default root mixes the wrong profile's state into the operation.
 
 The CLI bootstrap calls `_apply_profile_override()` before importing the rest
-of Hermes. An explicit `--profile`/`-p` resolves that profile and writes the
-resolved directory to `HERMES_HOME`. Without an explicit selector, a
-profile-specific `HERMES_HOME` is preserved; otherwise the bootstrap can use
+of X19. An explicit `--profile`/`-p` resolves that profile and writes the
+resolved directory to `X19_HOME`. Without an explicit selector, a
+profile-specific `X19_HOME` is preserved; otherwise the bootstrap can use
 the default root's active-profile selection. `HOME` only determines the
-platform default used when no context override or `HERMES_HOME` is available.
+platform default used when no context override or `X19_HOME` is available.
 Changing `HOME` is not a safe way to select a named profile. In particular, a
-subprocess that drops `HERMES_HOME` can fall back to the default profile even
+subprocess that drops `X19_HOME` can fall back to the default profile even
 when another profile is active, so subprocess spawners should pass
-`HERMES_HOME` explicitly.
+`X19_HOME` explicitly.
 
-Use `display_hermes_home()` only for user-facing text. It formats the resolved
+Use `display_x19_home()` only for user-facing text. It formats the resolved
 home relative to the user's home directory when possible (for example,
-`~/.hermes/profiles/coder`); it does not provide a separate resolution rule.
+`~/.x19/profiles/coder`); it does not provide a separate resolution rule.
 
 ### Test isolation guard
 
-Tests must use a temporary `HERMES_HOME` or an explicit temporary database
+Tests must use a temporary `X19_HOME` or an explicit temporary database
 path. The live-system guard raises before a test-context process opens a
-production `state.db` under the real default Hermes root or a real named
+production `state.db` under the real default X19 root or a real named
 profile, preventing fixture data or SQLite side effects from reaching a live
 installation.
 
-`HERMES_STATE_DB_GUARD_BYPASS=1` is a test-only escape hatch for a spawned
+`X19_STATE_DB_GUARD_BYPASS=1` is a test-only escape hatch for a spawned
 child process that genuinely must access the live database. The equivalent
 in-process escape hatch is `@pytest.mark.live_system_guard_bypass`. Do not set
-either bypass in normal Hermes commands, development shells, or application
+either bypass in normal X19 commands, development shells, or application
 configuration: it disables the guard (a hard `RuntimeError`) that protects live
 session history, and a shell that exports it hands the bypass to every later
 pytest run.
 
 ### Desktop profile isolation and compaction generations
 
-Each named profile stores its transcript in its own `$HERMES_HOME/state.db`,
-including when one `hermes serve` process serves several profiles. In-session
+Each named profile stores its transcript in its own `$X19_HOME/state.db`,
+including when one `x19 serve` process serves several profiles. In-session
 agent rebuilds (Bot Chat capability refresh and `tools.configure`) must retain
 that session's database handle and bind its profile home during construction.
 Releasing the outgoing agent must not close the handle inherited by its replacement.
@@ -82,7 +82,7 @@ history that appears to revert.
 
 The agent persists an accepted user input before starting its Codex turn. Codex
 then projects that input as a leading `userMessage` notification. At the runtime
-splice boundary, Hermes excludes only that leading item when it exactly matches
+splice boundary, X19 excludes only that leading item when it exactly matches
 the text serialized into `turn/start`, including rich-input coercion. Later or
 nonmatching user events remain intact, as do separately accepted identical turns.
 This also applies to synthetic/keyless input; it does not depend on a platform
@@ -115,7 +115,7 @@ ownership for a redelivered event.
 ## Architecture Overview
 
 ```
-~/.hermes/state.db (SQLite, WAL mode)
+~/.x19/state.db (SQLite, WAL mode)
 ├── sessions              — Session metadata, token counts, billing
 ├── messages              — Full message history per session
 ├── session_model_usage   — Per-model/per-task usage attribution rows
@@ -130,7 +130,7 @@ ownership for a redelivered event.
 └── schema_version        — Single-row table tracking migration state
 ```
 
-`hermes sessions recover` copies the row-bearing tables above into the
+`x19 sessions recover` copies the row-bearing tables above into the
 recovered database (FTS indexes and `schema_version` are regenerated), including
 the lazily-created `delivery_obligations` ledger when the source has one — its
 row count is verified like `sessions`/`messages`.
@@ -147,7 +147,7 @@ Key design decisions:
 
 ### Sessions Table
 
-Abridged — see `SCHEMA_SQL` in `hermes_state_common.py` (applied by `hermes_state_schema.py`) for the full current column list
+Abridged — see `SCHEMA_SQL` in `x19_state_common.py` (applied by `x19_state_schema.py`) for the full current column list
 (which also includes gateway routing metadata such as `session_key`, `chat_id`,
 `chat_type`, `thread_id`, `display_name`, `origin_json`, `expiry_finalized`,
 workspace fields `cwd` / `git_branch` / `git_repo_root`, handoff and
@@ -249,7 +249,7 @@ The FTS5 table is kept in sync via three triggers that fire on INSERT, UPDATE,
 and DELETE of the `messages` table. The current triggers are gated on the
 `fts_rebuild_high_water` / `fts_rebuild_progress` markers in `state_meta` (so a
 background FTS rebuild can proceed without double-indexing) and cover all three
-indexed columns — see `SCHEMA_SQL` in `hermes_state_common.py` for the exact SQL.
+indexed columns — see `SCHEMA_SQL` in `x19_state_common.py` for the exact SQL.
 
 
 ## Schema Version and Migrations
@@ -286,7 +286,7 @@ Declarative column adds use `ALTER TABLE ADD COLUMN` wrapped in try/except to ha
 
 ## Write Contention Handling
 
-Multiple hermes processes (gateway + CLI sessions + worktree agents) share one
+Multiple x19 processes (gateway + CLI sessions + worktree agents) share one
 `state.db`. The `SessionDB` class handles write contention with:
 
 - **Short SQLite timeout** (1 second) instead of the default 30s
@@ -310,9 +310,9 @@ _CHECKPOINT_EVERY_N_WRITES = 50
 ### Initialize
 
 ```python
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
-db = SessionDB()                           # Default: ~/.hermes/state.db
+db = SessionDB()                           # Default: ~/.x19/state.db
 db = SessionDB(db_path=Path("/tmp/test.db"))  # Custom path
 ```
 
@@ -516,9 +516,9 @@ db.delete_session("sess_abc123")
 
 ## Database Location
 
-Default path: `get_hermes_home() / "state.db"` — `~/.hermes/state.db` for the
-default profile, `~/.hermes/profiles/<name>/state.db` for a named profile, or
-wherever `HERMES_HOME` points (see [Hermes home and profile isolation](#hermes-home-and-profile-isolation)).
+Default path: `get_x19_home() / "state.db"` — `~/.x19/state.db` for the
+default profile, `~/.x19/profiles/<name>/state.db` for a named profile, or
+wherever `X19_HOME` points (see [X19 home and profile isolation](#x19-home-and-profile-isolation)).
 
 The database file, WAL file (`state.db-wal`), and shared-memory file
 (`state.db-shm`) are all created in the same directory.

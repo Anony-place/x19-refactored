@@ -15,8 +15,8 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn()
 }))
 
-vi.mock('@/hermes', () => ({
-  saveHermesConfig: (config: Record<string, unknown>) => mocks.save(config)
+vi.mock('@/x19', () => ({
+  saveX19Config: (config: Record<string, unknown>) => mocks.save(config)
 }))
 
 vi.mock('@/i18n', () => ({
@@ -42,8 +42,8 @@ vi.mock('@/store/notifications', () => ({
 }))
 
 vi.mock('../hooks/use-config-record', () => ({
-  setHermesConfigCache: (config: Record<string, unknown>) => mocks.cache(config),
-  useHermesConfigRecord: () => ({ data: mocks.loadedConfig, dataUpdatedAt: mocks.configUpdatedAt })
+  setX19ConfigCache: (config: Record<string, unknown>) => mocks.cache(config),
+  useX19ConfigRecord: () => ({ data: mocks.loadedConfig, dataUpdatedAt: mocks.configUpdatedAt })
 }))
 
 vi.mock('../hooks/use-on-profile-switch', () => ({

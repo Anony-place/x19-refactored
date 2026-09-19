@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { MemoryProviderConfig } from '@/types/hermes'
+import type { MemoryProviderConfig } from '@/types/x19'
 
 const getMemoryProviderConfig = vi.fn()
 const saveMemoryProviderConfig = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   getMemoryProviderConfig: (provider: string) => getMemoryProviderConfig(provider),
   saveMemoryProviderConfig: (provider: string, values: unknown) => saveMemoryProviderConfig(provider, values)
 }))
@@ -74,7 +74,7 @@ function honchoSchema(): MemoryProviderConfig {
         kind: 'text',
         value: 'myws',
         description: 'Honcho workspace ID.',
-        placeholder: 'hermes',
+        placeholder: 'x19',
         is_set: true,
         inline: true,
         group: 'Connection',
@@ -187,7 +187,7 @@ describe('ProviderConfigPanel', () => {
   })
 
   it('shows an inline error with retry when the load fails, then recovers', async () => {
-    getMemoryProviderConfig.mockRejectedValueOnce(new Error('Timed out connecting to Hermes backend'))
+    getMemoryProviderConfig.mockRejectedValueOnce(new Error('Timed out connecting to X19 backend'))
 
     await renderPanel()
 

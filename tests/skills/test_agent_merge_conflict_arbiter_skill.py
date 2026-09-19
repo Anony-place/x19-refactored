@@ -75,7 +75,7 @@ def test_body_size_within_bundled_norms():
     assert 80 <= lines <= 260, f"SKILL.md is {lines} lines; expected ~100-200"
 
 
-def test_references_native_hermes_tools():
+def test_references_native_x19_tools():
     _, body = _frontmatter_and_body()
     for tool in ("`terminal`", "`read_file`", "`patch`", "`delegate_task`"):
         assert tool in body, f"body must reference native tool {tool}"

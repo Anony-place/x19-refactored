@@ -1,4 +1,4 @@
-"""`hermes meet node ...` subcommand tree, wired under the ``hermes meet`` parser."""
+"""`x19 meet node ...` subcommand tree, wired under the ``x19 meet`` parser."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
     run = sp.add_parser("run", help="Start a node server on this machine.")
     run.add_argument("--host", default="0.0.0.0")
     run.add_argument("--port", type=int, default=18789)
-    run.add_argument("--display-name", default="hermes-meet-node")
+    run.add_argument("--display-name", default="x19-meet-node")
     sp.add_parser("list", help="List approved remote nodes.")
     app = sp.add_parser("approve", help="Register a remote node on the gateway.")
     for arg in ("name", "url", "token"):
@@ -36,7 +36,7 @@ def _cmd_run(args: argparse.Namespace, reg: NodeRegistry) -> int:
     print(f"[meet-node] display_name={server.display_name}\n"
           f"[meet-node] listening on ws://{args.host}:{args.port}\n"
           f"[meet-node] token (copy to gateway): {token}\n[meet-node] approve with:\n"
-          f"             hermes meet node approve <name> ws://<host>:{args.port} {token}")
+          f"             x19 meet node approve <name> ws://<host>:{args.port} {token}")
     try:
         asyncio.run(server.serve())
     except KeyboardInterrupt:
@@ -92,7 +92,7 @@ _COMMANDS = {
 
 
 def node_command(args: argparse.Namespace) -> int:
-    """Dispatch for ``hermes meet node ...``; returns a process exit code."""
+    """Dispatch for ``x19 meet node ...``; returns a process exit code."""
     cmd = getattr(args, "node_cmd", None)
     handler = _COMMANDS.get(cmd or "")
     if handler is None:
@@ -102,9 +102,3 @@ def node_command(args: argparse.Namespace) -> int:
     return handler(args, NodeRegistry())
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Any  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

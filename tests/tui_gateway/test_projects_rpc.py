@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+from x19_constants import reset_x19_home_override, set_x19_home_override
 import tui_gateway.server as server
 
 
@@ -300,7 +300,7 @@ def test_record_repos_persists_and_shows_zero_session_repo(tmp_path):
     repo = tmp_path / "fresh-repo"
     repo.mkdir()
 
-    # Repo-first: a scanned repo with no hermes sessions still surfaces.
+    # Repo-first: a scanned repo with no x19 sessions still surfaces.
     _call("projects.record_repos", {"repos": [{"root": str(repo), "label": "fresh-repo"}]})
 
     by_label = {r["label"]: r for r in _call("projects.discover_repos")["repos"]}
@@ -314,7 +314,7 @@ def test_scan_time_is_not_treated_as_session_activity(tmp_path):
     ``discovered_repos.last_seen`` records when the disk scan last saw the
     directory. Folding it into ``last_active`` stamped every scanned checkout
     with the scan time — i.e. "just now" — so repos the user has never opened
-    in Hermes outranked the ones they actually work in.
+    in X19 outranked the ones they actually work in.
     """
     worked_in = tmp_path / "worked-in"
     worked_in.mkdir()
@@ -350,7 +350,7 @@ def test_remote_scan_failure_merges_instead_of_replacing_cache(tmp_path, monkeyp
     state of #81723 (regression for MEDIUM: `replace=True` was wiping on every
     call regardless of success).
     """
-    from hermes_cli import projects_db as pdb
+    from x19_cli import projects_db as pdb
     import tui_gateway.server as server
 
     def _git_repo(path):
@@ -403,7 +403,7 @@ def test_remote_scan_missing_root_does_not_wipe_cache(tmp_path):
     set and DELETE-replace every cached repo that lived under it. The missing
     root must contribute nothing, and the scan must merge — never wipe.
     """
-    from hermes_cli import projects_db as pdb
+    from x19_cli import projects_db as pdb
     import tui_gateway.server as server
 
     def _git_repo(path):
@@ -441,7 +441,7 @@ def test_remote_scan_missing_root_does_not_wipe_cache(tmp_path):
 
 def test_remote_scan_full_authoritative_replaces_cache(tmp_path):
     """Only a fully-walked scan may replace the stale cache."""
-    from hermes_cli import projects_db as pdb
+    from x19_cli import projects_db as pdb
     import tui_gateway.server as server
 
     def _git_repo(path):
@@ -476,7 +476,7 @@ def test_remote_scan_full_authoritative_replaces_cache(tmp_path):
 def test_terminal_session_persists_its_launch_cwd():
     """A terminal session's cwd IS its workspace, so the row must record it.
 
-    The user cd'd into that directory before running hermes. Dropping it left
+    The user cd'd into that directory before running x19. Dropping it left
     the row with no cwd and no git_repo_root, so the sidebar could never place
     the session under its project.
     """
@@ -499,7 +499,7 @@ def test_desktop_launch_cwd_is_not_persisted_as_a_workspace():
 
 def test_desktop_launch_cwd_is_marked_as_context_artifact():
     assert server._context_cwd_is_launch_artifact(
-        {"source": "desktop", "cwd": "/opt/hermes"}
+        {"source": "desktop", "cwd": "/opt/x19"}
     ) is True
 
 
@@ -508,7 +508,7 @@ def test_explicit_desktop_and_terminal_cwds_are_context_workspaces():
         {"source": "desktop", "cwd": "/picked/repo", "explicit_cwd": True}
     ) is False
     assert server._context_cwd_is_launch_artifact(
-        {"source": "tui", "cwd": "/opt/hermes"}
+        {"source": "tui", "cwd": "/opt/x19"}
     ) is False
 
 
@@ -523,7 +523,7 @@ def test_desktop_agent_rebuild_preserves_workspace_provenance(
     session = {
         "agent": object(),
         "attached_images": [],
-        "cwd": "/picked/repo" if explicit_cwd else "/opt/hermes",
+        "cwd": "/picked/repo" if explicit_cwd else "/opt/x19",
         "edit_snapshots": {},
         "explicit_cwd": explicit_cwd,
         "history": ["old"],
@@ -670,25 +670,25 @@ def _bind_profiles(monkeypatch, tmp_path: Path, homes: dict[str, Path]) -> None:
     gateway detects "not a real profile on this host" and stays on launch.
     """
     monkeypatch.setattr(
-        "hermes_cli.profiles.get_profile_dir",
+        "x19_cli.profiles.get_profile_dir",
         lambda name: homes.get(name, tmp_path / "homes" / "missing" / name),
     )
 
 
 def _create_project(home: Path, name: str, folder: Path, *, use: bool = False) -> dict:
     """Create a project in ``home``'s projects.db via the real RPC."""
-    token = set_hermes_home_override(home)
+    token = set_x19_home_override(home)
     try:
         return _call(
             "projects.create", {"name": name, "folders": [str(folder)], "use": use}
         )["project"]
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
 
 
 def _create_session(home: Path, session_id: str, cwd: Path) -> None:
     """Seed one message-bearing session in ``home``'s state.db."""
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     db = SessionDB(db_path=home / "state.db")
     try:
@@ -701,9 +701,9 @@ def _create_session(home: Path, session_id: str, cwd: Path) -> None:
 @contextlib.contextmanager
 def _serving_launch_profile(launch_home: Path):
     """Run the handlers as a backend launched under ``launch_home``."""
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
-    token = set_hermes_home_override(launch_home)
+    token = set_x19_home_override(launch_home)
     prev_db, prev_error = server._db, server._db_error
     server._db = SessionDB(db_path=launch_home / "state.db")
     server._db_error = None
@@ -712,12 +712,12 @@ def _serving_launch_profile(launch_home: Path):
     finally:
         server._db.close()
         server._db, server._db_error = prev_db, prev_error
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
 
 
 def _cached_repo_labels(home: Path) -> list[str]:
     """Labels in ``home``'s discovered-repo cache, read straight off disk."""
-    from hermes_cli import projects_db as pdb
+    from x19_cli import projects_db as pdb
 
     with pdb.connect_closing(home / "projects.db") as conn:
         return sorted(str(entry.get("label") or "") for entry in pdb.list_discovered_repos(conn))
@@ -885,6 +885,6 @@ def test_projects_without_a_profile_stay_on_the_launch_home(monkeypatch, tmp_pat
 
     assert _cached_repo_labels(launch_home) == ["only"]
     assert not (coder_home / "projects.db").exists()
-    assert not (Path(os.environ["HERMES_HOME"]) / "projects.db").exists()
+    assert not (Path(os.environ["X19_HOME"]) / "projects.db").exists()
 
 

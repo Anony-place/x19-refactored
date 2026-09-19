@@ -21,7 +21,7 @@ _KEENABLE_API_URL = "https://api.keenable.ai"
 
 def _keenable_headers(api_key: str) -> Dict[str, str]:
     # The keyless tier structurally requires an app-identifier header; no user identifiers are sent.
-    headers = {"X-Keenable-Title": "hermes-agent"}
+    headers = {"X-Keenable-Title": "x19"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     return headers
@@ -86,23 +86,3 @@ class KeenableWebSearchProvider(BaseWebSearchProvider):
         )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'WebSearchProvider': ('agent.web_search_provider', 'WebSearchProvider'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

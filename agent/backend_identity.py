@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from hermes_cli.route_identity import normalize_route_base_url
+from x19_cli.route_identity import normalize_route_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _both_first_class(a: BackendIdentity, b: BackendIdentity) -> bool:
     if not a.provider or not b.provider or a.provider == b.provider:
         return False
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from x19_cli.auth import PROVIDER_REGISTRY
 
         return a.provider in PROVIDER_REGISTRY and b.provider in PROVIDER_REGISTRY
     except Exception:
@@ -133,22 +133,3 @@ def should_skip_candidate(
     return _SCOPE_PREDICATES.get(scope, same_deployment)(candidate, failed)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-_REASON_SCOPES = {
-    "auth error": FailureScope.CREDENTIAL,
-    "payment error": FailureScope.CREDENTIAL,
-    "rate limit": FailureScope.MODEL,
-    "model incompatible with route": FailureScope.MODEL,
-    "invalid provider response": FailureScope.MODEL,
-    "connection error": FailureScope.MODEL,
-    "timeout": FailureScope.MODEL,
-}
-
-def classify_failure_scope(reason: Optional[str]) -> FailureScope:
-    """Map a human-readable failure reason to the identity axis it kills."""
-    return _REASON_SCOPES.get((reason or "").strip().lower(), FailureScope.MODEL)
-# ---- END PLUGIN-COMPAT ----

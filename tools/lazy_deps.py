@@ -1,9 +1,9 @@
-"""Lazy dependency installer for opt-in Hermes backends.
+"""Lazy dependency installer for opt-in X19 backends.
 
 Backends call :func:`ensure(feature)` on first import; missing packages are installed into the
 active venv (or the durable target) unless ``security.allow_lazy_installs: false``, in which
 case :class:`FeatureUnavailable` carries a remediation hint. Security model: venv-scoped
-(never system Python); durable-target mode (``HERMES_LAZY_INSTALL_TARGET``, sealed images)
+(never system Python); durable-target mode (``X19_LAZY_INSTALL_TARGET``, sealed images)
 APPENDS the target to ``sys.path`` so core site-packages wins every collision and a lazy
 package can only add modules, never shadow core; PyPI-by-name specs only (``_spec_is_safe``);
 ``ensure`` accepts only the :data:`LAZY_DEPS` allowlist; failures surface pip's stderr, no retry.
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from hermes_cli._subprocess_compat import windows_hide_flags
+from x19_cli._subprocess_compat import windows_hide_flags
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # SILK voice-note decoding (WeChat/QQ); silk-v3 codec binding.
     "stt.silk": ("pilk==0.2.4",),
 
-    # ─── Wake word ("Hey Hermes") engines (sync with the `wake` extra) ──────
+    # ─── Wake word ("Hey X19") engines (sync with the `wake` extra) ──────
     # openWakeWord's ONNX model scores ~0 on macOS ARM64, so macOS uses the tflite backend
     # (ai-edge-litert, bridged in tools/wake_word.py). Separate feature because specs cannot
     # carry PEP 508 markers (";" is rejected) — the caller applies the platform gate.
@@ -202,12 +202,12 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
         "starlette==1.3.1",
     ),
     # huggingface-hub is SHARED with transformers (>=1.5.0,<2 via Hindsight) and marked active
-    # on mere presence, so `hermes update` re-asserts this pin everywhere hub exists. MUST stay
+    # on mere presence, so `x19 update` re-asserts this pin everywhere hub exists. MUST stay
     # inside transformers' window and match uv.lock (tests/test_project_metadata.py enforces).
-    # HF Agent Trace Viewer upload (hermes trace upload / /upload-trace). huggingface-hub is a SHARED
+    # HF Agent Trace Viewer upload (x19 trace upload / /upload-trace). huggingface-hub is a SHARED
     # dependency: transformers (pulled by sentence-transformers for local Hindsight embeddings) requires
     # >=1.5.0,<2, and faster-whisper/tokenizers depend on it transitively. Because active_features() marks a
-    # feature active from mere package presence, the `hermes update` lazy-refresh pass re-asserts THIS pin
+    # feature active from mere package presence, the `x19 update` lazy-refresh pass re-asserts THIS pin
     # on every install where hub is present — so an exact pin below 1.5.0 force-downgrades the shared
     # package and breaks Hindsight startup (#60783). Policy: keep the exact pin (no ranges — security
     # posture), but it MUST stay inside transformers' accepted window and MUST match uv.lock so the whole
@@ -243,7 +243,7 @@ class _InstallResult:
 
 # Internal bridge var (set by the Docker image, not user config) redirecting lazy installs from the
 # sealed venv to a writable durable volume.
-_LAZY_TARGET_ENV = "HERMES_LAZY_INSTALL_TARGET"
+_LAZY_TARGET_ENV = "X19_LAZY_INSTALL_TARGET"
 # Stamp of the Python X.Y + ABI the target was populated for; a mismatch after an image rebuild
 # wipes the store so stale .so files are never imported.
 _TARGET_STAMP_NAME = ".python-abi"
@@ -323,15 +323,15 @@ def activate_durable_lazy_target() -> None:
 
 def _allow_lazy_installs() -> bool:
     """Whether lazy installs are permitted: (1) ``security.allow_lazy_installs: false`` blocks in BOTH
-    modes; (2) the sealed venv (``HERMES_DISABLE_LAZY_INSTALLS=1``) blocks only without a durable
+    modes; (2) the sealed venv (``X19_DISABLE_LAZY_INSTALLS=1``) blocks only without a durable
     target to redirect into. Unreadable config fails OPEN — blocking is an explicit opt-in."""
     cfg = None
     with contextlib.suppress(Exception):
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         cfg = load_config()
     if cfg is not None and not bool((cfg.get("security") or {}).get("allow_lazy_installs", True)):
         return False
-    if os.environ.get("HERMES_DISABLE_LAZY_INSTALLS") == "1":
+    if os.environ.get("X19_DISABLE_LAZY_INSTALLS") == "1":
         return _lazy_install_target() is not None
     return True
 
@@ -340,7 +340,7 @@ def _unsupported_feature_reason(feature: str) -> Optional[str]:
     """Platform capability gate (not policy): why a feature cannot work on this host, or None."""
     if sys.platform == "win32" and feature == "platform.matrix":
         return ("unsupported on Windows: Matrix E2EE depends on python-olm, which has no Windows wheel and "
-                "requires make + libolm to build from sdist. Run Hermes under WSL to use Matrix on Windows.")
+                "requires make + libolm to build from sdist. Run X19 under WSL to use Matrix on Windows.")
     return None
 
 
@@ -375,7 +375,7 @@ def _installed_version(spec: str) -> Optional[str]:
 
 
 def _is_satisfied(spec: str) -> bool:
-    """Present AND inside the spec's version range, so ``hermes update`` propagates pin bumps to
+    """Present AND inside the spec's version range, so ``x19 update`` propagates pin bumps to
     installed backends. Unparseable specs/versions or a missing ``packaging`` count as satisfied — err
     toward "don't churn"."""
     installed = _installed_version(spec)
@@ -413,7 +413,7 @@ def _core_constraints_file() -> Optional[Path]:
                 pins[name.lower()] = f"{name}=={dist.version}"
         if not pins:
             return None
-        fd, path = tempfile.mkstemp(prefix="hermes-core-constraints-", suffix=".txt")
+        fd, path = tempfile.mkstemp(prefix="x19-core-constraints-", suffix=".txt")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write("\n".join(sorted(pins.values())) + "\n")
         return Path(path)
@@ -480,10 +480,10 @@ def _run_installer(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 
 def _uv_binary() -> Optional[str]:
-    """Managed uv first ($HERMES_HOME/bin is never on PATH), then PATH. A lookup, not ensure_uv():
+    """Managed uv first ($X19_HOME/bin is never on PATH), then PATH. A lookup, not ensure_uv():
     downloading uv mid-turn is more than the caller asked for; pip covers no-uv."""
     try:
-        from hermes_cli.managed_uv import resolve_uv
+        from x19_cli.managed_uv import resolve_uv
 
         return resolve_uv() or shutil.which("uv")
     except Exception:
@@ -492,7 +492,7 @@ def _uv_binary() -> Optional[str]:
 
 def _write_constraints_file(lines: tuple[str, ...]) -> Path:
     import tempfile
-    fd, path = tempfile.mkstemp(prefix="hermes-plugin-constraints-", suffix=".txt")
+    fd, path = tempfile.mkstemp(prefix="x19-plugin-constraints-", suffix=".txt")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     return Path(path)
@@ -511,9 +511,9 @@ def _venv_pip_install(specs: tuple[str, ...], *, timeout: int = 300, constraint_
                       dry_run: bool = False) -> _InstallResult:
     """Install ``specs`` via the uv -> pip -> ensurepip ladder, venv-scoped or into the durable
     ``--target`` (constrained to core versions) when :data:`_LAZY_TARGET_ENV` is set. Independent of
-    ``hermes_cli.tools_config._pip_install`` (no CLI dependency).
+    ``x19_cli.tools_config._pip_install`` (no CLI dependency).
 
-    *constraint_lines* pins the resolver (plugin installs pass Hermes' own declared ranges so a plugin
+    *constraint_lines* pins the resolver (plugin installs pass X19' own declared ranges so a plugin
     can never move a core package out of range); *dry_run* resolves without installing."""
     if not specs:
         return _InstallResult(True, "", "")
@@ -536,8 +536,8 @@ def _venv_pip_install(specs: tuple[str, ...], *, timeout: int = 300, constraint_
         return _InstallResult(r.returncode == 0, r.stdout or "", r.stderr or "")
 
     try:
-        from tools.environments.local import hermes_subprocess_env
-        uv_env = hermes_subprocess_env(inherit_credentials=False)
+        from tools.environments.local import x19_subprocess_env
+        uv_env = x19_subprocess_env(inherit_credentials=False)
         uv_env["VIRTUAL_ENV"] = str(Path(sys.executable).parent.parent)
         # Tier 1: uv. --compile-bytecode because uv writes no __pycache__ by default, so the first
         # import would recompile the backend AND its transitives (_warm_installed_bytecode is the
@@ -613,14 +613,14 @@ def ensure(feature: str, *, prompt: bool = True) -> None:
     if _lazy_install_target() is None:
         managed_by = ""  # config unreadable — proceed with the install
         with contextlib.suppress(Exception):
-            from hermes_cli.config import get_managed_system
+            from x19_cli.config import get_managed_system
             managed_by = get_managed_system()
         if managed_by:
             raise FeatureUnavailable(
                 feature, missing,
                 f"unsupported on {managed_by}-managed installs: this build's packages come from {managed_by}, "
-                f"so Hermes cannot install them at runtime. Add the dependencies for {feature!r} via "
-                f"{managed_by} (or run a pip/uv install of Hermes instead).")
+                f"so X19 cannot install them at runtime. Add the dependencies for {feature!r} via "
+                f"{managed_by} (or run a pip/uv install of X19 instead).")
     for spec in missing:  # belt and braces on top of the allowlist
         if not _spec_is_safe(spec):
             raise FeatureUnavailable(feature, missing, f"refusing to install unsafe spec {spec!r}")
@@ -685,9 +685,9 @@ def install_specs(specs: list[str] | tuple[str, ...], *, timeout: int = 300,
             return InstallSpecsResult(ok=False, blocked=True, reason=f"refusing to install unsafe spec {spec!r}")
     target = _lazy_install_target()
     if not _allow_lazy_installs():
-        sealed = os.environ.get("HERMES_DISABLE_LAZY_INSTALLS") == "1" and target is None
+        sealed = os.environ.get("X19_DISABLE_LAZY_INSTALLS") == "1" and target is None
         reason = ("runtime installs are disabled on this deployment: the agent environment is immutable "
-                  "and no writable install target is configured (HERMES_LAZY_INSTALL_TARGET)"
+                  "and no writable install target is configured (X19_LAZY_INSTALL_TARGET)"
                   ) if sealed else "runtime installs disabled (security.allow_lazy_installs=false)"
         return InstallSpecsResult(ok=False, blocked=True, reason=reason)
     display = "uv pip install " + (f"--target {target} " if target is not None else "") + " ".join(cleaned)
@@ -704,12 +704,12 @@ def install_specs(specs: list[str] | tuple[str, ...], *, timeout: int = 300,
 
 def active_features() -> list[str]:
     """Features whose ANCHOR package (first spec) is present at any version — shared helpers like
-    asyncpg are deliberately not proof a backend was enabled. Drives ``hermes update``."""
+    asyncpg are deliberately not proof a backend was enabled. Drives ``x19 update``."""
     return [f for f, specs in LAZY_DEPS.items() if specs and _is_present(specs[0])]
 
 
 def refresh_active_features(*, prompt: bool = False) -> dict[str, str]:
-    """Re-run ``ensure`` for every active feature (``hermes update``); returns
+    """Re-run ``ensure`` for every active feature (``x19 update``); returns
     ``{feature: "current" | "refreshed" | "failed: <reason>" | "skipped: <reason>"}``. Never raises."""
     return _refresh_features(active_features(), prompt=prompt, restoring=False)
 
@@ -762,14 +762,3 @@ def ensure_and_bind(feature: str, importer: Callable[[], dict[str, Any]], target
     return True
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def feature_specs(feature: str) -> tuple[str, ...]:
-    """Return the registered specs for a feature, or raise KeyError."""
-    if feature not in LAZY_DEPS:
-        raise KeyError(f"Unknown lazy feature: {feature!r}")
-    return LAZY_DEPS[feature]
-# ---- END PLUGIN-COMPAT ----

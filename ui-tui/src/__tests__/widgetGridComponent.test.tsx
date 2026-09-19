@@ -1,7 +1,7 @@
 import { PassThrough } from 'stream'
 
-import { renderSync, Text } from '@hermes/ink'
-import { stripAnsi } from '@hermes/shared/ansi'
+import { renderSync, Text } from '@x19/ink'
+import { stripAnsi } from '@x19/shared/ansi'
 import React, { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 
@@ -131,7 +131,7 @@ describe('GridStreamsDemo', () => {
   it('renders every stream panel with the promoted panel in the header', () => {
     const output = renderToText(<GridStreamsDemo cols={90} state={streamsState} t={DEFAULT_THEME} />)
 
-    expect(output).toContain('hermes mission control')
+    expect(output).toContain('x19 mission control')
 
     for (const def of STREAM_DEFS) {
       expect(output).toContain(def.title)

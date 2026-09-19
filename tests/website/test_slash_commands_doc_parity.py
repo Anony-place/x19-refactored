@@ -6,7 +6,7 @@ This class of drift has bitten before: ``/loop`` shipped with a feature page
 reference, and the zh-Hans doc carried retired ``/credits``/``/billing`` rows
 for months (PR #69639).
 
-Two directions, both driven by ``hermes_cli.commands.COMMAND_REGISTRY``
+Two directions, both driven by ``x19_cli.commands.COMMAND_REGISTRY``
 (the single source every surface derives from):
 
 1. Every registered command must be documented under at least one visible
@@ -51,7 +51,7 @@ _NON_REGISTRY_ROWS = {
 
 @pytest.fixture(scope="module")
 def registry():
-    from hermes_cli.commands import COMMAND_REGISTRY
+    from x19_cli.commands import COMMAND_REGISTRY
 
     return COMMAND_REGISTRY
 
@@ -70,7 +70,7 @@ def test_every_registered_command_is_documented(registry, doc_text):
         if not any(_mentioned(form, doc_text) for form in forms):
             missing.append(cmd.name)
     assert not missing, (
-        "Commands registered in hermes_cli/commands.py but absent from "
+        "Commands registered in x19_cli/commands.py but absent from "
         f"website/docs/reference/slash-commands.md: {missing}. "
         "Add a table row (Session/Configuration/Tools & Skills/Info for the "
         "CLI table, and the messaging table if the command works on the "

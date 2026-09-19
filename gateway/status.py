@@ -1,4 +1,4 @@
-"""Gateway runtime status helpers: PID/lock/marker files under ``{HERMES_HOME}`` (one set per
+"""Gateway runtime status helpers: PID/lock/marker files under ``{X19_HOME}`` (one set per
 home/profile) that tell whether the gateway daemon is running."""
 
 import contextlib
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, NamedTuple, Optional
 
-from hermes_constants import _get_platform_default_hermes_home, get_hermes_home
+from x19_constants import _get_platform_default_x19_home, get_x19_home
 from utils import atomic_json_write
 
 if sys.platform == "win32":
@@ -28,7 +28,7 @@ if sys.platform == "win32":
 else:
     import fcntl
 
-_GATEWAY_KIND = "hermes-gateway"
+_GATEWAY_KIND = "x19-gateway"
 _RUNTIME_STATUS_FILE = "gateway_state.json"
 _LOCKS_DIRNAME = "gateway-locks"
 _IS_WINDOWS = sys.platform == "win32"
@@ -60,7 +60,7 @@ def record_start_and_check_storm(
     """Record this start; :class:`StormInfo` when > ``max_starts`` landed in ``window_s``.
     Best-effort: a broken ``gateway-starts.log`` ledger is logged and swallowed, never fatal."""
     try:
-        path = get_hermes_home() / "gateway-starts.log"
+        path = get_x19_home() / "gateway-starts.log"
         path.parent.mkdir(parents=True, exist_ok=True)
         now = datetime.now(timezone.utc).timestamp()
         existing: list[float] = []
@@ -84,78 +84,78 @@ def record_start_and_check_storm(
         return None
 
 
-def _get_process_hermes_home() -> Path:
-    """Launch-home HERMES_HOME for identity files (PID, lock, status, markers):
-    ``get_hermes_home()`` honors the per-session ``_HERMES_HOME_OVERRIDE`` and would misroute
+def _get_process_x19_home() -> Path:
+    """Launch-home X19_HOME for identity files (PID, lock, status, markers):
+    ``get_x19_home()`` honors the per-session ``_X19_HOME_OVERRIDE`` and would misroute
     them."""
-    val = os.environ.get("HERMES_HOME", "").strip()
-    return Path(val) if val else _get_platform_default_hermes_home()
+    val = os.environ.get("X19_HOME", "").strip()
+    return Path(val) if val else _get_platform_default_x19_home()
 
 
-def _canonical_hermes_home(path: Path | str) -> Path:
-    """Stable absolute HERMES_HOME path for persisted identity data."""
+def _canonical_x19_home(path: Path | str) -> Path:
+    """Stable absolute X19_HOME path for persisted identity data."""
     return Path(path).expanduser().resolve(strict=False)
 
 
-def _same_hermes_home(left: Path | str, right: Path | str) -> bool:
-    """Compare HERMES_HOME paths with the host platform's case semantics."""
-    left_c = os.path.normcase(str(_canonical_hermes_home(left)))
-    return left_c == os.path.normcase(str(_canonical_hermes_home(right)))
+def _same_x19_home(left: Path | str, right: Path | str) -> bool:
+    """Compare X19_HOME paths with the host platform's case semantics."""
+    left_c = os.path.normcase(str(_canonical_x19_home(left)))
+    return left_c == os.path.normcase(str(_canonical_x19_home(right)))
 
 
 def recorded_gateway_home_conflicts(
     record: Optional[dict[str, Any]], *, expected_home: Optional[Path | str] = None
 ) -> bool:
-    """True when a persisted gateway record names a DIFFERENT HERMES_HOME (cross-profile kill guard:
+    """True when a persisted gateway record names a DIFFERENT X19_HOME (cross-profile kill guard:
     profile B's stop must never SIGTERM profile A). ``expected_home`` overrides the comparison base.
-    Legacy records without ``hermes_home`` prove nothing -> False; a comparison failure fails
+    Legacy records without ``x19_home`` prove nothing -> False; a comparison failure fails
     closed -> True."""
-    recorded_home = record.get("hermes_home") if isinstance(record, dict) else None
+    recorded_home = record.get("x19_home") if isinstance(record, dict) else None
     if not isinstance(recorded_home, str) or not recorded_home.strip():
         return False
     try:
-        base = expected_home if expected_home is not None else _get_process_hermes_home()
-        return not _same_hermes_home(recorded_home, base)
+        base = expected_home if expected_home is not None else _get_process_x19_home()
+        return not _same_x19_home(recorded_home, base)
     except Exception:
         return True
 
 
-# Mirrors hermes_cli.profiles._PROFILE_ID_RE -- duplicated so gateway identity code
-# stays import-light (hermes_constants + stdlib only).
+# Mirrors x19_cli.profiles._PROFILE_ID_RE -- duplicated so gateway identity code
+# stays import-light (x19_constants + stdlib only).
 _PROFILE_LABEL_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
 def _profile_label_for_home(home: Path | str) -> Optional[str]:
     """Best-effort label: ``<root>/profiles/<name>`` -> name, root home -> "default", else None."""
     try:
-        canonical = _canonical_hermes_home(home)
+        canonical = _canonical_x19_home(home)
     except Exception:
         return None
     if canonical.parent.name == "profiles" and _PROFILE_LABEL_RE.match(canonical.name):
         return canonical.name
-    import hermes_constants
-    default_homes = (hermes_constants.get_default_hermes_root, _get_platform_default_hermes_home)
+    import x19_constants
+    default_homes = (x19_constants.get_default_x19_root, _get_platform_default_x19_home)
     for default_home in default_homes:
         with contextlib.suppress(Exception):
-            if _same_hermes_home(canonical, default_home()):
+            if _same_x19_home(canonical, default_home()):
                 return "default"
     return None
 
 
 def scoped_lock_owner_label(record: Optional[dict[str, Any]]) -> Optional[str]:
     """Profile label of a scoped-lock owner (None: PID-only wording): the validated ``profile``
-    field stamped by :func:`acquire_scoped_lock`, else inferred from ``hermes_home`` (old locks)."""
+    field stamped by :func:`acquire_scoped_lock`, else inferred from ``x19_home`` (old locks)."""
     if not isinstance(record, dict):
         return None
     profile = record.get("profile")
     if isinstance(profile, str) and _PROFILE_LABEL_RE.match(profile.strip()):
         return profile.strip()
-    home = record.get("hermes_home")
+    home = record.get("x19_home")
     return _profile_label_for_home(home) if isinstance(home, str) and home.strip() else None
 
 
 def _get_pid_path() -> Path:
-    return _get_process_hermes_home() / "gateway.pid"
+    return _get_process_x19_home() / "gateway.pid"
 
 
 def _get_gateway_lock_path(pid_path: Optional[Path] = None) -> Path:
@@ -163,16 +163,16 @@ def _get_gateway_lock_path(pid_path: Optional[Path] = None) -> Path:
 
 
 def _get_runtime_status_path() -> Path:
-    return _get_process_hermes_home() / _RUNTIME_STATUS_FILE
+    return _get_process_x19_home() / _RUNTIME_STATUS_FILE
 
 
 def _get_lock_dir() -> Path:
-    """Machine-local dir for token-scoped gateway locks; ``HERMES_GATEWAY_LOCK_DIR`` overrides."""
-    override = os.getenv("HERMES_GATEWAY_LOCK_DIR")
+    """Machine-local dir for token-scoped gateway locks; ``X19_GATEWAY_LOCK_DIR`` overrides."""
+    override = os.getenv("X19_GATEWAY_LOCK_DIR")
     if override:
         return Path(override)
     state_home = Path(os.getenv("XDG_STATE_HOME", Path.home() / ".local" / "state"))
-    return state_home / "hermes" / _LOCKS_DIRNAME
+    return state_home / "x19" / _LOCKS_DIRNAME
 
 
 def _utc_now_iso() -> str:
@@ -214,7 +214,7 @@ def retained_gateway_state(runtime: Any) -> str:
     """What a NOT-running gateway's retained ``gateway_state.json`` says about it now:
     ``"startup_failed"`` only while the operator still wants it running, else ``"stopped"``.
 
-    ``hermes gateway stop`` keeps the last ``startup_failed`` + ``exit_reason`` on disk for
+    ``x19 gateway stop`` keeps the last ``startup_failed`` + ``exit_reason`` on disk for
     diagnostics and records the durable stop intent as ``desired_state``; a profile the operator
     stopped is "stopped", not a current failure. Any other retained state of a dead process
     (``running``, ``starting``, missing) is also just "stopped". Shared by ``/api/status`` and
@@ -251,7 +251,7 @@ def terminate_pid(
         os.kill(pid, signal.SIGTERM if not force else getattr(signal, "SIGKILL", signal.SIGTERM))
         return
     # Hide flags: a bare taskkill spawn from windowless pythonw.exe would flash a conhost window.
-    from hermes_cli._subprocess_compat import windows_hide_flags
+    from x19_cli._subprocess_compat import windows_hide_flags
 
     try:
         result = subprocess.run(
@@ -321,9 +321,9 @@ def _read_process_cmdline(pid: int) -> Optional[str]:
 
 
 def _gateway_command_subcommand(command: str | None) -> str | None:
-    """Hermes gateway lifecycle subcommand from a command line, or None. No loose substring matches
+    """X19 gateway lifecycle subcommand from a command line, or None. No loose substring matches
     (``"gateway" in cmdline`` also matched ``gateway status`` / ``python -m tui_gateway``): needs a
-    Hermes entrypoint plus the ``gateway`` subcommand, or a gateway-dedicated entrypoint. Tokenizes
+    X19 entrypoint plus the ``gateway`` subcommand, or a gateway-dedicated entrypoint. Tokenizes
     quote-aware (Windows paths with spaces); ``--profile``/``-p`` selectors are stripped anywhere in
     argv since ``_apply_profile_override`` removes them before argparse."""
     if not command:
@@ -340,11 +340,11 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
     # Gateway-dedicated entrypoints carry no subcommand to inspect.
     if any(t == "gateway/run.py" or t.endswith("/gateway/run.py") for t in tokens):
         return "run"
-    if any(b in ("hermes-gateway", "hermes-gateway.exe") for b in basenames):
+    if any(b in ("x19-gateway", "x19-gateway.exe") for b in basenames):
         return "run"
     joined = " ".join(tokens)
-    if "hermes_cli.main" not in joined and "hermes_cli/main.py" not in joined and not any(
-        b in ("hermes", "hermes.exe") for b in basenames
+    if "x19_cli.main" not in joined and "x19_cli/main.py" not in joined and not any(
+        b in ("x19", "x19.exe") for b in basenames
     ):
         return None
     # Drop --profile X / -p X / --profile=X / -p=X (consumes a VALUE of "gateway" too).
@@ -359,7 +359,7 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
             filtered.append(token)
     for i, token in enumerate(filtered):
         if token == "gateway":
-            # Bare `hermes gateway` defaults to `run`.
+            # Bare `x19 gateway` defaults to `run`.
             return filtered[i + 1] if i + 1 < len(filtered) else "run"
     return None
 
@@ -372,12 +372,12 @@ def looks_like_gateway_command_line(command: str | None) -> bool:
 def looks_like_gateway_runtime_command_line(command: str | None) -> bool:
     """True for command lines that can host the runtime (``run`` or ``restart``: without a service
     manager the manual restart fallback runs ``run_gateway()`` in-process). For validating
-    Hermes-owned records / cleanup scans only; ``looks_like_gateway_command_line`` stays strict."""
+    X19-owned records / cleanup scans only; ``looks_like_gateway_command_line`` stays strict."""
     return _gateway_command_subcommand(command) in {"run", "restart"}
 
 
 def _looks_like_gateway_process(pid: int) -> bool:
-    """True when the live PID still looks like the Hermes gateway."""
+    """True when the live PID still looks like the X19 gateway."""
     cmdline = _read_process_cmdline(pid)
     return bool(cmdline) and looks_like_gateway_command_line(cmdline)
 
@@ -409,21 +409,21 @@ def profile_flag_value(command: str) -> Optional[str]:
 
 def _command_line_belongs_to_profile(command: str, profile_home: Path) -> bool:
     """True when a gateway command line belongs to ``profile_home`` (mirrors
-    ``hermes_cli.gateway._matches_current_profile``): a stale state file can record a PID recycled
+    ``x19_cli.gateway._matches_current_profile``): a stale state file can record a PID recycled
     onto ANOTHER profile's live gateway. Named profiles carry ``-p``/``--profile <name>`` or
-    ``HERMES_HOME=`` on argv; the default gateway runs bare. Separators normalized."""
+    ``X19_HOME=`` on argv; the default gateway runs bare. Separators normalized."""
     command_lc = command.lower().replace("\\", "/")
     profile_name = _profile_name_for_home(profile_home)
     home_lc = str(profile_home).lower().replace("\\", "/")
     if profile_name is not None and profile_name != "default":
-        return profile_flag_value(command_lc) == profile_name.lower() or f"hermes_home={home_lc}" in command_lc
+        return profile_flag_value(command_lc) == profile_name.lower() or f"x19_home={home_lc}" in command_lc
     # Default profile: accept unless argv names another profile (any spelling the CLI pre-parser
     # accepts, ``--profile=ops`` included -- a substring test let that gateway pass as the default's)
-    # or a conflicting explicit HERMES_HOME= (its absence is not disqualifying -- HERMES_HOME usually
+    # or a conflicting explicit X19_HOME= (its absence is not disqualifying -- X19_HOME usually
     # arrives via the env).
     if profile_flag_value(command_lc) is not None:
         return False
-    return not ("hermes_home=" in command_lc and f"hermes_home={home_lc}" not in command_lc)
+    return not ("x19_home=" in command_lc and f"x19_home={home_lc}" not in command_lc)
 
 
 def _record_matches_live_gateway_pid(
@@ -446,21 +446,21 @@ def _build_pid_record() -> dict:
         "start_time": _get_process_start_time(os.getpid()),
         # Scoped locks are machine-global; the owner's home lets a cross-profile
         # --replace place its takeover marker where the target will read it.
-        "hermes_home": str(_canonical_hermes_home(_get_process_hermes_home())),
+        "x19_home": str(_canonical_x19_home(_get_process_x19_home())),
     }
 
 
 def _get_code_identity_fields() -> dict[str, Any]:
     """Code identity of THIS process for ``gateway_state.json`` (restart picked up new code?).
-    Lazy import keeps ``gateway.status`` free of ``hermes_cli`` at import time. Never raises.
+    Lazy import keeps ``gateway.status`` free of ``x19_cli`` at import time. Never raises.
 
     A gateway keeps serving the module versions it imported at startup, so stamping the identity into
-    ``gateway_state.json`` lets `hermes update` (and the dashboard) prove whether a running gateway actually
+    ``gateway_state.json`` lets `x19 update` (and the dashboard) prove whether a running gateway actually
     picked up new code after the restart phase — instead of assuming it did (#88654, #69754). Never raises;
     degrades to absent fields.
     """
     try:
-        from hermes_cli.build_info import get_code_identity
+        from x19_cli.build_info import get_code_identity
         identity = get_code_identity()
         return {"code_sha": identity.get("sha"), "code_version": identity.get("version")}
     except Exception:
@@ -468,12 +468,12 @@ def _get_code_identity_fields() -> dict[str, Any]:
 
 
 def _pid_record_belongs_to_current_profile(record: Optional[dict[str, Any]]) -> bool:
-    """True when the record's ``hermes_home`` matches the current process (legacy records: True);
-    another HERMES_HOME's record must be ignored or the default gateway assumes its identity."""
+    """True when the record's ``x19_home`` matches the current process (legacy records: True);
+    another X19_HOME's record must be ignored or the default gateway assumes its identity."""
     if not isinstance(record, dict):
         return False
-    record_home = record.get("hermes_home")
-    return not record_home or _same_hermes_home(record_home, _get_process_hermes_home())
+    record_home = record.get("x19_home")
+    return not record_home or _same_x19_home(record_home, _get_process_x19_home())
 
 
 def _build_runtime_status_record() -> dict[str, Any]:
@@ -961,20 +961,20 @@ def multiplexer_liveness_for_profile(profile_dir: Path) -> Optional[tuple[int, d
     ``profile_dir``; None for the default home itself, an unserved profile, or no live multiplexer.
 
     A served profile owns no ``gateway.pid``/``gateway_state.json`` (#97120), so every PID-file rung of the
-    dashboard ladder reports it stopped while ``hermes -p X status`` says running — the two must agree.
+    dashboard ladder reports it stopped while ``x19 -p X status`` says running — the two must agree.
     """
     name = _profile_name_for_home(Path(profile_dir))
     if not name:
         return None
-    from hermes_cli.gateway import named_profile_served_by_running_multiplexer
-    from hermes_cli.gateway_multiplex_served import live_default_gateway_pid
-    from hermes_constants import get_default_hermes_root
+    from x19_cli.gateway import named_profile_served_by_running_multiplexer
+    from x19_cli.gateway_multiplex_served import live_default_gateway_pid
+    from x19_constants import get_default_x19_root
     if not named_profile_served_by_running_multiplexer(name):
         return None
     pid = live_default_gateway_pid()
     if pid is None:
         return None
-    return pid, read_runtime_status(get_default_hermes_root() / "gateway_state.json") or {}
+    return pid, read_runtime_status(get_default_x19_root() / "gateway_state.json") or {}
 
 
 def shared_listener_mirror_platforms(runtime: Optional[dict[str, Any]], profile: str) -> dict[str, Any]:
@@ -1078,11 +1078,11 @@ def resolve_gateway_liveness(
             running=True, pid=runtime_pid, source="runtime_status", health_body=health_body
         )
     # (4) A named profile served by the live default multiplexer: no identity files of its own, but
-    # the multiplexer IS its gateway (mirrors `hermes -p X status` / `gateway list`). Unscoped, the
+    # the multiplexer IS its gateway (mirrors `x19 -p X status` / `gateway list`). Unscoped, the
     # question is about the process's OWN home — which is a named profile inside a pooled
-    # `hermes --profile X serve` (the Desktop's per-profile backend answers its REST without
+    # `x19 --profile X serve` (the Desktop's per-profile backend answers its REST without
     # `?profile=`), so it takes the same rung instead of reporting the served profile stopped.
-    own_home = profile_dir if scoped else _get_process_hermes_home()
+    own_home = profile_dir if scoped else _get_process_x19_home()
     served = guarded(multiplexer_liveness_for_profile, own_home)
     if served is not None:
         mux_pid, mux_runtime = served
@@ -1109,7 +1109,7 @@ def get_runtime_status_running_pid(
     pid = _live_pid_from_record(payload)
     if pid is None:
         return None
-    # Active-profile context: the record's hermes_home must match this process so a stale record
+    # Active-profile context: the record's x19_home must match this process so a stale record
     # cannot lend another profile's identity.
     if expected_home is None and not _pid_record_belongs_to_current_profile(payload):
         return None
@@ -1188,8 +1188,8 @@ def acquire_scoped_lock(
         "metadata": metadata or {}, "updated_at": _utc_now_iso(),
     }
     # Profile label for cross-profile conflict diagnostics ("token already in use (PID 559)" alone
-    # does not say WHICH profile). Omitted when not inferable; readers fall back to hermes_home.
-    profile = _profile_label_for_home(_get_process_hermes_home())
+    # does not say WHICH profile). Omitted when not inferable; readers fall back to x19_home.
+    profile = _profile_label_for_home(_get_process_x19_home())
     if profile:
         record["profile"] = profile
     existing = _read_json_file(lock_path)
@@ -1263,21 +1263,21 @@ def release_all_scoped_locks(
 # exits 0. Unlinked once consumed, so a stale one can grief at most one future shutdown on
 # the same PID, within _TAKEOVER_MARKER_TTL_S.
 # When a new gateway starts with ``--replace``, it SIGTERMs the existing gateway so it can take over the bot
-# token. ``hermes.service`` + ``hermes- gateway.service``). See #5646.
+# token. ``x19.service`` + ``x19- gateway.service``). See #5646.
 _TAKEOVER_MARKER_FILENAME = ".gateway-takeover.json"
 _TAKEOVER_MARKER_TTL_S = 60  # Marker older than this is treated as stale
 _PLANNED_STOP_MARKER_FILENAME = ".gateway-planned-stop.json"
 _PLANNED_STOP_MARKER_TTL_S = 60
 
 
-def _get_takeover_marker_path(hermes_home: Optional[Path] = None) -> Path:
-    """Takeover marker path; ``hermes_home`` is given only for a verified cross-home handoff."""
-    home = _canonical_hermes_home(hermes_home or _get_process_hermes_home())
+def _get_takeover_marker_path(x19_home: Optional[Path] = None) -> Path:
+    """Takeover marker path; ``x19_home`` is given only for a verified cross-home handoff."""
+    home = _canonical_x19_home(x19_home or _get_process_x19_home())
     return home / _TAKEOVER_MARKER_FILENAME
 
 
 def _get_planned_stop_marker_path() -> Path:
-    return _get_process_hermes_home() / _PLANNED_STOP_MARKER_FILENAME
+    return _get_process_x19_home() / _PLANNED_STOP_MARKER_FILENAME
 
 
 def _marker_is_stale(written_at: str, ttl_s: int) -> bool:
@@ -1306,7 +1306,7 @@ def _pid_marker_names_self(target_pid: int, target_start_time: Any) -> bool:
     times known -> must match; either unknown -> PID equality decides (bounded by the marker TTL):
     ``_get_process_start_time`` is None without /proc (macOS, native Windows -- where the
     planned-stop watcher matters most) and requiring a match there would misclassify a legitimate
-    ``hermes gateway stop`` as an unexpected exit revived by the service manager."""
+    ``x19 gateway stop`` as an unexpected exit revived by the service manager."""
     if target_pid != os.getpid():
         return False
     our_start_time = _get_process_start_time(target_pid)
@@ -1319,17 +1319,17 @@ def _consume_pid_marker_for_self(path: Path, *, ttl_s: int) -> bool:
         return False
     record, target_pid, target_start_time = parsed
     # Cross-profile guard: new markers name the verified TARGET home, which permits a deliberate
-    # cross-HERMES_HOME --replace while ignoring a marker accidentally written into another
+    # cross-X19_HOME --replace while ignoring a marker accidentally written into another
     # profile's directory. Legacy markers have no target field: keep the same-replacer-home rule.
     # See #29092.
-    our_home = _get_process_hermes_home()
-    target_home = record.get("target_hermes_home")
+    our_home = _get_process_x19_home()
+    target_home = record.get("target_x19_home")
     if target_home is not None:
-        if not isinstance(target_home, str) or not _same_hermes_home(target_home, our_home):
+        if not isinstance(target_home, str) or not _same_x19_home(target_home, our_home):
             return False
     else:
-        replacer_home = record.get("replacer_hermes_home")
-        if replacer_home is not None and not _same_hermes_home(replacer_home, our_home):
+        replacer_home = record.get("replacer_x19_home")
+        if replacer_home is not None and not _same_x19_home(replacer_home, our_home):
             return False
     matches = _pid_marker_names_self(target_pid, target_start_time)
     _unlink_quietly(path)
@@ -1344,13 +1344,13 @@ def write_takeover_marker(
     passes ``target_home`` + validated ``target_start_time`` so the marker lands in the target's
     home; such callers must fail closed on False (the target's supervisor could revive it)."""
     try:
-        marker_home = _canonical_hermes_home(target_home or _get_process_hermes_home())
+        marker_home = _canonical_x19_home(target_home or _get_process_x19_home())
         if target_start_time is _UNSET:
             target_start_time = _get_process_start_time(target_pid)
         return _write_marker(_get_takeover_marker_path(marker_home), {
             "target_pid": target_pid, "target_start_time": target_start_time,
-            "target_hermes_home": str(marker_home), "replacer_pid": os.getpid(),
-            "replacer_hermes_home": str(_canonical_hermes_home(_get_process_hermes_home())),
+            "target_x19_home": str(marker_home), "replacer_pid": os.getpid(),
+            "replacer_x19_home": str(_canonical_x19_home(_get_process_x19_home())),
             "written_at": _utc_now_iso(),
         })
     except OSError:
@@ -1384,7 +1384,7 @@ def _validated_scoped_lock_gateway_owner(record: dict[str, Any]) -> Optional[tup
         return None
     owner_pid = _pid_from_record(record)
     owner_start_time = record.get("start_time")
-    raw_home = record.get("hermes_home")
+    raw_home = record.get("x19_home")
     if (
         owner_pid is None or owner_pid <= 0 or owner_pid == os.getpid()
         or not isinstance(owner_start_time, int) or isinstance(owner_start_time, bool)
@@ -1392,7 +1392,7 @@ def _validated_scoped_lock_gateway_owner(record: dict[str, Any]) -> Optional[tup
         or not Path(raw_home).expanduser().is_absolute()
     ):
         return None
-    target_home = _canonical_hermes_home(raw_home)
+    target_home = _canonical_x19_home(raw_home)
     if _scoped_lock_owner_state(owner_pid, owner_start_time) != "same":
         return None
     live_cmdline = _read_process_cmdline(owner_pid)
@@ -1400,13 +1400,13 @@ def _validated_scoped_lock_gateway_owner(record: dict[str, Any]) -> Optional[tup
         return None
     # The target home's own PID record must corroborate the claim.
     pid_record = _read_json_file(target_home / "gateway.pid") or {}
-    pid_record_home = pid_record.get("hermes_home")
+    pid_record_home = pid_record.get("x19_home")
     if (
         not _record_looks_like_gateway(pid_record)
         or _pid_from_record(pid_record) != owner_pid
         or pid_record.get("start_time") != owner_start_time
         or not isinstance(pid_record_home, str)
-        or not _same_hermes_home(pid_record_home, target_home)
+        or not _same_x19_home(pid_record_home, target_home)
     ):
         return None
     return owner_pid, owner_start_time, target_home
@@ -1702,23 +1702,3 @@ def get_running_pid_cached(
     return pid
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def clear_planned_stop_marker() -> None:
-    """Remove the planned-stop marker unconditionally."""
-    try:
-        _get_planned_stop_marker_path().unlink(missing_ok=True)
-    except OSError:
-        pass
-
-def is_gateway_running(
-    pid_path: Optional[Path] = None,
-    *,
-    cleanup_stale: bool = True,
-) -> bool:
-    """Check if the gateway daemon is currently running."""
-    return get_running_pid(pid_path, cleanup_stale=cleanup_stale) is not None
-# ---- END PLUGIN-COMPAT ----

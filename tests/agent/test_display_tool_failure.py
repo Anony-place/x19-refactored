@@ -30,7 +30,7 @@ class TestTrimError:
         assert trimmed.endswith("...")
 
     def test_file_not_found_path_collapsed_to_filename(self):
-        long_path = "File not found: /home/teknium/.hermes/hermes-agent/very/deep/path/foo.py"
+        long_path = "File not found: /home/teknium/.x19/x19/very/deep/path/foo.py"
         assert _trim_error(long_path) == "File not found: foo.py"
 
 
@@ -63,13 +63,13 @@ class TestDetectToolFailureTerminal:
         result = json.dumps({
             "output": "", "exit_code": -1, "status": "degraded",
             "reason": "Docker daemon is not reachable at unix:///var/run/docker.sock",
-            "retry_hint": "Start Docker, or run `hermes setup terminal` to switch to Local, then retry",
+            "retry_hint": "Start Docker, or run `x19 setup terminal` to switch to Local, then retry",
             "error": "Terminal backend degraded: Docker daemon is not reachable at unix:///var/run/docker.sock",
         })
         is_failure, suffix = _detect_tool_failure("terminal", result)
         assert is_failure is True
         assert "unix:///var/run/docker.sock" in suffix
-        assert "hermes setup terminal" in suffix
+        assert "x19 setup terminal" in suffix
         assert "Terminal backend degraded:" not in suffix
 
     def test_nonzero_dict_result_is_a_failure(self):

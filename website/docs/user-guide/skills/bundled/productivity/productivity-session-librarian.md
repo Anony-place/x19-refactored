@@ -17,7 +17,7 @@ Organize sessions by prompt: find, rename, archive, prune.
 | Source | Bundled (installed by default) |
 | Path | `skills/productivity/session-librarian` |
 | Version | `1.0.0` |
-| Author | Hermes Agent + Teknium |
+| Author | X19 + Teknium |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Sessions`, `Organization`, `Cleanup`, `Library`, `Productivity` |
@@ -26,7 +26,7 @@ Organize sessions by prompt: find, rename, archive, prune.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Session Librarian
@@ -54,11 +54,11 @@ always shows the plan before touching anything.
 | Task | Surface |
 |---|---|
 | Find sessions by topic, read content, summarize decisions | `session_search` tool (FTS5 over the message store) |
-| List/filter by metadata (age, source, cost, tokens, workspace) | `hermes sessions list` / `stats` via terminal |
-| Rename | `hermes sessions rename <session_id> <title...>` |
-| Bulk soft-hide (reversible) | `hermes sessions archive <filters>` |
-| Delete (destructive) | `hermes sessions delete` / `hermes sessions prune <filters>` |
-| Export before deleting anything valuable | `hermes sessions export --session-id <id> --format md` |
+| List/filter by metadata (age, source, cost, tokens, workspace) | `x19 sessions list` / `stats` via terminal |
+| Rename | `x19 sessions rename <session_id> <title...>` |
+| Bulk soft-hide (reversible) | `x19 sessions archive <filters>` |
+| Delete (destructive) | `x19 sessions delete` / `x19 sessions prune <filters>` |
+| Export before deleting anything valuable | `x19 sessions export --session-id <id> --format md` |
 | Continue work in a new place | `/branch` (fork current session) or start a fresh session and cite the summary |
 
 ## Procedure
@@ -66,7 +66,7 @@ always shows the plan before touching anything.
 ① **Discover.** Use `session_search(query=..., limit=5-10)` with topic
 keywords; vary phrasing (feature name, symptom, project name). For metadata
 sweeps ("sessions older than 60 days from telegram"), use
-`hermes sessions list --source telegram --limit 50` instead.
+`x19 sessions list --source telegram --limit 50` instead.
 
 ② **Summarize per session.** The discovery result's `bookend_start` (goal),
 match window, and `bookend_end` (resolution) usually suffice — only dump a
@@ -85,7 +85,7 @@ explicitly dictated can be done directly.
 - Always run destructive commands with `--dry-run` first and show the output,
   then re-run with `--yes` after confirmation.
 - Before deleting anything with meaningful content, offer
-  `hermes sessions export --format md` as a backup.
+  `x19 sessions export --format md` as a backup.
 
 ⑤ **Report.** Renames applied, sessions archived (count + how to undo:
 archived sessions remain in the DB and are listed with `--include-archived`),
@@ -117,6 +117,6 @@ later via `session_search`.
 
 ## Verification
 
-After a cleanup pass, re-run the discovery query and `hermes sessions list`
+After a cleanup pass, re-run the discovery query and `x19 sessions list`
 to confirm the library reflects the plan (keepers present with new titles,
 archived ones gone from the default listing).

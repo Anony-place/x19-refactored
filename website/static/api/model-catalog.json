@@ -2,14 +2,14 @@
   "version": 1,
   "updated_at": "2026-09-16T16:50:25Z",
   "metadata": {
-    "source": "hermes-agent repo",
-    "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog"
+    "source": "x19 repo",
+    "docs": "https://anony-place.github.io/x19-refactored/docs/reference/model-catalog"
   },
   "providers": {
     "openrouter": {
       "metadata": {
         "display_name": "OpenRouter",
-        "note": "Descriptions drive picker badges. Live /api/v1/models filters curated ids by tool-calling support and free pricing. The entry labeled \"default\": true is the model Hermes silently lands on when the user never picked one."
+        "note": "Descriptions drive picker badges. Live /api/v1/models filters curated ids by tool-calling support and free pricing. The entry labeled \"default\": true is the model X19 silently lands on when the user never picked one."
       },
       "models": [
         {
@@ -254,7 +254,7 @@
     "nous": {
       "metadata": {
         "display_name": "Nous Portal",
-        "note": "The entry labeled \"default\": true is the model Hermes silently lands on when the user never picked one."
+        "note": "The entry labeled \"default\": true is the model X19 silently lands on when the user never picked one."
       },
       "models": [
         {

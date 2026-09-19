@@ -1408,7 +1408,7 @@ class TestBearerTokenRoutesToConverse:
     def _resolve(self, monkeypatch, *, bearer: bool):
         import os
 
-        from hermes_cli import runtime_provider as rp
+        from x19_cli import runtime_provider as rp
 
         if bearer:
             monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "test-bearer-token-123")

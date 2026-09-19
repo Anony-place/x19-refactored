@@ -1,10 +1,10 @@
-"""Regression tests: profile HERMES_HOME override in ephemeral agent threads (#50233).
+"""Regression tests: profile X19_HOME override in ephemeral agent threads (#50233).
 
 Why: normal prompt turns bind ``session['profile_home']`` via
-``set_hermes_home_override`` before ``run_conversation`` so the turn runs against
+``set_x19_home_override`` before ``run_conversation`` so the turn runs against
 the correct profile home. The two ephemeral RPC paths — ``prompt.background`` and
 ``preview.restart`` — spawn a fresh ``AIAgent`` on a NEW thread, and the
-``HERMES_HOME`` ContextVar set on the session-create thread does NOT propagate to
+``X19_HOME`` ContextVar set on the session-create thread does NOT propagate to
 those threads. Without an explicit re-bind, a background/preview-restart turn under
 a non-default profile would run against the wrong home. This module locks in:
 
@@ -27,7 +27,7 @@ import pytest
 from tui_gateway import server as srv
 
 
-PROFILE_HOME = "/home/user/.hermes/profiles/work"
+PROFILE_HOME = "/home/user/.x19/profiles/work"
 
 
 class _InlineThread:
@@ -65,8 +65,8 @@ def override_calls():
     agent_instance.run_conversation.return_value = {"final_response": "done"}
 
     with patch("tui_gateway.server.threading.Thread", _InlineThread), \
-        patch("tui_gateway.server.set_hermes_home_override", return_value="TOK") as m_set, \
-        patch("tui_gateway.server.reset_hermes_home_override") as m_reset, \
+        patch("tui_gateway.server.set_x19_home_override", return_value="TOK") as m_set, \
+        patch("tui_gateway.server.reset_x19_home_override") as m_reset, \
         patch("tui_gateway.server._background_agent_kwargs", return_value={}), \
         patch("tui_gateway.server._ephemeral_preview_agent_kwargs", return_value={}), \
         patch("tui_gateway.server._preview_restart_callbacks", return_value={}), \

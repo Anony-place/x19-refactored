@@ -25,7 +25,7 @@ from cron.jobs import (
     save_jobs,
     save_job_output,
     trigger_job,
-    _hermes_now,
+    _x19_now,
     ONESHOT_GRACE_SECONDS,
 )
 
@@ -38,7 +38,7 @@ def cron_store(tmp_path, monkeypatch):
     monkeypatch.setattr("cron.jobs.CRON_DIR", tmp_path / "cron")
     monkeypatch.setattr("cron.jobs.JOBS_FILE", tmp_path / "cron" / "jobs.json")
     monkeypatch.setattr("cron.jobs.OUTPUT_DIR", tmp_path / "cron" / "output")
-    monkeypatch.setattr("cron.jobs._hermes_now", lambda: FIXED_NOW)
+    monkeypatch.setattr("cron.jobs._x19_now", lambda: FIXED_NOW)
     return tmp_path
 
 

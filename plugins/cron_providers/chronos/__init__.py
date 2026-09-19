@@ -21,7 +21,7 @@ logger = logging.getLogger("cron.chronos")
 def _cfg(*keys: str, default: Any = "") -> Any:
     """Read a cron.chronos.* config value (no network)."""
     try:
-        from hermes_cli.config import cfg_get, load_config
+        from x19_cli.config import cfg_get, load_config
         return cfg_get(load_config(), *keys, default=default)
     except Exception:
         return default
@@ -47,7 +47,7 @@ class ChronosCronScheduler(CronScheduler):
             return False
         # Stored-token presence only (no refresh); refresh-aware token resolved at provision time.
         try:
-            from hermes_cli.auth import get_provider_auth_state
+            from x19_cli.auth import get_provider_auth_state
             return bool((get_provider_auth_state("nous") or {}).get("access_token"))
         except Exception:
             return False
@@ -160,9 +160,3 @@ def register(ctx) -> None:
     ctx.register_cron_scheduler(ChronosCronScheduler())
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Optional  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

@@ -18,4 +18,4 @@ The runner serves only loopback port 18120 and cleans up its browser and Vite
 server. Its Vite cache is private. Set `TASK_SCROLL_OUTPUT` to retain the JSON
 geometry and screenshots in a chosen directory. Otherwise these are retained in
 the printed test run's temporary directory. In shared campaigns wrap the command
-with the campaign's `flock tests.lock`, and isolate `HOME` and `HERMES_HOME`.
+with the campaign's `flock tests.lock`, and isolate `HOME` and `X19_HOME`.

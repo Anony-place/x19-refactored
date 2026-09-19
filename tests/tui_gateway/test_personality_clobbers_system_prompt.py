@@ -23,7 +23,7 @@ Contract tested here:
    text in `agent.system_prompt`.
 
 This test drives the REAL `_write_config_key` / `_save_cfg` against a temp
-HERMES_HOME config.yaml (no mocks of the persistence layer), so the captured
+X19_HOME config.yaml (no mocks of the persistence layer), so the captured
 config file is genuine proof of the write.
 """
 
@@ -105,9 +105,9 @@ def _run(home: str, session_id: str = ""):
 
 def test_personality_selection_preserves_manual_system_prompt(tmp_path, monkeypatch):
     """Selecting a personality must NOT overwrite the manual agent.system_prompt."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     # Force the server module to pick up the temp home for config reads/writes.
-    monkeypatch.setattr(server, "_hermes_home", Path(tmp_path))
+    monkeypatch.setattr(server, "_x19_home", Path(tmp_path))
     monkeypatch.setattr(server, "_cfg_path", None)
     monkeypatch.setattr(server, "_cfg_cache", None)
     _seed_config(str(tmp_path))
@@ -133,8 +133,8 @@ def test_switching_personality_leaves_no_stale_text(tmp_path, monkeypatch):
     should have been left untouched (the personality overlay belongs in the
     in-session ephemeral prompt, not the durable global system prompt).
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr(server, "_hermes_home", Path(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    monkeypatch.setattr(server, "_x19_home", Path(tmp_path))
     monkeypatch.setattr(server, "_cfg_path", None)
     monkeypatch.setattr(server, "_cfg_cache", None)
     _seed_config(str(tmp_path))

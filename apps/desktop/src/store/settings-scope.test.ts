@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ProfileInfo } from '@/types/hermes'
+import type { ProfileInfo } from '@/types/x19'
 
 // Keep store/profile's side-effecting imports inert — same seam as
 // store/profile.test.ts.
@@ -11,7 +11,7 @@ vi.mock('@/store/gateway', () => ({
   ensureGatewayForProfile: vi.fn(async () => undefined),
   openGatewayForProfile: vi.fn(async () => undefined)
 }))
-vi.mock('@/hermes', () => ({
+vi.mock('@/x19', () => ({
   getProfiles: vi.fn(async () => ({ profiles: [] })),
   setApiRequestProfile: vi.fn()
 }))

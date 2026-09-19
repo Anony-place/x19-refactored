@@ -98,7 +98,7 @@ cache break — keep it the only one. Full detail:
   compression — resolves through `agent/auxiliary_client.py::_resolve_auto_route`; each task can pin
   its own `provider/model/base_url/reasoning_effort` under `auxiliary:` in config.yaml.
 - Fallback models and credential pools are resolution-chain code: E2E them with real imports
-  against a temp `HERMES_HOME`, not mocks (root rubric).
+  against a temp `X19_HOME`, not mocks (root rubric).
 
 ## Memory, context engines, curator
 

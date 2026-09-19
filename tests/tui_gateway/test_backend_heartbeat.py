@@ -10,7 +10,7 @@ refreshes it periodically.  This file verifies:
   existing orphan-sweep wiring pattern).
 * Failure to start the refresher is swallowed so a malformed DB
   never breaks gateway startup.
-* ``HERMES_GATEWAY_HEARTBEAT_REFRESH_S=0`` disables the refresher.
+* ``X19_GATEWAY_HEARTBEAT_REFRESH_S=0`` disables the refresher.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ import os
 
 import pytest
 
-from hermes_state import SessionDB
-from hermes_cli import model_switch_providers
+from x19_state import SessionDB
+from x19_cli import model_switch_providers
 
 
 IDLE_S = 6 * 3600
@@ -134,7 +134,7 @@ class TestEntryAndWsWiring:
         monkeypatch.setattr(entry, "write_json", lambda _payload: True)
         monkeypatch.setattr(entry.sys, "stdin", io.StringIO(""))
 
-        import hermes_cli.model_switch as ms
+        import x19_cli.model_switch as ms
         monkeypatch.setattr(model_switch_providers, "prewarm_picker_cache_async", lambda: None)
 
         entry.main()

@@ -243,7 +243,7 @@ async def test_in_chat_restart_skips_home_shutdown_even_with_active_session():
     assert len(adapter.sent_calls) == 1
     chat_id, message, metadata = adapter.sent_calls[0]
     assert chat_id == source.chat_id
-    assert "Hermes is restarting" in message
+    assert "X19 is restarting" in message
     assert metadata["telegram_reply_to_message_id"] == "restart-command"
 
 
@@ -337,7 +337,7 @@ async def test_signal_initiated_shutdown_persists_running_not_stopped(tmp_path, 
     """Unexpected SIGTERM (container restart / OOM / kill) must persist
     gateway_state=running — NOT stopped, and NOT leave the mid-shutdown
     'draining' marker — so container_boot auto-starts on next boot (#42675)."""
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     runner, adapter = make_restart_runner()
     adapter.disconnect = AsyncMock()
     runner._signal_initiated_shutdown = True  # set by handler on unmarked signal

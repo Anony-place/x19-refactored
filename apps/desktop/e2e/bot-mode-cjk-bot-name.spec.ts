@@ -59,7 +59,7 @@ test('a CJK bot name enables Create Bot and lands as the display title over an A
   await shot(page, 'cjk-bot-row')
 
   // … while the backend profile id is the deterministic ASCII form.
-  const profileDir = path.join(fixture!.sandbox.hermesHome, 'profiles', 'u5c0f-u52a9-u624b')
+  const profileDir = path.join(fixture!.sandbox.x19Home, 'profiles', 'u5c0f-u52a9-u624b')
   await expect.poll(() => fs.existsSync(profileDir), { timeout: 30_000 }).toBe(true)
   const profileYaml = fs.readFileSync(path.join(profileDir, 'profile.yaml'), 'utf8')
   expect(profileYaml).toContain('小助手')

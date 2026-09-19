@@ -775,12 +775,12 @@ class LineAdapter(BasePlatformAdapter):
 
     async def _handle_media(self, request) -> Any:
         """Serve a registered local file for LINE's media URLs. Defence-in-depth: the resolved
-        path is rechecked against allowed roots (tempdir, ``/tmp``→``/private/tmp`` on macOS, HERMES_HOME).
+        path is rechecked against allowed roots (tempdir, ``/tmp``→``/private/tmp`` on macOS, X19_HOME).
 
         Defence-in-depth: even though ``_register_media`` is only called from trusted internal code, we
         recheck the resolved path against an allowed-roots set before serving. Sources allowed:
         ``tempfile.gettempdir()``, ``/tmp`` (which resolves to ``/private/tmp`` on macOS), and
-        ``HERMES_HOME``. PR #8398.
+        ``X19_HOME``. PR #8398.
         """
         from aiohttp import web
         token = request.match_info["token"]
@@ -794,12 +794,12 @@ class LineAdapter(BasePlatformAdapter):
         if not path.is_file():
             return web.Response(status=404, text="not found")
         try:
-            from hermes_constants import get_hermes_home
-            hermes_home = Path(get_hermes_home()).resolve()
+            from x19_constants import get_x19_home
+            x19_home = Path(get_x19_home()).resolve()
         except Exception:
-            hermes_home = Path.home().joinpath(".hermes").resolve()
+            x19_home = Path.home().joinpath(".x19").resolve()
         resolved = path.resolve()
-        if not any(resolved.is_relative_to(r) for r in (Path(tempfile.gettempdir()).resolve(), Path("/tmp").resolve(), hermes_home)):
+        if not any(resolved.is_relative_to(r) for r in (Path(tempfile.gettempdir()).resolve(), Path("/tmp").resolve(), x19_home)):
             logger.warning("LINE: refusing to serve outside allowed roots: %s", resolved)
             return web.Response(status=403, text="forbidden")
         content_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
@@ -907,16 +907,15 @@ def validate_config(config) -> bool:
 
 
 def is_connected(config) -> bool:
-    """Surface in ``hermes status`` even before the adapter is instantiated."""
+    """Surface in ``x19 status`` even before the adapter is instantiated."""
     return validate_config(config)
 
 
 def _env_enablement() -> Optional[Dict[str, Any]]:
-    """``env_enablement_fn``: seed ``PlatformConfig.extra`` from env-only setups so ``hermes status`` sees them."""
+    """``env_enablement_fn``: seed ``PlatformConfig.extra`` from env-only setups so ``x19 status`` sees them."""
     if not _env_credentials_present():
         return None
     return _seed_extra_from_env(_ENV_SEED_KEYS, home_env="LINE_HOME_CHANNEL")
-
 
 
 async def _standalone_send(
@@ -948,10 +947,10 @@ _SETUP_PROMPTS = (  # (env var, prompt, masked)
 
 
 def interactive_setup() -> None:
-    """``hermes setup line`` wizard (writes ``~/.hermes/.env``); CLI helpers are lazy-imported."""
-    from hermes_cli.config import get_env_value, save_env_value
-    from hermes_cli.cli_output import print_header, print_info, prompt
-    from hermes_cli.setup_platforms import declines_reconfigure
+    """``x19 setup line`` wizard (writes ``~/.x19/.env``); CLI helpers are lazy-imported."""
+    from x19_cli.config import get_env_value, save_env_value
+    from x19_cli.cli_output import print_header, print_info, prompt
+    from x19_cli.setup_platforms import declines_reconfigure
     print_header("LINE Messaging API")
     if declines_reconfigure("LINE", "Reconfigure LINE?", "LINE_CHANNEL_ACCESS_TOKEN"):
         return
@@ -985,9 +984,3 @@ def register(ctx) -> None:
             "to fetch the reply via a fresh free token."))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from dataclasses import field  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

@@ -17,7 +17,7 @@ from plugins.image_gen._common import (
     StaticImageGenProvider, catalog_rows, collect_source_images, error_factory,
     load_image_gen_config, materialize_image, post_json)
 from tools.xai_http import (
-    build_xai_storage_options, hermes_xai_user_agent, maybe_mark_xai_storage_notice_seen,
+    build_xai_storage_options, x19_xai_user_agent, maybe_mark_xai_storage_notice_seen,
     read_xai_imagine_storage_config, resolve_xai_http_credentials, xai_storage_notice_text)
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ def _fetch_live_models(creds: Optional[Dict[str, Any]] = None) -> Dict[str, Dict
         raise RuntimeError("no xAI credentials")
     response = requests.get(
         f"{_base_url(creds)}/image-generation-models",
-        headers={"Authorization": f"Bearer {api_key}", "User-Agent": hermes_xai_user_agent()},
+        headers={"Authorization": f"Bearer {api_key}", "User-Agent": x19_xai_user_agent()},
         timeout=_LIVE_TIMEOUT)
     response.raise_for_status()
     payload = response.json()
@@ -93,9 +93,9 @@ def _fetch_live_models(creds: Optional[Dict[str, Any]] = None) -> Dict[str, Dict
 def _live_models() -> Dict[str, Dict[str, Any]]:
     """Cached live catalog (``{}`` when unreachable)."""
     global _LIVE_CACHE
-    from hermes_constants import get_hermes_home_override
+    from x19_constants import get_x19_home_override
 
-    if get_hermes_home_override() is None:
+    if get_x19_home_override() is None:
         if _LIVE_CACHE is not None and time.monotonic() - _LIVE_CACHE[1] < _LIVE_CACHE_TTL:
             return _LIVE_CACHE[0]
         _LIVE_CACHE = (_fetch_live_models_or_empty(None), time.monotonic())
@@ -254,7 +254,7 @@ class XAIImageGenProvider(StaticImageGenProvider):
         provider_name = str(creds.get("provider") or "xai").strip() or "xai"
         if not api_key:
             return error_factory(provider_name, aspect_ratio)(
-                "No xAI credentials found. Configure xAI OAuth in `hermes model` or set XAI_API_KEY.",
+                "No xAI credentials found. Configure xAI OAuth in `x19 model` or set XAI_API_KEY.",
                 "missing_api_key")
 
         model_id, meta = _resolve_model(kwargs.get("model"))
@@ -269,11 +269,11 @@ class XAIImageGenProvider(StaticImageGenProvider):
 
         headers = {
             "Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-            "User-Agent": hermes_xai_user_agent(),
+            "User-Agent": x19_xai_user_agent(),
         }
         base_url = _base_url(creds)
         storage_options = build_xai_storage_options(
-            "image_gen", filename_prefix="hermes-xai-image", extension="png")
+            "image_gen", filename_prefix="x19-xai-image", extension="png")
         storage_notice = maybe_mark_xai_storage_notice_seen("image_gen")
         storage_cfg = read_xai_imagine_storage_config("image_gen")
 
@@ -345,27 +345,3 @@ def register(ctx: Any) -> None:
     ctx.register_image_gen_provider(XAIImageGenProvider())
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'ImageGenProvider': ('agent.image_gen_provider', 'ImageGenProvider'),
-    'error_response': ('agent.image_gen_provider', 'error_response'),
-    'normalize_reference_images': ('agent.image_gen_provider', 'normalize_reference_images'),
-    'save_b64_image': ('agent.image_gen_provider', 'save_b64_image'),
-    'save_url_image': ('agent.image_gen_provider', 'save_url_image'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

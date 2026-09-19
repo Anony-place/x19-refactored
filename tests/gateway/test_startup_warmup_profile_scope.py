@@ -24,9 +24,9 @@ PORTAL = "https://portal.staging-nousresearch.com"
 def multiplex_home(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    (home / ".env").write_text(f"HERMES_PORTAL_BASE_URL={PORTAL}\n")
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_PORTAL_BASE_URL", raising=False)
+    (home / ".env").write_text(f"X19_PORTAL_BASE_URL={PORTAL}\n")
+    monkeypatch.setenv("X19_HOME", str(home))
+    monkeypatch.delenv("X19_PORTAL_BASE_URL", raising=False)
     monkeypatch.delenv("NOUS_PORTAL_BASE_URL", raising=False)
     secret_scope.set_multiplex_active(True)
     try:
@@ -37,7 +37,7 @@ def multiplex_home(tmp_path, monkeypatch):
 
 def _probe(seen: dict):
     def probe() -> int:
-        from hermes_cli.auth_nous import _nous_portal_env_override
+        from x19_cli.auth_nous import _nous_portal_env_override
         seen["scope_installed"] = secret_scope._SECRET_SCOPE.get() is not None
         seen["portal_override"] = _nous_portal_env_override()
         return 1
@@ -58,9 +58,9 @@ def _run_warmup(monkeypatch, *, multiplex: bool) -> dict:
     async def drive() -> None:
         await _Runner(multiplex=multiplex)._warm_turn_prerequisites()
         # Same task as the warm-up (asyncio.run copies the context, so the caller's view proves nothing).
-        from hermes_constants import get_hermes_home_override
+        from x19_constants import get_x19_home_override
         seen["scope_after"] = secret_scope._SECRET_SCOPE.get()
-        seen["home_override_after"] = get_hermes_home_override()
+        seen["home_override_after"] = get_x19_home_override()
 
     asyncio.run(drive())
     return seen
@@ -81,8 +81,8 @@ def test_single_profile_warmup_keeps_environ_semantics(tmp_path, monkeypatch):
     """Multiplex off: no scope is installed and the process env stays the override source."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_PORTAL_BASE_URL", PORTAL)
+    monkeypatch.setenv("X19_HOME", str(home))
+    monkeypatch.setenv("X19_PORTAL_BASE_URL", PORTAL)
     secret_scope.set_multiplex_active(False)
     seen = _run_warmup(monkeypatch, multiplex=False)
     assert seen["scope_installed"] is False

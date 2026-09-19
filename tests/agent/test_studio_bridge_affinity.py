@@ -1,7 +1,7 @@
-"""Affinity contract on Hermes Studio's group-chat bridge shape (#96811).
+"""Affinity contract on X19 Studio's group-chat bridge shape (#96811).
 
 Studio's group chat is the reproduction reported on #96811, and it reaches
-Hermes as a LIBRARY rather than through the gateway: its Python bridge
+X19 as a LIBRARY rather than through the gateway: its Python bridge
 constructs ``AIAgent(...)`` directly with a fresh physical ``session_id`` for
 every reply, and only then persists the session row.
 
@@ -41,7 +41,7 @@ from uuid import uuid4
 import pytest
 
 from agent.prompt_cache_scope import resolve_prompt_cache_scope
-from hermes_state import SessionDB
+from x19_state import SessionDB
 from run_agent import AIAgent
 
 # The bridge stamps its rows with the ``source`` carried by ``bridge.chat``
@@ -49,7 +49,7 @@ from run_agent import AIAgent
 # not match.  Keeping them different here is deliberate — the scope has to
 # resolve under the source the row actually landed on.
 BRIDGE_ROW_SOURCE = "api_server"
-BRIDGE_PLATFORM = "hermes_bridge"
+BRIDGE_PLATFORM = "x19_bridge"
 
 ROOM = "room-7c1f"
 PROFILE = "default"
@@ -135,7 +135,7 @@ class TestStudioBridgeAffinity:
     def test_the_undeclared_bridge_shape_rekeys_every_reply(self, db):
         """The reproduction, stated as a permanent negative control.
 
-        Hermes must not infer the conversation from the id's syntax — that is
+        X19 must not infer the conversation from the id's syntax — that is
         #79017's collision class — so a bridge that declares nothing keeps a
         per-reply scope by design.  This stays green before and after the host
         adopts the key, and it is why the adoption has to happen host-side.
@@ -178,7 +178,7 @@ class TestStudioBridgeAffinity:
 
         A new conversation in the room mints a new seed, and the seed is part
         of the declared key, so the next conversation starts on a cold bucket
-        without Hermes having to observe a reset of its own.
+        without X19 having to observe a reset of its own.
         """
         first = _reply_scope(db, declared_key=_bridge_session_key(seed="0"))
         second = _reply_scope(db, declared_key=_bridge_session_key(seed="1"))

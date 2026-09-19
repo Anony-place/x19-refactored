@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCP (Model Context Protocol) client: connects to the ``mcp_servers`` configured in
-~/.hermes/config.yaml (stdio, Streamable HTTP or SSE), discovers their tools and registers them
-into the hermes tool registry. The ``mcp`` package is optional (no-op without it).
+~/.x19/config.yaml (stdio, Streamable HTTP or SSE), discovers their tools and registers them
+into the x19 tool registry. The ``mcp`` package is optional (no-op without it).
 
 One background event loop (``_mcp_loop``) in a daemon thread runs each server as a long-lived
 Task (``MCPServerTask``) so the transport's anyio cancel scopes enter and exit in one Task; every
@@ -54,7 +54,7 @@ async def _preflight_stdio_command(server_name: str, command: str, args: list) -
         raise ValueError(f"MCP server '{server_name}': {malware_error}")
 
     # npx resolves the package and then FORKS, staying resident as the real server's parent for
-    # nothing (~48 MB per server, measured). Hermes already supervises the child (shared death
+    # nothing (~48 MB per server, measured). X19 already supervises the child (shared death
     # supervisor), so a cached package is spawned directly; a cache miss leaves npx untouched.
     if os.path.basename(command).lower().startswith("npx"):
         cached = _npx_cached_bin(args)
@@ -382,7 +382,7 @@ class MCPServerTask(MCPServerRunMixin, MCPServerTransportMixin, MCPServerHealthM
         self._rpc_lock = asyncio.Lock()
         self._pending_refresh_tasks: set[asyncio.Task] = set()
         # contextvars snapshot inside session.call_tool(): the SDK runs elicitation/create on a
-        # task that does not inherit HERMES_SESSION_PLATFORM, so the callback replays this.
+        # task that does not inherit X19_SESSION_PLATFORM, so the callback replays this.
         self._pending_call_context: Optional[contextvars.Context] = None
         self._lifecycle_started_at = self._last_tool_call_at = time.monotonic()
         self._idle_timeout_seconds = self._max_lifetime_seconds = self._recycled_reason = None
@@ -644,7 +644,7 @@ def _update_death_supervisor(verb: str, pgids) -> None:
 def _mcp_registry_scope() -> Optional[str]:
     """Registry scope for MCP registrations: a profile overlay when this process serves profiles,
     else None. Under ``gateway.multiplex_profiles`` every turn runs scoped; a process that serves a
-    routed profile through the HERMES_HOME override (dashboard/desktop backend, per-profile cron
+    routed profile through the X19_HOME override (dashboard/desktop backend, per-profile cron
     ticker) is a multiplexer too, even with the flag off — keying its connections by the bare name
     would hand one profile's credentialed connection to every other served profile (#111151).
     Single-profile processes (no override, or an override naming their own home) keep bare names."""
@@ -681,59 +681,3 @@ _MCP_DISCOVERY_LOCK_PATH: Optional[str] = None  # resolved lazily
 _MCP_DISCOVERY_LOCK_MAX_RETRIES, _MCP_DISCOVERY_LOCK_RETRY_DELAY_S = 240, 0.5
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Coroutine  # noqa: F401,E402
-from types import SimpleNamespace  # noqa: F401,E402
-from typing import Tuple  # noqa: F401,E402
-from contextlib import asynccontextmanager  # noqa: F401,E402
-import concurrent.futures  # noqa: F401,E402
-from datetime import datetime  # noqa: F401,E402
-import errno  # noqa: F401,E402
-import fnmatch  # noqa: F401,E402
-import json  # noqa: F401,E402
-import math  # noqa: F401,E402
-import random  # noqa: F401,E402
-import re  # noqa: F401,E402
-import shutil  # noqa: F401,E402
-from urllib.parse import urlparse  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'InvalidMcpUrlError': ('tools.mcp_tool_errors', 'InvalidMcpUrlError'),
-    'MCP_TOOL_NAME_PREFIX': ('tools.mcp_tool_schema', 'MCP_TOOL_NAME_PREFIX'),
-    'NonMcpEndpointError': ('tools.mcp_tool_errors', 'NonMcpEndpointError'),
-    'discover_mcp_tools': ('tools.mcp_tool_discovery', 'discover_mcp_tools'),
-    'get_mcp_status': ('tools.mcp_tool_discovery', 'get_mcp_status'),
-    'get_registered_mcp_server_names': ('tools.mcp_tool_discovery', 'get_registered_mcp_server_names'),
-    'has_registered_mcp_tools': ('tools.mcp_tool_discovery', 'has_registered_mcp_tools'),
-    'is_mcp_tool_parallel_safe': ('tools.mcp_tool_discovery', 'is_mcp_tool_parallel_safe'),
-    'matches_name_filter': ('tools.mcp_tool_schema', 'matches_name_filter'),
-    'mcp_prefixed_tool_name': ('tools.mcp_tool_schema', 'mcp_prefixed_tool_name'),
-    'persist_agent_tool_names': ('tools.mcp_tool_agent', 'persist_agent_tool_names'),
-    'probe_mcp_server_tools': ('tools.mcp_tool_discovery', 'probe_mcp_server_tools'),
-    'reconnect_mcp_server': ('tools.mcp_tool_loop', 'reconnect_mcp_server'),
-    'refresh_agent_mcp_tools': ('tools.mcp_tool_agent', 'refresh_agent_mcp_tools'),
-    'register_mcp_servers': ('tools.mcp_tool_discovery', 'register_mcp_servers'),
-    'reprobe_tool_availability': ('tools.mcp_tool_agent', 'reprobe_tool_availability'),
-    'restore_agent_tool_prefix': ('tools.mcp_tool_agent', 'restore_agent_tool_prefix'),
-    'sanitize_mcp_name_component': ('tools.mcp_tool_schema', 'sanitize_mcp_name_component'),
-    'shutdown_mcp_servers': ('tools.mcp_tool_lifecycle', 'shutdown_mcp_servers'),
-    'strip_unicode_tags': ('tools.ansi_strip', 'strip_unicode_tags'),
-    'tool_error': ('tools.registry', 'tool_error'),
-}
-
-_plugin_compat_prev_getattr = __getattr__
-
-
-def __getattr__(name):  # PEP 562 — chained onto the module's own __getattr__
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        return _plugin_compat_prev_getattr(name)
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

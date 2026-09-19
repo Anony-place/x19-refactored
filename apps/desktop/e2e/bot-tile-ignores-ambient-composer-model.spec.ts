@@ -62,8 +62,8 @@ async function openUntil(action: () => Promise<void>, expected: () => Promise<vo
   }
 }
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<void> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -80,9 +80,9 @@ async function seedBot(hermesHome: string, mockUrl: string, name: string): Promi
 test.beforeAll(async () => {
   const mock = await startMockServer({ extraModels: [AMBIENT_PICK] })
   const sandbox = createSandbox('bot-tile-model')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  await seedBot(sandbox.hermesHome, mock.url, 'alpha')
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  await seedBot(sandbox.x19Home, mock.url, 'alpha')
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
 

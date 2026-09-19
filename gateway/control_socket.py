@@ -1,8 +1,8 @@
 """Gateway control socket — the gateway-owned local coordination surface: a local-only socket answering
 versioned JSON verbs (``identify``, ``status``). A connectable socket with a well-formed ``identify``
 answer IS liveness — no PID-reuse heuristics. Never a TCP port: filesystem/pipe ACLs are the auth
-boundary. POSIX: ``$HERMES_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
-file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
+boundary. POSIX: ``$X19_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
+file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\x19-gateway-<hash>``.
 Wire contract: ONE request per connection — one JSON line in, one out, then the server closes.
 Consumers PREFER the socket and fall back to the state-file/scan layer when it doesn't answer.
 """
@@ -41,8 +41,8 @@ def _home_hash(home: Path) -> str:
 
 
 def windows_pipe_name(home: Path) -> str:
-    """Per-HERMES_HOME named pipe path (Windows transport)."""
-    return rf"\\.\pipe\hermes-gateway-{_home_hash(home)}"
+    """Per-X19_HOME named pipe path (Windows transport)."""
+    return rf"\\.\pipe\x19-gateway-{_home_hash(home)}"
 
 
 def _fits_sun_path(path: Path) -> bool:
@@ -53,7 +53,7 @@ def _fallback_socket_path(home: Path) -> Path:
     """Short temp-dir path for homes whose direct socket path exceeds sun_path: ``tempfile.gettempdir()``
     then ``/tmp`` (POSIX); if nothing fits the tempdir candidate is returned anyway — bind fails
     non-fatally and consumers use the scan layer."""
-    name = f"hermes-gw-{_home_hash(home)}.sock"
+    name = f"x19-gw-{_home_hash(home)}.sock"
     candidates = [Path(tempfile.gettempdir()) / name] + ([] if _IS_WINDOWS else [Path("/tmp") / name])
     return next((c for c in candidates if _fits_sun_path(c)), candidates[0])
 
@@ -87,10 +87,10 @@ def _detect_supervisor() -> str:
     env = os.environ
     if env.get("INVOCATION_ID"):
         return "systemd"
-    if sys.platform == "darwin" and (env.get("XPC_SERVICE_NAME", "").startswith("ai.hermes")
+    if sys.platform == "darwin" and (env.get("XPC_SERVICE_NAME", "").startswith("ai.x19")
                                      or env.get("LAUNCHD_SOCKET")):
         return "launchd"
-    if env.get("HERMES_DESKTOP_MANAGED"):
+    if env.get("X19_DESKTOP_MANAGED"):
         return "desktop"
     return "external" if "--external-supervisor" in sys.argv else "manual"
 
@@ -101,8 +101,8 @@ def build_identify_payload() -> dict[str, Any]:
     record = _build_pid_record()
     payload: dict[str, Any] = {
         "protocol": CONTROL_PROTOCOL_VERSION,
-        **{k: record.get(k) for k in ("kind", "pid", "start_time", "hermes_home")},
-        "profile": _profile_label_for_home(record.get("hermes_home") or ""),
+        **{k: record.get(k) for k in ("kind", "pid", "start_time", "x19_home")},
+        "profile": _profile_label_for_home(record.get("x19_home") or ""),
         "supervisor": _detect_supervisor(), **_get_code_identity_fields()}
     with contextlib.suppress(Exception):
         # served_profiles (multiplex mode) is stamped into runtime status by the runner.
@@ -127,8 +127,8 @@ class GatewayControlServer:
     def __init__(self, home: Optional[Path] = None, *,
                  verb_handlers: Optional[dict[str, Callable[..., dict[str, Any]]]] = None) -> None:
         if home is None:
-            from gateway.status import _get_process_hermes_home
-            home = _get_process_hermes_home()
+            from gateway.status import _get_process_x19_home
+            home = _get_process_x19_home()
         self._home = Path(home)
         self._server: Optional[asyncio.AbstractServer] = None
         self._pipe_server: Any = None  # Windows proactor pipe server

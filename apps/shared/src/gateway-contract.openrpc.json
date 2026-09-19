@@ -1,7 +1,7 @@
 {
   "openrpc": "1.3.2",
   "info": {
-    "title": "Hermes TUI/Desktop gateway",
+    "title": "X19 TUI/Desktop gateway",
     "version": "1",
     "description": "Generated from tui_gateway/contracts by scripts/gen_gateway_contracts.py."
   },
@@ -350,7 +350,7 @@
     },
     {
       "name": "cli.exec",
-      "summary": "Run ``hermes <argv>`` non-interactively and capture its output; ``blocked`` explains a refusal.",
+      "summary": "Run ``x19 <argv>`` non-interactively and capture its output; ``blocked`` explains a refusal.",
       "params": [
         {
           "name": "params",
@@ -1627,6 +1627,240 @@
       }
     },
     {
+      "name": "org.agents",
+      "summary": "Registered roster overlaid with the delegation engine's live subagents.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ProfileParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgAgentsResult"
+        }
+      }
+    },
+    {
+      "name": "org.approvals",
+      "summary": "Decisions waiting on the operator.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ProfileParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgApprovalsResult"
+        }
+      }
+    },
+    {
+      "name": "org.approve",
+      "summary": "Approve a gated task or a delivered output. Never auto-resolved.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgApprovalDecisionParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgApprovalResult"
+        }
+      }
+    },
+    {
+      "name": "org.audit",
+      "summary": "Boss Audit Mode: the executive report over the task graph, queue, failures and spend.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgAuditParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgAuditResult"
+        }
+      }
+    },
+    {
+      "name": "org.deny",
+      "summary": "Deny a request; the task fails with the operator's reason recorded.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgApprovalDecisionParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgApprovalResult"
+        }
+      }
+    },
+    {
+      "name": "org.events",
+      "summary": "Recent organization events; pass since_seq to poll incrementally.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgEventsParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgEventsResult"
+        }
+      }
+    },
+    {
+      "name": "org.pause",
+      "summary": "Pause the run; ``enforced`` reports whether the spawn gate really closed.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgControlParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgPauseResult"
+        }
+      }
+    },
+    {
+      "name": "org.resume",
+      "summary": "Resume the run and reopen the spawn gate.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgControlParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgPauseResult"
+        }
+      }
+    },
+    {
+      "name": "org.roles",
+      "summary": "The live role catalog \u2014 dynamic, so the client never hardcodes the org chart.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ProfileParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgRolesResult"
+        }
+      }
+    },
+    {
+      "name": "org.status",
+      "summary": "Run, phase, counts, roster, blocked/failed/ready tasks and derived next actions.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgStatusParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgStatusResult"
+        }
+      }
+    },
+    {
+      "name": "org.stop",
+      "summary": "Stop the run and cancel everything not already terminal; returns the cancelled ids.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgControlParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgStopResult"
+        }
+      }
+    },
+    {
+      "name": "org.task.control",
+      "summary": "Retry, cancel, resolve a blocker on, or review one task \u2014 the real transition.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgTaskControlParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgTaskControlResult"
+        }
+      }
+    },
+    {
+      "name": "org.tasks",
+      "summary": "The task graph: tree, counts and the ready/blocked/failed/review slices.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OrgTasksParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OrgTasksResult"
+        }
+      }
+    },
+    {
       "name": "paste.collapse",
       "summary": "Spill a large paste to a file and hand back the inline placeholder.",
       "params": [
@@ -2528,7 +2762,7 @@
     },
     {
       "name": "reload.env",
-      "summary": "Re-read ~/.hermes/.env (CLI /reload parity); built agents keep their pool until /new.",
+      "summary": "Re-read ~/.x19/.env (CLI /reload parity); built agents keep their pool until /new.",
       "params": [
         {
           "name": "params",
@@ -3032,7 +3266,7 @@
     },
     {
       "name": "session.save",
-      "summary": "Export the transcript to ~/.hermes/sessions/saved (classic /save).",
+      "summary": "Export the transcript to ~/.x19/sessions/saved (classic /save).",
       "params": [
         {
           "name": "params",
@@ -7995,7 +8229,7 @@
       },
       "ConfigProviderRef": {
         "additionalProperties": true,
-        "description": "``hermes_cli/models.py::list_available_providers`` row.",
+        "description": "``x19_cli/models.py::list_available_providers`` row.",
         "properties": {
           "id": {
             "title": "Id",
@@ -10504,7 +10738,7 @@
       },
       "ForeignSessionRow": {
         "additionalProperties": false,
-        "description": "``hermes_cli/foreign_sessions_browser.py::list_foreign_sessions`` \u2014 ``id`` is an opaque\nhandle, never a path.",
+        "description": "``x19_cli/foreign_sessions_browser.py::list_foreign_sessions`` \u2014 ``id`` is an opaque\nhandle, never a path.",
         "properties": {
           "id": {
             "title": "Id",
@@ -10722,7 +10956,7 @@
       },
       "GoalContractSnapshot": {
         "additionalProperties": false,
-        "description": "``hermes_cli/goals.py::GoalContract.to_dict``.",
+        "description": "``x19_cli/goals.py::GoalContract.to_dict``.",
         "properties": {
           "outcome": {
             "default": "",
@@ -15048,7 +15282,7 @@
       },
       "MessageReaction": {
         "additionalProperties": true,
-        "description": "One persisted reaction row (``hermes_state_messages.set_message_reaction``); ``seen`` is\nstamped once announced.",
+        "description": "One persisted reaction row (``x19_state_messages.set_message_reaction``); ``seen`` is\nstamped once announced.",
         "properties": {
           "emoji": {
             "title": "Emoji",
@@ -15252,7 +15486,7 @@
       },
       "ModelCapabilities": {
         "additionalProperties": false,
-        "description": "``hermes_cli/inventory.py::_apply_capabilities``.",
+        "description": "``x19_cli/inventory.py::_apply_capabilities``.",
         "properties": {
           "fast": {
             "title": "Fast",
@@ -15334,7 +15568,7 @@
       },
       "ModelOptionProvider": {
         "additionalProperties": true,
-        "description": "One ``hermes_cli/inventory.py::build_models_payload`` provider row (the union of every field\nthe builder sets; ``pricing_pending`` / ``free_tier_pending`` mark the cached-only path).",
+        "description": "One ``x19_cli/inventory.py::build_models_payload`` provider row (the union of every field\nthe builder sets; ``pricing_pending`` / ``free_tier_pending`` mark the cached-only path).",
         "properties": {
           "slug": {
             "title": "Slug",
@@ -15665,7 +15899,7 @@
       },
       "ModelPricing": {
         "additionalProperties": false,
-        "description": "``hermes_cli/inventory.py::_apply_pricing`` \u2014 formatted $/Mtok strings (``\"\"`` unknown,\n``\"free\"``); the sale fields are Nous Portal-only.",
+        "description": "``x19_cli/inventory.py::_apply_pricing`` \u2014 formatted $/Mtok strings (``\"\"`` unknown,\n``\"free\"``); the sale fields are Nous Portal-only.",
         "properties": {
           "input": {
             "title": "Input",
@@ -15980,6 +16214,13 @@
         "title": "OnboardingAnswers",
         "type": "object"
       },
+      "OpenModel": {
+        "additionalProperties": true,
+        "description": "A result/payload row whose known fields are typed but which the producer may extend\n(the closed set is owned elsewhere: x19_state rows, provider inventories).",
+        "properties": {},
+        "title": "OpenModel",
+        "type": "object"
+      },
       "OpenRequestEntry": {
         "additionalProperties": false,
         "description": "One unanswered server\u2192client request (``server_requests.Request.snapshot``); the reconnecting\nclient re-delivers it to its request handlers.",
@@ -16022,6 +16263,793 @@
           }
         },
         "title": "OptionalProjectResult",
+        "type": "object"
+      },
+      "OrgAgent": {
+        "additionalProperties": true,
+        "description": "One roster slot overlaid with live delegation state (``x19.org.registry``).",
+        "properties": {
+          "role_id": {
+            "title": "Role Id",
+            "type": "string"
+          },
+          "state": {
+            "default": "",
+            "title": "State",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kind"
+          }
+        },
+        "required": [
+          "role_id"
+        ],
+        "title": "OrgAgent",
+        "type": "object"
+      },
+      "OrgAgentsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/OrgAgent"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "live_subagents": {
+            "items": {
+              "$ref": "#/components/schemas/OpenModel"
+            },
+            "title": "Live Subagents",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/OpenModel"
+          }
+        },
+        "required": [
+          "agents",
+          "live_subagents",
+          "counts"
+        ],
+        "title": "OrgAgentsResult",
+        "type": "object"
+      },
+      "OrgApproval": {
+        "additionalProperties": true,
+        "description": "A decision waiting on the operator, or one already made.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Task Id"
+          },
+          "question": {
+            "default": "",
+            "title": "Question",
+            "type": "string"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Decision"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OrgApproval",
+        "type": "object"
+      },
+      "OrgApprovalDecisionParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Decided By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "required": [
+          "approval_id"
+        ],
+        "title": "OrgApprovalDecisionParams",
+        "type": "object"
+      },
+      "OrgApprovalResult": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "$ref": "#/components/schemas/OrgApproval"
+          }
+        },
+        "required": [
+          "approval"
+        ],
+        "title": "OrgApprovalResult",
+        "type": "object"
+      },
+      "OrgApprovalsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "pending": {
+            "items": {
+              "$ref": "#/components/schemas/OrgApproval"
+            },
+            "title": "Pending",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pending"
+        ],
+        "title": "OrgApprovalsResult",
+        "type": "object"
+      },
+      "OrgAuditParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "include_outputs": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Include Outputs"
+          }
+        },
+        "title": "OrgAuditParams",
+        "type": "object"
+      },
+      "OrgAuditResult": {
+        "additionalProperties": false,
+        "properties": {
+          "audit": {
+            "$ref": "#/components/schemas/OpenModel"
+          },
+          "render": {
+            "default": "",
+            "title": "Render",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audit"
+        ],
+        "title": "OrgAuditResult",
+        "type": "object"
+      },
+      "OrgControlParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "title": "OrgControlParams",
+        "type": "object"
+      },
+      "OrgEvent": {
+        "additionalProperties": true,
+        "description": "One event from the append-only stream (``x19.org.events.OrgEvent.to_dict``).",
+        "properties": {
+          "seq": {
+            "default": 0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "type": {
+            "default": "",
+            "title": "Type",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "title": "OrgEvent",
+        "type": "object"
+      },
+      "OrgEventsParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "since_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Since Seq"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Task Id"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Agent Id"
+          }
+        },
+        "title": "OrgEventsParams",
+        "type": "object"
+      },
+      "OrgEventsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/OrgEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "last_seq": {
+            "default": 0,
+            "title": "Last Seq",
+            "type": "integer"
+          },
+          "counts_by_type": {
+            "$ref": "#/components/schemas/OpenModel"
+          }
+        },
+        "required": [
+          "events",
+          "counts_by_type"
+        ],
+        "title": "OrgEventsResult",
+        "type": "object"
+      },
+      "OrgPauseResult": {
+        "additionalProperties": false,
+        "properties": {
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "enforced": {
+            "default": false,
+            "title": "Enforced",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paused"
+        ],
+        "title": "OrgPauseResult",
+        "type": "object"
+      },
+      "OrgRole": {
+        "additionalProperties": true,
+        "description": "One registered role (``x19.org.roles.RoleSpec.to_dict``).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "manager_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manager Id"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OrgRole",
+        "type": "object"
+      },
+      "OrgRolesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/OrgRole"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles"
+        ],
+        "title": "OrgRolesResult",
+        "type": "object"
+      },
+      "OrgStatusParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "event_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Event Limit"
+          }
+        },
+        "title": "OrgStatusParams",
+        "type": "object"
+      },
+      "OrgStatusResult": {
+        "additionalProperties": false,
+        "description": "``status`` is the full projection; ``render`` is the same content as dense text.",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OpenModel"
+          },
+          "render": {
+            "default": "",
+            "title": "Render",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "OrgStatusResult",
+        "type": "object"
+      },
+      "OrgStopResult": {
+        "additionalProperties": false,
+        "properties": {
+          "stopped": {
+            "title": "Stopped",
+            "type": "boolean"
+          },
+          "cancelled": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cancelled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "stopped",
+          "cancelled"
+        ],
+        "title": "OrgStopResult",
+        "type": "object"
+      },
+      "OrgTask": {
+        "additionalProperties": true,
+        "description": "One task-graph node (``x19.org.tasks.Task.to_dict``).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "objective": {
+            "default": "",
+            "title": "Objective",
+            "type": "string"
+          },
+          "role_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role Id"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Id"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OrgTask",
+        "type": "object"
+      },
+      "OrgTaskControlParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "approved": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Approved"
+          }
+        },
+        "required": [
+          "task_id",
+          "op"
+        ],
+        "title": "OrgTaskControlParams",
+        "type": "object"
+      },
+      "OrgTaskControlResult": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/OpenModel"
+          }
+        },
+        "required": [
+          "op",
+          "task_id",
+          "result"
+        ],
+        "title": "OrgTaskControlResult",
+        "type": "object"
+      },
+      "OrgTasksParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          }
+        },
+        "title": "OrgTasksParams",
+        "type": "object"
+      },
+      "OrgTasksResult": {
+        "additionalProperties": false,
+        "properties": {
+          "stats": {
+            "$ref": "#/components/schemas/OpenModel"
+          },
+          "tree": {
+            "items": {
+              "$ref": "#/components/schemas/OpenModel"
+            },
+            "title": "Tree",
+            "type": "array"
+          },
+          "ready": {
+            "items": {
+              "$ref": "#/components/schemas/OpenModel"
+            },
+            "title": "Ready",
+            "type": "array"
+          },
+          "blocked": {
+            "items": {
+              "$ref": "#/components/schemas/OpenModel"
+            },
+            "title": "Blocked",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/OrgTask"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "in_review": {
+            "items": {
+              "$ref": "#/components/schemas/OrgTask"
+            },
+            "title": "In Review",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/OpenModel"
+          },
+          "filtered": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OrgTask"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Filtered"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Filter"
+          }
+        },
+        "required": [
+          "stats",
+          "tree",
+          "ready",
+          "blocked",
+          "failed",
+          "in_review",
+          "run"
+        ],
+        "title": "OrgTasksResult",
         "type": "object"
       },
       "PaneRevealPayload": {
@@ -18164,7 +19192,7 @@
       },
       "PluginsManageResult": {
         "additionalProperties": false,
-        "description": "``list`` \u2192 ``plugins`` + counts; ``toggle`` \u2192 ``ok``/``unchanged``/``name``/``plugin``;\n``install`` \u2192 ``hermes_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` \u2192\n``ok``/``unchanged``/``sha``.",
+        "description": "``list`` \u2192 ``plugins`` + counts; ``toggle`` \u2192 ``ok``/``unchanged``/``name``/``plugin``;\n``install`` \u2192 ``x19_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` \u2192\n``ok``/``unchanged``/``sha``.",
         "properties": {
           "plugins": {
             "anyOf": [
@@ -20365,7 +21393,7 @@
       },
       "ProjectFolder": {
         "additionalProperties": false,
-        "description": "``hermes_cli/projects_db.py::ProjectFolder.to_dict``.",
+        "description": "``x19_cli/projects_db.py::ProjectFolder.to_dict``.",
         "properties": {
           "path": {
             "title": "Path",
@@ -20467,7 +21495,7 @@
       },
       "ProjectInfo": {
         "additionalProperties": false,
-        "description": "``hermes_cli/projects_db.py::Project.to_dict`` \u2014 one stored project with its folders.",
+        "description": "``x19_cli/projects_db.py::Project.to_dict`` \u2014 one stored project with its folders.",
         "properties": {
           "id": {
             "title": "Id",
@@ -27343,7 +28371,7 @@
       },
       "SetupReadyPayload": {
         "additionalProperties": true,
-        "description": "``hermes_cli/free_tier_bootstrap.py::SetupRecord.as_payload``.",
+        "description": "``x19_cli/free_tier_bootstrap.py::SetupRecord.as_payload``.",
         "properties": {
           "provider_configured": {
             "title": "Provider Configured",
@@ -27759,7 +28787,7 @@
       },
       "SkillBrowseItem": {
         "additionalProperties": true,
-        "description": "``hermes_cli.skills_hub.browse_skills`` row.",
+        "description": "``x19_cli.skills_hub.browse_skills`` row.",
         "properties": {
           "name": {
             "default": "",
@@ -27861,7 +28889,7 @@
       },
       "SkillInspectInfo": {
         "additionalProperties": true,
-        "description": "``hermes_cli.skills_hub.inspect_skill``; ``{}`` when the identifier resolves nowhere.",
+        "description": "``x19_cli.skills_hub.inspect_skill``; ``{}`` when the identifier resolves nowhere.",
         "properties": {
           "name": {
             "anyOf": [
@@ -28205,7 +29233,7 @@
       },
       "SkinPayload": {
         "additionalProperties": true,
-        "description": "``tui_gateway/change_watcher.py::resolve_skin`` \u2014 the resolved active skin (``HermesSkin``).\n``{}`` when the skin engine failed to load. Colour maps are token \u2192 colour string.",
+        "description": "``tui_gateway/change_watcher.py::resolve_skin`` \u2014 the resolved active skin (``X19Skin``).\n``{}`` when the skin engine failed to load. Colour maps are token \u2192 colour string.",
         "properties": {
           "name": {
             "default": "",

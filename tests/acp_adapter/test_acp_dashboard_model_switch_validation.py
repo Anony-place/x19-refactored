@@ -15,11 +15,11 @@ import types
 
 import pytest
 
-from hermes_cli.model_switch import ModelSwitchResult
+from x19_cli.model_switch import ModelSwitchResult
 
 
 def _acp_agent():
-    from acp_adapter.server import HermesACPAgent
+    from acp_adapter.server import X19ACPAgent
     made: dict = {}
 
     class _SM:
@@ -30,7 +30,7 @@ def _acp_agent():
         def save_session(self, sid):
             pass
 
-    return HermesACPAgent(session_manager=_SM()), made
+    return X19ACPAgent(session_manager=_SM()), made
 
 
 def _state():
@@ -41,7 +41,7 @@ def _state():
 
 def test_acp_and_dashboard_reject_what_switch_model_rejects(monkeypatch):
     rejected = ModelSwitchResult(success=False, error_message="Unknown provider 'notaprovider'.")
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model", lambda **_kw: rejected)
+    monkeypatch.setattr("x19_cli.model_switch.switch_model", lambda **_kw: rejected)
 
     agent, made = _acp_agent()
     state = _state()
@@ -50,7 +50,7 @@ def test_acp_and_dashboard_reject_what_switch_model_rejects(monkeypatch):
     assert made == {} and state.model == "claude-sonnet-5"  # session untouched
 
     from fastapi import HTTPException
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from x19_cli.web_server_config import _apply_model_assignment_sync
     with pytest.raises(HTTPException) as exc:
         _apply_model_assignment_sync("main", "notaprovider", "whatever", "", "")
     assert exc.value.status_code == 400 and "Unknown provider" in exc.value.detail
@@ -63,7 +63,7 @@ def test_acp_explicit_provider_prefix_becomes_explicit_provider(monkeypatch):
         seen.update(kw)
         return ModelSwitchResult(success=True, new_model=kw["raw_input"], target_provider=kw["explicit_provider"])
 
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model", _switch)
+    monkeypatch.setattr("x19_cli.model_switch.switch_model", _switch)
     agent, made = _acp_agent()
     old, new_provider, model = agent._switch_model(_state(), "anthropic:claude-sonnet-5", keep_endpoint=True)
     assert (seen["explicit_provider"], seen["raw_input"]) == ("anthropic", "claude-sonnet-5")
@@ -83,7 +83,7 @@ def test_acp_set_session_model_runs_switch_model_off_the_event_loop(monkeypatch)
         seen["thread"] = threading.current_thread()
         return ModelSwitchResult(success=True, new_model=kw["raw_input"], target_provider="anthropic")
 
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model", _switch)
+    monkeypatch.setattr("x19_cli.model_switch.switch_model", _switch)
     agent, _made = _acp_agent()
     state = _state()
     agent.session_manager.get_session = lambda sid: state

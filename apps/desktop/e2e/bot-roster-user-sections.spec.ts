@@ -37,8 +37,8 @@ async function capture(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(dir, `${name}.png`) })
 }
 
-async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
-  const dir = path.join(hermesHome, 'profiles', name)
+async function seedBot(x19Home: string, mockUrl: string, name: string): Promise<void> {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -79,11 +79,11 @@ async function layout(page: Page): Promise<Array<[string, string[]]>> {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-sections')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
 
   for (const name of ['alpha', 'beta', 'gamma']) {
-    await seedBot(sandbox.hermesHome, mock.url, name)
+    await seedBot(sandbox.x19Home, mock.url, name)
   }
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
@@ -240,7 +240,7 @@ test('file bots into user sections by menu and drag; rename; delete returns them
     ])
 
   // Membership rides the bot's profile ui_meta, so it follows profile sync.
-  const alphaProfile = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha', 'profile.yaml')
+  const alphaProfile = path.join(fixture!.sandbox.x19Home, 'profiles', 'alpha', 'profile.yaml')
   await expect.poll(() => (fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : '')).toMatch(/sectionId:\s*sec-/)
 
   // Delete both sections: the roster is the plain list again.

@@ -25,7 +25,7 @@ def test_standalone_fallback_pool_keeps_profile_scope(tmp_path, monkeypatch):
         set_multiplex_active,
         set_secret_scope,
     )
-    from hermes_constants import get_hermes_home, set_hermes_home_override
+    from x19_constants import get_x19_home, set_x19_home_override
     import cron.scheduler as sched
     import tools.send_message_tool as smt
 
@@ -34,14 +34,14 @@ def test_standalone_fallback_pool_keeps_profile_scope(tmp_path, monkeypatch):
     for home in (default_home, sec_home):
         (home / "cron").mkdir(parents=True)
         (home / "config.yaml").write_text("platforms:\n  telegram:\n    enabled: true\n")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("X19_HOME", str(default_home))
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "DEFAULT-TOKEN")
     set_multiplex_active(True)
 
     seen = {}
 
     async def fake_send(platform, pconfig, chat_id, message, **kwargs):
-        seen["home"] = str(get_hermes_home())
+        seen["home"] = str(get_x19_home())
         seen["token"] = get_secret("TELEGRAM_BOT_TOKEN", None)
         return {"success": True, "message_id": "1"}
 
@@ -49,7 +49,7 @@ def test_standalone_fallback_pool_keeps_profile_scope(tmp_path, monkeypatch):
 
     async def _inside_running_loop():
         # Emulate the multiplex ticker's per-profile scope on the caller.
-        set_hermes_home_override(str(sec_home))
+        set_x19_home_override(str(sec_home))
         set_secret_scope({"TELEGRAM_BOT_TOKEN": "OPS-TOKEN"})
         return sched._deliver_result(job, "hello", adapters={}, loop=None)
 
@@ -66,7 +66,7 @@ def test_standalone_fallback_pool_keeps_profile_scope(tmp_path, monkeypatch):
 
 def test_multiplex_ticker_profile_gate_skips_rejected_profile(tmp_path):
     from cron.scheduler_provider import InProcessCronScheduler
-    from hermes_constants import get_hermes_home
+    from x19_constants import get_x19_home
 
     own_gateway = tmp_path / "own-gateway"
     orphan = tmp_path / "orphan"
@@ -77,7 +77,7 @@ def test_multiplex_ticker_profile_gate_skips_rejected_profile(tmp_path):
     ticked: list[str] = []
 
     def _tick(*args, **kwargs):
-        ticked.append(str(get_hermes_home()))
+        ticked.append(str(get_x19_home()))
         if len(ticked) >= 3:
             stop.set()
         return 0
@@ -110,17 +110,17 @@ def test_multiplex_ticker_profile_gate_skips_rejected_profile(tmp_path):
 @pytest.mark.parametrize("profile_count", [1, 2])
 def test_desktop_ticker_gates_on_profile_gateway_running(tmp_path, monkeypatch, profile_count):
     """Desktop yields to each live gateway, including a single-profile install."""
-    from hermes_cli import web_server
+    from x19_cli import web_server
 
     homes = [("default", tmp_path / "default"), ("ops", tmp_path / "ops")][:profile_count]
     running = {homes[-1][1]}
     monkeypatch.setattr(
-        "hermes_cli.profiles.profiles_to_serve", lambda multiplex=False: list(homes)
+        "x19_cli.profiles.profiles_to_serve", lambda multiplex=False: list(homes)
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._check_gateway_running", lambda home: home in running
+        "x19_cli.profiles._check_gateway_running", lambda home: home in running
     )
-    monkeypatch.setattr("hermes_cli.profiles._served_by_running_multiplexer", lambda name: False)
+    monkeypatch.setattr("x19_cli.profiles._served_by_running_multiplexer", lambda name: False)
     captured = {}
 
     class _Provider:
@@ -134,7 +134,7 @@ def test_desktop_ticker_gates_on_profile_gateway_running(tmp_path, monkeypatch, 
     monkeypatch.setattr(web_server, "resolve_cron_scheduler", lambda: _Provider(), raising=False)
     monkeypatch.setattr(sp, "resolve_cron_scheduler", lambda: _Provider())
     monkeypatch.setattr(sp, "InProcessCronScheduler", _Provider)
-    monkeypatch.setattr("hermes_logging.enable_profile_log_routing", lambda homes: None)
+    monkeypatch.setattr("x19_logging.enable_profile_log_routing", lambda homes: None)
 
     web_server._start_desktop_cron_ticker(threading.Event(), interval=0)
 

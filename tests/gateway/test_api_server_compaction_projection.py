@@ -19,7 +19,7 @@ from gateway.platforms.api_server import (
     APIServerAdapter,
     _is_compressed_summary_message,
 )
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 STANDALONE_SUMMARY = (
@@ -195,7 +195,7 @@ class TestMessagesEndpointProjection:
     @pytest.mark.asyncio
     async def test_suppressed_delegation_row_keeps_evidence_but_not_presentation(self, adapter, session_db, tmp_path, monkeypatch):
         from gateway.wake import persist_delegation_delivery
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         (tmp_path / "config.yaml").write_text("display: {suppress_warning_notifications: true}")
         sid = session_db.create_session("diagnostic-projection", "api_server")
         event = {"delegation_id": "early-failure", "task_failure_notice": True,

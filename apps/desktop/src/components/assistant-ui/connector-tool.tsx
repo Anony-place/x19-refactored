@@ -1,5 +1,5 @@
 import type { ToolCallMessagePartProps } from '@assistant-ui/react'
-import type { ConnectionTargetState } from '@hermes/shared'
+import type { ConnectionTargetState } from '@x19/shared'
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -193,7 +193,7 @@ export function ConnectorOffer({ owner, request }: ConnectorOfferProps) {
       const url = connectorAuthorizationUrl(minted?.connect_url)
 
       if (url) {
-        void window.hermesDesktop?.openExternal?.(url)
+        void window.x19Desktop?.openExternal?.(url)
       }
     } catch (error) {
       notifyError(error, copy.connectErrorFor(connectorTitle(target.name)))
@@ -243,8 +243,8 @@ export function ConnectorOffer({ owner, request }: ConnectorOfferProps) {
                   disabled: (reissuing.size > 0 && !busy) || (phase.verb === 'open' && target.connectUrl === null),
                   label: phase.verb === 'open' ? copy.connect : copy.retry,
                   onClick: () => {
-                    if (phase.verb === 'open' && target.connectUrl && window.hermesDesktop?.openExternal) {
-                      void window.hermesDesktop.openExternal(target.connectUrl)
+                    if (phase.verb === 'open' && target.connectUrl && window.x19Desktop?.openExternal) {
+                      void window.x19Desktop.openExternal(target.connectUrl)
                     }
 
                     if (phase.verb === 'reissue') {

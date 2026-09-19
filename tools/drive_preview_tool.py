@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interact with the in-app browser / preview pane in the Hermes desktop GUI (click, type, scroll).
+"""Interact with the in-app browser / preview pane in the X19 desktop GUI (click, type, scroll).
 
 Elements are addressed by legible refs from ``action="elements"`` (``btn-sign-in``); a ref survives
 re-renders and only a navigation retires it, so the renderer answers with a *delta* instead of
@@ -28,7 +28,7 @@ def drive_preview_tool(
     callback: Optional[Callable] = None) -> str:
     """Dispatch one interaction to the desktop renderer and return its outcome."""
     if callback is None:
-        return tool_error("drive_preview is only available in the Hermes desktop app.")
+        return tool_error("drive_preview is only available in the X19 desktop app.")
     verb = (action or "").strip().lower()
     if verb not in ACTIONS:
         return tool_error(f"action must be one of: {', '.join(ACTIONS)}.")
@@ -142,9 +142,3 @@ registry.register(
     emoji="🖱️")
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

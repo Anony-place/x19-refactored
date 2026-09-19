@@ -128,7 +128,7 @@ def test_generate_rejects_local_image_paths_before_spending(monkeypatch):
 
 
 def test_register_exposes_openrouter_in_the_video_gen_picker(monkeypatch):
-    from hermes_cli import plugins as plugin_loader, tools_config
+    from x19_cli import plugins as plugin_loader, tools_config
     from plugins.video_gen.openrouter import register
 
     class _Context:

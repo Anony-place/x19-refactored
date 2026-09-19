@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Build the Hermes Skills Index — a centralized JSON catalog of all skills.
+"""Build the X19 Skills Index — a centralized JSON catalog of all skills.
 
 This script crawls every skill source (skills.sh, GitHub taps, official,
 clawhub, lobehub) and writes a JSON index with resolved
 GitHub paths. The index is served as a static file on the docs site so that
-`hermes skills search/install` can use it without hitting the GitHub API.
+`x19 skills search/install` can use it without hitting the GitHub API.
 
 Usage:
     # Local (uses gh CLI or GITHUB_TOKEN for auth)
@@ -28,8 +28,8 @@ from datetime import datetime, timezone
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-# Ensure HERMES_HOME is set (needed by tools/skills_hub*.py imports)
-os.environ.setdefault("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
+# Ensure X19_HOME is set (needed by tools/skills_hub*.py imports)
+os.environ.setdefault("X19_HOME", os.path.join(os.path.expanduser("~"), ".x19"))
 
 from tools.skills_hub_clawhub import ClawHubSource
 from tools.skills_hub_github import GitHubAuth, GitHubSource
@@ -236,7 +236,7 @@ def batch_resolve_paths(skills: list, auth: GitHubAuth) -> list:
 
 
 def main():
-    print("Building Hermes Skills Index...", flush=True)
+    print("Building X19 Skills Index...", flush=True)
     overall_start = time.time()
 
     auth = GitHubAuth()

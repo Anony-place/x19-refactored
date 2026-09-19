@@ -1,6 +1,6 @@
 """Progressive tool disclosure ("tool search"): MCP/plugin tools and a curated set of
 event-triggered core tools are replaced in the model-visible array by three bridge tools —
-tool_search / tool_describe / tool_call. Invariants: core tools (``toolsets._HERMES_CORE_TOOLS``)
+tool_search / tool_describe / tool_call. Invariants: core tools (``toolsets._X19_CORE_TOOLS``)
 and session-gated GUI toolsets never defer unless named in ``defer``; ANY deferrable tool
 activates the bridge (the listing scales with budget, not activation); the catalog is
 stateless — rebuilt from the live tool-defs every assembly (a session-keyed one drifts and
@@ -98,9 +98,9 @@ def _safe_float(value: Any, fallback: float) -> float:
 
 
 def _config_from_loader(loader_name: str) -> ToolSearchConfig:
-    """Tool-search config via ``hermes_cli.config.<loader_name>`` (defaults on any failure)."""
+    """Tool-search config via ``x19_cli.config.<loader_name>`` (defaults on any failure)."""
     try:
-        import hermes_cli.config as _cfg_mod
+        import x19_cli.config as _cfg_mod
         tools_cfg = (getattr(_cfg_mod, loader_name)() or {}).get("tools")
         tools_cfg = tools_cfg if isinstance(tools_cfg, dict) else {}
         return ToolSearchConfig.from_raw(tools_cfg.get("tool_search"))
@@ -116,13 +116,13 @@ load_config_readonly = functools.partial(_config_from_loader, "load_config_reado
 def _core_tool_names() -> frozenset[str]:
     """Names that never defer by default (lazy: ``toolsets`` imports ``tools.registry``)."""
     try:
-        from toolsets import _HERMES_CORE_TOOLS
-        return frozenset(_HERMES_CORE_TOOLS)
+        from toolsets import _X19_CORE_TOOLS
+        return frozenset(_X19_CORE_TOOLS)
     except Exception:
         return frozenset()
 
 
-# Session-gated GUI toolsets: off ``_HERMES_CORE_TOOLS`` so non-GUI clients never pay
+# Session-gated GUI toolsets: off ``_X19_CORE_TOOLS`` so non-GUI clients never pay
 # their schema; once enabled they stay direct unless the deferral list names them.
 _DIRECT_SURFACE_TOOLSETS = frozenset({"desktop_ui", "project"})
 
@@ -578,46 +578,3 @@ __all__ = [
     "CONNECTOR_BATCH_SENTINEL", "is_connector_name"]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Literal  # noqa: F401,E402
-import copy  # noqa: F401,E402
-from dataclasses import field  # noqa: F401,E402
-import re  # noqa: F401,E402
-import snowballstemmer  # noqa: F401,E402
-import threading  # noqa: F401,E402
-
-def build_catalog_listing(
-    deferrable: List[Dict[str, Any]],
-    *,
-    max_tokens: int = 4000,
-) -> Optional[str]:
-    """Render a skills-style manifest of the deferred catalog.
-
-    One line per tool — ``name: short description`` — grouped under a
-    heading per source (MCP server / plugin toolset), exactly like the
-    bundled-skills listing in the system prompt:
-
-        github tools: (44)
-        - create_issue: Open a new issue in a GitHub repository.
-        - merge_pull_request: Merge an open pull request.
-        ...
-
-    Ordering is deterministic (groups and tools sorted by name) so the
-    rendered block is byte-stable across assemblies of the same catalog —
-    this keeps the request prefix cacheable across turns.
-
-    Token-budget fallbacks (cheap chars/4 estimate, same rule as the
-    activation gate):
-      1. full listing (names + short descriptions)
-      2. names-only listing, still grouped
-      3. server-level summary — one line per MCP server / plugin toolset
-         (name + tool count), so the model always knows WHICH domains are
-         reachable through the bridge even when per-tool names don't fit
-      4. ``None`` — only when the summary itself exceeds the budget
-    """
-    text, _form = build_catalog_listing_with_form(deferrable, max_tokens=max_tokens)
-    return text
-# ---- END PLUGIN-COMPAT ----

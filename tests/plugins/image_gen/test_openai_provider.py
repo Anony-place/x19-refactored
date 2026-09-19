@@ -30,8 +30,8 @@ def _fake_response(*, b64=None, url=None, revised_prompt=None):
 
 
 @pytest.fixture(autouse=True)
-def _tmp_hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+def _tmp_x19_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     yield tmp_path
 
 
@@ -109,11 +109,11 @@ class TestModelResolution:
 
 class TestSourceImageLoading:
     def test_load_image_bytes_blocks_credential_store(self, tmp_path, monkeypatch):
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        auth_json = hermes_home / "auth.json"
+        x19_home = tmp_path / ".x19"
+        x19_home.mkdir()
+        auth_json = x19_home / "auth.json"
         auth_json.write_text('{"api_key":"sk-secret"}', encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("X19_HOME", str(x19_home))
 
         with pytest.raises(ValueError, match="credential store"):
             openai_plugin._load_image_bytes(str(auth_json))
@@ -122,9 +122,9 @@ class TestSourceImageLoading:
     def test_load_image_bytes_allows_legit_local_image(self, tmp_path, monkeypatch):
         """Negative control: a legitimate local image path is NOT blocked and
         loads normally — proves the guard doesn't over-fire on everything."""
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        x19_home = tmp_path / ".x19"
+        x19_home.mkdir()
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         img = tmp_path / "pic.png"
         img.write_bytes(b"\x89PNG\r\n\x1a\nfake-image-bytes")
 

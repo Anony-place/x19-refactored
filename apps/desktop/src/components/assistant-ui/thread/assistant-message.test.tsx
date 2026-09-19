@@ -214,7 +214,7 @@ describe('ownership refusal recovery (#106217)', () => {
   it('explains the refusal in plain words and demotes the lease text to details', async () => {
     render(<Harness assistant={ownershipRefusalMessage()} />)
 
-    expect(await screen.findByText(/open in another Hermes window or terminal/)).toBeTruthy()
+    expect(await screen.findByText(/open in another X19 window or terminal/)).toBeTruthy()
     // The raw refusal ("live owner", "pid", "lease") is kept only inside the
     // collapsed Details disclosure, never as the headline.
     const raw = screen.getByText(/already has a live owner/)
@@ -293,7 +293,7 @@ describe('code-keyed error card copy and actions', () => {
 
     render(<Harness assistant={legacy} />)
 
-    expect(await screen.findByText("Hermes couldn't finish this reply")).toBeTruthy()
+    expect(await screen.findByText("X19 couldn't finish this reply")).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 })

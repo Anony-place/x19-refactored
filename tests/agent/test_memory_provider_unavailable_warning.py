@@ -1,8 +1,8 @@
-"""Regression tests for NousResearch/hermes-agent#2765.
+"""Regression tests for Anony-place/x19-refactored#2765.
 
 A memory provider configured via ``memory.provider`` but reporting
 ``is_available() == False`` (e.g. missing credentials, or a systemd/gateway
-service that didn't inherit ``~/.hermes/.env``) used to be dropped silently.
+service that didn't inherit ``~/.x19/.env``) used to be dropped silently.
 ``agent_init`` now emits a one-time, deduped warning instead.
 """
 
@@ -21,7 +21,7 @@ def test_warns_once_and_dedupes(caplog):
     assert len(warnings) == 1, "should warn exactly once per provider (gateway dedup)"
     msg = warnings[0].getMessage()
     assert "hindsight" in msg
-    assert "hermes memory status" in msg
+    assert "x19 memory status" in msg
     assert ".env" in msg  # surfaces the systemd/gateway root cause
 
 

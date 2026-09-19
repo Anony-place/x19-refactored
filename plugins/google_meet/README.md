@@ -1,6 +1,6 @@
 # google_meet plugin
 
-Let the hermes agent join a Google Meet call, transcribe it, optionally speak
+Let the x19 agent join a Google Meet call, transcribe it, optionally speak
 in it, and do the followup work afterwards.
 
 ## What ships
@@ -14,7 +14,7 @@ in it, and do the followup work afterwards.
 ## Architecture
 
 ```
-┌─ gateway (Linux box, where hermes runs) ────────────────────────────┐
+┌─ gateway (Linux box, where x19 runs) ────────────────────────────┐
 │                                                                      │
 │   agent → meet_join(url, mode='realtime', node='my-mac')             │
 │         │                                                            │
@@ -25,7 +25,7 @@ in it, and do the followup work afterwards.
                                    ▼
 ┌─ node host (user's Mac, signed-in Chrome lives here) ───────────────┐
 │                                                                      │
-│   NodeServer (from `hermes meet node run`)                           │
+│   NodeServer (from `x19 meet node run`)                           │
 │     │                                                                │
 │     ├─ start_bot → process_manager.start() → spawns meet_bot         │
 │     │                                                                │
@@ -49,50 +49,50 @@ Without v2: the "realtime" path is skipped; transcribe runs alone.
 | Path | Purpose |
 |---|---|
 | `plugin.yaml` | manifest |
-| `__init__.py` | `register(ctx)` — registers 5 tools + `on_session_end` hook + `hermes meet` CLI |
+| `__init__.py` | `register(ctx)` — registers 5 tools + `on_session_end` hook + `x19 meet` CLI |
 | `meet_bot.py` | Playwright bot subprocess (standalone, `python -m plugins.google_meet.meet_bot`) |
 | `process_manager.py` | local bot lifecycle + `enqueue_say` |
 | `tools.py` | agent-facing tools + node-routing helper |
-| `cli.py` | `hermes meet setup / auth / join / status / transcript / say / stop / node ...` |
+| `cli.py` | `x19 meet setup / auth / join / status / transcript / say / stop / node ...` |
 | `audio_bridge.py` | v2: PulseAudio null-sink (Linux) + BlackHole probe (macOS) |
 | `realtime/openai_client.py` | v2: `RealtimeSession` + `RealtimeSpeaker` (file-queue → OpenAI Realtime WS → PCM) |
 | `node/protocol.py` | v3: message envelope + validation |
-| `node/registry.py` | v3: `$HERMES_HOME/workspace/meetings/nodes.json` |
+| `node/registry.py` | v3: `$X19_HOME/workspace/meetings/nodes.json` |
 | `node/server.py` | v3: `NodeServer` (runs on host machine) |
 | `node/client.py` | v3: `NodeClient` (used by tool handlers + CLI on gateway) |
-| `node/cli.py` | v3: `hermes meet node {run,list,approve,remove,status,ping}` |
+| `node/cli.py` | v3: `x19 meet node {run,list,approve,remove,status,ping}` |
 | `SKILL.md` | agent usage guide |
 
 ## Local quick start
 
 ```bash
-hermes plugins enable google_meet
-hermes meet install                                      # pip + Chromium
-hermes meet setup                                        # preflight
-hermes meet auth                                         # optional
-hermes meet join https://meet.google.com/abc-defg-hij    # transcribe
+x19 plugins enable google_meet
+x19 meet install                                      # pip + Chromium
+x19 meet setup                                        # preflight
+x19 meet auth                                         # optional
+x19 meet join https://meet.google.com/abc-defg-hij    # transcribe
 ```
 
 ## Realtime mode
 
 Linux (preferred, most automated):
 ```bash
-hermes meet install --realtime                     # installs pulseaudio-utils
-echo 'OPENAI_API_KEY=sk-...' >> ~/.hermes/.env
-hermes meet join https://meet.google.com/abc-defg-hij --mode realtime
+x19 meet install --realtime                     # installs pulseaudio-utils
+echo 'OPENAI_API_KEY=sk-...' >> ~/.x19/.env
+x19 meet join https://meet.google.com/abc-defg-hij --mode realtime
 # then from the agent or CLI:
-hermes meet say "Good morning everyone, I'm the note-taker bot."
+x19 meet say "Good morning everyone, I'm the note-taker bot."
 ```
 
 macOS:
 ```bash
-hermes meet install --realtime     # runs: brew install blackhole-2ch ffmpeg
+x19 meet install --realtime     # runs: brew install blackhole-2ch ffmpeg
 # then — manually! — open System Settings → Sound → Input → BlackHole 2ch
-echo 'OPENAI_API_KEY=sk-...' >> ~/.hermes/.env
-hermes meet join https://meet.google.com/abc-defg-hij --mode realtime
+echo 'OPENAI_API_KEY=sk-...' >> ~/.x19/.env
+x19 meet join https://meet.google.com/abc-defg-hij --mode realtime
 ```
 
-On macOS, hermes will **not** switch your system audio input automatically — the
+On macOS, x19 will **not** switch your system audio input automatically — the
 user has to do it. This is deliberate: switching default input on a whim would
 be a surprising side effect.
 
@@ -102,15 +102,15 @@ On the node machine (e.g. user's Mac with a signed-in Chrome):
 ```bash
 pip install playwright websockets
 python -m playwright install chromium
-hermes plugins enable google_meet
-hermes meet node run --display-name my-mac --host 0.0.0.0 --port 18789
+x19 plugins enable google_meet
+x19 meet node run --display-name my-mac --host 0.0.0.0 --port 18789
 # prints the bearer token on first run; copy it
 ```
 
 On the gateway:
 ```bash
-hermes meet node approve my-mac ws://<mac-ip>:18789 <token>
-hermes meet node ping my-mac
+x19 meet node approve my-mac ws://<mac-ip>:18789 <token>
+x19 meet node ping my-mac
 # now any meet_* tool call accepts node='my-mac' (or 'auto')
 ```
 

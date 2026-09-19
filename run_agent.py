@@ -6,11 +6,11 @@
     response = agent.run_conversation("Tell me about the latest Python updates")
 """
 
-# hermes_bootstrap must be the very first import (UTF-8 stdio on Windows; no-op on POSIX).
+# x19_bootstrap must be the very first import (UTF-8 stdio on Windows; no-op on POSIX).
 try:
-    import hermes_bootstrap  # noqa: F401
+    import x19_bootstrap  # noqa: F401
 except ModuleNotFoundError:
-    pass  # partial `hermes update` — only skips the Windows UTF-8 stdio setup
+    pass  # partial `x19 update` — only skips the Windows UTF-8 stdio setup
 
 import json
 import logging
@@ -26,11 +26,11 @@ from typing import List, Dict, Any, Optional, Callable
 from datetime import datetime
 from pathlib import Path
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 
 
 def _launch_cwd_for_session(source: str) -> Optional[str]:
-    """cwd to stamp on a new session row (``hermes -c`` / ``--resume``), or None.
+    """cwd to stamp on a new session row (``x19 -c`` / ``--resume``), or None.
 
     Only local CLI sessions record one: gateway/cron/remote backends (non-"local" ``TERMINAL_ENV``) have no
     stable host cwd for the agent's tools.
@@ -43,15 +43,15 @@ def _launch_cwd_for_session(source: str) -> Optional[str]:
         return None
 
 
-# Sources that label the human conversation an interactive UI transport hosts. A finite ``hermes chat -q`` /
-# one-shot child spawned from such a session inherits HERMES_SESSION_SOURCE (the terminal tool bridges the
+# Sources that label the human conversation an interactive UI transport hosts. A finite ``x19 chat -q`` /
+# one-shot child spawned from such a session inherits X19_SESSION_SOURCE (the terminal tool bridges the
 # session env into child processes) but is NOT that conversation: labelling it ``tui``/``desktop`` lists it
-# in the TUI/WebUI pickers as a resumable chat and lets ``hermes -c`` in the TUI continue it (#112550).
+# in the TUI/WebUI pickers as a resumable chat and lets ``x19 -c`` in the TUI continue it (#112550).
 # Automation sources (kanban, tool, cron, a2a, ...) are inherited on purpose.
 _UI_TRANSPORT_SOURCES = frozenset({"tui", "desktop"})
 
-# Finite non-interactive CLI runs (``hermes chat -q``/``--oneshot``, ``hermes -z``) get their own source so human
-# pickers hide them without title/cwd heuristics; ``hermes -c`` still treats them as CLI history.
+# Finite non-interactive CLI runs (``x19 chat -q``/``--oneshot``, ``x19 -z``) get their own source so human
+# pickers hide them without title/cwd heuristics; ``x19 -c`` still treats them as CLI history.
 ONESHOT_SOURCE = "oneshot"
 CLI_FAMILY_SOURCES = frozenset({"cli", ONESHOT_SOURCE})
 
@@ -61,9 +61,9 @@ def _session_source_for_agent(platform: Optional[str]) -> str:
         from gateway.session_context import get_session_env
     except Exception:
         get_session_env = os.environ.get
-    source = str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip()
-    single_query = get_session_env("HERMES_SINGLE_QUERY_SESSION", "") == "1"
-    explicit = get_session_env("HERMES_SESSION_SOURCE_EXPLICIT", "") == "1"
+    source = str(get_session_env("X19_SESSION_SOURCE", "") or "").strip()
+    single_query = get_session_env("X19_SINGLE_QUERY_SESSION", "") == "1"
+    explicit = get_session_env("X19_SESSION_SOURCE_EXPLICIT", "") == "1"
     if single_query and not explicit and source in _UI_TRANSPORT_SOURCES:
         source = ""
     if single_query and not source and (platform or "cli") == "cli":
@@ -91,7 +91,7 @@ def _gateway_origin_json(agent: "AIAgent") -> Optional[str]:
     profile = getattr(agent, "_profile_name", None)
     if not profile:
         try:
-            from hermes_cli.profiles import get_active_profile_name
+            from x19_cli.profiles import get_active_profile_name
             profile = get_active_profile_name()
         except Exception:
             profile = None
@@ -106,11 +106,11 @@ def _gateway_origin_json(agent: "AIAgent") -> Optional[str]:
 
 
 from agent.iteration_budget import IterationBudget
-from hermes_cli.env_loader import load_hermes_dotenv
-from hermes_cli.timeouts import get_provider_request_timeout, get_provider_stale_timeout
+from x19_cli.env_loader import load_x19_dotenv
+from x19_cli.timeouts import get_provider_request_timeout, get_provider_stale_timeout
 
-_hermes_home = get_hermes_home()  # read by agent_init via _ra()._hermes_home
-_loaded_env_paths = load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).parent / '.env')
+_x19_home = get_x19_home()  # read by agent_init via _ra()._x19_home
+_loaded_env_paths = load_x19_dotenv(x19_home=_x19_home, project_env=Path(__file__).parent / '.env')
 for _env_path in _loaded_env_paths:
     logger.info("Loaded environment variables from %s", _env_path)
 if not _loaded_env_paths:
@@ -234,7 +234,7 @@ class AIAgent(
     """AI Agent with tool calling capabilities."""
 
     _TOOL_CALL_ARGUMENTS_CORRUPTION_MARKER = (
-        "[hermes-agent: tool call arguments were corrupted in this session and "
+        "[x19: tool call arguments were corrupted in this session and "
         "have been dropped to keep the conversation alive. See issue #15236.]"
     )
 
@@ -307,7 +307,7 @@ class AIAgent(
         if self._session_db is not None:
             return self._session_db
         try:
-            from hermes_state_registry import acquire
+            from x19_state_registry import acquire
 
             self._session_db = acquire()
             self._owns_session_db = True  # we opened it, so close() must release it
@@ -320,7 +320,7 @@ class AIAgent(
         """``model_config`` for the session row: the init config plus the live YOLO bypass.
 
         The row is created lazily on the first turn, so this is the only chance to record a pre-first-turn
-        /yolo toggle for ``hermes --resume``.
+        /yolo toggle for ``x19 --resume``.
         """
         model_config = self._session_init_model_config
         try:
@@ -341,7 +341,7 @@ class AIAgent(
             # Persist the profile name explicitly, including "default": profile-keyed consumers treat NULL
             # as unowned.
             try:
-                from hermes_cli.profiles import get_active_profile_name
+                from x19_cli.profiles import get_active_profile_name
                 profile_for_session = get_active_profile_name()
             except Exception:
                 # Persist the profile name EXPLICITLY, including "default". NULL used to stand in for the
@@ -472,7 +472,7 @@ class AIAgent(
         if (getattr(self, "lmstudio_load_mode", "explicit") or "explicit").strip().lower() == "jit":
             logger.debug("LM Studio explicit preload skipped: lmstudio_load_mode=jit")
             return None
-        from hermes_cli.models_local import ensure_lmstudio_model_loaded
+        from x19_cli.models_local import ensure_lmstudio_model_loaded
 
         if config_context_length is None:
             config_context_length = getattr(self, "_config_context_length", None)
@@ -553,13 +553,13 @@ class AIAgent(
 
     def _resolved_api_call_timeout(self) -> float:
         """Per-call request timeout: per-model ``timeout_seconds`` > provider ``request_timeout_seconds`` >
-        ``HERMES_API_TIMEOUT`` > 1800s."""
+        ``X19_API_TIMEOUT`` > 1800s."""
         cfg = get_provider_request_timeout(self.provider, self.model)
-        return cfg if cfg is not None else env_float("HERMES_API_TIMEOUT", 1800.0)
+        return cfg if cfg is not None else env_float("X19_API_TIMEOUT", 1800.0)
 
     def _resolved_api_call_stale_timeout_base(self) -> tuple[float, bool]:
         """Base non-stream stale timeout: per-model ``stale_timeout_seconds`` > provider-wide >
-        ``HERMES_API_CALL_STALE_TIMEOUT`` > reasoning floor > 90s.
+        ``X19_API_CALL_STALE_TIMEOUT`` > reasoning floor > 90s.
 
         Returns ``(seconds, uses_implicit_default)``; the implicit flag lets callers auto-disable the detector
         for local endpoints only when the user configured nothing.
@@ -567,7 +567,7 @@ class AIAgent(
         cfg = get_provider_stale_timeout(self.provider, self.model)
         if cfg is not None:
             return cfg, False
-        env_timeout = os.getenv("HERMES_API_CALL_STALE_TIMEOUT")
+        env_timeout = os.getenv("X19_API_CALL_STALE_TIMEOUT")
         if env_timeout is not None:
             return float(env_timeout), False
         # Reasoning-model floor (cloud gateways idle-kill mid-think); not "implicit" so the local-endpoint
@@ -607,7 +607,7 @@ class AIAgent(
         """True when the user explicitly configured the stale timeout (config or env var); implicit values
         (reasoning floors, the 90s default) yield to the run-budget cap, explicit ones never do."""
         return (get_provider_stale_timeout(self.provider, self.model) is not None
-                or os.getenv("HERMES_API_CALL_STALE_TIMEOUT") is not None)
+                or os.getenv("X19_API_CALL_STALE_TIMEOUT") is not None)
 
     def _codex_silent_hang_hint(self, model: Optional[str] = None) -> Optional[str]:
         """Actionable hint when the request matches a known Codex silent-reject shape (currently the ``gpt-5.5``
@@ -630,7 +630,7 @@ class AIAgent(
             "Workaround: try `gpt-5.4` on the same OAuth profile, or `gpt-5.3-codex`, "
             "or switch to a different model/provider in your fallback chain. "
             "Some ChatGPT Codex accounts do not support `gpt-5.4-codex`. "
-            "See hermes-agent#21444 for symptom history."
+            "See x19#21444 for symptom history."
         )
 
     def _is_openrouter_url(self) -> bool:
@@ -664,7 +664,7 @@ class AIAgent(
     @staticmethod
     def _provider_model_requires_responses_api(model: str, *, provider: Optional[str] = None) -> bool:
         """Return True when this provider/model pair should use Responses API."""
-        from hermes_cli.providers import is_actual_route
+        from x19_cli.providers import is_actual_route
         normalized_provider = (provider or "").strip().lower()
         # Nous serves GPT-5.x via chat completions (its /v1/responses returns 404); generic custom endpoints
         # may relay GPT-5 without full Responses semantics — only direct OpenAI/xAI URLs auto-upgrade.
@@ -672,7 +672,7 @@ class AIAgent(
             return False
         if normalized_provider == "copilot":
             try:
-                from hermes_cli.models import _should_use_copilot_responses_api
+                from x19_cli.models import _should_use_copilot_responses_api
                 return _should_use_copilot_responses_api(model)
             except Exception:
                 pass  # fall back to the generic GPT-5 rule
@@ -1011,7 +1011,7 @@ class AIAgent(
     @staticmethod
     def _trim_process_memory() -> None:
         """Return freed heap pages to the OS on glibc; safe no-op elsewhere."""
-        from hermes_cli.mem_trim import trim_memory
+        from x19_cli.mem_trim import trim_memory
         trim_memory(force=True, reason="agent close")
 
     def _finalize_owned_session_row(self) -> None:
@@ -1027,7 +1027,7 @@ class AIAgent(
             self._owns_session_db = False
             # Shared instances no-op on close(); release the refcount so the registry closes on the last caller.
             # See #90837.
-            from hermes_state_registry import release_or_close
+            from x19_state_registry import release_or_close
             release_or_close(session_db)
 
     def _hydrate_todo_store(self, history: List[Dict[str, Any]]) -> None:
@@ -1538,52 +1538,3 @@ if __name__ == "__main__":
     fire.Fire(main)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from types import SimpleNamespace  # noqa: F401,E402
-import asyncio  # noqa: F401,E402
-import base64  # noqa: F401,E402
-import copy  # noqa: F401,E402
-import hashlib  # noqa: F401,E402
-import tempfile  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'COMPRESSED_SUMMARY_METADATA_KEY': ('agent.context_compressor', 'COMPRESSED_SUMMARY_METADATA_KEY'),
-    'ContextCompressor': ('agent.context_compressor', 'ContextCompressor'),
-    'DEFAULT_AGENT_IDENTITY': ('agent.prompt_builder', 'DEFAULT_AGENT_IDENTITY'),
-    'FailoverReason': ('agent.error_classifier', 'FailoverReason'),
-    'OpenAI': ('agent.process_bootstrap', 'OpenAI'),
-    'atomic_json_write': ('utils', 'atomic_json_write'),
-    'build_context_files_prompt': ('agent.prompt_builder', 'build_context_files_prompt'),
-    'build_environment_hints': ('agent.prompt_builder', 'build_environment_hints'),
-    'build_skills_system_prompt': ('agent.prompt_builder', 'build_skills_system_prompt'),
-    'check_toolset_requirements': ('model_tools', 'check_toolset_requirements'),
-    'convert_scratchpad_to_think': ('agent.trajectory', 'convert_scratchpad_to_think'),
-    'estimate_request_tokens_rough': ('agent.model_metadata', 'estimate_request_tokens_rough'),
-    'file_mutation_result_landed': ('agent.tool_result_classification', 'file_mutation_result_landed'),
-    'flatten_message_text': ('agent.message_content', 'flatten_message_text'),
-    'get_tool_definitions': ('model_tools', 'get_tool_definitions'),
-    'handle_function_call': ('model_tools', 'handle_function_call'),
-    'is_truthy_value': ('utils', 'is_truthy_value'),
-    'jittered_backoff': ('agent.retry_utils', 'jittered_backoff'),
-    'load_soul_md': ('agent.prompt_builder', 'load_soul_md'),
-    'normalize_usage': ('agent.usage_pricing', 'normalize_usage'),
-    'redact_sensitive_text': ('agent.redact', 'redact_sensitive_text'),
-    'request_hard_interrupt': ('agent.interrupt_compat', 'request_hard_interrupt'),
-    'sanitize_context': ('agent.memory_manager', 'sanitize_context'),
-    'user_originated_turn_view': ('agent.context_compressor', 'user_originated_turn_view'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

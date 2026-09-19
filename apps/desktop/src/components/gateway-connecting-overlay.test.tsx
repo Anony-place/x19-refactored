@@ -66,7 +66,7 @@ describe('connecting overlay vs recovery surface', () => {
     // failDesktopBoot() ran: error set, gateway never opened.
     $desktopBoot.set({
       ...$desktopBoot.get(),
-      error: 'Hermes backend did not become ready',
+      error: 'X19 backend did not become ready',
       running: false,
       visible: true
     })

@@ -28,12 +28,12 @@ test('launches the unpacked helper without prompting and delivers only validated
   const captures: CommandScreenshotCapture[] = []
   const statuses: CommandScreenshotStatus[] = []
   const monitor = new CommandScreenshotMonitor({
-    platform: 'darwin', appPath: '/Applications/Hermes.app/Contents/Resources/app.asar', spawn,
+    platform: 'darwin', appPath: '/Applications/X19.app/Contents/Resources/app.asar', spawn,
   })
   monitor.start(value => captures.push(value), value => statuses.push(value))
   assert.equal(spawn.mock.calls.length, 1)
   assert.deepEqual(spawn.mock.calls[0], [
-    '/Applications/Hermes.app/Contents/Resources/app.asar.unpacked/dist/native/command-screenshot-monitor',
+    '/Applications/X19.app/Contents/Resources/app.asar.unpacked/dist/native/command-screenshot-monitor',
     [], { stdio: ['pipe', 'pipe', 'ignore'], shell: false, detached: false, windowsHide: true },
   ])
   child.stdout.write('{"type":"capture","windowId":2,"width":100,"height":200}\n')
@@ -104,7 +104,7 @@ test('stopping from the starting callback cancels the child before it can become
 })
 
 test.skipIf(process.platform !== 'darwin')('native state machine requires distinct keys, a clean chord and full release', () => {
-  const dir = mkdtempSync(resolve(tmpdir(), 'hermes-command-monitor-test-'))
+  const dir = mkdtempSync(resolve(tmpdir(), 'x19-command-monitor-test-'))
   try {
     const fixture = resolve(dir, 'gesture.m')
     const binary = resolve(dir, 'gesture')
@@ -197,7 +197,7 @@ int main(void) { @autoreleasepool {
 }, 40_000)
 
 test.skipIf(process.platform !== 'darwin')('builds a universal helper with a read-only permission check and real controller lifecycle', async () => {
-  const dir = mkdtempSync(resolve(tmpdir(), 'hermes-command-monitor-build-'))
+  const dir = mkdtempSync(resolve(tmpdir(), 'x19-command-monitor-build-'))
   try {
     const script = resolve(import.meta.dirname, '../scripts/build-command-screenshot-monitor.mjs')
     execFileSync(process.execPath, [script, '--out-dir', resolve(dir, 'dist')], { timeout: 60_000 })

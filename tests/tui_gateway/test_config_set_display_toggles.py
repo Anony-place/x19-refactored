@@ -15,7 +15,7 @@ from tui_gateway import server
 @pytest.fixture
 def config_home(tmp_path, monkeypatch):
     """Point the server's config read/write at a temp file."""
-    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setattr(server, "_x19_home", tmp_path)
     server._cfg_cache = server._cfg_sig = server._cfg_path = None
     yield tmp_path / "config.yaml"
     server._cfg_cache = server._cfg_sig = server._cfg_path = None

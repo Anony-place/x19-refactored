@@ -32,8 +32,8 @@ def _quarantined_nous_error(exc: BaseException) -> BaseException:
     carries the message and code the user needs (#42177). ``format_auth_error`` appends the
     remediation sentence with a space, so an unterminated message reads "Invalid refresh token Run …".
     """
-    from hermes_cli.auth import AuthError, get_provider_auth_state
-    from hermes_cli.auth_nous import _terminal_quarantine_marker
+    from x19_cli.auth import AuthError, get_provider_auth_state
+    from x19_cli.auth_nous import _terminal_quarantine_marker
 
     with contextlib.suppress(Exception):
         marker = _terminal_quarantine_marker(get_provider_auth_state("nous") or {})
@@ -59,7 +59,7 @@ def _nous_credential_present(exc: BaseException) -> bool:
     """
     if getattr(exc, "code", None):
         return True
-    from hermes_cli.auth import get_provider_auth_state
+    from x19_cli.auth import get_provider_auth_state
 
     with contextlib.suppress(Exception):
         return bool(get_provider_auth_state("nous"))
@@ -69,10 +69,10 @@ def _nous_credential_present(exc: BaseException) -> bool:
 def record_nous_credential_failure(exc: BaseException) -> str:
     """Remember *exc* as the latest Nous credential failure.
 
-    Logged once per distinct message: WARNING when a real credential failed, DEBUG when Hermes was
+    Logged once per distinct message: WARNING when a real credential failed, DEBUG when X19 was
     simply never logged into Nous.
     """
-    from hermes_cli.auth import format_auth_error
+    from x19_cli.auth import format_auth_error
 
     exc = _quarantined_nous_error(exc)
     message = format_auth_error(exc) if isinstance(exc, Exception) else str(exc)

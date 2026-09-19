@@ -4,7 +4,7 @@ OpenCode (opencode.ai Zen/Go relay) pins requests that share an
 ``x-opencode-session`` value to the same upstream backend, which is what
 keeps its prompt cache warm across the turns of one conversation. The value
 only has to be opaque and consistent per conversation, so it is derived the
-same way as the other conversation-affinity hints Hermes already sends
+same way as the other conversation-affinity hints X19 already sends
 (OpenRouter's sticky ``session_id``, xAI's ``x-grok-conv-id``): the
 host-declared routing scope first, then the ambient conversation root, then
 the physical session id — normalized through ``_cache_scope_from_session_id``
@@ -29,7 +29,7 @@ def is_opencode_target(provider: Optional[str], base_url: Optional[str]) -> bool
     ``opencode-<family>-*`` providers, and any base_url hosted on opencode.ai.
     """
     try:
-        from hermes_cli.models import opencode_provider_family
+        from x19_cli.models import opencode_provider_family
 
         if opencode_provider_family(provider) is not None:
             return True

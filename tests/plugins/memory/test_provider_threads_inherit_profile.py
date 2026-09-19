@@ -1,6 +1,6 @@
 """Multiplex invariant: every memory provider's background thread runs under the spawner's profile.
 
-Profile isolation is a ContextVar-scoped HERMES_HOME override; a plain ``threading.Thread`` starts
+Profile isolation is a ContextVar-scoped X19_HOME override; a plain ``threading.Thread`` starts
 with an EMPTY context, so a provider's prefetch/sync/writer thread would silently resolve the DEFAULT
 profile's home (and fail closed on scoped secrets). Each case drives the provider's real spawn path
 with a fake backend and asserts the thread saw the parent's home.
@@ -12,12 +12,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from x19_constants import get_x19_home, reset_x19_home_override, set_x19_home_override
 
 
 def _probe_home(seen: dict, key: str = "home"):
     def _record(*_args, **_kwargs):
-        seen[key] = get_hermes_home()
+        seen[key] = get_x19_home()
     return _record
 
 
@@ -37,7 +37,7 @@ def _retaindb(seen, tmp_path):
 
     p = retaindb.RetainDBMemoryProvider()
     p._client = MagicMock()
-    p._context_overlay = lambda query: {"context": seen.setdefault("home", get_hermes_home()) and "ctx"}
+    p._context_overlay = lambda query: {"context": seen.setdefault("home", get_x19_home()) and "ctx"}
     p._client.ask_user.return_value = {"answer": ""}
     p._client.get_agent_model.return_value = {}
     p.queue_prefetch("what do you know")
@@ -77,7 +77,7 @@ def _hindsight(seen, tmp_path):
 
     p = hindsight.HindsightMemoryProvider()
     p._recall_sync, p._memory_mode, p._auto_recall, p._prefetch_waits_for_retain = False, "hybrid", True, False
-    p._do_recall = lambda query: (seen.setdefault("home", get_hermes_home()) and "text", 1)
+    p._do_recall = lambda query: (seen.setdefault("home", get_x19_home()) and "text", 1)
     p.queue_prefetch("remember this")
     return [p._prefetch_thread]
 
@@ -96,15 +96,15 @@ _PROVIDERS = {
 
 @pytest.mark.parametrize("name", sorted(_PROVIDERS))
 def test_provider_background_thread_sees_spawner_profile_home(name, tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "default"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / "default"))
     profile_home = tmp_path / "profiles" / "b"
     profile_home.mkdir(parents=True)
     seen: dict = {}
-    token = set_hermes_home_override(profile_home)
+    token = set_x19_home_override(profile_home)
     try:
         threads = _PROVIDERS[name](seen, tmp_path)
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
     for t in threads:
         if t is not None:
             t.join(timeout=10)

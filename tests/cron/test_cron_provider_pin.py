@@ -14,7 +14,7 @@ Current contract:
     default as before.
 
 These tests exercise the full run_job path (real imports, mocked AIAgent +
-resolve_runtime_provider against a temp HERMES_HOME) and the create_job snapshot capture.
+resolve_runtime_provider against a temp X19_HOME) and the create_job snapshot capture.
 """
 
 import sys
@@ -75,13 +75,13 @@ def _run(job, tmp_path, *, current_provider="openrouter", current_model=None, cr
         }
 
     fake_db = MagicMock()
-    with patch("cron.scheduler._hermes_home", tmp_path), \
-         patch("cron.scheduler._get_hermes_home", return_value=tmp_path), \
+    with patch("cron.scheduler._x19_home", tmp_path), \
+         patch("cron.scheduler._get_x19_home", return_value=tmp_path), \
          patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
-         patch("hermes_cli.env_loader.load_hermes_dotenv"), \
-         patch("hermes_cli.env_loader.reset_secret_source_cache"), \
-         patch("hermes_state_registry.acquire", return_value=fake_db), \
-         patch("hermes_cli.runtime_provider.resolve_runtime_provider", side_effect=_resolve), \
+         patch("x19_cli.env_loader.load_x19_dotenv"), \
+         patch("x19_cli.env_loader.reset_secret_source_cache"), \
+         patch("x19_state_registry.acquire", return_value=fake_db), \
+         patch("x19_cli.runtime_provider.resolve_runtime_provider", side_effect=_resolve), \
          patch("run_agent.AIAgent") as mock_agent_cls:
         mock_agent = MagicMock()
         mock_agent.run_conversation.return_value = {"final_response": "ok"}
@@ -140,13 +140,13 @@ class TestSnapshotIsTheEffectivePin:
 
     def test_missing_model_guides_to_user_owned_cli(self, tmp_path, monkeypatch):
         """A missing-model failure cannot advertise agent-owned pinning."""
-        monkeypatch.delenv("HERMES_MODEL", raising=False)
+        monkeypatch.delenv("X19_MODEL", raising=False)
         success, error, agent_kwargs, _ = _run(
             _base_job(), tmp_path, current_provider="openrouter", current_model=None)
 
         assert success is False
         assert agent_kwargs is None
-        assert "hermes cron edit pin-test --model <name>" in error
+        assert "x19 cron edit pin-test --model <name>" in error
         assert "cronjob action=update" not in error
 
 
@@ -172,7 +172,7 @@ class TestCreateJobSnapshot:
         jobs = self._isolate_storage(monkeypatch)
 
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            "x19_cli.runtime_provider.resolve_runtime_provider",
             return_value={"provider": "openrouter"},
         ):
             job = jobs.create_job(prompt="do a thing", schedule="every 1 hour")
@@ -184,7 +184,7 @@ class TestCreateJobSnapshot:
         jobs = self._isolate_storage(monkeypatch)
 
         resolver = MagicMock(return_value={"provider": "openrouter"})
-        with patch("hermes_cli.runtime_provider.resolve_runtime_provider", resolver):
+        with patch("x19_cli.runtime_provider.resolve_runtime_provider", resolver):
             job = jobs.create_job(
                 prompt="do a thing", schedule="every 1 hour", provider="nous"
             )
@@ -199,7 +199,7 @@ class TestCreateJobSnapshot:
         jobs = self._isolate_storage(monkeypatch)
 
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            "x19_cli.runtime_provider.resolve_runtime_provider",
             side_effect=RuntimeError("no creds"),
         ):
             job = jobs.create_job(prompt="do a thing", schedule="every 1 hour")
@@ -270,9 +270,9 @@ class TestResnapshot:
             monkeypatch, [self._make_job("j1", model_snapshot="old-model")]
         )
         (tmp_path / "config.yaml").write_text("model:\n  default: new-model\n")
-        monkeypatch.setattr("cron.jobs.get_hermes_home", lambda: tmp_path, raising=True)
+        monkeypatch.setattr("cron.jobs.get_x19_home", lambda: tmp_path, raising=True)
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            "x19_cli.runtime_provider.resolve_runtime_provider",
             return_value={"provider": "openrouter"},
         ):
             updated = jobs_mod.resnapshot_job("j1")
@@ -301,9 +301,9 @@ class TestResnapshot:
             ],
         )
         (tmp_path / "config.yaml").write_text("model:\n  default: new-model\n")
-        monkeypatch.setattr("cron.jobs.get_hermes_home", lambda: tmp_path, raising=True)
+        monkeypatch.setattr("cron.jobs.get_x19_home", lambda: tmp_path, raising=True)
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            "x19_cli.runtime_provider.resolve_runtime_provider",
             return_value={"provider": "openrouter"},
         ):
             updated = jobs_mod.resnapshot_job("j1")
@@ -334,9 +334,9 @@ class TestResnapshot:
             ],
         )
         (tmp_path / "config.yaml").write_text("model:\n  default: new-model\n")
-        monkeypatch.setattr("cron.jobs.get_hermes_home", lambda: tmp_path, raising=True)
+        monkeypatch.setattr("cron.jobs.get_x19_home", lambda: tmp_path, raising=True)
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            "x19_cli.runtime_provider.resolve_runtime_provider",
             return_value={"provider": "openrouter"},
         ):
             updated = jobs_mod.resnapshot_all_unpinned()

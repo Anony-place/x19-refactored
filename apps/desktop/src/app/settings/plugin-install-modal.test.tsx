@@ -13,7 +13,7 @@ const { requestGateway } = vi.hoisted(() => ({
 vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway })
 }))
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/x19', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getProfiles: async () => ({ profiles: [] })
 }))
@@ -52,7 +52,7 @@ beforeEach(() => {
   $gatewayState.set('idle')
   $activeGatewayProfile.set('default')
   probePluginRepo.mockResolvedValue({ ok: true, agent: true, desktop: true, warnings: [] })
-  vi.stubGlobal('hermesDesktop', { probePluginRepo, installDesktopPlugin })
+  vi.stubGlobal('x19Desktop', { probePluginRepo, installDesktopPlugin })
 })
 afterEach(() => {
   cleanup()
@@ -83,7 +83,7 @@ describe('Install from Git entry flow', () => {
         screen.getByText(
           mode === 'remote'
             ? 'Installs into the connected default backend'
-            : 'Installs into the default backend (~/.hermes/plugins/)'
+            : 'Installs into the default backend (~/.x19/plugins/)'
         )
       ).toBeTruthy()
       // Local backend: the desktop half is copied out of the installed package

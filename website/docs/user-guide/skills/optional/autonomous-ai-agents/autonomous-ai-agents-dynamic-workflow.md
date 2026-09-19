@@ -14,19 +14,19 @@ Plan-in-code fan-outs, adversarial verification, waves.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/autonomous-ai-agents/dynamic-workflow` |
+| Source | Optional — install with `x19 skills install official/autonomous-ai-agents/dynamic-workflow` |
 | Path | `optional-skills/autonomous-ai-agents/dynamic-workflow` |
 | Version | `2.0.0` |
-| Author | Teknium + Hermes Agent |
+| Author | Teknium + X19 |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `orchestration`, `fan-out`, `subagents`, `delegation`, `verification`, `migration`, `audit`, `research`, `campaign` |
-| Related skills | [`hermes-agent`](/docs/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent), [`simplify-code`](/docs/user-guide/skills/bundled/software-development/software-development-simplify-code) |
+| Related skills | [`x19`](/docs/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-x19), [`simplify-code`](/docs/user-guide/skills/bundled/software-development/software-development-simplify-code) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Dynamic Workflow Skill
@@ -41,8 +41,8 @@ make `delegate_task` durable across restarts; that is the kanban swarm's job.
 
 Reach for it when the unit of work is clear (a file, an endpoint, a record) and
 there are more units than one context can hold. Skip it for under ~10 units or
-for serial chains. For a refactor or fix campaign on hermes-agent itself, load
-`hermes-agent` (the dev workflow) alongside; this skill owns the fan-out shape.
+for serial chains. For a refactor or fix campaign on x19 itself, load
+`x19` (the dev workflow) alongside; this skill owns the fan-out shape.
 
 ## Prerequisites
 
@@ -163,7 +163,7 @@ The one-shot recipe does not scale to a whole-codebase pass. What did:
    conflicted files by directory to workers editing ONE merge worktree with
    no commits, then the parent commits the merge once. CI never runs on a
    conflicted PR, so re-merge main before every push.
-10. Live QA is its own wave: one squad per surface, isolated `HERMES_HOME`,
+10. Live QA is its own wave: one squad per surface, isolated `X19_HOME`,
     expectation written before the check, evidence on disk, report only, and a
     PR-vs-main difference is the only thing that counts as a regression. Green
     unit tests missed the one P0 (a logged-in code path no test exercised).

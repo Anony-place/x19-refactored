@@ -1,27 +1,27 @@
 ---
 sidebar_position: 8
 title: "Memory Provider Plugins"
-description: "How to build a memory provider plugin for Hermes Agent"
+description: "How to build a memory provider plugin for X19"
 ---
 
 # Building a Memory Provider Plugin
 
-Memory provider plugins give Hermes Agent persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. This guide covers how to build one.
+Memory provider plugins give X19 persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. This guide covers how to build one.
 
 :::tip
-Memory providers are one of two **provider plugin** types. The other is [Context Engine Plugins](/developer-guide/context-engine-plugin), which replace the built-in context compressor. Both follow the same pattern: single-select, config-driven, managed via `hermes plugins`.
+Memory providers are one of two **provider plugin** types. The other is [Context Engine Plugins](/developer-guide/context-engine-plugin), which replace the built-in context compressor. Both follow the same pattern: single-select, config-driven, managed via `x19 plugins`.
 :::
 
 ## Installation Layouts
 
-Hermes discovers memory providers from four sources, in this precedence order:
+X19 discovers memory providers from four sources, in this precedence order:
 
 | Source | Location | Notes |
 |---|---|---|
-| Bundled | `plugins/memory/<name>/` | Ships with Hermes. Closed to new providers — see [CONTRIBUTING](https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md). |
-| User | `$HERMES_HOME/plugins/<name>/` | Dropped in by the user, per profile. |
-| Project | `./.hermes/plugins/<name>/` | Opt-in via `HERMES_ENABLE_PROJECT_PLUGINS=1`. |
-| Package | `hermes_agent.memory_providers` entry point | `pip install`, nothing to copy. |
+| Bundled | `plugins/memory/<name>/` | Ships with X19. Closed to new providers — see [CONTRIBUTING](https://github.com/Anony-place/x19-refactored/blob/main/CONTRIBUTING.md). |
+| User | `$X19_HOME/plugins/<name>/` | Dropped in by the user, per profile. |
+| Project | `./.x19/plugins/<name>/` | Opt-in via `X19_ENABLE_PROJECT_PLUGINS=1`. |
+| Package | `x19_agent.memory_providers` entry point | `pip install`, nothing to copy. |
 
 Earlier sources win on a name collision, so a directory dropped into a working
 tree can never shadow a shipped provider.
@@ -38,8 +38,8 @@ Discovery only *enumerates* — it never imports a provider. Nothing runs until
 ### Directory Provider
 
 A directory provider lives in `plugins/memory/<name>/` when bundled with
-Hermes, in `$HERMES_HOME/plugins/<name>/` when installed by a user, or in
-`./.hermes/plugins/<name>/` for a project-local one:
+X19, in `$X19_HOME/plugins/<name>/` when installed by a user, or in
+`./.x19/plugins/<name>/` for a project-local one:
 
 ```
 plugins/memory/my-provider/
@@ -51,22 +51,22 @@ plugins/memory/my-provider/
 ### Packaged Provider
 
 A pip-installed provider publishes an entry point in the
-`hermes_agent.memory_providers` group. The entry-point name is the provider
+`x19_agent.memory_providers` group. The entry-point name is the provider
 name users select in `memory.provider`; its value points to the provider's
 `register(ctx)` function:
 
 ```toml title="pyproject.toml"
-[project.entry-points."hermes_agent.memory_providers"]
+[project.entry-points."x19_agent.memory_providers"]
 my-provider = "my_provider:register"
 ```
 
 Point the entry point at the **package**, or at a `register(ctx)` inside it, and
 keep your implementation, skills, and other resources in the normal Python
-package layout. No copy under `$HERMES_HOME/plugins/` is required.
+package layout. No copy under `$X19_HOME/plugins/` is required.
 
 A package entry point gets everything a directory install does, including the
-two files Hermes reads from disk rather than importing — `config_schema.py`
-(the dashboard config panel) and `cli.py` (your `hermes <provider>`
+two files X19 reads from disk rather than importing — `config_schema.py`
+(the dashboard config panel) and `cli.py` (your `x19 <provider>`
 subcommands). Both are found next to your package's `__init__.py`, so point the
 entry point at a package rather than a single module if you ship either.
 
@@ -90,7 +90,7 @@ class MyMemoryProvider(MemoryProvider):
         """Called once at agent startup.
 
         kwargs always includes:
-          hermes_home (str): Active HERMES_HOME path. Use for storage.
+          x19_home (str): Active X19_HOME path. Use for storage.
         """
         self._api_key = os.environ.get("MY_API_KEY", "")
         self._session_id = session_id
@@ -106,15 +106,15 @@ fields; callers may initialize a provider without an agent or a session database
 
 | Keyword | Meaning |
 |---|---|
-| `hermes_home` | Active profile's storage directory. |
+| `x19_home` | Active profile's storage directory. |
 | `platform` | Session surface, such as `cli`, `gui`, `acp`, or `telegram`. |
 | `session_title` | Stored session title, when available. A display label is not necessarily a user-selected identity. |
-| `session_title_source` | Stored title provenance, when available: `derived`, `llm`, or `user`. Automatic sources must not be mistaken for explicit identity overrides; missing provenance retains a provider's legacy behavior. Shared constants live in `hermes_state_common.py`. |
+| `session_title_source` | Stored title provenance, when available: `derived`, `llm`, or `user`. Automatic sources must not be mistaken for explicit identity overrides; missing provenance retains a provider's legacy behavior. Shared constants live in `x19_state_common.py`. |
 | `cwd` | Non-empty logical workspace supplied as `AIAgent(cwd=...)`, available before provider initialization. Omitted for `None` or an empty string. |
 | `gateway_session_key` | Stable messaging-chat identity for per-chat session isolation. |
 | `user_id`, `user_id_alt`, `user_name`, `chat_id` | Gateway identity fields, included when present. |
 | `agent_identity` | Active profile name, when available. |
-| `agent_workspace`, `agent_context` | Runtime agent scope (`hermes` and `primary` for the main agent). |
+| `agent_workspace`, `agent_context` | Runtime agent scope (`x19` and `primary` for the main agent). |
 
 Do not assume `os.getcwd()` identifies the conversation's workspace: one Desktop
 or gateway backend can serve several sessions. If `cwd` is absent and directory
@@ -148,8 +148,8 @@ workspace; absent or empty cwd remains unpinned.
 
 | Method | Purpose | Must Implement? |
 |--------|---------|-----------------|
-| `get_config_schema()` | Declare config fields for `hermes memory setup` | **Yes** |
-| `save_config(values, hermes_home)` | Write non-secret config to native location | **Yes** (unless env-var-only) |
+| `get_config_schema()` | Declare config fields for `x19 memory setup` | **Yes** |
+| `save_config(values, x19_home)` | Write non-secret config to native location | **Yes** (unless env-var-only) |
 
 ### Optional Hooks
 
@@ -212,14 +212,14 @@ uncompressed transcript is preserved, the compaction attempt errors with
 `BLOCKED_MISSING_PREREQUISITE`, and it can be retried once your store
 recovers. With the gate off (default), nothing changes for existing providers.
 
-The gate binds to every compaction authority, not just the Hermes
+The gate binds to every compaction authority, not just the X19
 summarizer: server-side native compaction (`compression.codex_responses_native`)
 is suppressed while the gate is armed, post-turn micro-compaction
 (`compression.micro_compact`) is forced off at agent init (it absorbs old
 exchanges into a rolling summary with no checkpoint hook in its path), and
 the `codex_app_server` API mode is refused at agent init — the codex agent
 compacts its own thread with no truthful pre-compaction boundary, so a
-required checkpoint cannot be guaranteed there. The checkpoint-aware Hermes
+required checkpoint cannot be guaranteed there. The checkpoint-aware X19
 compressor stays the only lossy authority.
 
 What your provider receives depends on its declared API version. Version 1
@@ -244,24 +244,24 @@ Contract tests: `tests/agent/test_pre_compress_checkpoint_contract.py`.
 
 ## Setup UX — what a standalone provider keeps
 
-Every setup surface Hermes gives a bundled provider is driven by files in the provider's
+Every setup surface X19 gives a bundled provider is driven by files in the provider's
 own directory, so a provider installed from the plugin catalog keeps all of them:
 
 | Surface | What the provider ships |
 |---|---|
 | Desktop → Capabilities → Tools → Memory (config panel) | `config_schema.py` (below) |
-| `hermes memory setup` wizard | `get_config_schema()` declares the fields the wizard prompts for, `save_config(config, hermes_home)` persists them, `post_setup(hermes_home, config)` runs afterwards for anything interactive (OAuth, first sync); `get_status_config()` feeds `hermes memory status` |
-| `hermes <provider> …` subcommands | `cli.py` with `register_cli(subparser)` ([Adding CLI Commands](#adding-cli-commands)) |
-| Python dependencies | `pyproject.toml` `[project] dependencies` (or `python_dependencies` in `plugin.yaml`); installed under Hermes' own pins at install time and re-applied across `hermes update` |
+| `x19 memory setup` wizard | `get_config_schema()` declares the fields the wizard prompts for, `save_config(config, x19_home)` persists them, `post_setup(x19_home, config)` runs afterwards for anything interactive (OAuth, first sync); `get_status_config()` feeds `x19 memory status` |
+| `x19 <provider> …` subcommands | `cli.py` with `register_cli(subparser)` ([Adding CLI Commands](#adding-cli-commands)) |
+| Python dependencies | `pyproject.toml` `[project] dependencies` (or `python_dependencies` in `plugin.yaml`); installed under X19' own pins at install time and re-applied across `x19 update` |
 
 Your provider's name, `memory.<name>` config section, data directory and tool names are the
-contract with existing users. A provider that moves out of core keeps all four; Hermes then
+contract with existing users. A provider that moves out of core keeps all four; X19 then
 installs the catalog plugin automatically for anyone whose `memory.provider` still names it
-(on `hermes update`, and once at agent start when `security.allow_lazy_installs` is on).
+(on `x19 update`, and once at agent start when `security.allow_lazy_installs` is on).
 
 ## Config Schema
 
-`get_config_schema()` returns a list of field descriptors used by `hermes memory setup`:
+`get_config_schema()` returns a list of field descriptors used by `x19 memory setup`:
 
 ```python
 def get_config_schema(self):
@@ -283,7 +283,7 @@ def get_config_schema(self):
         {
             "key": "project",
             "description": "Project identifier",
-            "default": "hermes",
+            "default": "x19",
         },
     ]
 ```
@@ -291,17 +291,17 @@ def get_config_schema(self):
 Fields with `secret: True` and `env_var` go to `.env`. Non-secret fields are passed to `save_config()`.
 
 :::tip Minimal vs Full Schema
-Every field in `get_config_schema()` is prompted during `hermes memory setup`. Providers with many options should keep the schema minimal — only include fields the user **must** configure (API key, required credentials). Document optional settings in a config file reference (e.g. `$HERMES_HOME/myprovider.json`) rather than prompting for them all during setup. This keeps the setup wizard fast while still supporting advanced configuration. See the Supermemory provider for an example — it only prompts for the API key; all other options live in `supermemory.json`.
+Every field in `get_config_schema()` is prompted during `x19 memory setup`. Providers with many options should keep the schema minimal — only include fields the user **must** configure (API key, required credentials). Document optional settings in a config file reference (e.g. `$X19_HOME/myprovider.json`) rather than prompting for them all during setup. This keeps the setup wizard fast while still supporting advanced configuration. See the Supermemory provider for an example — it only prompts for the API key; all other options live in `supermemory.json`.
 :::
 
 ## Save Config
 
 ```python
-def save_config(self, values: dict, hermes_home: str) -> None:
+def save_config(self, values: dict, x19_home: str) -> None:
     """Write non-secret config to your native location."""
     import json
     from pathlib import Path
-    config_path = Path(hermes_home) / "my-provider.json"
+    config_path = Path(x19_home) / "my-provider.json"
     config_path.write_text(json.dumps(values, indent=2))
 ```
 
@@ -348,7 +348,7 @@ hooks:
 
 ## Threading Contract
 
-**`sync_turn()` MUST be non-blocking.** If your backend has latency (API calls, LLM processing), run the work in a daemon thread — spawned with `agent.memory_provider.spawn_context_thread`, never a bare `threading.Thread`. Profile isolation (the active `HERMES_HOME`, the per-turn secret scope) lives in `contextvars`, and a plain thread starts with an empty context: under multiplexed profiles it would silently write into the *default* profile's store, and `get_secret()` fails closed there.
+**`sync_turn()` MUST be non-blocking.** If your backend has latency (API calls, LLM processing), run the work in a daemon thread — spawned with `agent.memory_provider.spawn_context_thread`, never a bare `threading.Thread`. Profile isolation (the active `X19_HOME`, the per-turn secret scope) lives in `contextvars`, and a plain thread starts with an empty context: under multiplexed profiles it would silently write into the *default* profile's store, and `get_secret()` fails closed there.
 
 ```python
 from agent.memory_provider import spawn_context_thread
@@ -366,12 +366,12 @@ def sync_turn(self, user_content, assistant_content, *, session_id="", messages=
     self._sync_thread.start()
 ```
 
-The same applies to prefetch and writer threads. Small JSON config sidecars (`$HERMES_HOME/<provider>.json`) are read with `utils.read_json_or_empty` and written with `utils.atomic_json_write`; anything under `config.yaml` goes through `hermes_cli.config.save_config(..., merge_existing=True)`.
+The same applies to prefetch and writer threads. Small JSON config sidecars (`$X19_HOME/<provider>.json`) are read with `utils.read_json_or_empty` and written with `utils.atomic_json_write`; anything under `config.yaml` goes through `x19_cli.config.save_config(..., merge_existing=True)`.
 
 `messages` is optional OpenAI-style conversation context as of the completed
 turn. When present, it includes user/assistant messages, assistant tool calls,
 and tool result messages. Providers that do not need raw turn context can omit
-the `messages` parameter; Hermes will continue calling them with the legacy
+the `messages` parameter; X19 will continue calling them with the legacy
 signature.
 
 Cloud providers should document what parts of `messages` are sent off-device.
@@ -380,15 +380,15 @@ workspace data.
 
 ## Profile Isolation
 
-All storage paths **must** use the `hermes_home` kwarg from `initialize()`, not hardcoded `~/.hermes`:
+All storage paths **must** use the `x19_home` kwarg from `initialize()`, not hardcoded `~/.x19`:
 
 ```python
 # CORRECT — profile-scoped
-from hermes_constants import get_hermes_home
-data_dir = get_hermes_home() / "my-provider"
+from x19_constants import get_x19_home
+data_dir = get_x19_home() / "my-provider"
 
 # WRONG — shared across all profiles
-data_dir = Path("~/.hermes/my-provider").expanduser()
+data_dir = Path("~/.x19/my-provider").expanduser()
 ```
 
 ## Testing
@@ -413,16 +413,16 @@ mgr.shutdown_all()
 
 ## Adding CLI Commands
 
-Memory provider plugins can register their own CLI subcommand tree (e.g. `hermes my-provider status`, `hermes my-provider config`). This uses a convention-based discovery system — no changes to core files needed.
+Memory provider plugins can register their own CLI subcommand tree (e.g. `x19 my-provider status`, `x19 my-provider config`). This uses a convention-based discovery system — no changes to core files needed.
 
 ### How it works
 
 1. Add a `cli.py` file to your plugin directory
 2. Define a `register_cli(subparser)` function that builds the argparse tree
 3. The memory plugin system discovers it at startup via `discover_plugin_cli_commands()`
-4. Your commands appear under `hermes <provider-name> <subcommand>`
+4. Your commands appear under `x19 <provider-name> <subcommand>`
 
-**Active-provider gating:** Your CLI commands only appear when your provider is the active `memory.provider` in config. If a user hasn't configured your provider, your commands won't show in `hermes --help`.
+**Active-provider gating:** Your CLI commands only appear when your provider is the active `memory.provider` in config. If a user hasn't configured your provider, your commands won't show in `x19 --help`.
 
 ### Example
 
@@ -437,10 +437,10 @@ def my_command(args):
     elif sub == "config":
         print("Showing config...")
     else:
-        print("Usage: hermes my-provider <status|config>")
+        print("Usage: x19 my-provider <status|config>")
 
 def register_cli(subparser) -> None:
-    """Build the hermes my-provider argparse tree.
+    """Build the x19 my-provider argparse tree.
 
     Called by discover_plugin_cli_commands() at argparse setup time.
     """

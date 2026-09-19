@@ -4,8 +4,8 @@ A cron job may pin its own reasoning effort, independent of global config.
 Contract under test:
 
 - Job store (cron/jobs.py): the field is validated at the storage choke
-  point against the canonical Hermes effort grammar (parse_reasoning_effort
-  in hermes_constants — the SAME parser every other effort surface uses).
+  point against the canonical X19 effort grammar (parse_reasoning_effort
+  in x19_constants — the SAME parser every other effort surface uses).
   Garbage never persists; absent field keeps the job record byte-identical
   to pre-feature behavior. Capability clamping (xhigh on a model that caps
   at high, etc.) is intentionally NOT validated here — that is owned by the
@@ -131,7 +131,7 @@ class TestSchedulerJobReasoningPrecedence:
         assert result == {"enabled": False}
 
     def test_absent_field_byte_identical_to_config_resolution(self):
-        from hermes_constants import resolve_reasoning_config
+        from x19_constants import resolve_reasoning_config
         from cron.scheduler import _resolve_job_reasoning_config
 
         for model in ("anthropic/claude-opus-4.5", "gpt-5", ""):
@@ -144,7 +144,7 @@ class TestSchedulerJobReasoningPrecedence:
         tick: warn, then resolve from config exactly as if unset."""
         import logging
 
-        from hermes_constants import resolve_reasoning_config
+        from x19_constants import resolve_reasoning_config
         from cron.scheduler import _resolve_job_reasoning_config
 
         job = {"id": "abc123", "reasoning_effort": "turbo"}
@@ -171,7 +171,7 @@ class TestCronjobToolReasoningEffort:
     """The model tool READS the field (list surfacing) but must never WRITE
     it: models don't make model-configuration decisions (standing policy —
     the only exception is user-defined profile selection). The pin is set
-    via `hermes cron create/edit --reasoning-effort` only."""
+    via `x19 cron create/edit --reasoning-effort` only."""
 
     def test_format_job_surfaces_pin_when_set(self, tmp_cron_dir):
         import json
@@ -200,7 +200,7 @@ class TestCronjobToolReasoningEffort:
         """Policy pin: the model-facing surface must NOT offer the
         reasoning_effort knob. Models never choose model config; the CLI is
         the only mutation surface for this field. The cronjob() function
-        keeps the parameter for the CLI lane (hermes_cli/cron.py), but the
+        keeps the parameter for the CLI lane (x19_cli/cron.py), but the
         tool schema and the registry dispatch drop it — same pattern as
         model/provider/base_url."""
         import inspect

@@ -65,7 +65,7 @@ function renderBilling(initialEntries: string[] = ['/settings?tab=billing']) {
 beforeEach(() => {
   apiMocks.fetchBillingState.mockResolvedValue(okBilling(todayBillingState))
   apiMocks.fetchSubscriptionState.mockResolvedValue(okSubscription(todaySubscriptionState))
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'x19Desktop', {
     configurable: true,
     value: {
       openExternal: apiMocks.openExternal
@@ -87,7 +87,7 @@ describe('BillingSettings', () => {
     expect(screen.getByText('Visa •••• 3206')).toBeTruthy()
     expect(
       screen.getByText(
-        "Remote spending is off for this account — a billing admin can turn it on from the portal's Hermes Agent page."
+        "Remote spending is off for this account — a billing admin can turn it on from the portal's X19 page."
       )
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: '$100' })).toBeNull()

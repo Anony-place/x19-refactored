@@ -15,7 +15,7 @@ import pytest
 
 import agent.account_usage as account_usage
 from agent.account_usage import CreditsView, build_credits_view
-from hermes_cli.nous_account import NousPortalAccountInfo, NousPaidServiceAccessInfo
+from x19_cli.nous_account import NousPortalAccountInfo, NousPaidServiceAccessInfo
 
 
 def _account(**kwargs) -> NousPortalAccountInfo:
@@ -30,13 +30,13 @@ def _account(**kwargs) -> NousPortalAccountInfo:
 def _logged_in_account(monkeypatch):
     """Stub the auth token + account fetch so build_credits_view runs offline."""
     monkeypatch.setattr(
-        "hermes_cli.auth.get_provider_auth_state",
+        "x19_cli.auth.get_provider_auth_state",
         lambda provider: {"access_token": "tok", "portal_base_url": "https://portal.example.test"},
     )
 
     def _install(account):
         monkeypatch.setattr(
-            "hermes_cli.nous_account.get_nous_portal_account_info",
+            "x19_cli.nous_account.get_nous_portal_account_info",
             lambda *a, **kw: account,
         )
 
@@ -119,7 +119,7 @@ def test_gateway_topup_not_logged_in(monkeypatch):
 def test_credits_command_fully_removed():
     """`/credits` and the old `/billing` are gone entirely — not commands, not
     aliases. Billing lives only on /topup, with NO aliases, on every platform."""
-    from hermes_cli.commands import resolve_command, COMMAND_REGISTRY
+    from x19_cli.commands import resolve_command, COMMAND_REGISTRY
 
     # Both old names resolve to nothing.
     assert resolve_command("credits") is None

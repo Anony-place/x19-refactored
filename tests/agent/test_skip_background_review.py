@@ -129,11 +129,11 @@ def test_cron_construction_sets_skip_background_review() -> None:
 
 
 def test_persistence_failure_error_fallback_is_pinned_and_leaves_final_response_empty(monkeypatch, tmp_path) -> None:
-    """With no model text, result["error"] carries a profile-pinned `hermes doctor`, while the
+    """With no model text, result["error"] carries a profile-pinned `x19 doctor`, while the
     memory sync and the background-review gate still see the turn as having produced nothing."""
-    from hermes_constants import profile_cli_selector
+    from x19_constants import profile_cli_selector
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes" / "profiles" / "research"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19" / "profiles" / "research"))
     selector = profile_cli_selector()
     assert selector.strip()
     agent = _make_agent()
@@ -156,6 +156,6 @@ def test_persistence_failure_error_fallback_is_pinned_and_leaves_final_response_
         _should_review_memory=True,
         _turn_exit_reason="session_persistence_failed",
     )
-    assert f"`hermes {selector}doctor`" in result["error"]
+    assert f"`x19 {selector}doctor`" in result["error"]
     assert agent._sync_external_memory_for_turn.call_args.kwargs["final_response"] == ""
     agent._spawn_background_review.assert_not_called()

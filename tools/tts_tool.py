@@ -21,7 +21,7 @@ from typing import Callable, Dict, Any, List, Optional
 
 import copy
 
-from hermes_constants import display_hermes_home
+from x19_constants import display_x19_home
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +101,8 @@ DEFAULT_PROVIDER = "edge"
 
 
 def _get_default_output_dir() -> str:
-    from hermes_constants import get_hermes_dir
-    return str(get_hermes_dir("cache/audio", "audio_cache"))
+    from x19_constants import get_x19_dir
+    return str(get_x19_dir("cache/audio", "audio_cache"))
 
 
 DEFAULT_OUTPUT_DIR = _DEFAULT_OUTPUT_DIR_AT_IMPORT = _get_default_output_dir()
@@ -114,11 +114,11 @@ def _default_output_dir() -> str:
 
     Same bug class as skills_tool (f8723c478) and skills_sync (#65828): long-lived multi-profile runtimes
     (dashboard console, TUI/Desktop backend, cron, kanban workers) import this module once under the launch
-    HERMES_HOME and later scope requests to a different profile via
-    ``hermes_constants.set_hermes_home_override()`` — a frozen module constant keeps writing synthesized
+    X19_HOME and later scope requests to a different profile via
+    ``x19_constants.set_x19_home_override()`` — a frozen module constant keeps writing synthesized
     audio into the launch profile's cache instead of the active profile's (#98749). Keep the legacy
     ``DEFAULT_OUTPUT_DIR`` module attribute for tests and external patchers; when it has not been patched,
-    re-resolve from the live profile-scoped HERMES_HOME on every call.
+    re-resolve from the live profile-scoped X19_HOME on every call.
     """
     if DEFAULT_OUTPUT_DIR != _DEFAULT_OUTPUT_DIR_AT_IMPORT:
         return DEFAULT_OUTPUT_DIR
@@ -128,10 +128,10 @@ def _default_output_dir() -> str:
 def _load_tts_config() -> Dict[str, Any]:
     """Return the ``tts`` config section ({} when unavailable)."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         return load_config().get("tts") or {}
     except ImportError:
-        logger.debug("hermes_cli.config not available, using default TTS config")
+        logger.debug("x19_cli.config not available, using default TTS config")
     except Exception as e:
         logger.warning("Failed to load TTS config: %s", e, exc_info=True)
     return {}
@@ -165,18 +165,18 @@ _BUILTIN_DISPATCH: Dict[str, tuple] = {
     "xai": (None, "xAI TTS", "_generate_xai_tts", None),
     "mistral": (lambda: _importable(_import_mistral_client), "Mistral Voxtral TTS", "_generate_mistral_tts",
                 "Mistral provider selected but 'mistralai' package not installed. "
-                "Run `hermes setup` to install Mistral support."),
+                "Run `x19 setup` to install Mistral support."),
     "gemini": (None, "Google Gemini TTS", "_generate_gemini_tts", None),
     "neutts": (lambda: _check_neutts_available(), "NeuTTS (local)", "_generate_neutts",
                "NeuTTS provider selected but neutts is not installed. "
-               "Run hermes setup and choose NeuTTS, or install espeak-ng and run python -m pip install -U neutts[all]."),
+               "Run x19 setup and choose NeuTTS, or install espeak-ng and run python -m pip install -U neutts[all]."),
     "kittentts": (lambda: _importable(_import_kittentts), "KittenTTS (local, ~25MB)", "_generate_kittentts",
                   "KittenTTS provider selected but 'kittentts' package not installed. "
-                  "Run 'hermes setup tts' and choose KittenTTS, or install manually: "
+                  "Run 'x19 setup tts' and choose KittenTTS, or install manually: "
                   "pip install https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl"),
     "piper": (lambda: _importable(_import_piper), "Piper (local)", "_generate_piper_tts",
               "Piper provider selected but 'piper-tts' package not installed. "
-              "Run 'hermes tools' and select Piper under TTS, or install manually: "
+              "Run 'x19 tools' and select Piper under TTS, or install manually: "
               "pip install piper-tts")}
 
 
@@ -264,7 +264,7 @@ def _apply_call_overrides(tts_config: Dict[str, Any], speed: Optional[float], pr
 def _session_platform() -> tuple:
     """``(platform, wants_opus)`` — platforms delivering voice bubbles only as Ogg/Opus want Opus."""
     from gateway.session_context import get_session_env
-    platform = get_session_env("HERMES_SESSION_PLATFORM", "").lower()
+    platform = get_session_env("X19_SESSION_PLATFORM", "").lower()
     return platform, platform in OPUS_VOICE_PLATFORMS
 
 
@@ -520,7 +520,7 @@ def _tts_schema_overrides() -> dict:
     the multiplexed gateway serves every profile from one process, so a path baked in at import
     would name the launch profile's home for everyone else (#95685)."""
     params = copy.deepcopy(TTS_SCHEMA["parameters"])
-    params["properties"]["output_path"]["description"] = _output_path_description(display_hermes_home())
+    params["properties"]["output_path"]["description"] = _output_path_description(display_x19_home())
     return {"parameters": params}
 
 
@@ -536,7 +536,7 @@ TTS_SCHEMA = {
             },
             "output_path": {
                 "type": "string",
-                "description": _output_path_description("the profile HERMES_HOME")
+                "description": _output_path_description("the profile X19_HOME")
             },
             "speed": {
                 "type": "number",
@@ -578,108 +578,3 @@ registry.register(
     dynamic_schema_overrides=_tts_schema_overrides)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from concurrent.futures import Future  # noqa: F401,E402
-from typing import Iterator  # noqa: F401,E402
-from concurrent.futures import ThreadPoolExecutor  # noqa: F401,E402
-from typing import Tuple  # noqa: F401,E402
-import base64  # noqa: F401,E402
-from dataclasses import dataclass  # noqa: F401,E402
-from dataclasses import field  # noqa: F401,E402
-import platform  # noqa: F401,E402
-import queue  # noqa: F401,E402
-import re  # noqa: F401,E402
-import shlex  # noqa: F401,E402
-import shutil  # noqa: F401,E402
-import subprocess  # noqa: F401,E402
-import threading  # noqa: F401,E402
-import time  # noqa: F401,E402
-from urllib.parse import urljoin  # noqa: F401,E402
-from urllib.parse import urlparse  # noqa: F401,E402
-import uuid  # noqa: F401,E402
-
-GEMINI_TTS_CHANNELS = 1
-
-GEMINI_TTS_SAMPLE_RATE = 24000
-
-GEMINI_TTS_SAMPLE_WIDTH = 2  # 16-bit PCM (L16)
-
-FALLBACK_MAX_TEXT_LENGTH = 4000
-
-MAX_TEXT_LENGTH = FALLBACK_MAX_TEXT_LENGTH
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'AudioDeliveryProfile': ('tools.tts_tool_delivery', 'AudioDeliveryProfile'),
-    'COMMAND_TTS_OUTPUT_FORMATS': ('tools.tts_command_provider', 'COMMAND_TTS_OUTPUT_FORMATS'),
-    'DEFAULT_COMMAND_TTS_MAX_TEXT_LENGTH': ('tools.tts_command_provider', 'DEFAULT_COMMAND_TTS_MAX_TEXT_LENGTH'),
-    'DEFAULT_COMMAND_TTS_OUTPUT_FORMAT': ('tools.tts_command_provider', 'DEFAULT_COMMAND_TTS_OUTPUT_FORMAT'),
-    'DEFAULT_COMMAND_TTS_TIMEOUT_SECONDS': ('tools.tts_command_provider', 'DEFAULT_COMMAND_TTS_TIMEOUT_SECONDS'),
-    'DEFAULT_DEEPINFRA_TTS_VOICE': ('tools.tts_tool_openai', 'DEFAULT_DEEPINFRA_TTS_VOICE'),
-    'DEFAULT_EDGE_VOICE': ('tools.tts_tool_providers', 'DEFAULT_EDGE_VOICE'),
-    'DEFAULT_ELEVENLABS_MODEL_ID': ('tools.tts_tool_providers', 'DEFAULT_ELEVENLABS_MODEL_ID'),
-    'DEFAULT_ELEVENLABS_STREAMING_MODEL_ID': ('tools.tts_tool_providers', 'DEFAULT_ELEVENLABS_STREAMING_MODEL_ID'),
-    'DEFAULT_ELEVENLABS_VOICE_ID': ('tools.tts_tool_providers', 'DEFAULT_ELEVENLABS_VOICE_ID'),
-    'DEFAULT_GEMINI_AUDIO_TAGS': ('tools.tts_tool_providers', 'DEFAULT_GEMINI_AUDIO_TAGS'),
-    'DEFAULT_GEMINI_TTS_BASE_URL': ('tools.tts_tool_providers', 'DEFAULT_GEMINI_TTS_BASE_URL'),
-    'DEFAULT_GEMINI_TTS_MODEL': ('tools.tts_tool_providers', 'DEFAULT_GEMINI_TTS_MODEL'),
-    'DEFAULT_GEMINI_TTS_VOICE': ('tools.tts_tool_providers', 'DEFAULT_GEMINI_TTS_VOICE'),
-    'DEFAULT_KITTENTTS_MODEL': ('tools.tts_tool_local', 'DEFAULT_KITTENTTS_MODEL'),
-    'DEFAULT_KITTENTTS_VOICE': ('tools.tts_tool_local', 'DEFAULT_KITTENTTS_VOICE'),
-    'DEFAULT_MINIMAX_BASE_URL': ('tools.tts_tool_providers', 'DEFAULT_MINIMAX_BASE_URL'),
-    'DEFAULT_MINIMAX_CN_BASE_URL': ('tools.tts_tool_providers', 'DEFAULT_MINIMAX_CN_BASE_URL'),
-    'DEFAULT_MINIMAX_MODEL': ('tools.tts_tool_providers', 'DEFAULT_MINIMAX_MODEL'),
-    'DEFAULT_MINIMAX_VOICE_ID': ('tools.tts_tool_providers', 'DEFAULT_MINIMAX_VOICE_ID'),
-    'DEFAULT_MISTRAL_TTS_MODEL': ('tools.tts_tool_providers', 'DEFAULT_MISTRAL_TTS_MODEL'),
-    'DEFAULT_MISTRAL_TTS_VOICE_ID': ('tools.tts_tool_providers', 'DEFAULT_MISTRAL_TTS_VOICE_ID'),
-    'DEFAULT_OPENAI_BASE_URL': ('tools.tts_tool_openai', 'DEFAULT_OPENAI_BASE_URL'),
-    'DEFAULT_OPENAI_MODEL': ('tools.tts_tool_openai', 'DEFAULT_OPENAI_MODEL'),
-    'DEFAULT_OPENAI_VOICE': ('tools.tts_tool_openai', 'DEFAULT_OPENAI_VOICE'),
-    'DEFAULT_PIPER_VOICE': ('tools.tts_tool_local', 'DEFAULT_PIPER_VOICE'),
-    'DEFAULT_XAI_AUTO_SPEECH_TAGS': ('tools.tts_tool_providers', 'DEFAULT_XAI_AUTO_SPEECH_TAGS'),
-    'DEFAULT_XAI_BASE_URL': ('tools.tts_tool_providers', 'DEFAULT_XAI_BASE_URL'),
-    'DEFAULT_XAI_BIT_RATE': ('tools.tts_tool_providers', 'DEFAULT_XAI_BIT_RATE'),
-    'DEFAULT_XAI_LANGUAGE': ('tools.tts_tool_providers', 'DEFAULT_XAI_LANGUAGE'),
-    'DEFAULT_XAI_OPTIMIZE_STREAMING_LATENCY_DEFAULT': ('tools.tts_tool_providers', 'DEFAULT_XAI_OPTIMIZE_STREAMING_LATENCY_DEFAULT'),
-    'DEFAULT_XAI_SAMPLE_RATE': ('tools.tts_tool_providers', 'DEFAULT_XAI_SAMPLE_RATE'),
-    'DEFAULT_XAI_SPEED_DEFAULT': ('tools.tts_tool_providers', 'DEFAULT_XAI_SPEED_DEFAULT'),
-    'DEFAULT_XAI_SPEED_MAX': ('tools.tts_tool_providers', 'DEFAULT_XAI_SPEED_MAX'),
-    'DEFAULT_XAI_SPEED_MIN': ('tools.tts_tool_providers', 'DEFAULT_XAI_SPEED_MIN'),
-    'DEFAULT_XAI_TEXT_NORMALIZATION_DEFAULT': ('tools.tts_tool_providers', 'DEFAULT_XAI_TEXT_NORMALIZATION_DEFAULT'),
-    'DEFAULT_XAI_VOICE_ID': ('tools.tts_tool_providers', 'DEFAULT_XAI_VOICE_ID'),
-    'ELEVENLABS_MODEL_MAX_TEXT_LENGTH': ('tools.tts_tool_delivery', 'ELEVENLABS_MODEL_MAX_TEXT_LENGTH'),
-    'FALLBACK_MAX_TEXT_LENGTH': ('tools.tts_tool_delivery', 'FALLBACK_MAX_TEXT_LENGTH'),
-    'GEMINI_AUDIO_TAG_REWRITE_TASK': ('tools.tts_tool_providers', 'GEMINI_AUDIO_TAG_REWRITE_TASK'),
-    'MANAGED_OPENAI_TTS_MODELS': ('tools.tts_tool_openai', 'MANAGED_OPENAI_TTS_MODELS'),
-    'PROVIDER_MAX_TEXT_LENGTH': ('tools.tts_tool_delivery', 'PROVIDER_MAX_TEXT_LENGTH'),
-    'TTS_RESPONSE_BODY_CHUNK_BYTES': ('tools.tts_tool_providers', 'TTS_RESPONSE_BODY_CHUNK_BYTES'),
-    'TTS_RESPONSE_BODY_LIMIT_BYTES': ('tools.tts_tool_providers', 'TTS_RESPONSE_BODY_LIMIT_BYTES'),
-    'acquire_tts_lease': ('tools.tts_tool_lifecycle', 'acquire_tts_lease'),
-    'hermes_xai_user_agent': ('tools.xai_http', 'hermes_xai_user_agent'),
-    'managed_nous_tools_enabled': ('tools.tool_backend_helpers', 'managed_nous_tools_enabled'),
-    'nous_tool_gateway_unavailable_message': ('tools.tool_backend_helpers', 'nous_tool_gateway_unavailable_message'),
-    'read_selection': ('tools.tool_backend_helpers', 'read_selection'),
-    'release_tts_lease': ('tools.tts_tool_lifecycle', 'release_tts_lease'),
-    'release_tts_provider': ('tools.tts_tool_lifecycle', 'release_tts_provider'),
-    'resolve_managed_tool_gateway': ('tools.managed_tool_gateway', 'resolve_managed_tool_gateway'),
-    'resolve_openai_audio_api_key': ('tools.tool_backend_helpers', 'resolve_openai_audio_api_key'),
-    'selection_error': ('tools.tool_backend_helpers', 'selection_error'),
-    'stream_tts_to_speaker': ('tools.tts_tool_speaker', 'stream_tts_to_speaker'),
-    'tts_lease_holders': ('tools.tts_tool_lifecycle', 'tts_lease_holders'),
-    'warm_tts_provider': ('tools.tts_tool_lifecycle', 'warm_tts_provider'),
-    'windows_hide_flags': ('hermes_cli._subprocess_compat', 'windows_hide_flags'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

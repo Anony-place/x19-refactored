@@ -1,6 +1,6 @@
 """Regression: prevent transcript fork when two paths compress the same session_id.
 
-Damien's incident (Discord, 2026-05-28): a long Hermes session in a Discord
+Damien's incident (Discord, 2026-05-28): a long X19 session in a Discord
 gateway hit the compression threshold at the end of a turn.  The parent agent
 finished delivering the response and ``conversation_loop.py`` fired
 ``_spawn_background_review(...)`` — which builds a forked ``AIAgent`` that
@@ -42,7 +42,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 def _build_agent_with_db(
@@ -1288,12 +1288,12 @@ def _make_legacy_session_db_class() -> type:
     """Model the class retained in ``sys.modules`` before the lock API existed.
 
     During the real version-skew incident, a re-imported compression module
-    imports the same still-loaded ``hermes_state`` module, whose ``SessionDB``
+    imports the same still-loaded ``x19_state`` module, whose ``SessionDB``
     class is old. The test replaces that module attribute with this lockless
     class and forwards all persistence operations to a current real database.
     """
     source_path = inspect.getfile(SessionDB)
-    namespace = {"__name__": "hermes_state"}
+    namespace = {"__name__": "x19_state"}
     source = '''
 class SessionDB:
     def __init__(self, real_db):
@@ -1323,7 +1323,7 @@ class _NominalSessionDBImpostor:
         return getattr(self._real, name)
 
 
-_NominalSessionDBImpostor.__module__ = "hermes_state"
+_NominalSessionDBImpostor.__module__ = "x19_state"
 _NominalSessionDBImpostor.__name__ = "SessionDB"
 
 

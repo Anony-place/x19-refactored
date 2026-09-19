@@ -123,7 +123,7 @@ test('mentions render as inline references and Reply-to seeds the composer', asy
 
   // Storage truth: the stored text is untouched by rendering.
   const stored = await page.evaluate(room => {
-    const rooms = JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.group-chats') || '{}')
+    const rooms = JSON.parse(localStorage.getItem('x19.plugin.x19-bots.group-chats') || '{}')
 
     return (rooms[room]?.log || []).map((entry: any) => entry.text)[0]
   }, ROOM)

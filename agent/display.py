@@ -48,7 +48,7 @@ def _hex_rgb(h: str) -> tuple[int, int, int]:
 def _get_skin():
     """Active skin config, or None when unavailable (lazy import avoids cycles)."""
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from x19_cli.skin_engine import get_active_skin
         return get_active_skin()
     except Exception:
         return None
@@ -668,7 +668,7 @@ _DIFF_LINE_COLORS = (("@@", "hunk"), ("-", "minus"), ("+", "plus"), (" ", "dim")
 
 
 def _render_inline_unified_diff(diff: str) -> list[str]:
-    """Render unified diff lines in Hermes' inline transcript style."""
+    """Render unified diff lines in X19' inline transcript style."""
     rendered: list[str] = []
     from_file = to_file = None
     for raw_line in diff.splitlines():
@@ -835,7 +835,7 @@ class KawaiiSpinner:
         skin = _get_skin()
         wings = skin.get_spinner_wings() if skin else []
         while self.running:
-            if os.getenv("HERMES_SPINNER_PAUSE"):
+            if os.getenv("X19_SPINNER_PAUSE"):
                 time.sleep(0.1)
                 continue
             frame = self.spinner_frames[self.frame_idx % len(self.spinner_frames)]
@@ -1102,12 +1102,3 @@ def get_cute_tool_message(tool_name: str, args: dict, duration: float, result: s
         return f"┊ ⚡ {safe_name:9} completed  {safe_duration}"
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def get_friendly_tool_labels() -> bool:
-    """Return whether friendly tool labels are enabled."""
-    return _friendly_tool_labels
-# ---- END PLUGIN-COMPAT ----

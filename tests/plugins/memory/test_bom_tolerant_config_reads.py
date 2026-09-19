@@ -30,8 +30,8 @@ def _via_supermemory(p: Path, monkeypatch) -> dict:
 
 
 def _via_hindsight_runtime_deps(p: Path, monkeypatch) -> dict:
-    import hermes_cli.memory_setup as ms
-    monkeypatch.setattr(ms, "get_hermes_home", lambda: p.parent.parent)  # <home>/hindsight/config.json
+    import x19_cli.memory_setup as ms
+    monkeypatch.setattr(ms, "get_x19_home", lambda: p.parent.parent)  # <home>/hindsight/config.json
     deps = ms._provider_pip_dependencies("hindsight", ["hindsight-client"])
     return {"workspace": "bom-ws" if "hindsight-all" in deps else None, "container_tag": None}
 
@@ -57,7 +57,7 @@ def test_plugin_config_json_tolerates_bom(tmp_path, monkeypatch, filename, loade
 
 
 def test_qwen_cli_tokens_tolerate_bom(tmp_path, monkeypatch):
-    import hermes_cli.auth as auth_mod
+    import x19_cli.auth as auth_mod
 
     creds = _write_bom_json(tmp_path / "oauth_creds.json", {"access_token": "tok", "expiry_date": 4102444800000})
     monkeypatch.setattr(auth_mod, "_qwen_cli_auth_path", lambda: creds)

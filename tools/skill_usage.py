@@ -1,4 +1,4 @@
-"""Skill usage telemetry + provenance for the Curator: a sidecar ``~/.hermes/skills/.usage.json`` keyed by
+"""Skill usage telemetry + provenance for the Curator: a sidecar ``~/.x19/skills/.usage.json`` keyed by
 skill name (never frontmatter — keeps telemetry out of user-authored SKILL.md and off bundled/hub skills).
 Counter bumps are best-effort (DEBUG-logged failures never break the tool call); writes are atomic under a
 cross-process lock. Curator management is an explicit ``created_by: agent`` marker written by skill_manage —
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 from agent.skill_utils import is_excluded_skill_path, is_external_skill_path
 from utils import atomic_write_text
 
@@ -44,7 +44,7 @@ def is_protected_builtin(skill_name: str) -> bool:
 
 
 def _skills_dir() -> Path:
-    return get_hermes_home() / "skills"
+    return get_x19_home() / "skills"
 
 
 def _usage_file() -> Path:
@@ -183,7 +183,7 @@ def _read_hub_installed_names() -> Set[str]:
 def _prune_builtins_enabled() -> bool:
     """``curator.prune_builtins`` (default True); lazy config import keeps this module importable during update/sync."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         cur = load_config().get("curator")
         return bool(cur.get("prune_builtins", True)) if isinstance(cur, dict) else True
     except Exception as e:  # pragma: no cover — best-effort config read
@@ -439,7 +439,7 @@ def telemetry_provenance(skill_name: str, record: Optional[Dict[str, Any]] = Non
         return "installed"
     if ":" in skill_name:
         with suppress(Exception):
-            from hermes_cli.plugins import get_plugin_manager
+            from x19_cli.plugins import get_plugin_manager
             if get_plugin_manager().find_plugin_skill(skill_name) is not None:
                 return "installed"
     if label := {"installed": "installed", "agent": "agent_created"}.get(
@@ -455,7 +455,7 @@ def _emit_skill_lifecycle(skill_name: str, action: str, *, record: Optional[Dict
     """Best-effort lifecycle hook after an authoritative state change; facts absent from *record* go as None."""
     facts = record or {}
     try:
-        from hermes_cli.lifecycle import has_hook, invoke_hook
+        from x19_cli.lifecycle import has_hook, invoke_hook
         if has_hook("on_skill_lifecycle"):
             invoke_hook("on_skill_lifecycle", action=action, skill_name=skill_name,
                         provenance=telemetry_provenance(skill_name, record), task_id=task_id or "",
@@ -700,64 +700,3 @@ def usage_report() -> List[Dict[str, Any]]:
             for n in sorted({name for name, _md in _iter_skill_mds(base, local_only=False)})]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import tempfile  # noqa: F401,E402
-import os  # noqa: F401,E402
-import os  # noqa: F401,E402
-import tempfile  # noqa: F401,E402
-
-def _suppressed_file() -> Path:
-    return _skills_dir() / ".curator_suppressed"
-
-def _write_suppressed_names(names: Set[str]) -> None:
-    path = _suppressed_file()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = "\n".join(sorted(names)) + ("\n" if names else "")
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".curator_suppressed_", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(data)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, path)
-        except BaseException:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-            raise
-    except Exception as e:
-        logger.debug("Failed to write curator suppression list: %s", e, exc_info=True)
-
-def add_suppressed_name(skill_name: str) -> None:
-    """Record that a built-in skill was pruned, so sync won't restore it."""
-    if not skill_name:
-        return
-    names = read_suppressed_names()
-    if skill_name not in names:
-        names.add(skill_name)
-        _write_suppressed_names(names)
-
-def agent_created_report() -> List[Dict[str, Any]]:
-    """DEPRECATED — use :func:`curated_report` instead.
-
-    Used to return everything :func:`curated_report` returns (including bundled
-    skills when ``curator.prune_builtins`` is enabled), which made the
-    "agent-created" name misleading. Kept as a compatibility alias for
-    external callers; new code should call ``curated_report()``.
-    """
-    return curated_report()
-
-def remove_suppressed_name(skill_name: str) -> None:
-    """Clear a built-in's suppression entry (e.g. on restore)."""
-    if not skill_name:
-        return
-    names = read_suppressed_names()
-    if skill_name in names:
-        names.discard(skill_name)
-        _write_suppressed_names(names)
-# ---- END PLUGIN-COMPAT ----

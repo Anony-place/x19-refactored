@@ -8,7 +8,7 @@ cause and are covered here:
   (``agent.model_metadata.fetch_endpoint_model_metadata`` via
   ``_resolve_requests_verify``).
 * ``urllib``-based ``/models`` catalog discovery probe
-  (``hermes_cli.models.probe_api_models`` via ``_custom_provider_ssl_context``).
+  (``x19_cli.models.probe_api_models`` via ``_custom_provider_ssl_context``).
 
 Both previously resolved TLS from process-wide env vars only, so a custom
 endpoint whose chain verifies against the provider's configured bundle (but not
@@ -29,10 +29,10 @@ import certifi
 import pytest
 
 from agent.model_metadata import _resolve_requests_verify
-from hermes_cli.models import _custom_provider_ssl_context
+from x19_cli.models import _custom_provider_ssl_context
 
 _CA_ENV_VARS = (
-    "HERMES_CA_BUNDLE",
+    "X19_CA_BUNDLE",
     "REQUESTS_CA_BUNDLE",
     "SSL_CERT_FILE",
     "CURL_CA_BUNDLE",
@@ -79,7 +79,7 @@ class TestResolveRequestsVerifyProviderScoped:
 
     def test_provider_ca_used_for_matching_base_url(self, clean_env, bundle_file):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert=bundle_file),
         ):
             assert _resolve_requests_verify(_BASE) == bundle_file
@@ -89,37 +89,37 @@ class TestResolveRequestsVerifyProviderScoped:
         env_bundle.write_text("stub")
         clean_env.setenv("SSL_CERT_FILE", str(env_bundle))
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert=bundle_file),
         ):
             assert _resolve_requests_verify(_BASE) == bundle_file
 
     def test_provider_ssl_verify_false_disables(self, clean_env):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_verify=False),
         ):
             assert _resolve_requests_verify(_BASE) is False
 
     def test_no_base_url_does_not_consult_config(self, clean_env, bundle_file):
         """Existing callers pass no base_url — env-only behavior, no config read."""
-        clean_env.setenv("HERMES_CA_BUNDLE", bundle_file)
+        clean_env.setenv("X19_CA_BUNDLE", bundle_file)
         probe = MagicMock(return_value=[])
-        with patch("hermes_cli.config.get_compatible_custom_providers", probe):
+        with patch("x19_cli.config.get_compatible_custom_providers", probe):
             assert _resolve_requests_verify() == bundle_file
         probe.assert_not_called()
 
     def test_unmatched_base_url_falls_through_to_env(self, clean_env, bundle_file):
         clean_env.setenv("REQUESTS_CA_BUNDLE", bundle_file)
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers("https://other.example.invalid/v1", ssl_ca_cert="/nope.pem"),
         ):
             assert _resolve_requests_verify(_BASE) == bundle_file
 
     def test_unmatched_base_url_no_env_returns_true(self, clean_env):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=[],
         ):
             assert _resolve_requests_verify(_BASE) is True
@@ -127,7 +127,7 @@ class TestResolveRequestsVerifyProviderScoped:
     def test_provider_ca_missing_file_falls_through_to_env(self, clean_env, bundle_file):
         clean_env.setenv("SSL_CERT_FILE", bundle_file)
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert="/does/not/exist.pem"),
         ):
             assert _resolve_requests_verify(_BASE) == bundle_file
@@ -135,7 +135,7 @@ class TestResolveRequestsVerifyProviderScoped:
     def test_config_lookup_failure_falls_through_to_env(self, clean_env, bundle_file):
         clean_env.setenv("SSL_CERT_FILE", bundle_file)
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             side_effect=RuntimeError("config boom"),
         ):
             assert _resolve_requests_verify(_BASE) == bundle_file
@@ -146,7 +146,7 @@ class TestCustomProviderSSLContext:
 
     def test_returns_verifying_context_with_provider_ca(self, real_ca):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert=real_ca),
         ):
             ctx = _custom_provider_ssl_context(_BASE)
@@ -155,7 +155,7 @@ class TestCustomProviderSSLContext:
 
     def test_ssl_verify_false_returns_unverified_context(self):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_verify=False),
         ):
             ctx = _custom_provider_ssl_context(_BASE)
@@ -168,21 +168,21 @@ class TestCustomProviderSSLContext:
 
     def test_unmatched_returns_none(self):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=[],
         ):
             assert _custom_provider_ssl_context(_BASE) is None
 
     def test_missing_ca_file_returns_none(self):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert="/does/not/exist.pem"),
         ):
             assert _custom_provider_ssl_context(_BASE) is None
 
     def test_config_lookup_failure_returns_none(self):
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             side_effect=RuntimeError("config boom"),
         ):
             assert _custom_provider_ssl_context(_BASE) is None
@@ -206,7 +206,7 @@ class TestMetadataProbeThreadsProviderCA:
         mm._endpoint_model_metadata_cache.clear()
         mm._endpoint_model_metadata_cache_time.clear()
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert=bundle_file),
         ), patch.object(mm.requests, "get", side_effect=fake_get):
             mm.fetch_endpoint_model_metadata(_BASE, force_refresh=True)
@@ -228,7 +228,7 @@ class TestMetadataProbeThreadsProviderCA:
         mm._endpoint_model_metadata_cache.clear()
         mm._endpoint_model_metadata_cache_time.clear()
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=[],
         ), patch.object(mm.requests, "get", side_effect=fake_get):
             mm.fetch_endpoint_model_metadata(_BASE, force_refresh=True)
@@ -241,14 +241,14 @@ class TestCatalogProbeThreadsSSLContext:
 
     @pytest.fixture(autouse=True)
     def _clear_probe_neg_cache(self):
-        import hermes_cli.models as models
+        import x19_cli.models as models
 
         models._probe_neg_cache.clear()
         yield
         models._probe_neg_cache.clear()
 
     def test_probe_api_models_passes_ssl_context(self, clean_env, real_ca):
-        import hermes_cli.models as models
+        import x19_cli.models as models
 
         captured = {}
 
@@ -257,7 +257,7 @@ class TestCatalogProbeThreadsSSLContext:
             raise urllib.error.URLError("stop after capture")
 
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=_providers(_BASE, ssl_ca_cert=real_ca),
         ), patch.object(models, "open_credentialed_url", side_effect=fake_open):
             models.probe_api_models(None, _BASE, timeout=1)
@@ -266,7 +266,7 @@ class TestCatalogProbeThreadsSSLContext:
         assert captured["ssl_context"].verify_mode == ssl.CERT_REQUIRED
 
     def test_probe_api_models_public_endpoint_uses_default_policy(self, clean_env):
-        import hermes_cli.models as models
+        import x19_cli.models as models
 
         captured = {}
 
@@ -275,7 +275,7 @@ class TestCatalogProbeThreadsSSLContext:
             raise urllib.error.URLError("stop after capture")
 
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=[],
         ), patch.object(models, "open_credentialed_url", side_effect=fake_open):
             models.probe_api_models(None, _BASE, timeout=1)
@@ -290,7 +290,7 @@ class TestCatalogProbeThreadsSSLContext:
         must keep the original 2-arg call shape when no per-provider override
         applies, so a strict 2-arg mock still works.
         """
-        import hermes_cli.models as models
+        import x19_cli.models as models
 
         class _Resp:
             def __enter__(self):
@@ -309,7 +309,7 @@ class TestCatalogProbeThreadsSSLContext:
             return _Resp()
 
         with patch(
-            "hermes_cli.config.get_compatible_custom_providers",
+            "x19_cli.config.get_compatible_custom_providers",
             return_value=[],
         ), patch.object(
             models, "_urlopen_model_catalog_request", side_effect=_strict_two_arg

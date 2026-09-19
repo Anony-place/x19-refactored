@@ -29,12 +29,12 @@ from utils import base_url_host_matches, base_url_hostname
 import fire
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.console import Console
-from hermes_constants import OPENROUTER_BASE_URL, get_hermes_home
+from x19_constants import OPENROUTER_BASE_URL, get_x19_home
 from agent.retry_utils import jittered_backoff
-from hermes_cli.env_loader import load_hermes_dotenv
+from x19_cli.env_loader import load_x19_dotenv
 
-# Load .env from HERMES_HOME first, then project root as a dev fallback.
-load_hermes_dotenv(hermes_home=get_hermes_home(), project_env=Path(__file__).parent / ".env")
+# Load .env from X19_HOME first, then project root as a dev fallback.
+load_x19_dotenv(x19_home=get_x19_home(), project_env=Path(__file__).parent / ".env")
 
 
 def _response_finish_reason(response: Any) -> str:
@@ -311,7 +311,7 @@ class TrajectoryCompressor:
             from agent.auxiliary_client import resolve_provider_client
             client, _ = resolve_provider_client(provider, model=self.config.summarization_model)
             if client is None:
-                raise RuntimeError(f"Provider '{provider}' is not configured. Check your API key or run: hermes setup")
+                raise RuntimeError(f"Provider '{provider}' is not configured. Check your API key or run: x19 setup")
             self.client = self.async_client = None  # Not used directly
         else:
             # Custom endpoint — use config's raw base_url + api_key_env

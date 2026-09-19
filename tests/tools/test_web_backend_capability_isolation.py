@@ -61,5 +61,5 @@ def test_ladder_derived_firecrawl_takes_managed_path_on_gateway_ready_install(mo
     monkeypatch.setattr(prov, "Firecrawl", lambda **kwargs: SimpleNamespace(kwargs=kwargs), raising=False)
 
     assert prov.check_firecrawl_api_key() is True
-    # Broken before the fix: ValueError "web is configured to use firecrawl (set via hermes tools)".
+    # Broken before the fix: ValueError "web is configured to use firecrawl (set via x19 tools)".
     prov._get_firecrawl_client()

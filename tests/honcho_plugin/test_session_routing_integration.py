@@ -5,7 +5,7 @@ import subprocess
 import pytest
 
 from agent import runtime_cwd
-from hermes_state import SessionDB
+from x19_state import SessionDB
 from plugins.memory.honcho import HonchoMemoryProvider
 from plugins.memory.honcho.client import HonchoClientConfig
 

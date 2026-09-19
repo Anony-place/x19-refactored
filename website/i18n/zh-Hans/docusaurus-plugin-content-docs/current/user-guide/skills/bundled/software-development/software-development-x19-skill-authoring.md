@@ -65,7 +65,7 @@ version: 1.0.0
 author: X19
 license: MIT
 metadata:
-  hermes:
+  x19:
     tags: [short, descriptive, tags]
     related_skills: [other-skill, another-skill]
 ---
@@ -145,7 +145,7 @@ skills/<category>/<skill-name>/SKILL.md
 
 ## 交叉引用其他 Skill
 
-`metadata.hermes.related_skills` 在加载时会合并两个目录树（仓库内 `skills/` 和 `~/.x19/skills/`）。你**可以**从仓库内 skill 引用用户本地 skill，但对于全新克隆仓库的其他用户，该引用无法解析。仓库内 skill 优先只引用仓库内 skill。如果某个频繁被引用的 skill 仅存在于 `~/.x19/skills/`，请考虑将其提升到仓库中。
+`metadata.x19.related_skills` 在加载时会合并两个目录树（仓库内 `skills/` 和 `~/.x19/skills/`）。你**可以**从仓库内 skill 引用用户本地 skill，但对于全新克隆仓库的其他用户，该引用无法解析。仓库内 skill 优先只引用仓库内 skill。如果某个频繁被引用的 skill 仅存在于 `~/.x19/skills/`，请考虑将其提升到仓库中。
 
 ## 编辑现有仓库内 Skill
 
@@ -174,7 +174,7 @@ skills/<category>/<skill-name>/SKILL.md
 
 - [ ] 文件位于 `skills/<category>/<name>/SKILL.md`（不在 `~/.x19/skills/` 中）
 - [ ] Frontmatter 从字节 0 以 `---` 开头，以 `\n---\n` 结束
-- [ ] `name`、`description`、`version`、`author`、`license`、`metadata.hermes.{tags, related_skills}` 均已填写
+- [ ] `name`、`description`、`version`、`author`、`license`、`metadata.x19.{tags, related_skills}` 均已填写
 - [ ] Name ≤ 64 个字符，小写加连字符
 - [ ] Description ≤ 1024 个字符，且以"Use when ..."开头
 - [ ] 文件总大小 ≤ 100,000 个字符（目标 8-15k）

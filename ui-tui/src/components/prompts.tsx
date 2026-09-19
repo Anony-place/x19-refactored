@@ -1,4 +1,4 @@
-import { Box, Text, useInput, wrapAnsi } from '@hermes/ink'
+import { Box, Text, useInput, wrapAnsi } from '@x19/ink'
 import { useEffect, useState } from 'react'
 
 import { isMac } from '../lib/platform.js'

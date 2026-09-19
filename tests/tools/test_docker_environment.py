@@ -105,7 +105,7 @@ def test_auto_mount_host_cwd_adds_volume(monkeypatch, tmp_path):
 
 def test_non_persistent_cleanup_removes_container(monkeypatch):
     """When persist_across_processes=false, cleanup() must docker stop AND
-    docker rm so containers don't leak across hermes processes.
+    docker rm so containers don't leak across x19 processes.
 
     Updated for issue #20561: the previous implementation used fire-and-forget
     ``subprocess.Popen("... &", shell=True)`` which raced with parent exit;
@@ -167,23 +167,23 @@ def _make_execute_only_env(forward_env=None):
     env._docker_exe = "/usr/bin/docker"
     # Base class attributes needed by unified execute()
     env._session_id = "test123"
-    env._snapshot_path = "/tmp/hermes-snap-test123.sh"
-    env._cwd_file = "/tmp/hermes-cwd-test123.txt"
-    env._cwd_marker = "__HERMES_CWD_test123__"
+    env._snapshot_path = "/tmp/x19-snap-test123.sh"
+    env._cwd_file = "/tmp/x19-cwd-test123.txt"
+    env._cwd_marker = "__X19_CWD_test123__"
     env._snapshot_ready = True
     env._last_sync_time = None
     env._init_env_args = []
     return env
 
 
-def test_init_env_args_uses_hermes_dotenv_for_allowlisted_env(monkeypatch):
+def test_init_env_args_uses_x19_dotenv_for_allowlisted_env(monkeypatch):
     """_build_init_env_args picks up forwarded env vars from .env file at init time."""
-    # Use a var that is NOT in _HERMES_PROVIDER_ENV_BLOCKLIST (GITHUB_TOKEN
+    # Use a var that is NOT in _X19_PROVIDER_ENV_BLOCKLIST (GITHUB_TOKEN
     # is in the copilot provider's api_key_env_vars and gets stripped).
     env = _make_execute_only_env(["DATABASE_URL"])
 
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {"DATABASE_URL": "value_from_dotenv"})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {"DATABASE_URL": "value_from_dotenv"})
 
     args = env._build_init_env_args()
 
@@ -194,12 +194,12 @@ def test_init_env_args_uses_hermes_dotenv_for_allowlisted_env(monkeypatch):
     assert env._init_env_values["DATABASE_URL"] == "value_from_dotenv"
 
 
-def test_init_env_args_prefers_shell_env_over_hermes_dotenv(monkeypatch):
+def test_init_env_args_prefers_shell_env_over_x19_dotenv(monkeypatch):
     """Shell env vars take priority over .env file values in init env args."""
     env = _make_execute_only_env(["DATABASE_URL"])
 
     monkeypatch.setenv("DATABASE_URL", "value_from_shell")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {"DATABASE_URL": "value_from_dotenv"})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {"DATABASE_URL": "value_from_dotenv"})
 
     args = env._build_init_env_args()
 
@@ -208,17 +208,17 @@ def test_init_env_args_prefers_shell_env_over_hermes_dotenv(monkeypatch):
     assert not any("value_from_dotenv" in a for a in args)
 
 
-def test_init_env_args_uses_hermes_dotenv_for_empty_shell_env(monkeypatch):
+def test_init_env_args_uses_x19_dotenv_for_empty_shell_env(monkeypatch):
     """A transient empty-string in the live env must fall back to .env, not win.
 
     Regression: the disk fallback used to fire only on `value is None`, so a
     present-but-empty `MY_SECRET=""` skipped it and was forwarded as `-e
-    MY_SECRET=`, clobbering the correct value sitting in ~/.hermes/.env.
+    MY_SECRET=`, clobbering the correct value sitting in ~/.x19/.env.
     """
     env = _make_execute_only_env(["MY_SECRET"])
 
     monkeypatch.setenv("MY_SECRET", "")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {"MY_SECRET": "value_from_dotenv"})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {"MY_SECRET": "value_from_dotenv"})
 
     args = env._build_init_env_args()
 
@@ -234,7 +234,7 @@ def test_init_env_args_uses_active_profile_for_forwarded_env(monkeypatch):
 
     env = _make_execute_only_env(forward_env=["SERVICE_TOKEN"])
     monkeypatch.setenv("SERVICE_TOKEN", "token-for-default")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {})
     ss.set_multiplex_active(True)
     token = ss.set_secret_scope({"SERVICE_TOKEN": "token-for-routed-profile"})
     try:
@@ -254,7 +254,7 @@ def test_init_env_args_omits_missing_scoped_forwarded_env(monkeypatch):
 
     env = _make_execute_only_env(forward_env=["SERVICE_TOKEN"])
     monkeypatch.setenv("SERVICE_TOKEN", "token-for-default")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {})
     ss.set_multiplex_active(True)
     token = ss.set_secret_scope({})
     try:
@@ -274,7 +274,7 @@ def test_runtime_exec_tracks_scope_and_clears_missing_value(monkeypatch):
 
     env = _make_execute_only_env(forward_env=["SERVICE_TOKEN"])
     monkeypatch.setenv("SERVICE_TOKEN", "token-for-default")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {})
     calls = []
     monkeypatch.setattr(
         docker_env,
@@ -323,7 +323,7 @@ def test_wrapped_exec_scopes_explicit_forward_env_across_profiles(monkeypatch, t
         encoding="utf-8",
     )
     monkeypatch.setenv("EXPLICIT_TOKEN", "token-for-default")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {})
 
     def _run_fake_docker_exec(cmd, stdin_data=None, **kwargs):
         """Execute the generated docker exec command in a real local bash."""
@@ -414,7 +414,7 @@ def test_egress_node_options_overrides_conflicting_ca_flag(monkeypatch):
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     monkeypatch.setattr(
         docker_env, "_egress_proxy_args_for_docker",
-        lambda: ([], {"_HERMES_EGRESS_NODE_OPTIONS_APPEND": "--use-openssl-ca"}, []),
+        lambda: ([], {"_X19_EGRESS_NODE_OPTIONS_APPEND": "--use-openssl-ca"}, []),
     )
     calls = _mock_subprocess_run(monkeypatch)
 
@@ -433,7 +433,7 @@ def test_forward_env_overrides_docker_env_in_init_args(monkeypatch):
     env._env = {"MY_KEY": "static_value"}
 
     monkeypatch.setenv("MY_KEY", "dynamic_value")
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {})
 
     args = env._build_init_env_args()
 
@@ -457,7 +457,7 @@ def test_normalize_env_dict_filters_invalid_keys():
 def test_security_args_include_setuid_setgid_for_privdrop(monkeypatch):
     """The default (run_as_host_user=False) invocation must include SETUID and
     SETGID caps so the image's init can drop from root to a non-root user
-    (e.g. via ``s6-setuidgid`` in the bundled Hermes image, or ``gosu``/``su``
+    (e.g. via ``s6-setuidgid`` in the bundled X19 image, or ``gosu``/``su``
     in user-provided images).
 
     Without these caps the privilege-drop helper fails with
@@ -502,7 +502,7 @@ def test_snap_compat_drops_only_init_and_no_new_privileges(monkeypatch):
     assert "--init" not in compat and "no-new-privileges" not in compat
 
     def strip(argv):  # everything except the two flags and the random container name
-        return [a for a in argv if a not in ("--init", "--security-opt", "no-new-privileges") and not a.startswith("hermes-")]
+        return [a for a in argv if a not in ("--init", "--security-opt", "no-new-privileges") and not a.startswith("x19-")]
 
     assert strip(default) == strip(compat)
 
@@ -584,10 +584,10 @@ def _labels_in_run_args(run_args):
     }
 
 
-def test_run_command_tags_hermes_agent_label(monkeypatch):
-    """Every container hermes-agent starts must carry the hermes-agent=1 label
+def test_run_command_tags_x19_agent_label(monkeypatch):
+    """Every container x19 starts must carry the x19=1 label
     so the orphan reaper (and external operators) can identify them with a
-    single ``docker ps --filter label=hermes-agent=1`` call. Regression test
+    single ``docker ps --filter label=x19=1`` call. Regression test
     for issue #20561 — without the label there is no global sweep target."""
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     calls = _mock_subprocess_run(monkeypatch)
@@ -595,8 +595,8 @@ def test_run_command_tags_hermes_agent_label(monkeypatch):
     _make_dummy_env(task_id="my-task")
 
     labels = _labels_in_run_args(_run_args_from_calls(calls))
-    assert "hermes-agent=1" in labels, (
-        f"hermes-agent=1 label missing; got labels: {sorted(labels)}"
+    assert "x19=1" in labels, (
+        f"x19=1 label missing; got labels: {sorted(labels)}"
     )
 
 
@@ -628,7 +628,7 @@ def test_run_command_sanitizes_unsafe_task_id(monkeypatch):
 
     labels = _labels_in_run_args(_run_args_from_calls(calls))
     # Each non-OK character becomes an underscore; the safe chars survive.
-    assert "hermes-task-id=task_with_weird_chars" in labels, (
+    assert "x19-task-id=task_with_weird_chars" in labels, (
         f"sanitized task-id label missing; got: {sorted(labels)}"
     )
 
@@ -751,10 +751,10 @@ def test_labels_attribute_populated_after_init(monkeypatch):
     env = _make_dummy_env(task_id="abc")
 
     assert env._labels == {
-        "hermes-agent": "1",
-        "hermes-task-id": "abc",
-        "hermes-profile": "default",
-        "hermes-egress": "off",
+        "x19": "1",
+        "x19-task-id": "abc",
+        "x19-profile": "default",
+        "x19-egress": "off",
     }
 
 
@@ -769,9 +769,9 @@ def test_shared_container_key_replaces_profile_identity(monkeypatch):
 
     # Deterministic across processes/profiles, not the profile label, and
     # digest-suffixed (label sanitization alone is lossy).
-    assert a._labels["hermes-profile"] == b._labels["hermes-profile"]
-    assert a._labels["hermes-profile"] != "research"
-    assert a._labels["hermes-profile"].startswith("team_workspace-")
+    assert a._labels["x19-profile"] == b._labels["x19-profile"]
+    assert a._labels["x19-profile"] != "research"
+    assert a._labels["x19-profile"].startswith("team_workspace-")
 
 
 def test_distinct_shared_keys_never_collide(monkeypatch):
@@ -785,17 +785,17 @@ def test_distinct_shared_keys_never_collide(monkeypatch):
     # Sanitize-collision pair: both stems clean to "team_workspace".
     a = _make_dummy_env(task_id="abc", shared_container_key="team/workspace")
     b = _make_dummy_env(task_id="abc", shared_container_key="team_workspace")
-    assert a._labels["hermes-profile"] != b._labels["hermes-profile"]
+    assert a._labels["x19-profile"] != b._labels["x19-profile"]
 
     # Truncation pair: identical first 63 chars, differ after.
     long_a = "x" * 70 + "A"
     long_b = "x" * 70 + "B"
     c = _make_dummy_env(task_id="abc", shared_container_key=long_a)
     d = _make_dummy_env(task_id="abc", shared_container_key=long_b)
-    assert c._labels["hermes-profile"] != d._labels["hermes-profile"]
+    assert c._labels["x19-profile"] != d._labels["x19-profile"]
     # Both stay within Docker's 63-char label-value bound.
-    assert len(c._labels["hermes-profile"]) <= 63
-    assert len(d._labels["hermes-profile"]) <= 63
+    assert len(c._labels["x19-profile"]) <= 63
+    assert len(d._labels["x19-profile"]) <= 63
 
 
 def test_empty_shared_container_key_preserves_profile_isolation(monkeypatch):
@@ -805,7 +805,7 @@ def test_empty_shared_container_key_preserves_profile_isolation(monkeypatch):
 
     env = _make_dummy_env(task_id="abc", shared_container_key="")
 
-    assert env._labels["hermes-profile"] == "research"
+    assert env._labels["x19-profile"] == "research"
 
 
 # ── Cross-process container reuse (issue #20561) ──────────────────
@@ -860,7 +860,7 @@ def _mock_subprocess_run_with_reuse(monkeypatch, ps_state: str | None,
 def test_reuse_attaches_to_running_container_without_docker_run(monkeypatch):
     """When a labeled container is already ``running``, the reuse probe
     must pick it up and skip ``docker run`` entirely. Regression for the
-    issue #20561 root cause: every Hermes process spawning a new container
+    issue #20561 root cause: every X19 process spawning a new container
     despite docs claiming "ONE long-lived container shared across sessions"."""
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     monkeypatch.setattr(docker_env, "_get_active_profile_name", lambda: "default")
@@ -894,7 +894,7 @@ def test_egress_enabled_does_not_reuse_pre_egress_container(monkeypatch):
         docker_env,
         "_egress_proxy_args_for_docker",
         lambda: (
-            ["-v", "/tmp/ca:/etc/ssl/certs/hermes-egress-ca.crt:ro"],
+            ["-v", "/tmp/ca:/etc/ssl/certs/x19-egress-ca.crt:ro"],
             {"HTTPS_PROXY": "http://host.docker.internal:9090"},
             ["--add-host", "host.docker.internal:host-gateway"],
         ),
@@ -910,7 +910,7 @@ def test_egress_enabled_does_not_reuse_pre_egress_container(monkeypatch):
             if sub == "ps":
                 # Simulate an old pre-egress container: without the egress label
                 # filter it would match; with the filter Docker returns no match.
-                assert any(str(part).startswith("label=hermes-egress=") for part in cmd)
+                assert any(str(part).startswith("label=x19-egress=") for part in cmd)
                 return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
             if sub == "run":
                 return subprocess.CompletedProcess(cmd, 0, stdout="fresh-cid\n", stderr="")
@@ -956,7 +956,7 @@ def test_reuse_probe_format_is_podman_compatible(monkeypatch):
                             stderr="Error: can't evaluate field Label in type struct",
                         )
                     assert any(
-                        str(part) == "label=hermes-egress=off" for part in cmd
+                        str(part) == "label=x19-egress=off" for part in cmd
                     ), "egress=off posture must be expressed as a label filter"
                     return subprocess.CompletedProcess(
                         cmd, 0, stdout="podman-cid\trunning\n", stderr="",
@@ -981,7 +981,7 @@ def test_reuse_probe_format_is_podman_compatible(monkeypatch):
 
 
 def test_extra_args_proxy_override_refuses_under_egress(monkeypatch):
-    """docker_extra_args are appended after Hermes args, so egress enforcement
+    """docker_extra_args are appended after X19 args, so egress enforcement
     must reject critical overrides before Docker sees them."""
 
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
@@ -1002,7 +1002,7 @@ def test_extra_args_proxy_override_refuses_under_egress(monkeypatch):
 
 def test_reuse_starts_stopped_container_before_attaching(monkeypatch):
     """A labeled container in ``exited`` state must be restarted via
-    ``docker start`` before the new Hermes process uses it. Without this
+    ``docker start`` before the new X19 process uses it. Without this
     step, ``docker exec`` against a stopped container errors out and the
     first agent command fails opaquely."""
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
@@ -1058,7 +1058,7 @@ def test_failed_docker_run_cleans_up_orphaned_container(monkeypatch):
     assert len(cleanup_calls) == 1, "docker rm should be called once for the orphaned container"
     rm_cmd = cleanup_calls[0]
     assert rm_cmd[1] == "rm" and rm_cmd[2] == "-f"
-    assert rm_cmd[3].startswith("hermes-"), "should remove the container by its generated name"
+    assert rm_cmd[3].startswith("x19-"), "should remove the container by its generated name"
 
 
 def test_docker_run_timeout_cleans_up_orphaned_container(monkeypatch):
@@ -1093,7 +1093,7 @@ def test_docker_run_timeout_cleans_up_orphaned_container(monkeypatch):
     assert len(cleanup_calls) == 1, "docker rm should be called once for the orphaned container"
     rm_cmd = cleanup_calls[0]
     assert rm_cmd[1] == "rm" and rm_cmd[2] == "-f"
-    assert rm_cmd[3].startswith("hermes-"), "should remove the container by its generated name"
+    assert rm_cmd[3].startswith("x19-"), "should remove the container by its generated name"
 
 
 def test_find_reusable_handles_empty_label_string(monkeypatch):
@@ -1164,7 +1164,7 @@ def test_cleanup_with_persist_is_noop_for_container(monkeypatch):
     processes inside the container (npm watchers, pytest watchers, etc.).
 
     Resource reclamation in this mode happens via the orphan reaper on next
-    Hermes startup, not on graceful exit. Issue #20561 — the first iteration
+    X19 startup, not on graceful exit. Issue #20561 — the first iteration
     of this PR did docker stop here, which Ben caught as contradicting the
     "ONE long-lived container" semantics."""
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
@@ -1499,7 +1499,7 @@ def test_credential_mount_skipped_when_source_is_directory(monkeypatch, tmp_path
 
     # Mock get_credential_file_mounts to return the corrupted entry
     fake_mounts = [
-        {"host_path": str(corrupted_dir), "container_path": "/root/.hermes/google_token.json"},
+        {"host_path": str(corrupted_dir), "container_path": "/root/.x19/google_token.json"},
     ]
     monkeypatch.setattr(
         "tools.credential_files.get_credential_file_mounts",
@@ -1539,7 +1539,7 @@ def test_credential_mount_skipped_when_source_missing(monkeypatch, tmp_path, cap
     calls = _mock_subprocess_run(monkeypatch)
 
     fake_mounts = [
-        {"host_path": str(missing_path), "container_path": "/root/.hermes/deleted_token.json"},
+        {"host_path": str(missing_path), "container_path": "/root/.x19/deleted_token.json"},
     ]
     monkeypatch.setattr(
         "tools.credential_files.get_credential_file_mounts",
@@ -1598,7 +1598,7 @@ def test_s6_image_skips_docker_init_and_mounts_run_exec(monkeypatch):
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     calls = _mock_subprocess_run_with_entrypoint(monkeypatch, '["/init"]')
 
-    _make_dummy_env(image="hermes-agent:latest")
+    _make_dummy_env(image="x19:latest")
 
     run_calls = [c for c in calls if isinstance(c[0], list) and len(c[0]) >= 2 and c[0][1] == "run"]
     assert run_calls, "docker run should have been called"
@@ -1757,7 +1757,7 @@ def test_forwarded_secret_values_never_in_argv(monkeypatch):
     secret = "s3cr3t-gitlab-token-value"
     env = _make_execute_only_env(["GITLAB_TOKEN"])
     monkeypatch.setenv("GITLAB_TOKEN", secret)
-    monkeypatch.setattr(docker_env, "_load_hermes_env_vars", lambda: {})
+    monkeypatch.setattr(docker_env, "_load_x19_env_vars", lambda: {})
 
     # init path
     init_args = env._build_init_env_args()

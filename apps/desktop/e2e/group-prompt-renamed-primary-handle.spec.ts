@@ -15,8 +15,8 @@ import { expect, test } from './test'
 
 // The primary profile (`default`) renamed to a Bot Mode title ("Bobby") is
 // addressed by the roster, autocomplete and mention routing as @bobby — but the
-// group-turn prompt introduced it to itself as @hermes, so a member told
-// "You are @hermes" read `@bobby …` as a message for someone else and passed.
+// group-turn prompt introduced it to itself as @x19, so a member told
+// "You are @x19" read `@bobby …` as a message for someone else and passed.
 // The mock inference server scripts a member's line by the `You are @<handle>`
 // opener, so the assertion is exactly that mismatch: with a script for
 // `bobby`, the renamed primary must answer (the persisted room log carries an
@@ -57,7 +57,7 @@ async function createAgent(page: Page, name: string, title: string): Promise<voi
 
 async function roomLog(page: Page, group: string): Promise<RoomLogEntry[]> {
   return page.evaluate(name => {
-    const raw = window.localStorage.getItem('hermes.plugin.hermes-bots.group-chats')
+    const raw = window.localStorage.getItem('x19.plugin.x19-bots.group-chats')
     const rooms = raw ? (JSON.parse(raw) as Record<string, { log?: RoomLogEntry[] }>) : {}
 
     return rooms[name]?.log ?? []
@@ -67,13 +67,13 @@ async function roomLog(page: Page, group: string): Promise<RoomLogEntry[]> {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('renamed-primary')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  // The primary profile carries a Bot Mode title — what `hermes profile rename`
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  // The primary profile carries a Bot Mode title — what `x19 profile rename`
   // / the Edit Profile dialog persist into profile.yaml's ui_meta.
   writeFileSync(
-    join(sandbox.hermesHome, 'profile.yaml'),
-    'ui_meta:\n  hermes-bots:\n    title: Bobby\n    shape: circle\n    color: "#4f8"\n',
+    join(sandbox.x19Home, 'profile.yaml'),
+    'ui_meta:\n  x19-bots:\n    title: Bobby\n    shape: circle\n    color: "#4f8"\n',
     'utf8'
   )
 
@@ -106,7 +106,7 @@ test.afterEach(async ({}, info) => {
   })
   await info.attach('native-window', { body: await fixture.page.screenshot(), contentType: 'image/png' })
   await info.attach('desktop-log', {
-    body: readFileSync(join(fixture.sandbox.hermesHome, 'logs/desktop.log')),
+    body: readFileSync(join(fixture.sandbox.x19Home, 'logs/desktop.log')),
     contentType: 'text/plain'
   })
 })
@@ -149,7 +149,7 @@ test('a renamed primary bot is addressed by its own @tag in the group-turn promp
   await expect
     .poll(async () => (await roomLog(page, GROUP)).some(e => e.from?.name === 'default' && (e.text || '').trim() === 'B'), {
       timeout: 180_000,
-      message: 'the renamed primary (default / Bobby) was introduced to itself as @hermes and never answered @bobby'
+      message: 'the renamed primary (default / Bobby) was introduced to itself as @x19 and never answered @bobby'
     })
     .toBe(true)
 

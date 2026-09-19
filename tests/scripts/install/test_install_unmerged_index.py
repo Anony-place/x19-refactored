@@ -7,7 +7,7 @@ path's ``git stash`` aborts with "could not write index" and the following
 first" -- surfacing to GUI/bootstrap users as ``git checkout main failed
 (exit 1)`` and failing the whole install at the repository stage.
 
-The ``hermes update`` Python path already clears the conflict with ``git reset``
+The ``x19 update`` Python path already clears the conflict with ``git reset``
 before stashing (#4735); both installer scripts must do the same.
 """
 
@@ -86,7 +86,7 @@ def _make_unmerged_repo(repo: Path) -> None:
 
 @pytest.mark.live_system_guard_bypass  # runs against a dedicated throwaway repo
 def test_install_sh_clears_unmerged_index_then_stashes(tmp_path: Path) -> None:
-    repo = tmp_path / "hermes-agent"
+    repo = tmp_path / "x19"
     repo.mkdir()
     _make_unmerged_repo(repo)
 
@@ -157,8 +157,8 @@ def test_install_ps1_stops_venv_resident_processes_before_parking_venv() -> None
     old venv before moving it aside.
 
     A gateway autostarted by a scheduled task runs as
-    ``venv\\Scripts\\pythonw.exe -m hermes_cli.main gateway run`` — image name
-    ``pythonw``, not ``hermes.exe`` — so the ``taskkill /IM hermes.exe`` guard
+    ``venv\\Scripts\\pythonw.exe -m x19_cli.main gateway run`` — image name
+    ``pythonw``, not ``x19.exe`` — so the ``taskkill /IM x19.exe`` guard
     misses it and the loaded ``.pyd`` stays locked (issues #47036/#47557/#47910).
     The recreate branch must sweep by venv path prefix before Rename-Item, and
     must never fall back to an in-place ``Remove-Item`` of the live ``venv``
@@ -166,8 +166,8 @@ def test_install_ps1_stops_venv_resident_processes_before_parking_venv() -> None
     """
     text = INSTALL_PS1.read_text()
 
-    # The hermes.exe tree-kill is preserved (kills spawned child processes too).
-    assert 'taskkill /F /T /IM hermes.exe' in text
+    # The x19.exe tree-kill is preserved (kills spawned child processes too).
+    assert 'taskkill /F /T /IM x19.exe' in text
 
     # The venv path-prefix sweep exists. It must match by case-insensitive
     # StartsWith, NOT PowerShell -like: a venv path containing wildcard

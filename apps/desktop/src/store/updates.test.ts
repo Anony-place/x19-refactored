@@ -59,13 +59,13 @@ vi.mock('@/store/connections', () => ({
   refreshConnectionsRegistry: () => Promise.resolve($mockConnectionsRegistry.get())
 }))
 
-const checkHermesUpdateSpy = vi.fn()
-const updateHermesSpy = vi.fn()
+const checkX19UpdateSpy = vi.fn()
+const updateX19Spy = vi.fn()
 const getActionStatusSpy = vi.fn()
 
-vi.mock('@/hermes', () => ({
-  checkHermesUpdate: (...args: unknown[]) => checkHermesUpdateSpy(...args),
-  updateHermes: (...args: unknown[]) => updateHermesSpy(...args),
+vi.mock('@/x19', () => ({
+  checkX19Update: (...args: unknown[]) => checkX19UpdateSpy(...args),
+  updateX19: (...args: unknown[]) => updateX19Spy(...args),
   getActionStatus: (...args: unknown[]) => getActionStatusSpy(...args)
 }))
 
@@ -245,27 +245,27 @@ describe('checkBackendUpdates', () => {
   beforeEach(() => {
     storage.clear()
     notifySpy.mockClear()
-    checkHermesUpdateSpy.mockReset()
+    checkX19UpdateSpy.mockReset()
     $backendUpdateStatus.set(null)
     vi.useRealTimers()
   })
 
   it('maps the backend /update/check onto the backend status, including commits', async () => {
     setRemote(true)
-    checkHermesUpdateSpy.mockResolvedValue({
+    checkX19UpdateSpy.mockResolvedValue({
       install_method: 'git',
       current_version: '0.16.0',
       behind: 2,
       update_available: true,
       can_apply: true,
-      update_command: 'hermes update',
+      update_command: 'x19 update',
       message: null,
       commits: [{ sha: 'abc1234', summary: 'feat: x', author: 'a', at: 1 }]
     })
 
     const result = await checkBackendUpdates()
 
-    expect(checkHermesUpdateSpy).toHaveBeenCalled()
+    expect(checkX19UpdateSpy).toHaveBeenCalled()
     expect(result?.behind).toBe(2)
     expect(result?.updateAvailable).toBe(true)
     expect(result?.commits?.[0]?.sha).toBe('abc1234')
@@ -275,7 +275,7 @@ describe('checkBackendUpdates', () => {
 
   it('preserves backend update_available when the backend cannot count commits', async () => {
     setRemote(true)
-    checkHermesUpdateSpy.mockResolvedValue({
+    checkX19UpdateSpy.mockResolvedValue({
       install_method: 'nixos',
       current_version: '0.16.0',
       behind: -1,
@@ -294,7 +294,7 @@ describe('checkBackendUpdates', () => {
 
   it('honours can_apply=false (docker/nix): not supported, carries message', async () => {
     setRemote(true)
-    checkHermesUpdateSpy.mockResolvedValue({
+    checkX19UpdateSpy.mockResolvedValue({
       install_method: 'docker',
       current_version: '0.16.0',
       behind: null,
@@ -313,11 +313,11 @@ describe('checkBackendUpdates', () => {
   it('is a no-op in local mode (backend check only runs when remote)', async () => {
     setRemote(false)
     await checkBackendUpdates()
-    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
+    expect(checkX19UpdateSpy).not.toHaveBeenCalled()
   })
 })
 
-// The ⌘K "Update Hermes" row. It used to call applyBackendUpdate() flat, which
+// The ⌘K "Update X19" row. It used to call applyBackendUpdate() flat, which
 // in local mode aimed at the backend checkout instead of the client and, with
 // no overlay open, showed nothing at all.
 describe('requestActiveUpdate', () => {
@@ -330,8 +330,8 @@ describe('requestActiveUpdate', () => {
     dismissSpy.mockClear()
     applyClientMock.mockReset().mockResolvedValue({ ok: true, handedOff: true })
     checkClientMock.mockReset().mockResolvedValue(status({ behind: 0 }))
-    updateHermesSpy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
-    checkHermesUpdateSpy.mockReset().mockResolvedValue({
+    updateX19Spy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
+    checkX19UpdateSpy.mockReset().mockResolvedValue({
       install_method: 'git',
       current_version: '0.4.2',
       behind: 0,
@@ -346,7 +346,7 @@ describe('requestActiveUpdate', () => {
     $backendUpdateStatus.set(null)
     $updateOverlayOpen.set(false)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
+      x19Desktop: { updates: { apply: applyClientMock, check: checkClientMock } }
     }
     vi.useRealTimers()
   })
@@ -370,7 +370,7 @@ describe('requestActiveUpdate', () => {
     requestActiveUpdate()
     await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalled())
 
-    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect(updateX19Spy).not.toHaveBeenCalled()
     expect($updateOverlayTarget.get()).toBe('client')
   })
 
@@ -379,7 +379,7 @@ describe('requestActiveUpdate', () => {
     $backendUpdateStatus.set(status({ behind: 3 }))
 
     requestActiveUpdate()
-    await vi.waitFor(() => expect(updateHermesSpy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(updateX19Spy).toHaveBeenCalled())
 
     expect(applyClientMock).not.toHaveBeenCalled()
     expect($updateOverlayTarget.get()).toBe('backend')
@@ -402,7 +402,7 @@ describe('requestActiveUpdate', () => {
 
     expect($updateOverlayOpen.get()).toBe(true)
     expect(applyClientMock).not.toHaveBeenCalled()
-    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect(updateX19Spy).not.toHaveBeenCalled()
   })
 
   it('applies on a backend that reports an update it cannot count commits for', async () => {
@@ -410,7 +410,7 @@ describe('requestActiveUpdate', () => {
     $backendUpdateStatus.set(status({ behind: 0, updateAvailable: true }))
 
     requestActiveUpdate()
-    await vi.waitFor(() => expect(updateHermesSpy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(updateX19Spy).toHaveBeenCalled())
   })
 })
 
@@ -429,8 +429,8 @@ describe('explicit update targets', () => {
     dismissSpy.mockClear()
     applyClientMock.mockReset().mockResolvedValue({ ok: true, handedOff: true })
     checkClientMock.mockReset().mockResolvedValue(status({ behind: 4, updateAvailable: true }))
-    updateHermesSpy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
-    checkHermesUpdateSpy.mockReset().mockResolvedValue({
+    updateX19Spy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
+    checkX19UpdateSpy.mockReset().mockResolvedValue({
       install_method: 'git',
       current_version: '0.4.2',
       behind: 0,
@@ -448,7 +448,7 @@ describe('explicit update targets', () => {
     $mockConnectionsRegistry.set(null)
     setRemote(true)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
+      x19Desktop: { updates: { apply: applyClientMock, check: checkClientMock } }
     }
     vi.useRealTimers()
   })
@@ -461,20 +461,20 @@ describe('explicit update targets', () => {
   })
 
   // The macOS "Check for Updates…" app-menu item — the OS-standard affordance
-  // for updating THIS app — routes here via `hermes:open-updates`.
+  // for updating THIS app — routes here via `x19:open-updates`.
   it('opens the client overlay on an explicit client target, even in remote mode', async () => {
     openUpdatesWindow('client')
 
     expect($updateOverlayTarget.get()).toBe('client')
     await vi.waitFor(() => expect(checkClientMock).toHaveBeenCalledTimes(1))
-    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
+    expect(checkX19UpdateSpy).not.toHaveBeenCalled()
   })
 
   it('still defaults to the connected machine when no target is named', async () => {
     openUpdatesWindow()
 
     expect($updateOverlayTarget.get()).toBe('backend')
-    await vi.waitFor(() => expect(checkHermesUpdateSpy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(checkX19UpdateSpy).toHaveBeenCalled())
     expect(checkClientMock).not.toHaveBeenCalled()
   })
 
@@ -483,7 +483,7 @@ describe('explicit update targets', () => {
 
     expect($updateOverlayTarget.get()).toBe('client')
     await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalledTimes(1))
-    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect(updateX19Spy).not.toHaveBeenCalled()
     expect($updateEverything.get().running).toBe(false)
   })
 
@@ -492,7 +492,7 @@ describe('explicit update targets', () => {
 
     startActiveUpdate()
 
-    await vi.waitFor(() => expect(updateHermesSpy).toHaveBeenCalled(), { timeout: 5000 })
+    await vi.waitFor(() => expect(updateX19Spy).toHaveBeenCalled(), { timeout: 5000 })
   })
 
   // A toast raised by the CLIENT check must open the client overlay: the user
@@ -528,8 +528,8 @@ describe('applyEverythingUpdate', () => {
     applyClientMock.mockReset().mockResolvedValue({ ok: true, handedOff: true })
     checkClientMock.mockReset().mockResolvedValue(status({ behind: 0, updateAvailable: false }))
     updateAllMock.mockReset().mockResolvedValue({ ok: true, results: [] })
-    updateHermesSpy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
-    checkHermesUpdateSpy.mockReset().mockResolvedValue({
+    updateX19Spy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
+    checkX19UpdateSpy.mockReset().mockResolvedValue({
       install_method: 'git',
       current_version: '0.4.2',
       behind: 0,
@@ -545,7 +545,7 @@ describe('applyEverythingUpdate', () => {
     $updateOverlayOpen.set(false)
     $mockConnectionsRegistry.set(null)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: {
+      x19Desktop: {
         updates: { apply: applyClientMock, check: checkClientMock },
         connections: { updateAll: updateAllMock }
       }
@@ -582,7 +582,7 @@ describe('applyEverythingUpdate', () => {
 
     await applyEverythingUpdate()
 
-    expect(updateHermesSpy).toHaveBeenCalledTimes(1)
+    expect(updateX19Spy).toHaveBeenCalledTimes(1)
     expect(applyClientMock).toHaveBeenCalledTimes(1)
   })
 
@@ -593,7 +593,7 @@ describe('applyEverythingUpdate', () => {
 
     await applyEverythingUpdate()
 
-    expect(updateHermesSpy).toHaveBeenCalledTimes(1)
+    expect(updateX19Spy).toHaveBeenCalledTimes(1)
     expect(applyClientMock).not.toHaveBeenCalled()
   })
 
@@ -617,7 +617,7 @@ describe('applyEverythingUpdate', () => {
 
     await applyEverythingUpdate()
 
-    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect(updateX19Spy).not.toHaveBeenCalled()
     expect(updateAllMock).toHaveBeenCalledTimes(1)
     expect(applyClientMock).toHaveBeenCalledTimes(1)
   })
@@ -625,7 +625,7 @@ describe('applyEverythingUpdate', () => {
   it('a failed backend leg does not strand the fan-out or the client', async () => {
     setRemote(true)
     $mockConnectionsRegistry.set(registryOf(['local', 'vps']))
-    updateHermesSpy.mockRejectedValue(new Error('backend gone'))
+    updateX19Spy.mockRejectedValue(new Error('backend gone'))
     checkClientMock.mockResolvedValue(status({ behind: 4, updateAvailable: true }))
 
     await applyEverythingUpdate()
@@ -721,8 +721,8 @@ describe('client nudge after a backend update', () => {
     dismissSpy.mockClear()
     applyClientMock.mockReset().mockResolvedValue({ ok: true, handedOff: true })
     checkClientMock.mockReset()
-    updateHermesSpy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
-    checkHermesUpdateSpy.mockReset().mockResolvedValue({
+    updateX19Spy.mockReset().mockResolvedValue({ ok: true, name: 'update' })
+    checkX19UpdateSpy.mockReset().mockResolvedValue({
       install_method: 'git',
       current_version: '0.4.2',
       behind: 0,
@@ -738,7 +738,7 @@ describe('client nudge after a backend update', () => {
     $mockConnectionsRegistry.set(null)
     setRemote(true)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
+      x19Desktop: { updates: { apply: applyClientMock, check: checkClientMock } }
     }
     vi.useRealTimers()
   })
@@ -801,7 +801,7 @@ describe('applyUpdates terminal state', () => {
     resetUpdateApplyState()
     $updateOverlayOpen.set(true)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyMock } }
+      x19Desktop: { updates: { apply: applyMock } }
     }
     vi.useRealTimers()
   })
@@ -868,12 +868,12 @@ describe('applyUpdates terminal state', () => {
   })
 
   it('keeps the manual command state for CLI installs with no staged updater', async () => {
-    applyMock.mockResolvedValue({ ok: true, manual: true, command: 'hermes update' })
+    applyMock.mockResolvedValue({ ok: true, manual: true, command: 'x19 update' })
 
     await applyUpdates()
 
     expect($updateApply.get().stage).toBe('manual')
-    expect($updateApply.get().command).toBe('hermes update')
+    expect($updateApply.get().command).toBe('x19 update')
     expect($updateOverlayOpen.get()).toBe(true)
     expect(notifySpy).not.toHaveBeenCalled()
   })
@@ -910,7 +910,7 @@ describe('applyUpdates terminal state', () => {
       guiUpdated: false,
       manualRestart: true,
       sandboxBlocked: true,
-      message: 'Backend updated. Quit and reopen Hermes to finish.'
+      message: 'Backend updated. Quit and reopen X19 to finish.'
     })
 
     const result = await applyUpdates()
@@ -927,8 +927,8 @@ describe('applyUpdates terminal state', () => {
 describe('applyBackendUpdate recovery', () => {
   beforeEach(() => {
     storage.clear()
-    checkHermesUpdateSpy.mockReset()
-    updateHermesSpy.mockReset()
+    checkX19UpdateSpy.mockReset()
+    updateX19Spy.mockReset()
     getActionStatusSpy.mockReset()
     $backendUpdateStatus.set(null)
     $backendUpdateApply.set({
@@ -949,10 +949,10 @@ describe('applyBackendUpdate recovery', () => {
 
   it('waits for the backend to return after the restart drops the connection, then clears the overlay', async () => {
     const actionId = 'd'.repeat(32)
-    updateHermesSpy.mockResolvedValue({ action_id: actionId, ok: true, name: 'update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ action_id: actionId, ok: true, name: 'update', pid: 1 })
     getActionStatusSpy.mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValueOnce({
       exit_code: null,
-      lines: [`=== hermes-update completed ${actionId} ===`],
+      lines: [`=== x19-update completed ${actionId} ===`],
       name: 'update',
       pid: null,
       running: false
@@ -969,7 +969,7 @@ describe('applyBackendUpdate recovery', () => {
 
   it('surfaces backend update action log lines while the action is running', async () => {
     const actionId = 'e'.repeat(32)
-    updateHermesSpy.mockResolvedValue({ action_id: actionId, ok: true, name: 'update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ action_id: actionId, ok: true, name: 'update', pid: 1 })
     getActionStatusSpy
       .mockResolvedValueOnce({
         exit_code: null,
@@ -981,7 +981,7 @@ describe('applyBackendUpdate recovery', () => {
       .mockRejectedValueOnce(new Error('ECONNREFUSED'))
       .mockResolvedValueOnce({
         exit_code: null,
-        lines: [`=== hermes-update completed ${actionId} ===`],
+        lines: [`=== x19-update completed ${actionId} ===`],
         name: 'update',
         pid: null,
         running: false
@@ -1002,13 +1002,13 @@ describe('applyBackendUpdate recovery', () => {
 
   it('keeps waiting past the old 45-second cutoff while the update action is running', async () => {
     const actionId = 'f'.repeat(32)
-    updateHermesSpy.mockResolvedValue({ action_id: actionId, ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ action_id: actionId, ok: true, name: 'x19-update', pid: 1 })
 
     for (let attempt = 0; attempt < 31; attempt += 1) {
       getActionStatusSpy.mockResolvedValueOnce({
         exit_code: null,
-        lines: ['=== hermes-update started now ===', `step ${attempt}`],
-        name: 'hermes-update',
+        lines: ['=== x19-update started now ===', `step ${attempt}`],
+        name: 'x19-update',
         pid: 1,
         running: true
       })
@@ -1016,8 +1016,8 @@ describe('applyBackendUpdate recovery', () => {
 
     getActionStatusSpy.mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValueOnce({
       exit_code: null,
-      lines: [`=== hermes-update completed ${actionId} ===`],
-      name: 'hermes-update',
+      lines: [`=== x19-update completed ${actionId} ===`],
+      name: 'x19-update',
       pid: null,
       running: false
     })
@@ -1033,11 +1033,11 @@ describe('applyBackendUpdate recovery', () => {
   })
 
   it('treats a successful no-op as complete without waiting for a restart', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: 0,
-      lines: ['stale output from another run', '=== hermes-update started now ===', '✓ Already up to date!'],
-      name: 'hermes-update',
+      lines: ['stale output from another run', '=== x19-update started now ===', '✓ Already up to date!'],
+      name: 'x19-update',
       pid: 1,
       running: false
     })
@@ -1051,11 +1051,11 @@ describe('applyBackendUpdate recovery', () => {
   })
 
   it('treats a successful dependency repair as complete without waiting for a restart', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: 0,
-      lines: ['=== hermes-update started now ===', '✓ Dependencies repaired!', '✓ Update complete!'],
-      name: 'hermes-update',
+      lines: ['=== x19-update started now ===', '✓ Dependencies repaired!', '✓ Update complete!'],
+      name: 'x19-update',
       pid: 1,
       running: false
     })
@@ -1067,36 +1067,36 @@ describe('applyBackendUpdate recovery', () => {
   })
 
   it('trusts the current action exit code without parsing its output', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: 0,
       lines: ['✓ Already up to date!'],
-      name: 'hermes-update',
+      name: 'x19-update',
       pid: 1,
       running: false
     })
     const promise = applyBackendUpdate()
     await vi.advanceTimersByTimeAsync(1500)
     await expect(promise).resolves.toMatchObject({ ok: true })
-    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
+    expect(checkX19UpdateSpy).not.toHaveBeenCalled()
   })
 
   it('waits for current-action completion proof after the backend restarts', async () => {
     const actionId = 'a'.repeat(32)
-    updateHermesSpy.mockResolvedValue({ action_id: actionId, ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ action_id: actionId, ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy
       .mockRejectedValueOnce(new Error('ECONNREFUSED'))
       .mockResolvedValueOnce({
         exit_code: null,
-        lines: ['Update complete!', `=== hermes-update completed ${'c'.repeat(32)} ===`],
-        name: 'hermes-update',
+        lines: ['Update complete!', `=== x19-update completed ${'c'.repeat(32)} ===`],
+        name: 'x19-update',
         pid: null,
         running: false
       })
       .mockResolvedValueOnce({
         exit_code: null,
-        lines: ['Update complete!', `=== hermes-update completed ${actionId} ===`],
-        name: 'hermes-update',
+        lines: ['Update complete!', `=== x19-update completed ${actionId} ===`],
+        name: 'x19-update',
         pid: null,
         running: false
       })
@@ -1104,16 +1104,16 @@ describe('applyBackendUpdate recovery', () => {
     const promise = applyBackendUpdate()
     await vi.advanceTimersByTimeAsync(5000)
     await expect(promise).resolves.toMatchObject({ ok: true })
-    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
+    expect(checkX19UpdateSpy).not.toHaveBeenCalled()
   })
 
   it('accepts its terminal receipt when a verbose update pushes the start marker out of the log tail', async () => {
     const actionId = 'b'.repeat(32)
-    updateHermesSpy.mockResolvedValue({ action_id: actionId, ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ action_id: actionId, ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValueOnce({
       exit_code: null,
-      lines: ['final build output', 'Update complete!', `=== hermes-update completed ${actionId} ===`],
-      name: 'hermes-update',
+      lines: ['final build output', 'Update complete!', `=== x19-update completed ${actionId} ===`],
+      name: 'x19-update',
       pid: null,
       running: false
     })
@@ -1122,7 +1122,7 @@ describe('applyBackendUpdate recovery', () => {
     await vi.advanceTimersByTimeAsync(5000)
 
     await expect(promise).resolves.toMatchObject({ ok: true })
-    expect(getActionStatusSpy).toHaveBeenCalledWith('hermes-update', 2000)
+    expect(getActionStatusSpy).toHaveBeenCalledWith('x19-update', 2000)
   })
 
   it('proves a pre-action-ID backend reached its requested commit after restart', async () => {
@@ -1134,15 +1134,15 @@ describe('applyBackendUpdate recovery', () => {
       targetSha: 'backend:0.18.2',
       updateAvailable: true
     })
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValue({
       exit_code: null,
       lines: ['verbose output', 'Update complete!'],
-      name: 'hermes-update',
+      name: 'x19-update',
       pid: null,
       running: false
     })
-    checkHermesUpdateSpy
+    checkX19UpdateSpy
       .mockResolvedValueOnce({
         behind: null,
         can_apply: true,
@@ -1151,7 +1151,7 @@ describe('applyBackendUpdate recovery', () => {
         install_method: 'git',
         message: 'offline',
         update_available: false,
-        update_command: 'hermes update'
+        update_command: 'x19 update'
       })
       .mockResolvedValueOnce({
         behind: 1,
@@ -1161,14 +1161,14 @@ describe('applyBackendUpdate recovery', () => {
         install_method: 'git',
         message: null,
         update_available: true,
-        update_command: 'hermes update'
+        update_command: 'x19 update'
       })
 
     const promise = applyBackendUpdate()
     await vi.advanceTimersByTimeAsync(5000)
 
     await expect(promise).resolves.toMatchObject({ ok: true })
-    expect(checkHermesUpdateSpy).toHaveBeenCalledTimes(2)
+    expect(checkX19UpdateSpy).toHaveBeenCalledTimes(2)
   })
 
   it('proves a fast pre-action-ID packaged update by its changed version', async () => {
@@ -1180,15 +1180,15 @@ describe('applyBackendUpdate recovery', () => {
       targetSha: 'backend:0.18.2',
       updateAvailable: true
     })
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: null,
       lines: ['verbose output without a retained start marker'],
-      name: 'hermes-update',
+      name: 'x19-update',
       pid: null,
       running: false
     })
-    checkHermesUpdateSpy.mockResolvedValue({
+    checkX19UpdateSpy.mockResolvedValue({
       behind: -1,
       can_apply: true,
       commits: [],
@@ -1196,31 +1196,31 @@ describe('applyBackendUpdate recovery', () => {
       install_method: 'pip',
       message: null,
       update_available: true,
-      update_command: 'hermes update'
+      update_command: 'x19 update'
     })
 
     const promise = applyBackendUpdate()
     await vi.advanceTimersByTimeAsync(1500)
 
     await expect(promise).resolves.toMatchObject({ ok: true })
-    expect(checkHermesUpdateSpy).toHaveBeenCalledWith(true)
+    expect(checkX19UpdateSpy).toHaveBeenCalledWith(true)
   })
 
   it('resumes action polling after a transient status failure', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy
       .mockRejectedValueOnce(new Error('ECONNRESET'))
       .mockResolvedValueOnce({
         exit_code: null,
-        lines: ['=== hermes-update started now ===', 'still running'],
-        name: 'hermes-update',
+        lines: ['=== x19-update started now ===', 'still running'],
+        name: 'x19-update',
         pid: 1,
         running: true
       })
       .mockResolvedValueOnce({
         exit_code: 0,
-        lines: ['=== hermes-update started now ===', 'Update complete!'],
-        name: 'hermes-update',
+        lines: ['=== x19-update started now ===', 'Update complete!'],
+        name: 'x19-update',
         pid: 1,
         running: false
       })
@@ -1232,12 +1232,12 @@ describe('applyBackendUpdate recovery', () => {
   })
 
   it('restores the fixed action deadline after reconnecting', async () => {
-    updateHermesSpy.mockResolvedValue({ action_id: 'a'.repeat(32), ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ action_id: 'a'.repeat(32), ok: true, name: 'x19-update', pid: 1 })
 
     const running = {
       exit_code: null,
       lines: ['still running'],
-      name: 'hermes-update',
+      name: 'x19-update',
       pid: 1,
       running: true
     }
@@ -1256,11 +1256,11 @@ describe('applyBackendUpdate recovery', () => {
   })
 
   it('shares one in-flight update between concurrent apply requests', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: 0,
-      lines: ['=== hermes-update started now ===', '✓ Already up to date!'],
-      name: 'hermes-update',
+      lines: ['=== x19-update started now ===', '✓ Already up to date!'],
+      name: 'x19-update',
       pid: 1,
       running: false
     })
@@ -1271,15 +1271,15 @@ describe('applyBackendUpdate recovery', () => {
     expect(second).toBe(first)
     await vi.advanceTimersByTimeAsync(1500)
     await Promise.all([first, second])
-    expect(updateHermesSpy).toHaveBeenCalledTimes(1)
+    expect(updateX19Spy).toHaveBeenCalledTimes(1)
   })
 
   it('fails closed when the update action never reaches a terminal state', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: null,
-      lines: ['=== hermes-update started now ===', 'still running'],
-      name: 'hermes-update',
+      lines: ['=== x19-update started now ===', 'still running'],
+      name: 'x19-update',
       pid: 1,
       running: true
     })
@@ -1291,11 +1291,11 @@ describe('applyBackendUpdate recovery', () => {
   })
 
   it('fails immediately when the update action exits nonzero', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'hermes-update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'x19-update', pid: 1 })
     getActionStatusSpy.mockResolvedValue({
       exit_code: 1,
-      lines: ['=== hermes-update started now ===', 'update failed'],
-      name: 'hermes-update',
+      lines: ['=== x19-update started now ===', 'update failed'],
+      name: 'x19-update',
       pid: 1,
       running: false
     })
@@ -1303,14 +1303,14 @@ describe('applyBackendUpdate recovery', () => {
     const promise = applyBackendUpdate()
     await vi.advanceTimersByTimeAsync(1500)
     await expect(promise).resolves.toMatchObject({ ok: false, error: 'apply-failed' })
-    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
+    expect(checkX19UpdateSpy).not.toHaveBeenCalled()
     expect($backendUpdateApply.get().stage).toBe('error')
   })
 
   it('surfaces an error when the backend never comes back after the restart', async () => {
-    updateHermesSpy.mockResolvedValue({ ok: true, name: 'update', pid: 1 })
+    updateX19Spy.mockResolvedValue({ ok: true, name: 'update', pid: 1 })
     getActionStatusSpy.mockRejectedValue(new Error('ECONNREFUSED'))
-    checkHermesUpdateSpy.mockRejectedValue(new Error('ECONNREFUSED'))
+    checkX19UpdateSpy.mockRejectedValue(new Error('ECONNREFUSED'))
 
     const promise = applyBackendUpdate()
     await vi.advanceTimersByTimeAsync(250000)
@@ -1339,7 +1339,7 @@ describe('startUpdatePoller', () => {
     })
     $updateStatus.set(null)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { check: checkMock, onProgress: onProgressMock } },
+      x19Desktop: { updates: { check: checkMock, onProgress: onProgressMock } },
       addEventListener: vi.fn((event: string, handler: Function) => {
         listeners[event] = handler
       }),

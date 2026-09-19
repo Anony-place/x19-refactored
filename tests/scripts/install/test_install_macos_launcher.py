@@ -1,4 +1,4 @@
-"""Regression coverage for the user-facing macOS Hermes launcher."""
+"""Regression coverage for the user-facing macOS X19 launcher."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def _setup_path_function() -> str:
 
 
 def test_venv_launcher_bypasses_uv_console_script_that_requires_realpath(tmp_path: Path) -> None:
-    """Stock macOS must start Hermes even when its uv console script needs realpath."""
+    """Stock macOS must start X19 even when its uv console script needs realpath."""
     install_dir = tmp_path / "install"
     venv_bin = install_dir / "venv" / "bin"
     command_dir = tmp_path / "command"
@@ -47,9 +47,13 @@ def test_venv_launcher_bypasses_uv_console_script_that_requires_realpath(tmp_pat
         venv_bin / "python",
         '#!/bin/sh\nprintf "%s\\n" "$@" > "$LAUNCH_RESULT"\n',
     )
-    (install_dir / "hermes").write_text("# source entrypoint\n", encoding="utf-8")
+    # The launcher runs the CLI as a module; setup_path() guards on the
+    # checked-in module existing. `$INSTALL_DIR/x19` is the package
+    # directory, not an entrypoint script.
+    (install_dir / "x19_cli").mkdir()
+    (install_dir / "x19_cli" / "main.py").write_text("# CLI module\n", encoding="utf-8")
     _make_executable(
-        venv_bin / "hermes",
+        venv_bin / "x19",
         "#!/bin/sh\n"
         f'PATH="{minimal_path}"\n'
         "'''exec' \"$(dirname -- \"$(realpath -- \"$0\")\")\"/'python3' \"$0\" \"$@\"\n"
@@ -76,7 +80,7 @@ def test_venv_launcher_bypasses_uv_console_script_that_requires_realpath(tmp_pat
     subprocess.run(["/bin/bash", "-c", harness], env=env, check=True)
 
     completed = subprocess.run(
-        [command_dir / "hermes", "--version"],
+        [command_dir / "x19", "--version"],
         env=os.environ | {"LAUNCH_RESULT": str(result)},
         text=True,
         capture_output=True,
@@ -84,6 +88,7 @@ def test_venv_launcher_bypasses_uv_console_script_that_requires_realpath(tmp_pat
 
     assert completed.returncode == 0, completed.stderr
     assert result.read_text(encoding="utf-8").splitlines() == [
-        str(install_dir / "hermes"),
+        "-m",
+        "x19_cli.main",
         "--version",
     ]

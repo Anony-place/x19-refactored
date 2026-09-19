@@ -125,7 +125,7 @@ def _is_alias(node) -> bool:
 
 
 def _reexports(src: str) -> dict[str, tuple[str, str]]:
-    """name -> (module, original) for top-level `from m import orig as name`, plus PLUGIN-COMPAT lazy tables."""
+    """name -> (module, original) for top-level `from m import orig as name`."""
     out = {}
     try:
         t = ast.parse(src)

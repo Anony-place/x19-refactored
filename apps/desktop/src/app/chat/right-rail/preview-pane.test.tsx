@@ -52,7 +52,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'remote' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      x19Desktop: {
         onPreviewFileChanged,
         watchPreviewFile
       }
@@ -154,8 +154,8 @@ describe('PreviewPane console state', () => {
   it('does not offer the URL-only pop-out action for a local HTML file', async () => {
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
-        ...window.hermesDesktop,
+      x19Desktop: {
+        ...window.x19Desktop,
         openBrowserWindow: vi.fn(async () => ({ ok: true }))
       }
     })
@@ -243,10 +243,10 @@ describe('PreviewPane console state', () => {
       })
     })
 
-    const previousDesktop = window.hermesDesktop
+    const previousDesktop = window.x19Desktop
     let captureCount = 0
 
-    window.hermesDesktop = {
+    window.x19Desktop = {
       ...previousDesktop,
       capturePreview: vi.fn(async () => {
         captureCount += 1
@@ -301,7 +301,7 @@ describe('PreviewPane console state', () => {
     })
     await waitFor(() => expect(rendered.queryByRole('form', { name: 'Comment 2' })).toBeNull())
     expect(rendered.queryByRole('button', { name: 'Add 1 comment' })).toBeNull()
-    window.hermesDesktop = previousDesktop
+    window.x19Desktop = previousDesktop
   })
 
   // The webview always runs on THIS machine, so a remote agent's localhost is
@@ -493,7 +493,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      x19Desktop: {
         readFileDataUrl
       }
     })
@@ -556,7 +556,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      x19Desktop: {
         readFileDataUrl
       }
     })
@@ -593,7 +593,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      x19Desktop: {
         readFileDataUrl
       }
     })
@@ -634,7 +634,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      x19Desktop: {
         api,
         readFileDataUrl
       }
@@ -674,21 +674,21 @@ describe('PreviewPane console state', () => {
 
 describe('PreviewPane guest external handoff', () => {
   // #112941: a guest page's `_blank` anchor (Streamlit's "Ask Google" button)
-  // reaches the OS browser only through the audited `hermes:openExternal` IPC.
-  const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
-  const initialHermesDesktop = desktopWindow.hermesDesktop
+  // reaches the OS browser only through the audited `x19:openExternal` IPC.
+  const desktopWindow = window as unknown as { x19Desktop?: Window['x19Desktop'] }
+  const initialX19Desktop = desktopWindow.x19Desktop
 
   afterEach(() => {
-    if (initialHermesDesktop) {
-      desktopWindow.hermesDesktop = initialHermesDesktop
+    if (initialX19Desktop) {
+      desktopWindow.x19Desktop = initialX19Desktop
     } else {
-      delete desktopWindow.hermesDesktop
+      delete desktopWindow.x19Desktop
     }
   })
 
   async function renderWebview() {
     const openExternal = vi.fn(async () => undefined)
-    desktopWindow.hermesDesktop = { openExternal } as unknown as Window['hermesDesktop']
+    desktopWindow.x19Desktop = { openExternal } as unknown as Window['x19Desktop']
 
     let rendered!: ReturnType<typeof render>
 

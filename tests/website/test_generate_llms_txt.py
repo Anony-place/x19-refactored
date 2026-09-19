@@ -1,7 +1,7 @@
-"""`llms.txt` is how an LLM learns what Hermes can do.
+"""`llms.txt` is how an LLM learns what X19 can do.
 
-It is the index every model reads when pointed at our docs — including Hermes
-itself, whose `hermes-agent` skill routes unknown-feature questions there.
+It is the index every model reads when pointed at our docs — including X19
+itself, whose `x19` skill routes unknown-feature questions there.
 `website/` is never packaged, so there is no shipped copy to fall back on.
 
 The index used to be a hand-written list of page paths, and it rotted to 53%
@@ -130,4 +130,4 @@ def test_per_skill_catalog_pages_stay_out(gen):
 def test_bot_mode_is_reachable(gen, index):
     """The page behind the original complaint, and the answer it has to carry."""
     assert "user-guide/bot-mode" in _linked(gen, index)
-    assert "hermes peer dm" in (gen.DOCS / "user-guide" / "bot-mode.md").read_text(encoding="utf-8")
+    assert "x19 peer dm" in (gen.DOCS / "user-guide" / "bot-mode.md").read_text(encoding="utf-8")

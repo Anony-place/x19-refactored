@@ -1,4 +1,4 @@
-import type { ModelOptionProvider } from '@hermes/shared/gateway-events'
+import type { ModelOptionProvider } from '@x19/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
 import { providerIndexAfterClearingFilter } from '../components/modelPicker.js'

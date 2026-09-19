@@ -23,14 +23,14 @@ def _get_mcp_stderr_log() -> Any:
     """Shared append-mode handle for MCP subprocess stderr, cached until shutdown PER PROFILE HOME (a
     multiplexed gateway's secondary profile must log under ITS ``logs/``, not the launch profile's). Must
     expose a real fd (asyncio wires the child's stderr to it); falls back to ``/dev/null``, then real stderr."""
-    from hermes_constants import get_hermes_home, hermes_home_key, mkdir_under_hermes_home
-    home_key = hermes_home_key()
+    from x19_constants import get_x19_home, x19_home_key, mkdir_under_x19_home
+    home_key = x19_home_key()
     with _mcp_stderr_log_lock:
         fh = _mcp_stderr_log_fh.get(home_key)
         if fh is None or fh.closed:
             try:
-                log_dir = get_hermes_home() / "logs"
-                mkdir_under_hermes_home(log_dir)
+                log_dir = get_x19_home() / "logs"
+                mkdir_under_x19_home(log_dir)
                 # Line-buffered so output lands promptly; errors="replace" tolerates garbled binary.
                 fh = open(log_dir / "mcp-stderr.log", "a", encoding="utf-8", errors="replace", buffering=1)
                 fh.fileno()  # confirm a real fd before committing
@@ -113,7 +113,7 @@ def _build_safe_env(user_env: Optional[dict]) -> dict:
     keys, ``XDG_*``, vars injected by an external secret source (users configured that backend
     precisely so subprocesses can consume them), plus the server config's own ``env``."""
     from agent.secret_scope import get_secret
-    from hermes_cli.env_loader import secret_source_names
+    from x19_cli.env_loader import secret_source_names
     env = {
         key: value for key, value in os.environ.items()
         if key in _SAFE_ENV_KEYS or key.upper() in _SAFE_ENV_KEYS_CASE_INSENSITIVE or key.startswith("XDG_")}
@@ -124,7 +124,7 @@ def _build_safe_env(user_env: Optional[dict]) -> dict:
         value = get_secret(key)
         if value is not None:
             env[key] = value
-    for key in ("HERMES_KANBAN_DB", "HERMES_KANBAN_BOARD"):
+    for key in ("X19_KANBAN_DB", "X19_KANBAN_BOARD"):
         if key in os.environ:
             env[key] = os.environ[key]
     if user_env:
@@ -152,14 +152,14 @@ def _which_with_config_pathext(command: str, path_arg, env: dict):
 def _node_fallback(command: str, *, windows: Optional[bool] = None) -> str:
     """Well-known Node install locations for bare ``npx``/``npm``/``node``; *command* unchanged when none exists.
 
-    The managed tree comes from ``iter_hermes_node_dirs`` (Windows unpacks into ``<home>\\node``, POSIX into
-    ``<home>/node/bin``) under the active profile's ``get_hermes_home()``; on Windows the real files are
+    The managed tree comes from ``iter_x19_node_dirs`` (Windows unpacks into ``<home>\\node``, POSIX into
+    ``<home>/node/bin``) under the active profile's ``get_x19_home()``; on Windows the real files are
     ``npx.cmd``/``node.exe`` (``windows`` injectable, as for ``_npx_bin_candidates``)."""
-    from hermes_constants import get_hermes_home, iter_hermes_node_dirs
+    from x19_constants import get_x19_home, iter_x19_node_dirs
     home = os.path.expanduser("~")
-    # /usr/local/bin: canonical Node location (from-source Linux, Hermes Docker image, Intel Homebrew),
+    # /usr/local/bin: canonical Node location (from-source Linux, X19 Docker image, Intel Homebrew),
     # needed when a hand-authored env.PATH omits it — npx's shebang re-execs /usr/bin/env node.
-    directories = [*map(str, iter_hermes_node_dirs(get_hermes_home())), os.path.join(home, ".local", "bin"),
+    directories = [*map(str, iter_x19_node_dirs(get_x19_home())), os.path.join(home, ".local", "bin"),
                    os.path.join(os.sep, "usr", "local", "bin")]
     candidates = (c for d in directories for c in _npx_bin_candidates(d, command, windows=windows))
     return next((c for c in candidates if os.path.isfile(c) and os.access(c, os.X_OK)), command)
@@ -188,7 +188,7 @@ def _npx_bin_candidates(bin_dir: str, name: str, *, windows: Optional[bool] = No
     """Launcher paths to try for *name* inside an npx cache's ``.bin``, in order. On Windows that
     directory holds the extensionless sh script plus ``<name>.cmd``/``<name>.ps1``; the sh one
     cannot be spawned there and ``os.access(X_OK)`` is only an existence check, so select by
-    extension (same precedence as ``hermes_constants._candidate_node_command_names``). ``windows``
+    extension (same precedence as ``x19_constants._candidate_node_command_names``). ``windows``
     is injectable so the branch is testable without patching ``os.name`` process-wide."""
     is_windows = os.name == "nt" if windows is None else windows
     if is_windows:
@@ -200,7 +200,7 @@ def _npx_cached_bin(args: list) -> Optional[tuple]:
     """Resolve ``npx -y <pkg>`` to the already-installed binary, or None.
 
     ``npx`` resolves the package and then FORKS, staying resident as the real server's parent
-    for nothing (~48 MB private memory per MCP server, measured); Hermes already supervises the
+    for nothing (~48 MB private memory per MCP server, measured); X19 already supervises the
     child (shared death supervisor). When the package is in npx's cache we spawn its binary
     directly. Deliberately conservative — None (caller keeps plain ``npx``, so a cold machine
     still installs) for a cache miss, a version pin (``pkg@1.2.3``), extra npx flags, a manifest
@@ -311,7 +311,7 @@ def _warn_hidden_whitespace(server_name: str, config: dict) -> List[str]:
 def _filter_suspicious_mcp_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
     """Drop exfiltration-shaped MCP configs before any stdio spawn path."""
     try:
-        from hermes_cli.mcp_security import validate_mcp_server_entry
+        from x19_cli.mcp_security import validate_mcp_server_entry
     except Exception:
         return servers
     safe_servers = {}
@@ -327,7 +327,7 @@ def _filter_suspicious_mcp_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
 def _portable_mcp_servers(safe_servers: Dict[str, dict]) -> None:
     """Merge plugin-provided (portable) MCP servers into *safe_servers*; native config wins on a clash. Never raises."""
     try:
-        from hermes_cli.plugins import discover_plugins, get_plugin_manager
+        from x19_cli.plugins import discover_plugins, get_plugin_manager
         discover_plugins()
         portable = get_plugin_manager().get_portable_mcp_servers()
         for name, cfg in _filter_suspicious_mcp_servers(portable).items():
@@ -342,14 +342,14 @@ def _portable_mcp_servers(safe_servers: Dict[str, dict]) -> None:
 def _load_mcp_config() -> Dict[str, dict]:
     """``mcp_servers`` from config.yaml as ``{name: config}`` (empty on error / safe mode), ``${VAR}`` interpolated."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         from utils import env_var_enabled as _env_enabled
-        if _env_enabled("HERMES_SAFE_MODE"):
+        if _env_enabled("X19_SAFE_MODE"):
             return {}
         servers = load_config().get("mcp_servers")
         try:  # ensure .env vars are available for interpolation
-            from hermes_cli.env_loader import load_hermes_dotenv
-            load_hermes_dotenv()
+            from x19_cli.env_loader import load_x19_dotenv
+            load_x19_dotenv()
         except Exception:
             pass
         safe_servers: Dict[str, dict] = {}

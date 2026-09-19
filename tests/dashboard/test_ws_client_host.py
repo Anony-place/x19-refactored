@@ -13,7 +13,7 @@ The contract these tests pin down:
   * Loopback bind (``127.0.0.1``) → client dials ``127.0.0.1`` (unchanged).
   * LAN / non-wildcard bind (``192.168.1.5``) → client dials that exact
     address (no rewrite to loopback — the bind was deliberate).
-  * Explicit ``HERMES_DASHBOARD_WS_HOST`` env var → wins always, regardless
+  * Explicit ``X19_DASHBOARD_WS_HOST`` env var → wins always, regardless
     of the bind host.
   * ``app.state.bound_host`` is left untouched — the bind address used by
     the listener doesn't change.
@@ -25,8 +25,8 @@ import os
 
 import pytest
 
-from hermes_cli import web_server
-import hermes_cli.web_server_chat as _web_server_chat
+from x19_cli import web_server
+import x19_cli.web_server_chat as _web_server_chat
 
 
 # ---------------------------------------------------------------------------
@@ -54,8 +54,8 @@ def saved_app_state():
 
 @pytest.fixture
 def clear_ws_host_env(monkeypatch):
-    """Ensure no ``HERMES_DASHBOARD_WS_HOST`` leaks in from the test shell."""
-    monkeypatch.delenv("HERMES_DASHBOARD_WS_HOST", raising=False)
+    """Ensure no ``X19_DASHBOARD_WS_HOST`` leaks in from the test shell."""
+    monkeypatch.delenv("X19_DASHBOARD_WS_HOST", raising=False)
     yield monkeypatch
 
 
@@ -103,10 +103,10 @@ class TestResolveClientWsHost:
     def test_blank_env_falls_back_to_bind(
         self, saved_app_state, monkeypatch
     ):
-        """An explicitly empty override (e.g. ``HERMES_DASHBOARD_WS_HOST=``)
+        """An explicitly empty override (e.g. ``X19_DASHBOARD_WS_HOST=``)
         must NOT silently pin to loopback — it's an unset-by-accident, not
         an intent. Treat whitespace-only as absent and fall through."""
-        monkeypatch.setenv("HERMES_DASHBOARD_WS_HOST", "   ")
+        monkeypatch.setenv("X19_DASHBOARD_WS_HOST", "   ")
         _set_bound(saved_app_state, "0.0.0.0")
         assert _web_server_chat._resolve_client_ws_host() == "127.0.0.1"
 
@@ -175,7 +175,7 @@ class TestSidecarUrlHost:
 
 def test_netloc_helper_handles_ipv6_bracket_form():
     """The IPv6 netloc path is exercised by the production ``[host]:port``
-    branch when ``HERMES_DASHBOARD_WS_HOST`` points at an IPv6 address.
+    branch when ``X19_DASHBOARD_WS_HOST`` points at an IPv6 address.
     Verify the helper doesn't choke on the bracket form."""
     assert _netloc("ws://[::1]:9119/api/ws?x=1") == "[::1]:9119"
     assert _netloc("ws://127.0.0.1:9119/api/ws?x=1") == "127.0.0.1:9119"

@@ -147,7 +147,7 @@ async def test_review_dispatch_branch_reaches_handler(monkeypatch):
     Proves the gateway/run.py dispatch branch exists by resolving the command
     through the registry the same way _handle_message does.
     """
-    from hermes_cli.commands import resolve_command
+    from x19_cli.commands import resolve_command
 
     cmd = resolve_command("review")
     assert cmd is not None

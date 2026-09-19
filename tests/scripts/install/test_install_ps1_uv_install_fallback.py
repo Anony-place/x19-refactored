@@ -18,7 +18,7 @@ The fix installs a three-rung ladder inside ``Install-Uv``:
 - Rung 2: GitHub releases installer mirror, same ``UV_INSTALL_DIR``.
 - Rung 3: salvage an existing ``uv.exe`` (``Get-Command uv`` or
   ``%USERPROFILE%\\.local\\bin\\uv.exe``) by copying it into
-  ``$HermesHome\\bin\\uv.exe`` so the managed-first invariant holds.
+  ``$X19Home\\bin\\uv.exe`` so the managed-first invariant holds.
 
 Only after all three rungs fail does it error out -- and then it prints the
 tail of the captured installer output so the real cause reaches the user.
@@ -115,7 +115,7 @@ def test_existing_uv_salvage_rung_present(source: str):
     )
     assert "Copy-Item" in body and "$managedUv" in body, (
         "A salvaged uv.exe must be copied into the managed location "
-        "($HermesHome\\bin\\uv.exe) so managed-first resolution holds."
+        "($X19Home\\bin\\uv.exe) so managed-first resolution holds."
     )
 
 

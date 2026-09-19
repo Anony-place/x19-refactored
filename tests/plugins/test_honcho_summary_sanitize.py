@@ -80,7 +80,7 @@ def _manager_with_summary(content: str):
     session = HonchoSession(
         key="test-session",
         user_peer_id="chris",
-        assistant_peer_id="hermes",
+        assistant_peer_id="x19",
         honcho_session_id="test-session",
     )
     fake = _RecordingHonchoSession(content)
@@ -95,7 +95,7 @@ def test_prefetch_omits_planning_only_summary() -> None:
         "representation": "representation",
         "card": ["fact"],
     }
-    mgr._resolve_observer_target = lambda *a, **k: ("hermes", "chris")
+    mgr._resolve_observer_target = lambda *a, **k: ("x19", "chris")
     result = mgr.get_prefetch_context("test-session")
     assert "summary" not in result
     assert result.get("representation") == "representation"
@@ -107,7 +107,7 @@ def test_prefetch_keeps_body_after_think_close() -> None:
         "representation": "representation",
         "card": ["fact"],
     }
-    mgr._resolve_observer_target = lambda *a, **k: ("hermes", "chris")
+    mgr._resolve_observer_target = lambda *a, **k: ("x19", "chris")
     result = mgr.get_prefetch_context("test-session")
     assert result["summary"] == "Alice prefers dark roast coffee."
 

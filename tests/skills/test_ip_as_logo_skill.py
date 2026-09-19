@@ -23,7 +23,7 @@ def test_frontmatter_fields_and_section_order():
     for field in ("name", "description", "version", "author", "license", "platforms"):
         assert field in fm, f"missing frontmatter field: {field}"
     assert fm["name"] == "ip-as-logo"
-    assert fm["metadata"]["hermes"]["category"] == "creative"
+    assert fm["metadata"]["x19"]["category"] == "creative"
     headings = re.findall(r"^## (.+)$", body, re.MULTILINE)
     expected = ["When to Use", "Prerequisites", "Procedure"]
     assert [h for h in headings if h in expected] == expected, headings
@@ -32,7 +32,7 @@ def test_frontmatter_fields_and_section_order():
 
 def test_generation_routes_through_native_tool():
     """The upstream skill targeted another agent's image pipeline; the port must
-    route through Hermes' `image_generate` and carry no residue of that harness."""
+    route through X19' `image_generate` and carry no residue of that harness."""
     _, body = _frontmatter_and_body()
     assert "`image_generate`" in body
     assert 'aspect_ratio="square"' in body

@@ -36,7 +36,7 @@ def set_approval_callback(cb) -> None:
     global _approval_callback
     _approval_callback = cb
 
-# Hard-blocked regardless of approval level (e.g. logout kills the session Hermes runs in). Alt is
+# Hard-blocked regardless of approval level (e.g. logout kills the session X19 runs in). Alt is
 # canonicalized to option, so the Windows variants are blocked before any backend sees them.
 # See #4562.
 _BLOCKED_KEY_COMBOS = {
@@ -76,7 +76,7 @@ def _input_target_mismatch(backend, requested_app: str) -> Optional[str]:
     return None if not current or not wanted or wanted in current or current in wanted else last_app
 
 # ── Backend selection — env-swappable for tests ─────────────────────────────
-# Per-Hermes-session cached backends (own cua-driver session, native target, refs, grant namespace).
+# Per-X19-session cached backends (own cua-driver session, native target, refs, grant namespace).
 _backend_lock = threading.Lock()
 _backend: Optional[ComputerUseBackend] = None  # backward-compatible empty-session injection hook (older tests)
 _backends: Dict[str, ComputerUseBackend] = {}
@@ -129,7 +129,7 @@ def reset_screenshot_dedup(session_id: str) -> None:
     _reset_screenshot_dedup(_scoped_sid(session_id))
 
 def _cua_permission_mode(session_id: str) -> str:
-    """Map Hermes's approval bypass onto Cua's immutable mode; fails closed. Both identity namespaces are consulted
+    """Map X19's approval bypass onto Cua's immutable mode; fails closed. Both identity namespaces are consulted
     (DB ``session_id`` and gateway ``session_key`` contextvar) or a gateway ``/yolo`` would be invisible here.
     Warns once per session that ``-z``/``--yolo`` swapped the driver onto a private ``unrestricted`` daemon, dropping
     the configured ceiling: deliberate (``unrestricted`` is not a config value) but easy to trigger by accident."""
@@ -157,12 +157,12 @@ def _cua_permission_mode(session_id: str) -> str:
     return configured
 
 def _new_backend(permission_mode: str) -> ComputerUseBackend:
-    backend_name = os.environ.get("HERMES_COMPUTER_USE_BACKEND", "cua").lower()
+    backend_name = os.environ.get("X19_COMPUTER_USE_BACKEND", "cua").lower()
     if backend_name in {"cua", "cua-driver", ""}:
         from tools.computer_use.cua_backend import CuaDriverBackend
         return CuaDriverBackend(permission_mode=permission_mode)
     if backend_name != "noop":
-        raise RuntimeError(f"Unknown HERMES_COMPUTER_USE_BACKEND={backend_name!r}")
+        raise RuntimeError(f"Unknown X19_COMPUTER_USE_BACKEND={backend_name!r}")
     return _NoopBackend()  # pragma: no cover
 
 def _install_backend(sid: str, backend: ComputerUseBackend, permission_mode: str) -> ComputerUseBackend:
@@ -195,20 +195,20 @@ def _stop_backend(backend: ComputerUseBackend, call_lock: Optional[threading.RLo
         on_error(e)
 
 def _scoped_sid(session_id: str) -> str:
-    """Cache key for one Hermes session's backend. Outside a served-profile scope it is the bare id
+    """Cache key for one X19 session's backend. Outside a served-profile scope it is the bare id
     (legacy keys byte-identical); under a multiplexed turn the routed profile's home key is appended
     so two profiles that share a session id (or a DISPLAY) never share one cua-driver (#110032).
     Every cache path — lookup, install, release — goes through this, so release finds what lookup made."""
-    from hermes_constants import get_hermes_home_override, hermes_home_key
+    from x19_constants import get_x19_home_override, x19_home_key
     sid = str(session_id or "")
-    return sid if get_hermes_home_override() is None else f"{sid}@{hermes_home_key()}"
+    return sid if get_x19_home_override() is None else f"{sid}@{x19_home_key()}"
 
 def _get_backend(session_id: str = "") -> ComputerUseBackend:
     bare_sid, sid = str(session_id or ""), _scoped_sid(session_id)
     while True:
         with _backend_lock:
             # Mode resolved under the cache lock; YOLO mutation never holds the approval lock while releasing it.
-            permission_mode = _cua_permission_mode(bare_sid)  # approval state is keyed by the Hermes session id
+            permission_mode = _cua_permission_mode(bare_sid)  # approval state is keyed by the X19 session id
             if sid == "" and _backend is not None and sid not in _backends:
                 _install_backend(sid, _backend, permission_mode)  # fold the injection hook into the cache
             if (cached := _backends.get(sid)) is None:
@@ -242,7 +242,7 @@ def _shutdown_backend_atexit() -> None:
     Never raises. Drops the global lock before stop(): teardown budgets 5s and must not block spawns.
 
     Each session backend holds a long-lived ``cua-driver`` subprocess, so without this a driver can survive
-    the Hermes process that spawned it (#28152 item 3). #69903 kept the orphan from burning a core by
+    the X19 process that spawned it (#28152 item 3). #69903 kept the orphan from burning a core by
     disabling the cursor overlay; the process itself still lingered.
     """
     global _backend
@@ -271,7 +271,7 @@ def _noop_stub(name: str, *params: str, result: Any = None):
     return method
 
 class _NoopBackend(ComputerUseBackend):  # pragma: no cover
-    """Test/CI stub (HERMES_COMPUTER_USE_BACKEND=noop). Records ``(name, kwargs)`` calls; returns trivial results."""
+    """Test/CI stub (X19_COMPUTER_USE_BACKEND=noop). Records ``(name, kwargs)`` calls; returns trivial results."""
 
     def __init__(self) -> None: self.calls: List[Tuple[str, Dict[str, Any]]] = []
     start = stop = lambda self: None
@@ -304,7 +304,7 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
         backend = _get_backend(session_id=session_id)
     except Exception as e:
         return json.dumps({"error": f"computer_use backend unavailable: {e}",
-                           "hint": "If the cua-driver binary is missing, run `hermes computer-use install`. "
+                           "hint": "If the cua-driver binary is missing, run `x19 computer-use install`. "
                                    "If a Python dependency is missing, the error above shows the exact install command."})
     try:
         with _backend_lock:
@@ -661,10 +661,10 @@ def _maybe_follow_capture(backend: ComputerUseBackend, res: ActionResult, do_cap
 
 # ── Cache files (screenshots, element spills, vision temps) ─────────────────
 def _cache_file(subdir: str, legacy: str, name: str, pattern: str = "", cap: int = 0):
-    """Path for a new file under ``$HERMES_HOME/<subdir>`` (dir created). With ``pattern``/``cap``, first unlinks the
+    """Path for a new file under ``$X19_HOME/<subdir>`` (dir created). With ``pattern``/``cap``, first unlinks the
     oldest matching files so at most ``cap - 1`` remain (best-effort)."""
-    from hermes_constants import get_hermes_dir  # lazy so tests can patch get_hermes_dir
-    cache_dir = get_hermes_dir(subdir, legacy)
+    from x19_constants import get_x19_dir  # lazy so tests can patch get_x19_dir
+    cache_dir = get_x19_dir(subdir, legacy)
     cache_dir.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(Exception):
         files = sorted(cache_dir.glob(pattern), key=lambda p: p.stat().st_mtime) if pattern else []
@@ -684,7 +684,7 @@ def _write_cache_file(what: str, subdir: str, legacy: str, name: str, pattern: s
         return None
 
 def _persist_capture_image(cap: CaptureResult) -> Optional[str]:
-    """Copy of the capture in Hermes' media cache so attachment surfaces can deliver it (None without an image)."""
+    """Copy of the capture in X19' media cache so attachment surfaces can deliver it (None without an image)."""
     return _write_cache_file(
         "screenshot persistence", "cache/images", "image_cache", f"computer_use_{uuid.uuid4().hex}{_capture_image_format(cap)[1]}",
         "computer_use_*.*", _MAX_CAPTURE_FILES, lambda p: p.write_bytes(base64.b64decode(cap.png_b64, validate=False)),
@@ -731,12 +731,12 @@ def _should_route_through_aux_vision() -> bool:
     stage = "import"
     try:
         from agent.auxiliary_client import _read_main_model, _read_main_provider
-        from hermes_cli.config import load_config
-        from hermes_constants import hermes_home_key
+        from x19_cli.config import load_config
+        from x19_constants import x19_home_key
         from tools.computer_use.vision_routing import should_route_capture_to_aux_vision
         stage = "config read"
         provider, model = _read_main_provider() or "", _read_main_model() or ""
-        if (cached := _AUX_VISION_ROUTE_CACHE.get(key := (hermes_home_key(), str(provider), str(model)))) is not None:
+        if (cached := _AUX_VISION_ROUTE_CACHE.get(key := (x19_home_key(), str(provider), str(model)))) is not None:
             return cached
         stage = "decision"
         _AUX_VISION_ROUTE_CACHE[key] = decision = bool(should_route_capture_to_aux_vision(provider, model, load_config()))
@@ -748,7 +748,7 @@ def _should_route_through_aux_vision() -> bool:
 def _capture_after_mode() -> str:
     """Mode for ``capture_after`` follow-ups. Default ``som`` (screenshot)."""
     with contextlib.suppress(Exception):
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         mode = str(((load_config() or {}).get("computer_use") or {}).get("capture_after_mode", "som") or "som")
         return mode if (mode := mode.strip().lower()) in {"som", "vision", "ax"} else "som"
     return "som"
@@ -761,7 +761,7 @@ _VISION_PROMPT = ("Describe what is visible in this desktop application screensh
 def _route_capture_through_aux_vision(cap: CaptureResult, summary: str, *, visible_elements: Optional[List[UIElement]] = None,
                                       truncated_elements: int = 0, elements_file: Optional[str] = None,
                                       screenshot_path: Optional[str] = None) -> Optional[str]:
-    """Pre-analyse the capture via ``vision_analyze_tool`` (temp file under ``$HERMES_HOME/cache/vision/``) and merge
+    """Pre-analyse the capture via ``vision_analyze_tool`` (temp file under ``$X19_HOME/cache/vision/``) and merge
     the description with the AX/SOM summary into one text payload. JSON, or None on any failure."""
     if not cap.png_b64:
         return None
@@ -806,7 +806,7 @@ def _route_capture_through_aux_vision(cap: CaptureResult, summary: str, *, visib
 
 # ── Availability check (used by the tool registry check_fn) ─────────────────
 def check_computer_use_requirements() -> bool:
-    """macOS/Windows/Linux + cua-driver binary (or env override). `hermes computer-use doctor` names blocked checks."""
+    """macOS/Windows/Linux + cua-driver binary (or env override). `x19 computer-use doctor` names blocked checks."""
     if sys.platform not in ("darwin", "win32", "linux"):
         return False
     from tools.computer_use.cua_backend_driver import cua_driver_binary_available
@@ -817,9 +817,3 @@ def get_computer_use_schema() -> Dict[str, Any]:
     return COMPUTER_USE_SCHEMA
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import struct  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

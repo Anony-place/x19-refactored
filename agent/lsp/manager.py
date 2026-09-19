@@ -49,7 +49,7 @@ class _BackgroundLoop:
     def start(self) -> None:
         if self._thread is not None:
             return
-        self._thread = threading.Thread(target=self._run_forever, name="hermes-lsp-loop", daemon=True)
+        self._thread = threading.Thread(target=self._run_forever, name="x19-lsp-loop", daemon=True)
         self._thread.start()
         self._ready.wait(timeout=5.0)
 
@@ -133,9 +133,9 @@ class LSPService:
 
     @classmethod
     def create_from_config(cls) -> Optional["LSPService"]:
-        """Build a service from ``hermes_cli.config``; ``None`` if config can't load."""
+        """Build a service from ``x19_cli.config``; ``None`` if config can't load."""
         try:
-            from hermes_cli.config import load_config_readonly
+            from x19_cli.config import load_config_readonly
             cfg = load_config_readonly()
         except Exception as e:  # noqa: BLE001
             logger.debug("LSP config load failed: %s", e)
@@ -189,7 +189,7 @@ class LSPService:
 
     def enabled_for(self, file_path: str) -> bool:
         """True iff LSP should run for this file: registered non-disabled server, git workspace,
-        and pair not broken (a failed server costs nothing until ``hermes lsp restart`` / exit)."""
+        and pair not broken (a failed server costs nothing until ``x19 lsp restart`` / exit)."""
         srv = find_server_for_file(file_path) if self._enabled else None
         if srv is None or srv.server_id in self._disabled_servers:
             return False
@@ -307,7 +307,7 @@ class LSPService:
         clear_cache()
 
     def get_status(self) -> Dict[str, Any]:
-        """Return a snapshot of the service for ``hermes lsp status``."""
+        """Return a snapshot of the service for ``x19 lsp status``."""
         with self._state_lock:
             clients = [
                 {"server_id": c.server_id, "workspace_root": c.workspace_root,

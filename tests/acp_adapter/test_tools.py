@@ -27,13 +27,13 @@ from acp.schema import (
 # ---------------------------------------------------------------------------
 
 
-COMMON_HERMES_TOOLS = ["read_file", "search_files", "terminal", "patch", "write_file", "process"]
+COMMON_X19_TOOLS = ["read_file", "search_files", "terminal", "patch", "write_file", "process"]
 
 
 class TestToolKindMap:
-    def test_all_hermes_tools_have_kind(self):
-        """Every common hermes tool should appear in TOOL_KIND_MAP."""
-        for tool in COMMON_HERMES_TOOLS:
+    def test_all_x19_tools_have_kind(self):
+        """Every common x19 tool should appear in TOOL_KIND_MAP."""
+        for tool in COMMON_X19_TOOLS:
             assert tool in TOOL_KIND_MAP, f"{tool} missing from TOOL_KIND_MAP"
 
     def test_tool_kind_read_file(self):
@@ -101,8 +101,8 @@ class TestBuildToolTitle:
         assert "github-pitfalls" in title
 
     def test_execute_code_title_includes_first_code_line(self):
-        title = build_tool_title("execute_code", {"code": "\nfrom hermes_tools import terminal\nprint('done')"})
-        assert "from hermes_tools import terminal" in title
+        title = build_tool_title("execute_code", {"code": "\nfrom x19_tools import terminal\nprint('done')"})
+        assert "from x19_tools import terminal" in title
 
     def test_unknown_tool_uses_name(self):
         title = build_tool_title("some_new_tool", {"foo": "bar"})
@@ -114,8 +114,8 @@ class TestBuildToolTitle:
             ("terminal", {"command": "git status --short"}),
             ("read_file", {"path": "/etc/hosts", "offset": 10}),
             ("search_files", {"pattern": "TODO", "path": "src"}),
-            ("web_search", {"query": "hermes agent acp"}),
-            ("execute_code", {"code": "\nfrom hermes_tools import terminal\nprint('done')"}),
+            ("web_search", {"query": "x19 agent acp"}),
+            ("execute_code", {"code": "\nfrom x19_tools import terminal\nprint('done')"}),
             ("skill_view", {"name": "github", "file_path": "references/x.md"}),
         ],
     )

@@ -18,7 +18,7 @@ def preview_close(url: str = "") -> str:
         "preview.close",
         {"url": target},
         "Failed to close the preview: ",
-        "The preview pane is only available in the Hermes desktop app.",
+        "The preview pane is only available in the X19 desktop app.",
         {"success": True, "closed": target or "all"},
     )
 
@@ -78,12 +78,3 @@ registry.register(
 )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-
-def preview_open(url: str, label: str = "") -> str:
-    return open_preview_tool(url=url, label=label)
-# ---- END PLUGIN-COMPAT ----

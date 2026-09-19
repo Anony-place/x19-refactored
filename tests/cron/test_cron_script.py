@@ -4,7 +4,7 @@ Tests cover:
 - Script field in job creation / storage / update
 - Script execution and output injection into prompts
 - Error handling (missing script, timeout, non-zero exit)
-- Path resolution (absolute, relative to HERMES_HOME/scripts/)
+- Path resolution (absolute, relative to X19_HOME/scripts/)
 """
 
 import json
@@ -26,22 +26,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch):
-    """Isolated cron environment with temp HERMES_HOME."""
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "cron").mkdir()
-    (hermes_home / "cron" / "output").mkdir()
-    (hermes_home / "scripts").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    """Isolated cron environment with temp X19_HOME."""
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
+    (x19_home / "cron").mkdir()
+    (x19_home / "cron" / "output").mkdir()
+    (x19_home / "scripts").mkdir()
+    monkeypatch.setenv("X19_HOME", str(x19_home))
 
     # Clear cached module-level paths
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", hermes_home)
-    monkeypatch.setattr(jobs_mod, "CRON_DIR", hermes_home / "cron")
-    monkeypatch.setattr(jobs_mod, "JOBS_FILE", hermes_home / "cron" / "jobs.json")
-    monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", hermes_home / "cron" / "output")
+    monkeypatch.setattr(jobs_mod, "X19_DIR", x19_home)
+    monkeypatch.setattr(jobs_mod, "CRON_DIR", x19_home / "cron")
+    monkeypatch.setattr(jobs_mod, "JOBS_FILE", x19_home / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", x19_home / "cron" / "output")
 
-    return hermes_home
+    return x19_home
 
 
 class TestJobScriptField:
@@ -75,7 +75,7 @@ def test_cronjob_tool_rejects_stale_past_one_shot(cron_env, monkeypatch):
     from tools.cronjob_tools import cronjob
 
     now = datetime(2026, 3, 18, 4, 30, 0, tzinfo=timezone.utc)
-    monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+    monkeypatch.setattr("cron.jobs._x19_now", lambda: now)
     stale = (now - timedelta(minutes=5)).isoformat()
 
     result = json.loads(cronjob(action="create", prompt="Too late", schedule=stale))
@@ -115,17 +115,17 @@ class TestRunJobScript:
         assert success is False
         assert "Script not found" in output
         assert str(cron_env / "scripts") in output and "profile" in output
-        assert "hermes cron edit" in output
+        assert "x19 cron edit" in output
 
 
     def test_script_subprocess_env_sanitized(self, cron_env, monkeypatch):
-        """Cron scripts must not inherit Hermes provider env (SECURITY.md §2.3)."""
-        from tools.environments.local_env_policy import _HERMES_PROVIDER_ENV_BLOCKLIST
+        """Cron scripts must not inherit X19 provider env (SECURITY.md §2.3)."""
+        from tools.environments.local_env_policy import _X19_PROVIDER_ENV_BLOCKLIST
         from cron.scheduler_script import _run_job_script
 
         # sorted() so the probed var is deterministic across runs
         # (frozenset iteration order varies with PYTHONHASHSEED).
-        blocked_var = sorted(_HERMES_PROVIDER_ENV_BLOCKLIST)[0]
+        blocked_var = sorted(_X19_PROVIDER_ENV_BLOCKLIST)[0]
         monkeypatch.setenv(blocked_var, "must_not_leak")
 
         script = cron_env / "scripts" / "env_probe.py"
@@ -458,7 +458,7 @@ class TestCronjobToolScript:
 
 
     def test_clear_script(self, cron_env, monkeypatch):
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+        monkeypatch.setenv("X19_INTERACTIVE", "1")
         from tools.cronjob_tools import cronjob
 
         (cron_env / "scripts" / "some_script.py").write_text("print('hi')\n")
@@ -479,7 +479,7 @@ class TestCronjobToolScript:
         assert "script" not in update_result["job"]
 
     def test_list_shows_script(self, cron_env, monkeypatch):
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+        monkeypatch.setenv("X19_INTERACTIVE", "1")
         from tools.cronjob_tools import cronjob
 
         (cron_env / "scripts" / "data_collector.py").write_text("print('hi')\n")
@@ -505,7 +505,7 @@ class TestScriptPathContainment:
     """
 
     def test_absolute_path_outside_scripts_dir_blocked(self, cron_env):
-        """Absolute paths outside ~/.hermes/scripts/ must be rejected."""
+        """Absolute paths outside ~/.x19/scripts/ must be rejected."""
         from cron.scheduler_script import _run_job_script
 
         # Create a script outside the scripts dir
@@ -592,7 +592,7 @@ class TestCronjobToolScriptValidation:
 
 
     def test_create_with_traversal_script_rejected(self, cron_env, monkeypatch):
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+        monkeypatch.setenv("X19_INTERACTIVE", "1")
         from tools.cronjob_tools import cronjob
 
         result = json.loads(cronjob(
@@ -612,9 +612,9 @@ class TestRunJobEnvVarCleanup:
         """Origin env vars must be cleaned up even if run_job fails early."""
         # Ensure env vars are clean before test
         for key in (
-            "HERMES_SESSION_PLATFORM",
-            "HERMES_SESSION_CHAT_ID",
-            "HERMES_SESSION_CHAT_NAME",
+            "X19_SESSION_PLATFORM",
+            "X19_SESSION_CHAT_ID",
+            "X19_SESSION_CHAT_NAME",
         ):
             monkeypatch.delenv(key, raising=False)
 
@@ -641,9 +641,9 @@ class TestRunJobEnvVarCleanup:
             pass
 
         # Verify env vars were cleaned up by the finally block
-        assert os.environ.get("HERMES_SESSION_PLATFORM") is None
-        assert os.environ.get("HERMES_SESSION_CHAT_ID") is None
-        assert os.environ.get("HERMES_SESSION_CHAT_NAME") is None
+        assert os.environ.get("X19_SESSION_PLATFORM") is None
+        assert os.environ.get("X19_SESSION_CHAT_ID") is None
+        assert os.environ.get("X19_SESSION_CHAT_NAME") is None
 
 
 class TestScriptTimeoutTreeKill:
@@ -788,7 +788,7 @@ class TestScriptTimeoutTreeKill:
             "time.sleep(30)\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_CRON_SCRIPT_TIMEOUT", "2")
+        monkeypatch.setenv("X19_CRON_SCRIPT_TIMEOUT", "2")
         monkeypatch.setattr(sched, "_SCRIPT_TIMEOUT", sched._DEFAULT_SCRIPT_TIMEOUT)
 
         ok, out = sched_script._run_job_script(

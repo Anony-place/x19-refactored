@@ -8,7 +8,7 @@ import pytest
 
 from gateway.config import GatewayConfig
 from gateway.session import SessionStore
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 def _assert_diverted(tmp_path, sid, needle):
@@ -28,12 +28,12 @@ def _assert_diverted(tmp_path, sid, needle):
 
 
 def test_replaced_state_db_diverts_pending_without_fts_rebuild(tmp_path, monkeypatch):
-    import hermes_state
+    import x19_state
 
     live = tmp_path / "state.db"
     other = tmp_path / "other.db"
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", live)
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    monkeypatch.setattr(x19_state, "DEFAULT_DB_PATH", live)
 
     store = SessionStore(sessions_dir=tmp_path, config=GatewayConfig())
     sid = "gw-replaced"
@@ -67,12 +67,12 @@ def test_replaced_state_db_diverts_pending_without_fts_rebuild(tmp_path, monkeyp
 def test_copyfile_replaced_state_db_diverts_pending_without_fts_rebuild(
     tmp_path, monkeypatch
 ):
-    import hermes_state
+    import x19_state
 
     live = tmp_path / "state.db"
     other = tmp_path / "other.db"
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", live)
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    monkeypatch.setattr(x19_state, "DEFAULT_DB_PATH", live)
 
     store = SessionStore(sessions_dir=tmp_path, config=GatewayConfig())
     sid = "gw-cp-replaced"

@@ -1,4 +1,4 @@
-"""Deterministic spritesheet assembly — generated row strips → Hermes atlas.
+"""Deterministic spritesheet assembly — generated row strips → X19 atlas.
 
 Image models draw a row of poses well but can't do exact grid geometry, so the
 model never owns the layout: it emits one loose strip per state and these ops
@@ -621,22 +621,3 @@ def _check_atlas_cells(atlas) -> tuple[list[str], list[str], list[str]]:
     return errors, warnings, filled_states
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import io  # noqa: F401,E402
-import io  # noqa: F401,E402
-
-COLUMNS = max(count for _, _, count in ROW_SPECS)
-
-FRAME_COUNTS: dict[str, int] = {state: count for state, _, count in ROW_SPECS}
-
-ROWS = len(ROW_SPECS)
-
-def atlas_to_webp_bytes(atlas) -> bytes:
-    """Encode an atlas image to lossless WebP bytes (the on-disk pet format)."""
-    buf = io.BytesIO()
-    atlas.save(buf, format="WEBP", lossless=True, quality=100, method=6, exact=True)
-    return buf.getvalue()
-# ---- END PLUGIN-COMPAT ----

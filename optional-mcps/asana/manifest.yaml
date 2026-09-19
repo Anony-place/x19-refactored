@@ -7,9 +7,9 @@ description: >-
   Tasks, projects, and goals from your Asana workspace.
 source: https://developers.asana.com/docs/using-asanas-mcp-server
 
-# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
+# Official vendor-hosted remote MCP (URL-only — X19 never spawns a local
 # process for this entry). Native OAuth 2.1 + Dynamic Client Registration;
-# Hermes's MCP client + mcp_oauth_manager handle discovery, PKCE, token
+# X19's MCP client + mcp_oauth_manager handle discovery, PKCE, token
 # exchange, and refresh.
 transport:
   type: http
@@ -26,6 +26,6 @@ suggest:
     - asana.com
 
 post_install: |
-  On first connection Hermes opens a browser to authorize with
-  Asana (or run `hermes mcp login asana`). Approve access,
+  On first connection X19 opens a browser to authorize with
+  Asana (or run `x19 mcp login asana`). Approve access,
   then restart the session so tools load.

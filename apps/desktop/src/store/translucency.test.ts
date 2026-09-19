@@ -10,7 +10,7 @@ vi.hoisted(() => {
   Object.defineProperty(globalThis.navigator, 'platform', { configurable: true, value: 'MacIntel' })
 })
 
-import { DEFAULT_GLASS_MATERIAL, DEFAULT_GLASS_SCOPE } from '@hermes/shared/translucency'
+import { DEFAULT_GLASS_MATERIAL, DEFAULT_GLASS_SCOPE } from '@x19/shared/translucency'
 
 import { onPersistenceEvent, type PersistenceEvent } from '@/lib/storage'
 
@@ -35,8 +35,8 @@ import {
   TRANSLUCENCY_STEP
 } from './translucency'
 
-const KEY = 'hermes.desktop.translucency.v2'
-const LEGACY_KEY = 'hermes.desktop.translucency.v1'
+const KEY = 'x19.desktop.translucency.v2'
+const LEGACY_KEY = 'x19.desktop.translucency.v1'
 
 // The book is per-appearance; the tests below drive one appearance at a time.
 // Dark is the store's initial appearance, so it is also the reset target.
@@ -45,8 +45,8 @@ const LEGACY_KEY = 'hermes.desktop.translucency.v1'
 const DARK = defaultTranslucencyValues('dark', false)
 const LIGHT = defaultTranslucencyValues('light', false)
 
-const glassAttr = () => document.documentElement.hasAttribute('data-hermes-glass')
-const clearAttr = () => document.documentElement.hasAttribute('data-hermes-clear')
+const glassAttr = () => document.documentElement.hasAttribute('data-x19-glass')
+const clearAttr = () => document.documentElement.hasAttribute('data-x19-clear')
 const keep = () => document.documentElement.style.getPropertyValue('--translucency-glass-keep')
 
 // Snapshotted at import time: every describe below mutates the store, so the
@@ -143,7 +143,7 @@ describe('window translucency lever', () => {
   it('mirrors every tick to the desktop bridge so the clear-mode fade tracks the drag', () => {
     vi.useFakeTimers()
     const calls: unknown[] = []
-    window.hermesDesktop = { setTranslucency: (payload: unknown) => calls.push(payload) } as never
+    window.x19Desktop = { setTranslucency: (payload: unknown) => calls.push(payload) } as never
 
     try {
       for (let intensity = 36; intensity <= 40; intensity += 1) {
@@ -266,26 +266,26 @@ describe('frost and area', () => {
     setTranslucencyScope('sidebar')
 
     if (!GLASS_SUPPORTED) {
-      expect(document.documentElement.hasAttribute('data-hermes-glass-scope')).toBe(false)
+      expect(document.documentElement.hasAttribute('data-x19-glass-scope')).toBe(false)
 
       return
     }
 
     setTranslucencyMode('glass')
-    expect(document.documentElement.getAttribute('data-hermes-glass-scope')).toBe('sidebar')
+    expect(document.documentElement.getAttribute('data-x19-glass-scope')).toBe('sidebar')
 
     setTranslucencyScope('window')
-    expect(document.documentElement.getAttribute('data-hermes-glass-scope')).toBe('window')
+    expect(document.documentElement.getAttribute('data-x19-glass-scope')).toBe('window')
 
     // Each of the three ways glass can end has to clear it, independently.
     setTranslucency(0)
-    expect(document.documentElement.hasAttribute('data-hermes-glass-scope')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-glass-scope')).toBe(false)
 
     setTranslucency(50)
-    expect(document.documentElement.hasAttribute('data-hermes-glass-scope')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-glass-scope')).toBe(true)
 
     setTranslucencyMode('clear')
-    expect(document.documentElement.hasAttribute('data-hermes-glass-scope')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-glass-scope')).toBe(false)
   })
 })
 
@@ -296,13 +296,13 @@ describe('translucency peek', () => {
   it('stays open until every overlapping hold has ended', () => {
     beginTranslucencyPeek()
     beginTranslucencyPeek()
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(true)
 
     endTranslucencyPeek()
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(true)
 
     endTranslucencyPeek()
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(false)
   })
 
   it('never goes negative, so a stray release cannot wedge the next peek open', () => {
@@ -311,9 +311,9 @@ describe('translucency peek', () => {
     expect($translucencyPeek.get()).toBe(0)
 
     beginTranslucencyPeek()
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(true)
     endTranslucencyPeek()
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(false)
   })
 })
 
@@ -325,17 +325,17 @@ describe('peek reset', () => {
     beginTranslucencyPeek()
     beginTranslucencyPeek()
     beginTranslucencyPeek()
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(true)
 
     resetTranslucencyPeek()
     expect($translucencyPeek.get()).toBe(0)
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(false)
 
     // A pulse timer expiring after the reset must not push the counter negative
     // or resurrect the attribute.
     endTranslucencyPeek()
     expect($translucencyPeek.get()).toBe(0)
-    expect(document.documentElement.hasAttribute('data-hermes-translucency-peek')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-translucency-peek')).toBe(false)
   })
 })
 
@@ -359,7 +359,7 @@ describe('cross-window sync', () => {
     setTranslucency(12)
     window.localStorage.setItem(KEY, JSON.stringify({ mode: 'clear', base: {}, light: {}, dark: { intensity: 99 } }))
 
-    window.dispatchEvent(new StorageEvent('storage', { key: 'hermes.desktop.zoom.v1', newValue: 'x' }))
+    window.dispatchEvent(new StorageEvent('storage', { key: 'x19.desktop.zoom.v1', newValue: 'x' }))
 
     expect($translucency.get().intensity).toBe(12)
   })
@@ -391,19 +391,19 @@ describe('glass is confined to chat windows', () => {
 
     // The mode is still the user's choice — only the page rewrite is withheld.
     expect($translucency.get().mode).toBe('glass')
-    expect(document.documentElement.hasAttribute('data-hermes-glass')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-glass')).toBe(false)
   })
 
   // The HUD paints its band from the app's field mix, so it needs the setting
   // and the tint number even though its surfaces must not be rewritten. The
   // two flags are what keep those separable: keying the band off
-  // `data-hermes-glass` would silently never match.
+  // `data-x19-glass` would silently never match.
   it('still publishes the live setting and the tint to a special-purpose window', () => {
     setSearch('?win=hud')
     setTranslucency(60)
     setTranslucencyMode('glass')
 
-    expect(document.documentElement.hasAttribute('data-hermes-glass-on')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-glass-on')).toBe(true)
     expect(document.documentElement.style.getPropertyValue('--translucency-glass-keep')).toBe('40%')
   })
 
@@ -413,7 +413,7 @@ describe('glass is confined to chat windows', () => {
     setTranslucencyMode('glass')
     setTranslucencyMode('clear')
 
-    expect(document.documentElement.hasAttribute('data-hermes-glass-on')).toBe(false)
+    expect(document.documentElement.hasAttribute('data-x19-glass-on')).toBe(false)
     expect(document.documentElement.style.getPropertyValue('--translucency-glass-keep')).toBe('')
   })
 
@@ -422,7 +422,7 @@ describe('glass is confined to chat windows', () => {
     setTranslucency(60)
     setTranslucencyMode('glass')
 
-    expect(document.documentElement.hasAttribute('data-hermes-glass')).toBe(true)
+    expect(document.documentElement.hasAttribute('data-x19-glass')).toBe(true)
   })
 })
 

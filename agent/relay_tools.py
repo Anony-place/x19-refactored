@@ -1,4 +1,4 @@
-"""Core NeMo Relay adapter for Hermes tool execution."""
+"""Core NeMo Relay adapter for X19 tool execution."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def execute(
             raise callback_error
         if isinstance(exc, Exception) and callback_error is None and "value" in raw_result:
             logger.warning(
-                "NeMo Relay tool post-processing failed after dispatch success; returning the Hermes tool result",
+                "NeMo Relay tool post-processing failed after dispatch success; returning the X19 tool result",
                 exc_info=True,
             )
             return raw_result["value"], observed_args
@@ -102,14 +102,7 @@ def _json_equal(left: Any, right: Any) -> bool:
 
 def _run_awaitable(value: Any) -> Any:
     return relay_llm._run_awaitable(
-        value, loop_error="Synchronous Hermes Relay tool execution cannot run on an active event-loop thread",
+        value, loop_error="Synchronous X19 Relay tool execution cannot run on an active event-loop thread",
     )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import asyncio  # noqa: F401,E402
-import inspect  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

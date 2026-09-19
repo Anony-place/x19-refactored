@@ -12,7 +12,7 @@ const { prepareWindowForInput } = createRequire(import.meta.url)(
 test('input setup survives a fresh-install zoom restore before onboarding', async () => {
   const sandbox = createSandbox('cold-input')
   unlinkSync(path.join(sandbox.userDataDir, 'zoom-state.json'))
-  writeFileSync(path.join(sandbox.hermesHome, 'config.yaml'), '# no provider\n', 'utf8')
+  writeFileSync(path.join(sandbox.x19Home, 'config.yaml'), '# no provider\n', 'utf8')
   let app: ElectronApplication | undefined
 
   try {
@@ -48,7 +48,7 @@ for (const lifecycleEvent of ['focus', 'navigation'] as const) {
       const zoomFile = path.join(sandbox.userDataDir, 'zoom-state.json')
       const savedLevel = () => JSON.parse(readFileSync(zoomFile, 'utf8')).zoomLevel as number
       await page.evaluate(() => {
-        const desktop = (window as unknown as { hermesDesktop: { zoom: { setPercent: (percent: number) => void } } }).hermesDesktop
+        const desktop = (window as unknown as { x19Desktop: { zoom: { setPercent: (percent: number) => void } } }).x19Desktop
         desktop.zoom.setPercent(90)
       })
       await expect.poll(savedLevel).toBeCloseTo(Math.log(0.9) / Math.log(1.2))

@@ -25,8 +25,8 @@ def _run_node_deps_stage(
     install_dir = tmp_path / "install"
     tui_dir = install_dir / "ui-tui"
     bin_dir = tmp_path / "bin"
-    hermes_home = tmp_path / "home"
-    managed_bin = hermes_home / "bin"
+    x19_home = tmp_path / "home"
+    managed_bin = x19_home / "bin"
     npm_calls = tmp_path / "npm-calls"
 
     tui_dir.mkdir(parents=True)
@@ -61,8 +61,8 @@ exit 0
     env = os.environ.copy()
     env.update(
         {
-            "HERMES_HOME": str(hermes_home),
-            "HERMES_INSTALL_DIR": str(install_dir),
+            "X19_HOME": str(x19_home),
+            "X19_INSTALL_DIR": str(install_dir),
             "NPM_CALLS": str(npm_calls),
             "NPM_FAIL_DIRECTORY": fail_directory or "",
             "PATH": f"{bin_dir}:{env['PATH']}",

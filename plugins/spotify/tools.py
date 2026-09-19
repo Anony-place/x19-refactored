@@ -1,4 +1,4 @@
-"""Native Spotify tools for Hermes (registered via plugins/spotify).
+"""Native Spotify tools for X19 (registered via plugins/spotify).
 
 Each tool routes ``args["action"]`` through a dict dispatch table; every entry
 has the signature ``(client, args, action) -> str`` and issues its Spotify Web
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
-from hermes_cli.auth import get_auth_status
+from x19_cli.auth import get_auth_status
 from plugins.spotify.client import (
     SpotifyClient, SpotifyError, normalize_spotify_id, normalize_spotify_uri, normalize_spotify_uris)
 from tools.registry import tool_error, tool_result
@@ -316,24 +316,3 @@ SPOTIFY_LIBRARY_SCHEMA = _schema("spotify_library", "List, save, or remove the u
 }, ("kind", "action"))
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'SpotifyAPIError': ('plugins.spotify.client', 'SpotifyAPIError'),
-    'SpotifyAuthRequiredError': ('plugins.spotify.client', 'SpotifyAuthRequiredError'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

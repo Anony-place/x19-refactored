@@ -20,8 +20,8 @@ import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
-function seedProfile(hermesHome: string, mockUrl: string, name: string, profileYaml: string): void {
-  const dir = path.join(hermesHome, 'profiles', name)
+function seedProfile(x19Home: string, mockUrl: string, name: string, profileYaml: string): void {
+  const dir = path.join(x19Home, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
   writeMockProviderConfig(dir, mockUrl)
   writeEnvFile(dir)
@@ -31,12 +31,12 @@ function seedProfile(hermesHome: string, mockUrl: string, name: string, profileY
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('settings-chips')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
-  writeEnvFile(sandbox.hermesHome)
-  // A Bot Mode bot: the roster shows ui_meta['hermes-bots'].title.
-  seedProfile(sandbox.hermesHome, mock.url, 'alpha', 'ui_meta:\n  hermes-bots:\n    title: Atlas Prime\n')
-  // A renamed profile: `hermes profile rename` writes display_name.
-  seedProfile(sandbox.hermesHome, mock.url, 'beta', 'display_name: Beacon\n')
+  writeMockProviderConfig(sandbox.x19Home, mock.url)
+  writeEnvFile(sandbox.x19Home)
+  // A Bot Mode bot: the roster shows ui_meta['x19-bots'].title.
+  seedProfile(sandbox.x19Home, mock.url, 'alpha', 'ui_meta:\n  x19-bots:\n    title: Atlas Prime\n')
+  // A renamed profile: `x19 profile rename` writes display_name.
+  seedProfile(sandbox.x19Home, mock.url, 'beta', 'display_name: Beacon\n')
 
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
 

@@ -14,10 +14,10 @@ Versioned site deploys to GitHub/Cloudflare/Netlify Pages.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/web-development/publish-site` |
+| Source | Optional — install with `x19 skills install official/web-development/publish-site` |
 | Path | `optional-skills/web-development\publish-site` |
 | Version | `1.0.0` |
-| Author | Hermes Agent (Nous Research) |
+| Author | X19 (Nous Research) |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `publish`, `deploy`, `hosting`, `github-pages`, `cloudflare-pages`, `netlify`, `static-site`, `versioning`, `rollback`, `web-development` |
@@ -25,7 +25,7 @@ Versioned site deploys to GitHub/Cloudflare/Netlify Pages.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Publish Site

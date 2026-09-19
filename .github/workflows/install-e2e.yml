@@ -10,12 +10,12 @@ name: Install & Update E2E
 #   Matrix: linux     the real curl|bash install one-liner, isolated by a
 #                     git URL redirect to a local bare clone
 #                     (install-e2e-run.yml)
-#   Matrix: windows   the real desktop user flow: website Hermes-Setup.exe
+#   Matrix: windows   the real desktop user flow: website X19-Setup.exe
 #                     clicked by AutoHotkey, update via the app, Playwright
 #                     clicking "Update now" (install-e2e-windows-run.yml)
 #   Matrix: macos     script installs on the shared OS-agnostic driver,
 #                     plus the real desktop user flow: website
-#                     Hermes-Setup.dmg mounted and run, updates via the
+#                     X19-Setup.dmg mounted and run, updates via the
 #                     app under Playwright (install-e2e-macos-run.yml)
 #
 # Every combination is dispatched to its OS's run workflow; the run

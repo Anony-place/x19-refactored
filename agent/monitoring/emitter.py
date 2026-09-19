@@ -66,7 +66,7 @@ class MonitoringEmitter:
         with self._lock:
             if self._started:
                 return
-            self._thread = threading.Thread(target=self._run, name="hermes-monitoring-dispatch", daemon=True)
+            self._thread = threading.Thread(target=self._run, name="x19-monitoring-dispatch", daemon=True)
             self._thread.start()
             self._started = True
 
@@ -119,7 +119,7 @@ class MonitoringEmitter:
             self._q.join()
             finished.set()
 
-        threading.Thread(target=_wait_for_completion, name="hermes-monitoring-flush", daemon=True).start()
+        threading.Thread(target=_wait_for_completion, name="x19-monitoring-flush", daemon=True).start()
         finished.wait(timeout=timeout)
 
     def stats(self) -> Dict[str, int]:
@@ -167,10 +167,3 @@ def reset_emitter_for_tests(emitter: Optional[MonitoringEmitter] = None) -> None
 __all__ = ["MonitoringEmitter", "get_emitter", "emit", "reset_emitter_for_tests"]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-TelemetryEmitter = MonitoringEmitter
-# ---- END PLUGIN-COMPAT ----

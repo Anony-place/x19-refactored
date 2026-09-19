@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, Dict, NamedTuple, Optional, Tuple
 
 from agent.error_classifier import FailoverReason
-from hermes_constants import display_hermes_home
+from x19_constants import display_x19_home
 
 # Failure codes minted by loop sites that are not provider verdicts (see module docstring).
 SITE_FAILURE_CODES = frozenset({
@@ -30,7 +30,7 @@ def stamp_failure(result: Dict[str, Any], reason: str, retryable: bool) -> Dict[
 
 def provider_label_for(provider: Any) -> str:
     """Human-friendly provider name for chat copy (``"OpenRouter"``, ``"Nous Portal"``…)."""
-    from hermes_cli.models import provider_label
+    from x19_cli.models import provider_label
 
     return provider_label(str(provider or ""))
 
@@ -105,7 +105,7 @@ def exit_reason_failure(turn_exit_reason: Any) -> Optional[ExitFailure]:
 _NEXT_STEPS_RETRY = "Wait a minute and send /retry, or switch models with /model."
 _NEXT_STEPS_LOOP = (
     "Your message is saved. Send `continue` to try again, or start a new session with /new. "
-    "If it happens again, run `hermes doctor` and share the error details."
+    "If it happens again, run `x19 doctor` and share the error details."
 )
 
 # Lead sentence per classifier reason once retries and fallback are exhausted.
@@ -122,14 +122,14 @@ _EXHAUSTED_DEFAULT_LEAD = "{label} didn't answer after {attempts} attempts"
 _NONRETRYABLE_COPY: Dict[str, str] = {
     FailoverReason.model_not_found.value: (
         "Model '{model}' isn't available on {label}. Pick a different model with /model "
-        "(or `hermes model` in a terminal).{prefix_hint}"
+        "(or `x19 model` in a terminal).{prefix_hint}"
     ),
     FailoverReason.format_error.value: (
         "{label} rejected this request as malformed, so the model didn't answer. Start a clean "
-        "session with /new or switch models with /model; if it keeps happening, run `hermes doctor`."
+        "session with /new or switch models with /model; if it keeps happening, run `x19 doctor`."
     ),
     FailoverReason.ssl_cert_verification.value: (
-        "Hermes couldn't verify {label}'s security certificate, so the connection was refused. "
+        "X19 couldn't verify {label}'s security certificate, so the connection was refused. "
         "This is usually a corporate proxy or an outdated certificate store on this computer — "
         "see the terminal or `{home}/logs/agent.log` for the exact fix, or try another provider "
         "with /model."
@@ -146,11 +146,11 @@ _NONRETRYABLE_DEFAULT_COPY = (
 _AUTH_COPY: Dict[str, str] = {
     "oauth": (
         "{label} rejected your sign-in, so the model can't be reached. Sign in again: "
-        "`hermes portal` for Nous, `hermes auth add <provider> --type oauth` for other accounts."
+        "`x19 portal` for Nous, `x19 auth add <provider> --type oauth` for other accounts."
     ),
     "api_key": (
         "{label} rejected your API key, so the model can't be reached. Update it in "
-        "Settings → Providers, or run `hermes setup` in a terminal."
+        "Settings → Providers, or run `x19 setup` in a terminal."
     ),
 }
 
@@ -194,13 +194,13 @@ def failure_cause_gloss(reason: Any, *, subject: str = "it", possessive: str = "
 # (``empty_response`` is worded by agent/turn_explainers.py, ``session_busy`` by the lease).
 _FAILURE_CODE_COPY: Dict[str, str] = {
     "context_overflow": (
-        "This conversation has grown too long for {model} to read, and Hermes couldn't shrink "
+        "This conversation has grown too long for {model} to read, and X19 couldn't shrink "
         "it enough automatically. Start a new session with /new (your history is kept), or try "
         "/compress once more. Switching to a model with a bigger context window also works."
     ),
     "truncated": (
         "The model's reply was cut off before it finished (it hit its output length limit), so "
-        "Hermes didn't run the incomplete action. Nothing was changed. Send `continue`, ask for "
+        "X19 didn't run the incomplete action. Nothing was changed. Send `continue`, ask for "
         "the work in smaller steps, or raise max_tokens for this model."
     ),
     "invalid_response": (
@@ -208,11 +208,11 @@ _FAILURE_CODE_COPY: Dict[str, str] = {
         "or rate-limiting you. " + _NEXT_STEPS_RETRY + "\n\nDetails: {detail}"
     ),
     "loop_error": (
-        "Hermes hit repeated errors and stopped this turn so it wouldn't keep retrying. "
+        "X19 hit repeated errors and stopped this turn so it wouldn't keep retrying. "
         + _NEXT_STEPS_LOOP + "\n\nDetails: {detail}"
     ),
     "interpreter_shutdown": (
-        "Hermes was shutting down and stopped this turn. Your conversation is saved — reopen "
+        "X19 was shutting down and stopped this turn. Your conversation is saved — reopen "
         "it{resume} and send your message again."
     ),
 }
@@ -222,7 +222,7 @@ _FAILURE_CODE_COPY: Dict[str, str] = {
 _ONE_OFF_COPY: Dict[str, str] = {
     "payload_too_large": (
         "This conversation (including attachments) has grown too large to send to {model}, and "
-        "Hermes couldn't shrink it enough automatically. Start a new session with /new (your "
+        "X19 couldn't shrink it enough automatically. Start a new session with /new (your "
         "history is kept), or try /compress once more."
     ),
     "compression_disabled": (
@@ -237,7 +237,7 @@ _ONE_OFF_COPY: Dict[str, str] = {
     ),
     # Rides failure_reason="loop_error" (advisory; the turn is incomplete, not failed).
     "local_processing_error": (
-        "Hermes hit an internal error while handling the model's reply and stopped this turn. "
+        "X19 hit an internal error while handling the model's reply and stopped this turn. "
         + _NEXT_STEPS_LOOP + "\n\nDetails: {detail}"
     ),
     "reasoning_only": (
@@ -251,7 +251,7 @@ _ONE_OFF_COPY: Dict[str, str] = {
     ),
     "nous_rate_limit": (
         "Wait for the reset and send /retry, or switch models with /model. To avoid waits, add "
-        "a backup provider with `hermes fallback add`."
+        "a backup provider with `x19 fallback add`."
     ),
 }
 _SITE_COPY: Dict[str, str] = {**_FAILURE_CODE_COPY, **_ONE_OFF_COPY}
@@ -259,7 +259,7 @@ _SITE_COPY: Dict[str, str] = {**_FAILURE_CODE_COPY, **_ONE_OFF_COPY}
 
 def site_copy(code: str, **fields: Any) -> str:
     """Chat copy for a failure code or one-off loop outcome; unknown fields default to empty strings."""
-    fields.setdefault("home", display_hermes_home())
+    fields.setdefault("home", display_x19_home())
     return _SITE_COPY[code].format_map(_Defaults(fields))
 
 
@@ -268,7 +268,7 @@ def exhausted_copy(reason: str, *, label: str, attempts: int, summary: str) -> s
     lead = _EXHAUSTED_LEADS.get(reason, _EXHAUSTED_DEFAULT_LEAD).format(label=label, attempts=attempts)
     return (
         f"{lead} — it looks temporarily unavailable. {_NEXT_STEPS_RETRY} To avoid this in future, "
-        f"add a backup provider with `hermes fallback add`.\n\nProvider said: {summary}"
+        f"add a backup provider with `x19 fallback add`.\n\nProvider said: {summary}"
     )
 
 
@@ -288,7 +288,7 @@ def nonretryable_copy(
         f"'{prefix_suggestion}'?"
         if prefix_suggestion else ""
     )
-    body = template.format(label=label, model=model, home=display_hermes_home(), prefix_hint=prefix_hint)
+    body = template.format(label=label, model=model, home=display_x19_home(), prefix_hint=prefix_hint)
     return f"{body}\n\nProvider said: {summary}"
 
 

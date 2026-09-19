@@ -14,7 +14,7 @@ from plugins.memory.honcho import HonchoMemoryProvider
 
 class _FakeHonchoConfig(SimpleNamespace):
     raw: dict = {}
-    host: str = "hermes"
+    host: str = "x19"
 
     def resolve_session_name(self, **kwargs):
         return "test-session"
@@ -308,8 +308,8 @@ def _init_with_unresolved_peer(monkeypatch, cfg, platform: str = "cli") -> tuple
 
 
 @pytest.mark.parametrize("platform, present, absent", [
-    ("cli", "hermes honcho peer --user", "Do not suggest peerName"),
-    ("telegram", "Do not suggest peerName", "hermes honcho peer --user"),
+    ("cli", "x19 honcho peer --user", "Do not suggest peerName"),
+    ("telegram", "Do not suggest peerName", "x19 honcho peer --user"),
 ])
 def test_honcho_unresolved_peer_notices_once_and_stops_retrying(monkeypatch, platform, present, absent):
     """No runtime identity and no peerName: memory stays off for the session, the model hears it once, and
@@ -329,8 +329,8 @@ def test_honcho_unresolved_peer_notices_once_and_stops_retrying(monkeypatch, pla
 
 
 @pytest.mark.parametrize("platform, present, absent", [
-    ("cli", "hermes honcho peer --user", "could not be initialized"),
-    ("discord", "supplied no user id", "hermes honcho peer --user"),
+    ("cli", "x19 honcho peer --user", "could not be initialized"),
+    ("discord", "supplied no user id", "x19 honcho peer --user"),
 ])
 def test_honcho_unresolved_peer_tool_error_names_the_fix_for_the_platform(monkeypatch, platform, present, absent):
     cfg = _configured_tools_config(init_on_session_start=True)

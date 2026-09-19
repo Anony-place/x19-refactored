@@ -6,7 +6,7 @@ describe('$localModelsEnabled', () => {
   })
 
   it('reads true when the preload bridge reports the --local launch flag', async () => {
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: { localModelsEnabled: true }
     })
@@ -17,7 +17,7 @@ describe('$localModelsEnabled', () => {
   })
 
   it('defaults to false when the bridge omits the flag (older preload, web)', async () => {
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: {}
     })
@@ -28,7 +28,7 @@ describe('$localModelsEnabled', () => {
   })
 
   it('defaults to false with no bridge at all', async () => {
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: undefined
     })

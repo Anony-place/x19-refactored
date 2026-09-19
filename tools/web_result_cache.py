@@ -159,8 +159,8 @@ _index_lock = threading.Lock()
 
 def _cache_dir() -> Optional[Path]:
     try:
-        from hermes_constants import get_hermes_dir
-        d = get_hermes_dir("cache/web", "web_cache")
+        from x19_constants import get_x19_dir
+        d = get_x19_dir("cache/web", "web_cache")
         d.mkdir(parents=True, exist_ok=True)
         return d
     except Exception:  # noqa: BLE001
@@ -302,10 +302,3 @@ def extract_cache_put(
         logger.debug("Failed to cache web extract for %s: %s", url, exc)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Any  # noqa: F401,E402
-from typing import List  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

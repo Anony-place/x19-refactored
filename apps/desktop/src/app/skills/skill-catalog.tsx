@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-import type { ProfileScope } from '@/hermes'
+import type { ProfileScope } from '@/x19'
 import { useI18n } from '@/i18n'
 import { installHubSkill, notifyHubActionFailed } from '@/store/hub-actions'
 import { notify } from '@/store/notifications'

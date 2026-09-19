@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { usePageHeader } from "@/contexts/usePageHeader";
 
 /** Select value for built-in memory (`config` uses empty string). Never use `""` — UI Select maps empty value to an empty label. */
-const MEMORY_PROVIDER_BUILTIN = "__hermes_memory_builtin__";
+const MEMORY_PROVIDER_BUILTIN = "__x19_memory_builtin__";
 
 type MemoryFormValue = string | boolean | number;
 
@@ -180,7 +180,7 @@ function MemoryProviderSetupHint({
   if (!hasDetails || !setup) {
     return (
       <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
-        This provider is installed but unavailable. It may need local dependencies or a manual setup step before Hermes can activate it.
+        This provider is installed but unavailable. It may need local dependencies or a manual setup step before X19 can activate it.
       </p>
     );
   }
@@ -194,7 +194,7 @@ function MemoryProviderSetupHint({
     >
       <p className={isBlocked ? "text-destructive" : "text-muted-foreground"}>
         {needsDependencySetup
-          ? "Finish these setup steps before Hermes can activate this provider."
+          ? "Finish these setup steps before X19 can activate this provider."
           : "Provider dependency setup completed."}
       </p>
 
@@ -263,7 +263,7 @@ function MemoryProviderSetupHint({
       {setup.required_env.length && needsDependencySetup ? (
         <div className="grid gap-2">
           <p className="text-muted-foreground">
-            Required environment values. Fill the matching fields below, or set them in the Hermes environment.
+            Required environment values. Fill the matching fields below, or set them in the X19 environment.
           </p>
           <div className="flex flex-wrap gap-2">
             {setup.required_env.map((envKey) => (
@@ -628,7 +628,7 @@ export default function PluginsPage() {
 
                   {!selectedMemoryName && (
                     <p className="text-xs text-muted-foreground">
-                      Hermes will use the built-in MEMORY.md and USER.md files.
+                      X19 will use the built-in MEMORY.md and USER.md files.
                     </p>
                   )}
 
@@ -920,11 +920,11 @@ export default function PluginsPage() {
               {t.pluginsPage.catalogEmpty ?? "No catalog entries match."}{" "}
               <a
                 className="underline"
-                href="https://hermes-agent.nousresearch.com/docs/plugins"
+                href="https://anony-place.github.io/x19-refactored/docs/plugins"
                 target="_blank"
                 rel="noreferrer"
               >
-                {t.pluginsPage.catalogEmptyDocsLink ?? "Learn about Hermes plugins"}
+                {t.pluginsPage.catalogEmptyDocsLink ?? "Learn about X19 plugins"}
               </a>
             </p>
           ) : (
@@ -1381,8 +1381,8 @@ function CatalogEntryCard(props: CatalogEntryCardProps) {
             </a>
           ) : null}
 
-          {entry.requires_hermes ? (
-            <span>hermes {entry.requires_hermes}</span>
+          {entry.requires_x19 ? (
+            <span>x19 {entry.requires_x19}</span>
           ) : null}
 
           {entry.platforms.length ? (

@@ -40,10 +40,10 @@ def is_connected(config) -> bool:
 
 
 def interactive_setup() -> None:
-    """`hermes gateway setup` flow for A2A."""
-    from hermes_cli.setup import prompt, prompt_yes_no, save_env_value, get_env_value, print_header, print_info, print_warning
+    """`x19 gateway setup` flow for A2A."""
+    from x19_cli.setup import prompt, prompt_yes_no, save_env_value, get_env_value, print_header, print_info, print_warning
     print_header("A2A (Agent-to-Agent)")
-    print_info("Expose Hermes as an A2A-discoverable agent and call other A2A agents.")
+    print_info("Expose X19 as an A2A-discoverable agent and call other A2A agents.")
     print_info("Uses Python stdlib — no extra packages needed.")
     print()
     def ask(label: str, env: str) -> str:

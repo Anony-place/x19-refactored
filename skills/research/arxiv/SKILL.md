@@ -2,11 +2,11 @@
 name: arxiv
 description: "Search arXiv papers by keyword, author, category, or ID."
 version: 1.0.0
-author: Hermes Agent
+author: X19
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
+  x19:
     tags: [Research, Arxiv, Papers, Academic, Science, API]
     related_skills: [pdf]
 ---

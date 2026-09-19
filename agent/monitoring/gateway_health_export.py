@@ -45,12 +45,12 @@ _METRICS_SDK = (
 )
 # Every gauge the runtime snapshot can emit MUST be listed here or it is silently dropped.
 _OBSERVABLE_METRIC_NAMES = (
-    "hermes.gateway.up", "hermes.gateway.state", "hermes.gateway.active_agents", "hermes.gateway.busy",
-    "hermes.gateway.drainable", "hermes.gateway.restart_requested", "hermes.gateway.background_work",
-    "hermes.gateway.background_delegations", "hermes.platform.up", "hermes.platform.degraded",
-    "hermes.cron.scheduler.heartbeat_age_seconds", "hermes.cron.scheduler.last_success_age_seconds",
-    "hermes.cron.scheduler.catch_up_occurrences", "hermes.cron.jobs.enabled", "hermes.cron.jobs.running",
-    "hermes.cron.jobs.overdue",
+    "x19.gateway.up", "x19.gateway.state", "x19.gateway.active_agents", "x19.gateway.busy",
+    "x19.gateway.drainable", "x19.gateway.restart_requested", "x19.gateway.background_work",
+    "x19.gateway.background_delegations", "x19.platform.up", "x19.platform.degraded",
+    "x19.cron.scheduler.heartbeat_age_seconds", "x19.cron.scheduler.last_success_age_seconds",
+    "x19.cron.scheduler.catch_up_occurrences", "x19.cron.jobs.enabled", "x19.cron.jobs.running",
+    "x19.cron.jobs.overdue",
 )
 
 
@@ -96,7 +96,7 @@ class GatewayHealthExportRuntime:
                     item.shutdown()
 
         if closeables:
-            worker = threading.Thread(target=_close, name="hermes-gateway-health-export-shutdown", daemon=True)
+            worker = threading.Thread(target=_close, name="x19-gateway-health-export-shutdown", daemon=True)
             worker.start()
             worker.join(timeout=2.0)
         self.streamer = self.log_streamer = self.metric_provider = self.thread = self.stop_event = None
@@ -177,8 +177,8 @@ def _read_runtime_snapshot(config: Dict[str, Any]):
     try:
         base = dict(gateway_snapshot.metrics[0].attributes) if gateway_snapshot.metrics else {}
         for name, read in (
-            ("hermes.gateway.background_work", _read_background_work_count),
-            ("hermes.gateway.background_delegations", _read_background_delegations_count),
+            ("x19.gateway.background_work", _read_background_work_count),
+            ("x19.gateway.background_delegations", _read_background_delegations_count),
         ):
             gateway_snapshot.metrics.append(GatewayMetric(name=name, value=read(), attributes=base))
     except Exception as exc:
@@ -210,7 +210,7 @@ def _start_metric_provider(config: Dict[str, Any], sdk: Dict[str, Any]) -> Any:
     reader = sdk["PeriodicExportingMetricReader"](exporter, export_interval_millis=interval_ms)
     resource = sdk["Resource"].create(_runtime_resource_attributes(config, telemetry_scope="gateway_health"))
     provider = sdk["MeterProvider"](metric_readers=[reader], resource=resource)
-    meter = provider.get_meter("hermes.gateway.health")
+    meter = provider.get_meter("x19.gateway.health")
     Observation = sdk["Observation"]
 
     def callback(name: str):
@@ -243,7 +243,7 @@ class GatewayDiagnosticLogStreamer(EmitterStreamer):
         self._provider = sdk["LoggerProvider"](resource=resource)
         self._processor = sdk["BatchLogRecordProcessor"](sdk["OTLPLogExporter"](**_exporter_kwargs(config, "logs")))
         self._provider.add_log_record_processor(self._processor)
-        self._logger = self._provider.get_logger("hermes.gateway.diagnostics")
+        self._logger = self._provider.get_logger("x19.gateway.diagnostics")
         self._sdk = sdk
         self.exported = 0
 
@@ -289,7 +289,7 @@ def start_gateway_health_export(config: Dict[str, Any]) -> GatewayHealthExportRu
         try:
             sdk = otlp_exporter._require_sdk(_METRICS_SDK, auto_install=True, prompt=False)
         except Exception:
-            logger.warning("monitoring.gateway_health_export.enabled but OTLP SDK is unavailable; install 'hermes-agent[otlp]'", exc_info=True)
+            logger.warning("monitoring.gateway_health_export.enabled but OTLP SDK is unavailable; install 'x19[otlp]'", exc_info=True)
             return GatewayHealthExportRuntime(enabled=False, reason="otlp_unavailable")
     if metrics_on and sdk is not None:
         try:
@@ -325,7 +325,7 @@ def start_gateway_health_export(config: Dict[str, Any]) -> GatewayHealthExportRu
                 while not stop_event.wait(interval):
                     _emit_snapshot_events(config)
 
-            thread = threading.Thread(target=_run, name="hermes-gateway-health-export", daemon=True)
+            thread = threading.Thread(target=_run, name="x19-gateway-health-export", daemon=True)
             thread.start()
             runtime.thread = thread
         except Exception:
@@ -336,9 +336,3 @@ def start_gateway_health_export(config: Dict[str, Any]) -> GatewayHealthExportRu
 __all__ = ["GatewayHealthExportRuntime", "start_gateway_health_export"]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import re  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

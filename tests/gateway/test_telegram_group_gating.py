@@ -40,7 +40,7 @@ def _make_adapter(
     guest_mode=None,
     observe_unmentioned_group_messages=None,
     bots_require_mention=None,
-    bot_username="hermes_bot",
+    bot_username="x19_bot",
 ):
     from plugins.platforms.telegram.adapter import TelegramAdapter
 
@@ -153,7 +153,7 @@ def _dm_message(text="hello", *, from_user_id=111):
     )
 
 
-def _mention_entity(text, mention="@hermes_bot"):
+def _mention_entity(text, mention="@x19_bot"):
     offset = text.index(mention)
     return SimpleNamespace(type="mention", offset=offset, length=len(mention))
 
@@ -217,7 +217,7 @@ def test_observed_group_context_uses_shared_source_and_prompt_for_later_mentions
             observe_unmentioned_group_messages=True,
         )
         adapter._session_store = _FakeSessionStore()
-        text = "@hermes_bot what did Alice say?"
+        text = "@x19_bot what did Alice say?"
         msg = _group_message(
             text,
             from_user_id=222,
@@ -253,7 +253,7 @@ def test_observed_group_context_preserves_slash_command_text_for_dispatch():
         observe_unmentioned_group_messages=True,
     )
     event = MessageEvent(
-        text="/new@hermes_bot",
+        text="/new@x19_bot",
         message_type=MessageType.COMMAND,
         source=SessionSource(
             platform=Platform.TELEGRAM,
@@ -264,14 +264,14 @@ def test_observed_group_context_preserves_slash_command_text_for_dispatch():
             thread_id="7",
         ),
         raw_message=_group_message(
-            "/new@hermes_bot",
-            entities=[_bot_command_entity("/new@hermes_bot", "/new@hermes_bot")],
+            "/new@x19_bot",
+            entities=[_bot_command_entity("/new@x19_bot", "/new@x19_bot")],
         ),
     )
 
     attributed = adapter._apply_telegram_group_observe_attribution(event)
 
-    assert attributed.text == "/new@hermes_bot"
+    assert attributed.text == "/new@x19_bot"
     assert attributed.get_command() == "new"
     # Commands preserve sender identity for slash-access control (#67816).
     assert attributed.source.user_id == "111"
@@ -318,7 +318,7 @@ def test_group_messages_can_require_direct_trigger_via_config():
     adapter = _make_adapter(require_mention=True)
 
     assert adapter._should_process_message(_group_message("hello everyone")) is False
-    assert adapter._should_process_message(_group_message("hi @hermes_bot", entities=[_mention_entity("hi @hermes_bot")])) is True
+    assert adapter._should_process_message(_group_message("hi @x19_bot", entities=[_mention_entity("hi @x19_bot")])) is True
     assert adapter._should_process_message(_group_message("replying", reply_to_bot=True)) is True
     # Commands must also respect require_mention when it is enabled
     assert adapter._should_process_message(_group_message("/status"), is_command=True) is False
@@ -327,8 +327,8 @@ def test_group_messages_can_require_direct_trigger_via_config():
     # entity). We must accept it so the menu works when require_mention is on.
     assert adapter._should_process_message(
         _group_message(
-            "/status@hermes_bot",
-            entities=[_bot_command_entity("/status@hermes_bot", "/status@hermes_bot")],
+            "/status@x19_bot",
+            entities=[_bot_command_entity("/status@x19_bot", "/status@x19_bot")],
         ),
         is_command=True,
     ) is True
@@ -391,11 +391,11 @@ def test_intern_bots_ignore_messages_addressed_to_other_intern_bot():
 
 
 def test_raw_bot_mention_fallback_does_not_match_email_or_substring():
-    adapter = _make_adapter(require_mention=True, bot_username="hermes_bot")
+    adapter = _make_adapter(require_mention=True, bot_username="x19_bot")
 
-    assert adapter._should_process_message(_group_message("email ops@hermes_bot.example")) is False
-    assert adapter._should_process_message(_group_message("prefix@hermes_bot hi")) is False
-    assert adapter._should_process_message(_group_message("hi @hermes_bot")) is True
+    assert adapter._should_process_message(_group_message("email ops@x19_bot.example")) is False
+    assert adapter._should_process_message(_group_message("prefix@x19_bot hi")) is False
+    assert adapter._should_process_message(_group_message("hi @x19_bot")) is True
 
 
 def test_exclusive_bot_mentions_can_be_disabled_for_legacy_groups():
@@ -439,9 +439,9 @@ def test_guest_mode_allows_only_direct_mentions_outside_allowed_chats():
     )
 
     mentioned = _group_message(
-        "hi @hermes_bot",
+        "hi @x19_bot",
         chat_id=-201,
-        entities=[_mention_entity("hi @hermes_bot")],
+        entities=[_mention_entity("hi @x19_bot")],
     )
     assert adapter._should_process_message(mentioned) is True
     assert adapter._should_process_message(_group_message("reply", chat_id=-201, reply_to_bot=True)) is False
@@ -455,7 +455,7 @@ def test_allowed_topics_drop_other_forum_topics_before_other_gates():
     assert adapter._should_process_message(_group_message("hello", chat_id=-100, thread_id=8)) is True
     assert adapter._should_process_message(_group_message("hello", chat_id=-100, thread_id=11)) is False
     assert adapter._should_process_message(
-        _group_message("hi @hermes_bot", chat_id=-100, thread_id=11, entities=[_mention_entity("hi @hermes_bot")])
+        _group_message("hi @x19_bot", chat_id=-100, thread_id=11, entities=[_mention_entity("hi @x19_bot")])
     ) is False
 
 
@@ -544,9 +544,9 @@ def test_bot_self_messages_are_ignored_in_dm_and_group():
 
 
 def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text(
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
+    (x19_home / "config.yaml").write_text(
         "telegram:\n"
         "  require_mention: true\n"
         "  guest_mode: true\n"
@@ -565,7 +565,7 @@ def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     # Clear the TELEGRAM_* vars this test exercises so a developer's ambient
     # shell/.env values don't pre-empt the YAML→env bridge (env-over-YAML
     # precedence, adapter.py::_apply_yaml_config). The authoritative assertions
@@ -590,7 +590,7 @@ def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
     # bridge. We deliberately do NOT assert on os.environ here: a third-party
     # import (microsoft_teams/apps/app.py) runs load_dotenv(find_dotenv(usecwd=True))
     # at import time, which walks up from cwd and can repopulate TELEGRAM_* vars
-    # from a developer's real ~/.hermes/.env, defeating the env-over-YAML bridge
+    # from a developer's real ~/.x19/.env, defeating the env-over-YAML bridge
     # for any key present there. The PlatformConfig.extra values below are parsed
     # straight from the test's config.yaml and are immune to that ambient leak.
     assert config is not None
@@ -614,16 +614,16 @@ def test_top_level_require_mention_bridges_to_telegram(monkeypatch, tmp_path):
     """require_mention at the config.yaml top level (alongside group_sessions_per_user)
     must behave identically to telegram.require_mention: true (#3979).
     """
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
+    x19_home = tmp_path / ".x19"
+    x19_home.mkdir()
     # Intentionally no "telegram:" section — keys are at the top level.
-    (hermes_home / "config.yaml").write_text(
+    (x19_home / "config.yaml").write_text(
         "require_mention: true\n"
         "group_sessions_per_user: true\n",
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     monkeypatch.delenv("TELEGRAM_REQUIRE_MENTION", raising=False)
 
     config = load_gateway_config()
@@ -804,7 +804,7 @@ def _group_document_message(*, chat_id=-100, caption="Este arquivo", document=No
 class _IdentityBot:
     """Stand-in for PTB's Bot: ``.username`` only changes when get_me() runs."""
 
-    def __init__(self, bot_id=999, cached="hermes_bot", server=None):
+    def __init__(self, bot_id=999, cached="x19_bot", server=None):
         self.id = bot_id
         self._cached = cached
         self._server = server if server is not None else cached
@@ -858,13 +858,13 @@ def test_stale_username_schedules_background_identity_recheck():
 def test_bot_never_adopts_another_accounts_username():
     """Only a user id matching this bot may update our own handle."""
     adapter = _make_adapter(require_mention=True)
-    adapter._bot = _IdentityBot(cached="hermes_bot")
+    adapter._bot = _IdentityBot(cached="x19_bot")
     message = _group_message("hello")
     message.from_user = SimpleNamespace(id=555, username="impostor_bot", full_name="Impostor", first_name="Impostor")
 
     adapter._observe_bot_identity_from_message(message)
 
-    assert adapter._current_bot_username() == "hermes_bot"
+    assert adapter._current_bot_username() == "x19_bot"
 
 
 def test_collectible_username_not_suppressed_by_other_bot_mention():
@@ -940,7 +940,7 @@ def test_bot_quote_reply_loop_is_broken_by_bots_require_mention():
         is False
     )
 
-    text = "@hermes_bot ping"
+    text = "@x19_bot ping"
     assert (
         gated._should_process_message(
             _bot_sender_message(text, entities=[_mention_entity(text)])

@@ -250,7 +250,7 @@ class TestStoredPromptReuse:
         model reads old `Model:` metadata ("what model are you?" lies).
         """
         stored = (
-            "You are Hermes Agent.\n\n"
+            "You are X19.\n\n"
             "Conversation started: Tuesday, June 16, 2026\n"
             "Session ID: test-session-id\n"
             "Model: anthropic/claude-opus-4.8-fast\n"
@@ -261,7 +261,7 @@ class TestStoredPromptReuse:
         agent = _make_agent(
             session_db=db,
             prebuilt_prompt=(
-                "You are Hermes Agent.\n\n"
+                "You are X19.\n\n"
                 "Conversation started: Tuesday, June 16, 2026\n"
                 "Session ID: test-session-id\n"
                 "Model: openai/gpt-5.5\n"
@@ -373,7 +373,7 @@ class TestPromptStabilityInvariant:
         invalidates KV cache on every prefix-cache backend.
         """
         stored = (
-            "You are Hermes Agent.\n"
+            "You are X19.\n"
             "\n"
             "Conversation started: Sunday, May 17, 2026\n"
             "Session ID: 20260517_153500_abc123\n"
@@ -551,7 +551,7 @@ class TestReconstructStaticPrefixMemoization:
 class TestPerResponseSessionWritePath:
     """The write path under an embedding host's per-response session (#96570).
 
-    Hermes Studio group chat pre-creates the SQLite row and pre-persists the
+    X19 Studio group chat pre-creates the SQLite row and pre-persists the
     user message BEFORE ``run_conversation()``, then runs one turn under a
     session id it destroys afterwards. The row therefore starts with a null
     system prompt and a non-empty history on its own genuine FIRST turn, which
@@ -568,7 +568,7 @@ class TestPerResponseSessionWritePath:
         return agent
 
     def test_prepersisted_row_stores_the_freshly_built_prompt(self, tmp_path):
-        from hermes_state import SessionDB
+        from x19_state import SessionDB
 
         session_id = "gc_run_room42_default_Worker_5f2c1ab9d4e34f7a8b0c6d1e2f3a4b5c"
         with SessionDB(db_path=tmp_path / "state.db") as db:
@@ -588,7 +588,7 @@ class TestPerResponseSessionWritePath:
         self, tmp_path, caplog
     ):
         """Second turn of the SAME id restores — so nothing was dropped."""
-        from hermes_state import SessionDB
+        from x19_state import SessionDB
 
         session_id = "gc_run_room42_default_Worker_9a7e3b1c05d24e6fb83a1c7d9e0f2a4b"
         history = [{"role": "user", "content": "hi"}]

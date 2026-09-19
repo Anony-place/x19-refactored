@@ -4,14 +4,14 @@ from __future__ import annotations
 from typing import Any
 
 _DESC_TASK_ID_DEFAULT = (
-    "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env "
+    "Task id. If omitted, defaults to X19_KANBAN_TASK from the env "
     "(the task the dispatcher spawned you to work on)."
 )
 
 _DESC_BOARD = (
     "Kanban board slug to target. When omitted, the call resolves the "
-    "active board the usual way: HERMES_KANBAN_DB env → "
-    "HERMES_KANBAN_BOARD env → the 'current' symlink under the kanban "
+    "active board the usual way: X19_KANBAN_DB env → "
+    "X19_KANBAN_BOARD env → the 'current' symlink under the kanban "
     "home → 'default'. Pass an explicit slug only when the caller (e.g. "
     "a Telegram routing layer) needs to override the env-pinned active "
     "board for this one call."
@@ -334,7 +334,7 @@ KANBAN_ATTACH_SCHEMA = _schema(
 KANBAN_ATTACH_URL_SCHEMA = _schema(
     "kanban_attach_url",
     (
-        "Attach a file to a task by URL — Hermes downloads it server-side "
+        "Attach a file to a task by URL — X19 downloads it server-side "
         "and stores it as a real attachment (capped at 25 MB). Use when "
         "you have a link rather than the bytes. Only http/https URLs are "
         "accepted."
@@ -402,7 +402,7 @@ KANBAN_CREATE_SCHEMA = _schema(
         },
         "tenant": _prop("string", (
                 "Optional namespace for multi-project isolation. "
-                "Defaults to HERMES_TENANT env if set."
+                "Defaults to X19_TENANT env if set."
         )),
         "priority": _prop("integer", (
                 "Dispatcher tiebreaker. Higher = picked sooner "

@@ -15,7 +15,7 @@ type Page = MockBackendFixture['page']
 
 async function durableMembers(page: Page) {
   return page.evaluate(room => {
-    const rooms = JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.group-chats') || '{}')
+    const rooms = JSON.parse(localStorage.getItem('x19.plugin.x19-bots.group-chats') || '{}')
 
     return ((rooms[room]?.members || []) as { name: string }[]).map(member => member.name).sort()
   }, ROOM)
@@ -124,7 +124,7 @@ test('Group settings edits the room roster and the next round seats only the sav
   await expect.poll(() => durableMembers(page)).toEqual(['planner', 'programmer'])
   // … and so does each local Bot's groups[] metadata (the plugin's meta snapshot).
   await expect.poll(() => page.evaluate(room => {
-    const meta = JSON.parse(localStorage.getItem('hermes.plugin.hermes-bots.bot-meta-v2') || '{}')
+    const meta = JSON.parse(localStorage.getItem('x19.plugin.x19-bots.bot-meta-v2') || '{}')
 
     return Object.entries(meta as Record<string, any>)
       .filter(([, value]) => (value?.groups || []).includes(room))

@@ -93,7 +93,7 @@ class TestKillToolSubprocessesMarksCronInterrupted:
 
         sched._running_job_ids.add("job-1")
         sched._running_fire_owners["job-1"] = {
-            object(): ("owner-1", sched._get_hermes_home().resolve())
+            object(): ("owner-1", sched._get_x19_home().resolve())
         }
 
         monkeypatch.setattr(_pr.process_registry, "kill_all", lambda task_id=None: 1)

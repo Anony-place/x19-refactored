@@ -17,7 +17,7 @@ Carry a GitHub issue to a verified PR with honest CI state.
 | Source | Bundled (installed by default) |
 | Path | `skills/github/github-issue-to-pr` |
 | Version | `0.1.0` |
-| Author | Ben Barclay (benbarclay), Hermes Agent |
+| Author | Ben Barclay (benbarclay), X19 |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `GitHub`, `Issues`, `Coding`, `Pull-Requests`, `CI` |
@@ -26,7 +26,7 @@ Carry a GitHub issue to a verified PR with honest CI state.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # GitHub Issue to Pull Request

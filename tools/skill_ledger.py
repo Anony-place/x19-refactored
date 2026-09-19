@@ -1,9 +1,9 @@
 """Per-mutation skill audit ledger + single-edit rollback.
 
 Every skill mutation (any actor) appends one JSONL entry to
-``~/.hermes/skills/.curator_ledger.jsonl`` with before/after file manifests whose
+``~/.x19/skills/.curator_ledger.jsonl`` with before/after file manifests whose
 contents are stored content-addressed (sha256-deduped) under
-``~/.hermes/.curator_backups/blobs/``. JSONL, not the state DB: durable, greppable,
+``~/.x19/.curator_backups/blobs/``. JSONL, not the state DB: durable, greppable,
 survives DB resets. TELEMETRY, NOT A GATE: every public write path swallows and
 logs — except ``rollback_entry``, which FAILS CLOSED when its safety capture fails.
 """
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def derive_actor() -> str:
 
 
 def _skills_dir() -> Path:
-    return get_hermes_home() / "skills"
+    return get_x19_home() / "skills"
 
 
 def ledger_path() -> Path:
@@ -72,13 +72,13 @@ def ledger_path() -> Path:
 
 
 def blobs_dir() -> Path:
-    return get_hermes_home() / ".curator_backups" / "blobs"
+    return get_x19_home() / ".curator_backups" / "blobs"
 
 
 def ledger_enabled() -> bool:
     """Config gate ``skills.ledger`` (default True); lazy import keeps this importable without the CLI."""
     try:
-        from hermes_cli.config import cfg_get, load_config
+        from x19_cli.config import cfg_get, load_config
         return bool(cfg_get(load_config(), "skills", "ledger", default=True))
     except Exception as e:  # pragma: no cover — best-effort config read
         logger.debug("skill_ledger: config read failed (%s); defaulting on", e)
@@ -206,7 +206,7 @@ def fill_snapshot_from_curator_backup(
     where rollback must restore them: under *root* when known (for purge that is
     ``.archive/<name>/``, NOT the live tree), else the live skills dir; the tar's leading
     package-dir segment is stripped when *root* already names the package. Every target must stay
-    under ``skills/`` and HERMES_HOME."""
+    under ``skills/`` and X19_HOME."""
     out = list(existing or [])
     prefixes = package_prefixes(root, skill, out)
     if not prefixes:
@@ -229,7 +229,7 @@ def fill_snapshot_from_curator_backup(
         if not parts:
             continue
         dest = (dest_root if dest_root is not None else skills).joinpath(*parts)
-        if not _is_within(skills, dest) or not _is_within(get_hermes_home(), dest):
+        if not _is_within(skills, dest) or not _is_within(get_x19_home(), dest):
             continue
         rel_key = _rel_posix(dest, skills)
         if rel_key is None or rel_key in have:
@@ -324,9 +324,9 @@ def get_entry(entry_id: str) -> Optional[Dict[str, Any]]:
 
 
 def _validate_entry_paths(entry: Dict[str, Any]) -> Optional[str]:
-    """Every entry path must be under HERMES_HOME — a hand-edited ledger must not
+    """Every entry path must be under X19_HOME — a hand-edited ledger must not
     become a write-anywhere primitive."""
-    home = get_hermes_home()
+    home = get_x19_home()
     for section in ("before", "after"):
         for item in entry.get(section) or []:
             p = Path(str(item.get("path", "")))
@@ -402,14 +402,3 @@ def rollback_entry(entry_id: str) -> Tuple[bool, str]:
         f"Safety entry {safety_id} captured the pre-rollback state.")
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-ACTOR_AGENT = "agent"
-
-ACTOR_CURATOR = "curator"
-
-ACTOR_USER = "user"
-# ---- END PLUGIN-COMPAT ----

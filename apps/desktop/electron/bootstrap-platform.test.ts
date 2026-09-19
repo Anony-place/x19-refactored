@@ -19,12 +19,12 @@ test('isWslEnvironment detects WSL2 env vars on linux', () => {
 })
 
 test('isWindowsBinaryPathInWsl blocks Windows binary types on WSL', () => {
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.exe', { isWsl: true }), true)
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.cmd', { isWsl: true }), true)
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.bat', { isWsl: true }), true)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/x19.exe', { isWsl: true }), true)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/x19.cmd', { isWsl: true }), true)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/x19.bat', { isWsl: true }), true)
   assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/install.ps1', { isWsl: true }), true)
-  assert.equal(isWindowsBinaryPathInWsl('/usr/local/bin/hermes', { isWsl: true }), false)
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.exe', { isWsl: false }), false)
+  assert.equal(isWindowsBinaryPathInWsl('/usr/local/bin/x19', { isWsl: true }), false)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/x19.exe', { isWsl: false }), false)
 })
 
 test('bundledRuntimeImportCheck selects platform-specific import checks', () => {
@@ -70,16 +70,16 @@ test('detectRemoteDisplay flags RDP sessions', () => {
   assert.match(String(detectRemoteDisplay({ env: { SESSIONNAME: 'RDP-Tcp#7' }, platform: 'win32' })), /^rdp/)
 })
 
-test('detectRemoteDisplay honors the HERMES_DESKTOP_DISABLE_GPU override both ways', () => {
+test('detectRemoteDisplay honors the X19_DESKTOP_DISABLE_GPU override both ways', () => {
   // Force-on even on a local display.
   assert.match(
-    String(detectRemoteDisplay({ env: { HERMES_DESKTOP_DISABLE_GPU: '1', DISPLAY: ':0' }, platform: 'linux' })),
+    String(detectRemoteDisplay({ env: { X19_DESKTOP_DISABLE_GPU: '1', DISPLAY: ':0' }, platform: 'linux' })),
     /override/
   )
   // Force-off even over SSH (escape hatch when a remote display has working accel).
   assert.equal(
     detectRemoteDisplay({
-      env: { HERMES_DESKTOP_DISABLE_GPU: 'false', SSH_CONNECTION: '1.2.3.4 5 6.7.8.9 22' },
+      env: { X19_DESKTOP_DISABLE_GPU: 'false', SSH_CONNECTION: '1.2.3.4 5 6.7.8.9 22' },
       platform: 'linux'
     }),
     null
@@ -88,7 +88,7 @@ test('detectRemoteDisplay honors the HERMES_DESKTOP_DISABLE_GPU override both wa
 
 test('resolveLinuxPasswordStore applies known backends on linux', () => {
   for (const store of ['gnome-libsecret', 'kwallet', 'kwallet5', 'kwallet6', 'basic']) {
-    assert.deepEqual(resolveLinuxPasswordStore({ env: { HERMES_DESKTOP_PASSWORD_STORE: store }, platform: 'linux' }), {
+    assert.deepEqual(resolveLinuxPasswordStore({ env: { X19_DESKTOP_PASSWORD_STORE: store }, platform: 'linux' }), {
       store,
       warning: null
     })
@@ -97,7 +97,7 @@ test('resolveLinuxPasswordStore applies known backends on linux', () => {
 
 test('resolveLinuxPasswordStore is a no-op when the env var is unset', () => {
   assert.deepEqual(resolveLinuxPasswordStore({ env: {}, platform: 'linux' }), { store: null, warning: null })
-  assert.deepEqual(resolveLinuxPasswordStore({ env: { HERMES_DESKTOP_PASSWORD_STORE: '  ' }, platform: 'linux' }), {
+  assert.deepEqual(resolveLinuxPasswordStore({ env: { X19_DESKTOP_PASSWORD_STORE: '  ' }, platform: 'linux' }), {
     store: null,
     warning: null
   })
@@ -105,18 +105,18 @@ test('resolveLinuxPasswordStore is a no-op when the env var is unset', () => {
 
 test('resolveLinuxPasswordStore ignores the env var off linux', () => {
   assert.deepEqual(
-    resolveLinuxPasswordStore({ env: { HERMES_DESKTOP_PASSWORD_STORE: 'gnome-libsecret' }, platform: 'darwin' }),
+    resolveLinuxPasswordStore({ env: { X19_DESKTOP_PASSWORD_STORE: 'gnome-libsecret' }, platform: 'darwin' }),
     { store: null, warning: null }
   )
   assert.deepEqual(
-    resolveLinuxPasswordStore({ env: { HERMES_DESKTOP_PASSWORD_STORE: 'kwallet6' }, platform: 'win32' }),
+    resolveLinuxPasswordStore({ env: { X19_DESKTOP_PASSWORD_STORE: 'kwallet6' }, platform: 'win32' }),
     { store: null, warning: null }
   )
 })
 
 test('resolveLinuxPasswordStore warns on unknown values instead of applying them', () => {
   const result = resolveLinuxPasswordStore({
-    env: { HERMES_DESKTOP_PASSWORD_STORE: 'keychain-of-wonders' },
+    env: { X19_DESKTOP_PASSWORD_STORE: 'keychain-of-wonders' },
     platform: 'linux'
   })
 

@@ -154,7 +154,7 @@ class TestGuardFailureIsNotFatal:
             raise RuntimeError("guard table is broken")
 
         monkeypatch.setattr(
-            "hermes_cli.model_selection_guards.combined_selection_warning", _boom
+            "x19_cli.model_selection_guards.combined_selection_warning", _boom
         )
 
         result = _config_set_model(GUARDED_MODEL)["result"]
@@ -191,7 +191,7 @@ class TestHelperContract:
             seen["provider"] = provider
             return None
 
-        import hermes_cli.model_selection_guards as guards
+        import x19_cli.model_selection_guards as guards
 
         monkeypatch.setattr(guards, "combined_selection_warning", _fake)
         server._pending_switch_selection_warning(UNGUARDED_MODEL, "openrouter")
@@ -207,7 +207,7 @@ class TestHelperContract:
             seen["provider"] = provider
             return None
 
-        import hermes_cli.model_selection_guards as guards
+        import x19_cli.model_selection_guards as guards
 
         monkeypatch.setattr(guards, "combined_selection_warning", _fake)
         server._pending_switch_selection_warning(UNGUARDED_MODEL, "")

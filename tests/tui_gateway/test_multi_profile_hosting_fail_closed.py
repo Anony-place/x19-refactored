@@ -2,10 +2,10 @@
 the FULL runtime scope of the requested profile (home + secrets + terminal), the launch profile
 included once the process multiplexes.
 
-Regression for the silent cross-profile secret leak class: ``hermes serve`` hosted many profile
+Regression for the silent cross-profile secret leak class: ``x19 serve`` hosted many profile
 homes but never called ``set_multiplex_active(True)``, so every unscoped ``get_secret`` read for a
 secondary silently returned the LAUNCH profile's ``os.environ`` value; ``@_profile_scoped`` bound
-only HERMES_HOME. And the launch-profile asymmetry: a default-member hosted-room turn in a
+only X19_HOME. And the launch-profile asymmetry: a default-member hosted-room turn in a
 ``multiplex_profiles: true`` gateway died at agent build with ``UnscopedSecretError``.
 """
 
@@ -31,25 +31,25 @@ B_BASE_URL = "https://secondary.example.invalid/v1"
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
     """Launch home (root) + secondary ``profiles/b``; B's config references both tokens."""
-    root = tmp_path / "hermes_home"
+    root = tmp_path / "x19_home"
     b = root / "profiles" / "b"
     b.mkdir(parents=True)
     (root / ".env").write_text(
-        f"A_ONLY_TOKEN={A_VAL}\nHERMES_API_KEY={A_API_KEY}\nHERMES_BASE_URL={A_BASE_URL}\n",
+        f"A_ONLY_TOKEN={A_VAL}\nX19_API_KEY={A_API_KEY}\nX19_BASE_URL={A_BASE_URL}\n",
         encoding="utf-8")
     (b / ".env").write_text(
-        f"B_ONLY_TOKEN={B_VAL}\nHERMES_API_KEY={B_API_KEY}\nHERMES_BASE_URL={B_BASE_URL}\n",
+        f"B_ONLY_TOKEN={B_VAL}\nX19_API_KEY={B_API_KEY}\nX19_BASE_URL={B_BASE_URL}\n",
         encoding="utf-8")
     for home in (root, b):
         (home / "config.yaml").write_text(
             "probe:\n  a_ref: ${A_ONLY_TOKEN}\n  b_ref: ${B_ONLY_TOKEN}\n  env_ref: ${INJECTED_TOKEN}\n",
             encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("X19_HOME", str(root))
     monkeypatch.setenv("A_ONLY_TOKEN", A_VAL)  # the launch process loaded its own .env
-    monkeypatch.setenv("HERMES_API_KEY", A_API_KEY)
-    monkeypatch.setenv("HERMES_BASE_URL", A_BASE_URL)
+    monkeypatch.setenv("X19_API_KEY", A_API_KEY)
+    monkeypatch.setenv("X19_BASE_URL", A_BASE_URL)
     monkeypatch.setenv("INJECTED_TOKEN", ENV_VAL)  # systemd / op run credential injection
-    monkeypatch.setattr(server, "_hermes_home", root)
+    monkeypatch.setattr(server, "_x19_home", root)
     monkeypatch.setattr(server, "_served_profile_homes", set())
     monkeypatch.setattr(lpp, "_snapshot", None)
     from agent import secret_scope
@@ -110,20 +110,20 @@ def test_rpc_scope_reaches_llm_oneshot_and_model_options(two_homes, monkeypatch)
     seen = {}
 
     def fake_oneshot(**kwargs):
-        seen["oneshot"] = (Path(os.environ.get("HERMES_HOME", "")), get_secret("B_ONLY_TOKEN"), get_secret("A_ONLY_TOKEN"))
-        from hermes_constants import get_hermes_home
-        seen["oneshot_home"] = Path(get_hermes_home())
+        seen["oneshot"] = (Path(os.environ.get("X19_HOME", "")), get_secret("B_ONLY_TOKEN"), get_secret("A_ONLY_TOKEN"))
+        from x19_constants import get_x19_home
+        seen["oneshot_home"] = Path(get_x19_home())
         return "t"
 
     monkeypatch.setattr("agent.oneshot.run_oneshot", fake_oneshot)
     monkeypatch.setattr(server, "_model_picker_context", lambda agent: object())
 
     def build_payload(ctx, **kwargs):
-        from hermes_constants import get_hermes_home
-        seen["options"] = (Path(get_hermes_home()), get_secret("B_ONLY_TOKEN"), get_secret("A_ONLY_TOKEN"))
+        from x19_constants import get_x19_home
+        seen["options"] = (Path(get_x19_home()), get_secret("B_ONLY_TOKEN"), get_secret("A_ONLY_TOKEN"))
         return {"providers": []}
 
-    monkeypatch.setattr("hermes_cli.inventory.build_model_options_payload", build_payload)
+    monkeypatch.setattr("x19_cli.inventory.build_model_options_payload", build_payload)
 
     r = server._methods["llm.oneshot"]("r1", {"profile": "b", "instructions": "x", "input": "y"})
     assert r["result"]["text"] == "t"
@@ -162,7 +162,7 @@ def test_launch_profile_agent_build_is_scoped_once_multiplexing(two_homes, monke
     """The C6 asymmetry: a default-profile session (``profile_home`` None) in a multiplexing process
     must bind the launch profile's own scope for its agent build instead of running unscoped."""
     from agent.secret_scope import current_secret_scope, set_multiplex_active
-    from hermes_constants import get_hermes_home
+    from x19_constants import get_x19_home
 
     root, _b = two_homes
     set_multiplex_active(True)  # the messaging gateway's flip (GatewayRunner.__init__)
@@ -171,7 +171,7 @@ def test_launch_profile_agent_build_is_scoped_once_multiplexing(two_homes, monke
         scope = current_secret_scope()
         assert scope is not None and scope["A_ONLY_TOKEN"] == A_VAL and scope["INJECTED_TOKEN"] == ENV_VAL
         assert "B_ONLY_TOKEN" not in scope
-        assert Path(get_hermes_home()) == root
+        assert Path(get_x19_home()) == root
     finally:
         server._release_build_profile_scopes(scopes)
     assert current_secret_scope() is None
@@ -181,8 +181,8 @@ class _MemoryManager:
     """Stands in for an external memory provider: ``system_prompt_block()`` reads its credential via get_secret."""
     def build_system_prompt(self):
         from agent.secret_scope import get_secret
-        from hermes_constants import get_hermes_home
-        return f"{get_hermes_home()}|{get_secret('MEM_PROVIDER_KEY')}"
+        from x19_constants import get_x19_home
+        return f"{get_x19_home()}|{get_secret('MEM_PROVIDER_KEY')}"
 
 
 def _prompt_building_session(profile_home, key):

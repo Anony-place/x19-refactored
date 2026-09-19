@@ -17,7 +17,7 @@ toolsets:
   - file
   - terminal
 metadata:
-  hermes:
+  x19:
     tags: [Security, X19, Recon, AssetDiscovery]
 ---
 

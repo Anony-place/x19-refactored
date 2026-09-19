@@ -31,7 +31,7 @@ else:
     try:
         import httpx
         HTTPX_AVAILABLE = True
-    except ImportError:  # pragma: no cover - httpx is already a Hermes dep
+    except ImportError:  # pragma: no cover - httpx is already a X19 dep
         HTTPX_AVAILABLE = False
         httpx = None
 
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SIDECAR_PORT = 8789
 _DEFAULT_SIDECAR_BIND = "127.0.0.1"
 _MAX_MESSAGE_LENGTH = 8000  # iMessage caps practical size at ~16 KB; conservative, matches BlueBubbles
-# Out-of-process senders (cron, `hermes send`) need the live sidecar's port + spawn-time
+# Out-of-process senders (cron, `x19 send`) need the live sidecar's port + spawn-time
 # token; persisted once /healthz passes, removed on every stop / failed-start path.
 # --------------------------------------------------------------------------- Sidecar runtime record The
 # gateway persists this record once the sidecar passes its /healthz readiness check, and removes it on every
@@ -74,12 +74,12 @@ _PHOTON_RETRYABLE_PATTERNS = (
     "internal sidecar error", "upstream connect error", "upstream unavailable", "connection dropped",
     "reset reason: overflow", "upstream_overflow", "upstream_unavailable")
 # iMessage emits Open Graph preview art as attachments right after a URL message;
-# suppress those so Hermes sees the link once.
+# suppress those so X19 sees the link once.
 _RICHLINK_PREVIEW_SUPPRESS_SECONDS = 30.0
 _RICHLINK_PREVIEW_ATTACHMENT_SUFFIX = ".pluginpayloadattachment"
 _TYPING_COOLDOWN_SECONDS = 5.0  # per chat; reduces gRPC pressure during overflow
 # Group-chat wake words — same defaults as BlueBubbles so both iMessage adapters gate alike.
-_DEFAULT_MENTION_PATTERNS = [r"(?<![\w@])@?hermes\s+agent\b[,:\-]?", r"(?<![\w@])@?hermes\b[,:\-]?"]
+_DEFAULT_MENTION_PATTERNS = [r"(?<![\w@])@?x19\s+agent\b[,:\-]?", r"(?<![\w@])@?x19\b[,:\-]?"]
 # Shared/free-tier lines can only reply to conversations the target initiated.
 _TARGET_NOT_ALLOWED_MESSAGE = (
     "shared/free-tier Photon lines cannot initiate outbound sends to new "
@@ -101,8 +101,8 @@ async def _aiter_ndjson_lines(response: Any) -> AsyncIterator[str]:
 # -- Sidecar runtime record ----------------------------------------------------
 
 def _runtime_record_path() -> Path:
-    from hermes_constants import get_hermes_home  # honors profile overrides
-    return get_hermes_home() / "runtime" / _RUNTIME_RECORD_NAME
+    from x19_constants import get_x19_home  # honors profile overrides
+    return get_x19_home() / "runtime" / _RUNTIME_RECORD_NAME
 
 
 def _write_runtime_record(port: int, token: str, pid: int) -> None:
@@ -231,13 +231,13 @@ def check_requirements() -> bool:
             if _npm_error_log().exists():
                 npm_error = _npm_error_log().read_text(encoding="utf-8").strip()[:_NPM_ERROR_LOG_MAX_CHARS]
         hint = f" (last npm error: {npm_error})" if npm_error else ""
-        logger.debug("photon: spectrum-ts not installed at %s%s — run: hermes photon setup", _sidecar_dir(), hint)
+        logger.debug("photon: spectrum-ts not installed at %s%s — run: x19 photon setup", _sidecar_dir(), hint)
         return False
     return True
 
 
 def _sidecar_deps_stale() -> bool:
-    """True when node_modules predates the lockfile (`hermes update` rewrites it without
+    """True when node_modules predates the lockfile (`x19 update` rewrites it without
     reinstalling); False if either file is missing."""
     return _lock_newer_than_install(_sidecar_dir())
 
@@ -249,7 +249,7 @@ def _reinstall_sidecar_deps() -> None:
     if not npm:
         logger.warning("[photon] cannot reinstall stale sidecar deps: npm not on PATH")
         return
-    from hermes_cli._subprocess_compat import windows_hide_flags  # no console flash on Windows
+    from x19_cli._subprocess_compat import windows_hide_flags  # no console flash on Windows
 
     def _run(verb: str) -> subprocess.CompletedProcess:
         return subprocess.run(  # noqa: S603
@@ -289,7 +289,6 @@ def _env_enablement() -> Optional[dict]:
         return None
     return {"project_id": project_id, "project_secret": project_secret,
             **_seed_extra_from_env((), home_env="PHOTON_HOME_CHANNEL")}
-
 
 
 def _markdown_enabled() -> bool:
@@ -439,7 +438,7 @@ def _normalize_content(content: Dict[str, Any]) -> _Normalized:
 def _attachment_body(space_id: str, safe_path: str, *, kind: str, name: Optional[str] = None,
                      mime_type: Optional[str] = None, caption: Optional[str] = None) -> Dict[str, Any]:
     """``/send-attachment`` body; spectrum-ts infers name/mimeType from the extension,
-    so optional keys are only sent when Hermes supplied them."""
+    so optional keys are only sent when X19 supplied them."""
     body: Dict[str, Any] = {
         "spaceId": space_id, "path": safe_path, "kind": "voice" if kind == "voice" else "attachment"}
     body.update({k: v for k, v in (("name", name), ("mimeType", mime_type), ("caption", caption)) if v})
@@ -449,8 +448,6 @@ def _attachment_body(space_id: str, safe_path: str, *, kind: str, name: Optional
 def _guess_mime(path: str) -> Optional[str]:
     import mimetypes
     return mimetypes.guess_type(path)[0] or None
-
-
 
 
 # -- Adapter -------------------------------------------------------------------
@@ -537,7 +534,7 @@ class PhotonAdapter(BasePlatformAdapter):
         return f"http://{self._sidecar_bind}:{self._sidecar_port}{path}"
 
     def _sidecar_headers(self) -> Dict[str, str]:
-        return {"X-Hermes-Sidecar-Token": self._sidecar_token}
+        return {"X-X19-Sidecar-Token": self._sidecar_token}
 
     # -- Connection lifecycle ------------------------------------------------------
 
@@ -548,7 +545,7 @@ class PhotonAdapter(BasePlatformAdapter):
         if not self._project_id or not self._project_secret:
             self._set_fatal_error(
                 "MISSING_CREDENTIALS",
-                "PHOTON_PROJECT_ID and PHOTON_PROJECT_SECRET are required. Run: hermes photon setup",
+                "PHOTON_PROJECT_ID and PHOTON_PROJECT_SECRET are required. Run: x19 photon setup",
                 retryable=False)
             return False
         client = httpx.AsyncClient(timeout=30.0, trust_env=False)
@@ -815,7 +812,7 @@ class PhotonAdapter(BasePlatformAdapter):
 
     @classmethod
     def _pid_is_sidecar(cls, pid: int) -> bool:
-        """True if ``pid``'s command line is a Photon sidecar (any Hermes checkout)."""
+        """True if ``pid``'s command line is a Photon sidecar (any X19 checkout)."""
         out = cls._quick_stdout(["ps", "-p", str(pid), "-o", "command="])
         return out is not None and "photon/sidecar/index.mjs" in out
 
@@ -869,7 +866,7 @@ class PhotonAdapter(BasePlatformAdapter):
     async def _ensure_sidecar_deps(self) -> None:
         """Cold-install or refresh sidecar node_modules before spawn (off the loop)."""
         if not sidecar_deps_installed():
-            # Hosted images have no CLI for `hermes photon setup`: connect bootstraps deps itself.
+            # Hosted images have no CLI for `x19 photon setup`: connect bootstraps deps itself.
             logger.info("[photon] sidecar deps not installed; installing into %s", _sidecar_dir())
             await asyncio.to_thread(_reinstall_sidecar_deps)
             if not sidecar_deps_installed():
@@ -877,9 +874,9 @@ class PhotonAdapter(BasePlatformAdapter):
                 raise PhotonSidecarStartupError(
                     f"Photon sidecar deps could not be installed into "
                     f"{_sidecar_dir()} (see log for the npm error). "
-                    f"Run: cd {_sidecar_dir()} && npm ci   (or `hermes photon setup`)",
+                    f"Run: cd {_sidecar_dir()} && npm ci   (or `x19 photon setup`)",
                     code="SIDECAR_DEPS_MISSING", retryable=False)
-        # `hermes update` bumps the lockfile without reinstalling node_modules; the sidecar
+        # `x19 update` bumps the lockfile without reinstalling node_modules; the sidecar
         # would spawn against stale deps and die on every reconnect.
         if _sidecar_deps_stale():
             logger.warning("[photon] sidecar deps are stale (lockfile newer than install); reinstalling before start")
@@ -910,7 +907,7 @@ class PhotonAdapter(BasePlatformAdapter):
             "PHOTON_SIDECAR_TOKEN": self._sidecar_token,
             # Exit on stdin EOF so ANY gateway death (incl. SIGKILL) can't orphan it on the port.
             "PHOTON_SIDECAR_WATCH_STDIN": "1"})
-        from hermes_cli._subprocess_compat import windows_hide_flags  # hide child console on Windows
+        from x19_cli._subprocess_compat import windows_hide_flags  # hide child console on Windows
         await self._apply_spectrum_patch(windows_hide_flags())
         try:
             self._sidecar_proc = subprocess.Popen(  # noqa: S603
@@ -1461,8 +1458,8 @@ def _standalone_token_from_record(port: int) -> Tuple[Optional[str], int, str]:
         stale_hint = (f" A stale sidecar runtime record was found (pid {record.get('pid')} is not running)"
                       " — the gateway appears to be down.")
     return None, port, (
-        "Photon standalone send requires a running sidecar. Start the Hermes gateway (which spawns "
-        f"the sidecar and records its address under <hermes-home>/runtime/{_RUNTIME_RECORD_NAME}), "
+        "Photon standalone send requires a running sidecar. Start the X19 gateway (which spawns "
+        f"the sidecar and records its address under <x19-home>/runtime/{_RUNTIME_RECORD_NAME}), "
         "or set PHOTON_SIDECAR_TOKEN in this process's environment." + stale_hint)
 
 
@@ -1482,7 +1479,7 @@ async def _standalone_send(
         if not token:
             return send_error(error)
     base = f"http://{_DEFAULT_SIDECAR_BIND}:{port}"
-    headers = {"X-Hermes-Sidecar-Token": token}
+    headers = {"X-X19-Sidecar-Token": token}
     last_message_id: Optional[str] = None
     try:
         async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
@@ -1527,17 +1524,17 @@ async def _standalone_send(
 # -- Plugin entry point ----------------------------------------------------------
 
 def register(ctx) -> None:
-    """Called by the Hermes plugin loader at startup."""
+    """Called by the X19 plugin loader at startup."""
     from . import cli as _cli  # local: avoid argparse work at module load
     ctx.register_platform(
         name="photon", label="iMessage via Photon", adapter_factory=lambda cfg: PhotonAdapter(cfg),
         check_fn=check_requirements, validate_config=validate_config, is_connected=is_connected,
         required_env=["PHOTON_PROJECT_ID", "PHOTON_PROJECT_SECRET"],
         install_hint=(
-            "Run: hermes photon setup  (logs in via device flow, creates a "
+            "Run: x19 photon setup  (logs in via device flow, creates a "
             "Spectrum project, links your phone number, installs the "
             "spectrum-ts sidecar)."),
-        setup_fn=_cli.gateway_setup,  # surfaces Photon in the unified `hermes gateway setup` wizard
+        setup_fn=_cli.gateway_setup,  # surfaces Photon in the unified `x19 gateway setup` wizard
         env_enablement_fn=_env_enablement, cron_deliver_env_var="PHOTON_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, allowed_users_env="PHOTON_ALLOWED_USERS",
         allow_all_env="PHOTON_ALLOW_ALL_USERS", max_message_length=_MAX_MESSAGE_LENGTH, emoji="📱",
@@ -1555,24 +1552,3 @@ def register(ctx) -> None:
         setup_fn=_cli.register_cli, handler_fn=_cli.dispatch)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'ProcessingOutcome': ('gateway.platforms.event', 'ProcessingOutcome'),
-    'resolve_sidecar_dir': ('plugins.platforms.photon.sidecar_paths', 'resolve_sidecar_dir'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

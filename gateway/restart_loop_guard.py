@@ -1,10 +1,10 @@
 """Auto-resume restart-loop breaker (defense-3).
 
-Defenses 1-2 (``_HERMES_GATEWAY`` guard on ``hermes gateway stop|restart`` /
+Defenses 1-2 (``_X19_GATEWAY`` guard on ``x19 gateway stop|restart`` /
 ``terminal_tool``, cron lifecycle filter) stop the agent scheduling its own restart
 but not every SIGTERM source: the supervisor respawns, the gateway auto-resumes the
 restart-interrupted session, whose next turn re-runs the offending logic.  Boots are
-persisted to ``<HERMES_HOME>/gateway/restart_loop.json`` and CHAIN while gaps stay
+persisted to ``<X19_HOME>/gateway/restart_loop.json`` and CHAIN while gaps stay
 within ``max_gap_seconds`` (a ~150s watchdog-kill cycle trips like a ~10s loop).
 Tripped → caller SKIPS auto-resume.  Any I/O failure fails OPEN, never wedging.
 """
@@ -17,7 +17,7 @@ import logging
 import time
 from typing import List, Optional
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 
 logger = logging.getLogger("gateway.run")
 
@@ -35,7 +35,7 @@ _MAX_STORED_BOOTS = 50
 
 
 def _state_path():
-    return get_hermes_home() / "gateway" / "restart_loop.json"
+    return get_x19_home() / "gateway" / "restart_loop.json"
 
 
 def _load_boots() -> List[float]:
@@ -114,35 +114,3 @@ def check_and_record(
     return tripped
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def is_restart_loop_tripped(
-    max_restarts: int = DEFAULT_MAX_RESTARTS,
-    window_seconds: int = DEFAULT_WINDOW_SECONDS,
-    *,
-    now: Optional[float] = None,
-    max_gap_seconds: int = DEFAULT_MAX_GAP_SECONDS,
-) -> bool:
-    """Return True if the gateway has restarted ``>= max_restarts`` times with
-    restart-interrupted sessions in one unbroken chain ending at ``now``.
-
-    Reads the persisted boot log written by
-    ``record_restart_interrupted_boot`` and counts the boots that still chain
-    together (consecutive gaps within ``max_gap_seconds``), so the verdict does
-    not depend on how fast the crash cycle happens to be.
-    Fails OPEN (returns False) on any error — a broken breaker must never
-    wedge a healthy gateway.
-    """
-    if max_restarts <= 0:
-        return False
-    ts = time.time() if now is None else now
-    gap = _chain_gap(window_seconds, max_gap_seconds)
-    try:
-        recent = _chain_ending_at(_load_boots(), ts, gap)
-    except Exception:  # pragma: no cover — _load_boots already guards
-        return False
-    return len(recent) >= max_restarts
-# ---- END PLUGIN-COMPAT ----

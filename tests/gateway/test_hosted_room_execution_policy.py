@@ -33,7 +33,7 @@ def _policy(*, approval_mode: str = "manual", max_turns: int = 12) -> dict:
         config={
             "agent": {"max_turns": max_turns},
             "approvals": {"mode": approval_mode},
-            "platform_toolsets": {"api_server": ["hermes-api-server", "web"]},
+            "platform_toolsets": {"api_server": ["x19-api-server", "web"]},
         },
     )
 
@@ -177,7 +177,7 @@ def test_room_agent_uses_target_policy_toolsets_and_turn_limit(monkeypatch):
     )
     monkeypatch.setattr("gateway.run._current_max_iterations", lambda: 999)
     monkeypatch.setattr(
-        "hermes_cli.tools_config._get_platform_tools",
+        "x19_cli.tools_config._get_platform_tools",
         lambda *_: {"terminal", "file", "web"},
     )
     adapter = APIServerAdapter(PlatformConfig(enabled=True))

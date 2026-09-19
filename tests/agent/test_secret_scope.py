@@ -121,7 +121,7 @@ class TestEnvFileParsing:
         '\"' or '\\' worked interactively but were corrupted under scoped
         (cron / multiplex) resolution.
         """
-        from hermes_cli.config import _quote_env_value
+        from x19_cli.config import _quote_env_value
 
         original = 'tok"en\\with spaces'
         (tmp_path / ".env").write_text(f"MY_TOKEN={_quote_env_value(original)}\n")
@@ -174,7 +174,7 @@ class TestEnvFileParsing:
     def test_round_trip_writer_value_with_trailing_comment(self, tmp_path):
         """A value quoted by the save_env_value writer survives an appended
         inline comment byte-exactly."""
-        from hermes_cli.config import _quote_env_value
+        from x19_cli.config import _quote_env_value
 
         original = 'we#ird "tok\\en" # not a comment'
         quoted = _quote_env_value(original)
@@ -221,7 +221,7 @@ class TestEnvFileParsing:
         self, tmp_path, monkeypatch
     ):
         (tmp_path / ".env").write_text("XIAOMI_API_KEY=placeholder\n")
-        from hermes_cli import env_loader
+        from x19_cli import env_loader
 
         home_key = str(tmp_path.resolve())
         monkeypatch.setitem(
@@ -241,7 +241,7 @@ class TestEnvFileParsing:
         other = tmp_path / "other"
         profile.mkdir()
         other.mkdir()
-        from hermes_cli import env_loader
+        from x19_cli import env_loader
 
         monkeypatch.setitem(
             env_loader._SECRET_SOURCE_VALUES_BY_HOME,
@@ -385,7 +385,7 @@ class TestUnscopedSecretErrorSignature:
         err = ss.UnscopedSecretError("SURPLUS_API_KEY", "get_secret('SURPLUS_API_KEY') with no scope")
         assert err.secret_name == "SURPLUS_API_KEY" and "SURPLUS_API_KEY" in str(err)
         assert err.developer_detail in getattr(err, "__notes__", [])
-        assert "hermes gateway restart" in str(err)
+        assert "x19 gateway restart" in str(err)
 
     def test_legacy_single_message_positional_is_the_developer_detail(self):
         """Older callers passed the whole sentence positionally; it must not be read as a name."""

@@ -14,17 +14,17 @@ Play Pokemon via headless emulator + RAM reads.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/gaming/pokemon-player` |
+| Source | Optional — install with `x19 skills install official/gaming/pokemon-player` |
 | Path | `optional-skills/gaming\pokemon-player` |
 | Version | `1.0.0` |
-| Author | Teknium (teknium1), Hermes Agent |
+| Author | Teknium (teknium1), X19 |
 | License | MIT |
 | Platforms | linux, macos, windows |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that X19 loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Pokemon Player

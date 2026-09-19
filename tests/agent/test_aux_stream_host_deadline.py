@@ -254,7 +254,7 @@ def test_protected_provider_daemon_inherits_the_host_deadline():
     ), aux.aux_stream_deadline(deadline):
         assert aux._run_protected_sync_provider_call(_callback, {}) == "ok"
 
-    assert seen["thread"] == "hermes-protected-aux-provider"
+    assert seen["thread"] == "x19-protected-aux-provider"
     assert seen["deadline"] == deadline
 
 

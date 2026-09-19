@@ -1,37 +1,37 @@
 ---
 sidebar_position: 16
 title: "Google Gemini"
-description: "Use Hermes Agent with Google Gemini — native AI Studio API, API-key setup, tool calling, streaming, and quota guidance"
+description: "Use X19 with Google Gemini — native AI Studio API, API-key setup, tool calling, streaming, and quota guidance"
 ---
 
 # Google Gemini
 
-Hermes Agent supports Google Gemini as a native provider using the **Google AI Studio / Gemini API** — not the OpenAI-compatible endpoint. This lets Hermes translate its internal OpenAI-shaped message and tool loop into Gemini's native `generateContent` API while preserving tool calling, streaming, multimodal inputs, and Gemini-specific response metadata.
+X19 supports Google Gemini as a native provider using the **Google AI Studio / Gemini API** — not the OpenAI-compatible endpoint. This lets X19 translate its internal OpenAI-shaped message and tool loop into Gemini's native `generateContent` API while preserving tool calling, streaming, multimodal inputs, and Gemini-specific response metadata.
 
 ## Prerequisites
 
 - **Google AI Studio API key** — create one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **Billing-enabled Google Cloud project** — recommended for agent use. Gemini's free tier is too small for long-running agent sessions because Hermes may make several model calls per user turn.
-- **Hermes installed** — no extra Python package is required for the native Gemini provider.
+- **Billing-enabled Google Cloud project** — recommended for agent use. Gemini's free tier is too small for long-running agent sessions because X19 may make several model calls per user turn.
+- **X19 installed** — no extra Python package is required for the native Gemini provider.
 
 :::tip API key path
-Set `GOOGLE_API_KEY` or `GEMINI_API_KEY`. Hermes checks both names for the `gemini` provider.
+Set `GOOGLE_API_KEY` or `GEMINI_API_KEY`. X19 checks both names for the `gemini` provider.
 :::
 
 ## Quick Start
 
 ```bash
 # Add your Gemini API key
-echo "GOOGLE_API_KEY=..." >> ~/.hermes/.env
+echo "GOOGLE_API_KEY=..." >> ~/.x19/.env
 
 # Select Gemini as your provider
-hermes model
+x19 model
 # → Choose "More providers..." → "Google AI Studio"
-# → Hermes checks your key tier and shows Gemini models
+# → X19 checks your key tier and shows Gemini models
 # → Select a model
 
 # Start chatting
-hermes chat
+x19 chat
 ```
 
 If you prefer direct config editing, use the native Gemini API base URL:
@@ -45,7 +45,7 @@ model:
 
 ## Configuration
 
-After running `hermes model`, your `~/.hermes/config.yaml` will contain:
+After running `x19 model`, your `~/.x19/config.yaml` will contain:
 
 ```yaml
 model:
@@ -54,7 +54,7 @@ model:
   base_url: https://generativelanguage.googleapis.com/v1beta
 ```
 
-And in `~/.hermes/.env`:
+And in `~/.x19/.env`:
 
 ```bash
 GOOGLE_API_KEY=...
@@ -68,13 +68,13 @@ The recommended endpoint is:
 https://generativelanguage.googleapis.com/v1beta
 ```
 
-Hermes detects this endpoint and creates its native Gemini adapter. Internally, Hermes still keeps the agent loop in OpenAI-shaped messages, then translates each request to Gemini's native schema:
+X19 detects this endpoint and creates its native Gemini adapter. Internally, X19 still keeps the agent loop in OpenAI-shaped messages, then translates each request to Gemini's native schema:
 
 - `messages[]` → Gemini `contents[]`
 - system prompts → Gemini `systemInstruction`
 - tool schemas → Gemini `functionDeclarations`
 - tool results → Gemini `functionResponse` parts
-- streaming responses → OpenAI-shaped stream chunks for the Hermes loop
+- streaming responses → OpenAI-shaped stream chunks for the X19 loop
 
 Tool parameter type arrays such as `"type": ["number", "null"]` are translated
 into Gemini's scalar type plus `nullable` form. Multi-type unions keep every
@@ -82,9 +82,9 @@ alternative through `anyOf`, including nested properties and array items. This
 happens automatically; no MCP server or provider configuration change is needed.
 
 :::note Gemini 3 thought signatures
-For Gemini 3 tool use, Hermes preserves the `thoughtSignature` values attached to function-call parts and replays them on the next tool turn. That covers the validation-critical path for multi-step agent workflows.
+For Gemini 3 tool use, X19 preserves the `thoughtSignature` values attached to function-call parts and replays them on the next tool turn. That covers the validation-critical path for multi-step agent workflows.
 
-Gemini 3 may also attach thought signatures to other response parts. Hermes' native adapter is optimized for agent tool loops today, so it does not yet replay every non-tool-call signature with full part-level fidelity.
+Gemini 3 may also attach thought signatures to other response parts. X19' native adapter is optimized for agent tool loops today, so it does not yet replay every non-tool-call signature with full part-level fidelity.
 :::
 
 ### Prefer the Native Endpoint
@@ -95,7 +95,7 @@ Google also exposes an OpenAI-compatible endpoint:
 https://generativelanguage.googleapis.com/v1beta/openai/
 ```
 
-For Hermes agent sessions, prefer the native Gemini endpoint above. Hermes includes a native Gemini adapter so it can map multi-turn tool use, tool-call results, streaming, multimodal inputs, and Gemini response metadata directly onto Gemini's `generateContent` API. The OpenAI-compatible endpoint is still useful when you specifically need OpenAI API compatibility.
+For X19 sessions, prefer the native Gemini endpoint above. X19 includes a native Gemini adapter so it can map multi-turn tool use, tool-call results, streaming, multimodal inputs, and Gemini response metadata directly onto Gemini's `generateContent` API. The OpenAI-compatible endpoint is still useful when you specifically need OpenAI API compatibility.
 
 If you previously set `GEMINI_BASE_URL` to the `/openai` URL, remove it or change it:
 
@@ -104,7 +104,7 @@ GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 ```
 
 Host-root base URLs on the Google host are normalized automatically: if the URL
-doesn't end with an API version segment (`v1beta`, `v1alpha`, `v1`, ...), Hermes
+doesn't end with an API version segment (`v1beta`, `v1alpha`, `v1`, ...), X19
 appends `/v1beta` for you, so `GEMINI_BASE_URL=https://generativelanguage.googleapis.com`
 works the same as spelling out the `/v1beta` suffix. The same normalization
 applies to the Gemini TTS base URL (`tts.gemini.base_url`). Chat requests only
@@ -114,7 +114,7 @@ OpenAI-compatible endpoint, so configure it with its `/openai`-style URL.
 
 ## Available Models
 
-The `hermes model` picker shows Gemini models maintained in Hermes' provider registry. Common choices include:
+The `x19 model` picker shows Gemini models maintained in X19' provider registry. Common choices include:
 
 | Model | ID | Notes |
 |-------|----|-------|
@@ -125,7 +125,7 @@ The `hermes model` picker shows Gemini models maintained in Hermes' provider reg
 | Gemini 2.5 Flash | `gemini-2.5-flash` | Previous generation fast model with thinking capabilities |
 | Gemini 2.5 Pro | `gemini-2.5-pro` | Previous generation complex reasoning model |
 
-Model availability changes over time. If a model disappears or is not enabled for your key, run `hermes model` again and pick one from the current list.
+Model availability changes over time. If a model disappears or is not enabled for your key, run `x19 model` again and pick one from the current list.
 
 :::info Model IDs
 Use Gemini's native model IDs such as `gemini-3.7-flash`, not OpenRouter-style IDs like `google/gemini-3.7-flash`, when `provider: gemini`.
@@ -133,7 +133,7 @@ Use Gemini's native model IDs such as `gemini-3.7-flash`, not OpenRouter-style I
 
 ### Latest Aliases
 
-Google publishes moving aliases for the Pro and Flash Gemini families. `gemini-pro-latest` and `gemini-flash-latest` are useful when you want Google to advance the model automatically without changing your Hermes config. Note that your usage charges may be affected if newer models introduce different rates.
+Google publishes moving aliases for the Pro and Flash Gemini families. `gemini-pro-latest` and `gemini-flash-latest` are useful when you want Google to advance the model automatically without changing your X19 config. Note that your usage charges may be affected if newer models introduce different rates.
 
 | Alias | Currently tracks | Notes |
 |-------|------------------|-------|
@@ -151,7 +151,7 @@ If you need strict reproducibility, prefer explicit model IDs such as `gemini-3.
 
 ### Gemma via the Gemini API
 
-Google also exposes Gemma models through the Gemini API. Hermes recognizes these as Google models, but hides very low-throughput Gemma entries from the default model picker so new users do not accidentally select an evaluation-tier model for a long-running agent session.
+Google also exposes Gemma models through the Gemini API. X19 recognizes these as Google models, but hides very low-throughput Gemma entries from the default model picker so new users do not accidentally select an evaluation-tier model for a long-running agent session.
 
 Useful evaluation IDs include:
 
@@ -160,7 +160,7 @@ Useful evaluation IDs include:
 | Gemma 4 31B IT | `gemma-4-31b-it` | Larger Gemma model; useful for compatibility and quality evaluation |
 | Gemma 4 26B A4B IT | `gemma-4-26b-a4b-it` | Smaller active-parameter variant when available |
 
-These models are best treated as evaluation options on Gemini API keys. Google's Gemma API pricing is free-tier-only and the usage caps are low compared with production Gemini models, so sustained Hermes agent use should normally move to a paid Gemini model, a self-hosted deployment, or another provider with appropriate quota.
+These models are best treated as evaluation options on Gemini API keys. Google's Gemma API pricing is free-tier-only and the usage caps are low compared with production Gemini models, so sustained X19 use should normally move to a paid Gemini model, a self-hosted deployment, or another provider with appropriate quota.
 
 To use a Gemma model that is hidden from the picker, set it directly:
 
@@ -184,12 +184,12 @@ Use the `/model` command during a conversation:
 /model gemini-3.1-flash-lite-preview
 ```
 
-If you have not configured Gemini yet, exit the session and run `hermes model` first. `/model` switches among already-configured providers and models; it does not collect new API keys.
+If you have not configured Gemini yet, exit the session and run `x19 model` first. `/model` switches among already-configured providers and models; it does not collect new API keys.
 
 ## Diagnostics
 
 ```bash
-hermes doctor
+x19 doctor
 ```
 
 The doctor checks:
@@ -199,11 +199,11 @@ The doctor checks:
 
 ## Gateway (Messaging Platforms)
 
-Gemini works with all Hermes gateway platforms (Telegram, Discord, Slack, WhatsApp, LINE, Feishu, etc.). Configure Gemini as your provider, then start the gateway normally:
+Gemini works with all X19 gateway platforms (Telegram, Discord, Slack, WhatsApp, LINE, Feishu, etc.). Configure Gemini as your provider, then start the gateway normally:
 
 ```bash
-hermes gateway setup
-hermes gateway start
+x19 gateway setup
+x19 gateway start
 ```
 
 The gateway reads `config.yaml` and uses the same Gemini provider configuration.
@@ -212,7 +212,7 @@ The gateway reads `config.yaml` and uses the same Gemini provider configuration.
 
 ### "Gemini native client requires an API key"
 
-Hermes could not find a usable API key. Add one of these to `~/.hermes/.env`:
+X19 could not find a usable API key. Add one of these to `~/.x19/.env`:
 
 ```bash
 GOOGLE_API_KEY=...
@@ -220,25 +220,25 @@ GOOGLE_API_KEY=...
 GEMINI_API_KEY=...
 ```
 
-Then run `hermes model` again.
+Then run `x19 model` again.
 
 ### "This Google API key is on the free tier"
 
-Hermes probes Gemini API keys during setup. Free-tier quotas can be exhausted after a handful of agent turns because tool use, retries, compression, and auxiliary tasks may require multiple model calls.
+X19 probes Gemini API keys during setup. Free-tier quotas can be exhausted after a handful of agent turns because tool use, retries, compression, and auxiliary tasks may require multiple model calls.
 
 Enable billing on the Google Cloud project attached to your key, regenerate the key if needed, then run:
 
 ```bash
-hermes model
+x19 model
 ```
 
 ### "404 model not found"
 
-The selected model is not available for your account, region, or key. Run `hermes model` again and pick another Gemini model from the current list.
+The selected model is not available for your account, region, or key. Run `x19 model` again and pick another Gemini model from the current list.
 
-### Gemma model is not shown in `hermes model`
+### Gemma model is not shown in `x19 model`
 
-Hermes may hide low-throughput Gemma models from the picker by default. If you intentionally want to evaluate one, set the model ID directly in `~/.hermes/config.yaml`.
+X19 may hide low-throughput Gemma models from the picker by default. If you intentionally want to evaluate one, set the model ID directly in `~/.x19/config.yaml`.
 
 ### "429 quota exceeded" on Gemma
 
@@ -246,7 +246,7 @@ Gemma models exposed through the Gemini API are useful for evaluation, but their
 
 ### OpenAI-compatible endpoint is configured
 
-Check `~/.hermes/.env` for:
+Check `~/.x19/.env` for:
 
 ```bash
 GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
@@ -260,7 +260,7 @@ GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 
 ### Tool calling fails with schema errors
 
-Upgrade Hermes and rerun `hermes model`. The native Gemini adapter sanitizes tool schemas for Gemini's stricter function-declaration format; older builds or custom endpoints may not.
+Upgrade X19 and rerun `x19 model`. The native Gemini adapter sanitizes tool schemas for Gemini's stricter function-declaration format; older builds or custom endpoints may not.
 
 ## Related
 

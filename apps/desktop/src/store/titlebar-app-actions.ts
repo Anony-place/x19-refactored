@@ -2,7 +2,7 @@ import { type Codec, persistentAtom } from '@/lib/persisted'
 
 export type TitlebarAppActionsSide = 'left' | 'right'
 
-const STORAGE_KEY = 'hermes.desktop.titlebarAppActions'
+const STORAGE_KEY = 'x19.desktop.titlebarAppActions'
 
 /** Right is the original titlebar: Settings / Layout / HUD stay off the tab strip. */
 export const TITLEBAR_APP_ACTIONS_DEFAULT: TitlebarAppActionsSide = 'right'

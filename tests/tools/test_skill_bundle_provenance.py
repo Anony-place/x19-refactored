@@ -331,11 +331,11 @@ def test_lock_file_persists_scan_provenance(tmp_path):
 
 
 def test_real_temp_repo_and_home_install_e2e(served_repo, monkeypatch, tmp_path):
-    from hermes_cli.skills_hub import do_install
+    from x19_cli.skills_hub import do_install
 
     _repo, url = served_repo
     home = tmp_path / "home"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setattr("tools.skills_hub.is_safe_url", lambda _url: True)
     monkeypatch.setattr("tools.skills_hub.check_website_access", lambda _url: None)
     monkeypatch.setattr("tools.skills_hub_search.create_source_router", lambda auth=None: [UrlSource()])
@@ -385,9 +385,9 @@ def test_install_with_junctioned_skills_dir(served_repo, monkeypatch, tmp_path):
     install_dir is resolved by _resolve_lock_install_path (following the
     redirect), so relative_to() must receive the resolved skills root or it
     raises ValueError after the files have already been moved, leaving a lock
-    entry without a content_hash (which then poisons 'hermes skills check').
+    entry without a content_hash (which then poisons 'x19 skills check').
     """
-    from hermes_cli.skills_hub import do_install
+    from x19_cli.skills_hub import do_install
 
     _repo, url = served_repo
     home = tmp_path / "home"
@@ -398,7 +398,7 @@ def test_install_with_junctioned_skills_dir(served_repo, monkeypatch, tmp_path):
     if not _make_skills_redirect(skills_link, real_skills):
         pytest.skip("Cannot create a junction/symlink in this environment")
 
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setattr("tools.skills_hub.is_safe_url", lambda _url: True)
     monkeypatch.setattr("tools.skills_hub.check_website_access", lambda _url: None)
     monkeypatch.setattr("tools.skills_hub_search.create_source_router", lambda auth=None: [UrlSource()])
@@ -469,11 +469,11 @@ def test_install_skips_unreachable_support_file_e2e(served_repo_missing_support,
     whole URL install: the bundle still installs end-to-end through quarantine,
     scan, install, and lock provenance, with only the reachable files landing
     on disk and recorded in the lock file (#66760)."""
-    from hermes_cli.skills_hub import do_install
+    from x19_cli.skills_hub import do_install
 
     _repo, url = served_repo_missing_support
     home = tmp_path / "home"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setattr("tools.skills_hub.is_safe_url", lambda _url: True)
     monkeypatch.setattr("tools.skills_hub.check_website_access", lambda _url: None)
     monkeypatch.setattr("tools.skills_hub_search.create_source_router", lambda auth=None: [UrlSource()])
@@ -518,17 +518,17 @@ UPSTREAM_STUB_MD = """---
 name: upstream-demo
 description: Upstream-maintained catalog entry.
 metadata:
-  hermes:
+  x19:
     upstream:
       repo: acme/design-skill
-      path: .hermes/skills/design
+      path: .x19/skills/design
 ---
 # Stub
 """
 
 
 def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monkeypatch):
-    """A catalog stub with metadata.hermes.upstream installs the upstream repo's
+    """A catalog stub with metadata.x19.upstream installs the upstream repo's
     content (relabelled official/trusted), not the stub itself."""
     from tools.skills_hub_models import SkillBundle
     from tools.skills_hub_official import OptionalSkillSource
@@ -560,7 +560,7 @@ def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monk
 
     bundle = source.fetch("official/creative/upstream-demo")
 
-    assert fetched_ids == ["acme/design-skill/.hermes/skills/design"]
+    assert fetched_ids == ["acme/design-skill/.x19/skills/design"]
     assert bundle is not None
     assert bundle.source == "official"
     assert bundle.identifier == "official/creative/upstream-demo"
@@ -574,10 +574,10 @@ def test_optional_source_upstream_pointer_rejects_malformed(tmp_path):
 
     source = OptionalSkillSource()
     bad = [
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: acme\n      path: skills/x\n---\n",          # repo not owner/name
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: a/b/c\n      path: skills/x\n---\n",        # repo too deep
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: acme/skill\n      path: ../../etc\n---\n",  # traversal
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: acme/skill\n---\n",                          # missing path
+        "---\nname: x\nmetadata:\n  x19:\n    upstream:\n      repo: acme\n      path: skills/x\n---\n",          # repo not owner/name
+        "---\nname: x\nmetadata:\n  x19:\n    upstream:\n      repo: a/b/c\n      path: skills/x\n---\n",        # repo too deep
+        "---\nname: x\nmetadata:\n  x19:\n    upstream:\n      repo: acme/skill\n      path: ../../etc\n---\n",  # traversal
+        "---\nname: x\nmetadata:\n  x19:\n    upstream:\n      repo: acme/skill\n---\n",                          # missing path
         "---\nname: x\n---\n",                                                                                       # no pointer
     ]
     for content in bad:

@@ -3,8 +3,8 @@
  *
  * The reported bug: configuring a remote gateway persisted the dashboard
  * session token as PLAINTEXT into `connection.json` under the app's userData
- * dir (macOS `~/Library/Application Support/Hermes/connection.json`, Windows
- * `AppData\Roaming\Hermes\connection.json`). Anything that can read the file
+ * dir (macOS `~/Library/Application Support/X19/connection.json`, Windows
+ * `AppData\Roaming\X19\connection.json`). Anything that can read the file
  * — a backup, a sync client, another local process, a support bundle — got a
  * live gateway credential.
  *
@@ -14,7 +14,7 @@
  *   1. ABSENT FROM DISK. After the app has been configured with a remote
  *      gateway token, the token's plaintext value must not appear anywhere in
  *      `connection.json`, in any sibling file the app writes under userData,
- *      or in HERMES_HOME (logs included).
+ *      or in X19_HOME (logs included).
  *   2. STILL FUNCTIONAL. After a restart, the app must still be able to USE
  *      that credential — it decrypts the stored blob and puts the exact
  *      original token on the wire.
@@ -26,7 +26,7 @@
  * satisfied by a "fix" that drops the token on the floor; (2) alone is
  * satisfied by the bug itself. So (2) is verified through the app's own
  * connection test against a fake gateway that records the
- * `X-Hermes-Session-Token` header it receives — a dropped or mangled token
+ * `X-X19-Session-Token` header it receives — a dropped or mangled token
  * cannot produce that header.
  *
  * (3) is orthogonal to (1) and invisible to it: safeStorage keeps the token
@@ -72,7 +72,7 @@
  * `d3d177283` exists only on `upstream/bb/gui-mainmerge-tmp`,
  * `brooklyn/gui-installer-prereqs`, and the `desktop-pr20059-installers`
  * pre-release tag. Mainline NEVER shipped a code path that wrote a plaintext
- * gateway token: `51c68d4ab` ("Add Hermes desktop app (#20059)"), the commit
+ * gateway token: `51c68d4ab` ("Add X19 desktop app (#20059)"), the commit
  * that brought the desktop app to mainline, already contained the strict
  * throw ("Secure token storage is unavailable, …") in `hardening.cjs`.
  *
@@ -130,7 +130,7 @@ import { allowErrorBanners, type ElectronApplication, expect, type Page, test } 
  * the identity function over this alphabet, so the raw-bytes needle also
  * covers the URL-encoded form the WS dialer builds (`?token=…`).
  */
-const SENTINEL_TOKEN = 'hermes-e2e-at-rest-sentinel-Zq7Z4hV9nX2pL8sK3tB6wR1yM5jD0fG'
+const SENTINEL_TOKEN = 'x19-e2e-at-rest-sentinel-Zq7Z4hV9nX2pL8sK3tB6wR1yM5jD0fG'
 
 /** Skip absurdly large files during the leak scan (Chromium caches). */
 const MAX_SCAN_BYTES = 16 * 1024 * 1024
@@ -144,19 +144,19 @@ const MAX_SCAN_BYTES = 16 * 1024 * 1024
  * one worker at a time and both launches here are sequential; the
  * single-instance lock keys off userData, which is per-sandbox.
  */
-const STABLE_APP_NAME = 'HermesE2EAtRestStorage'
+const STABLE_APP_NAME = 'X19E2EAtRestStorage'
 
 // ─── Fake gateway ───────────────────────────────────────────────────────
 
 interface FakeGateway {
   url: string
-  /** Every `X-Hermes-Session-Token` value the app has sent us. */
+  /** Every `X-X19-Session-Token` value the app has sent us. */
   sessionTokens: string[]
   close: () => Promise<void>
 }
 
 /**
- * A minimal stand-in for a remote Hermes gateway. It serves the public
+ * A minimal stand-in for a remote X19 gateway. It serves the public
  * `/api/status` probe (which the desktop connection test hits first, with the
  * session token in a header) and refuses the WebSocket upgrade immediately so
  * the second leg of the connection test fails fast instead of burning the
@@ -169,7 +169,7 @@ async function startFakeGateway(): Promise<FakeGateway> {
   const sessionTokens: string[] = []
 
   const server = http.createServer((req, res) => {
-    const token = req.headers['x-hermes-session-token']
+    const token = req.headers['x-x19-session-token']
 
     if (typeof token === 'string' && token) {
       sessionTokens.push(token)
@@ -361,17 +361,17 @@ function expectOwnerOnlyMode(filePath: string, why: string): void {
  *
  * The credential path we are testing is entirely main-process (IPC handler →
  * coerce → safeStorage → userData write) and does not need a live agent
- * backend, so we skip spawning `hermes serve` (no Python needed, ~3s launch,
+ * backend, so we skip spawning `x19 serve` (no Python needed, ~3s launch,
  * hermetic). This is also a real user situation rather than an artificial one:
  * the boot-failure overlay's own recovery affordance is "Connection settings",
  * i.e. pointing the app at a remote gateway is exactly what a user does from
- * this state. BOOT_FAKE_ERROR short-circuits startHermes() *before* remote
+ * this state. BOOT_FAKE_ERROR short-circuits startX19() *before* remote
  * resolution, so no launch ever dials the fake gateway on its own.
  */
 async function launchAgainst(sandbox: Sandbox): Promise<{ app: ElectronApplication; page: Page }> {
   const env = buildAppEnv(sandbox, {
-    HERMES_DESKTOP_APP_NAME: STABLE_APP_NAME,
-    HERMES_DESKTOP_BOOT_FAKE_ERROR: 'E2E at-rest storage spec: local backend intentionally not started',
+    X19_DESKTOP_APP_NAME: STABLE_APP_NAME,
+    X19_DESKTOP_BOOT_FAKE_ERROR: 'E2E at-rest storage spec: local backend intentionally not started',
   })
 
   const { app, page } = await launchDesktop(env)
@@ -379,7 +379,7 @@ async function launchAgainst(sandbox: Sandbox): Promise<{ app: ElectronApplicati
   // The capability bridge is what we drive; it lands with the preload, well
   // before the app would be "ready" in the boot sense.
   await page.waitForFunction(
-    () => Boolean((window as unknown as { hermesDesktop?: Record<string, unknown> }).hermesDesktop?.saveConnectionConfig),
+    () => Boolean((window as unknown as { x19Desktop?: Record<string, unknown> }).x19Desktop?.saveConnectionConfig),
     undefined,
     { timeout: 60_000 },
   )
@@ -410,7 +410,7 @@ interface SafeStorageCapability {
  * the `basic_text` backend, which encrypts with a hardcoded password — the
  * bytes on disk are not the plaintext, but they are not meaningfully
  * protected either. We record it rather than assert on it, because which
- * posture Hermes should take there (refuse to save vs. accept basic_text) is
+ * posture X19 should take there (refuse to save vs. accept basic_text) is
  * a product decision, not something this test should silently ratify.
  */
 async function readSafeStorageCapability(app: ElectronApplication): Promise<SafeStorageCapability> {
@@ -451,7 +451,7 @@ interface SaveOutcome {
 async function saveRemoteToken(page: Page, remoteUrl: string, remoteToken?: string): Promise<SaveOutcome> {
   return page.evaluate(
     async ([url, token]) => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { x19Desktop: any }).x19Desktop
 
       try {
         const config = await desktop.saveConnectionConfig({
@@ -480,7 +480,7 @@ async function saveRemoteToken(page: Page, remoteUrl: string, remoteToken?: stri
  */
 async function exerciseStoredToken(page: Page, remoteUrl: string): Promise<{ error: null | string }> {
   return page.evaluate(async url => {
-    const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+    const desktop = (window as unknown as { x19Desktop: any }).x19Desktop
 
     try {
       await desktop.testConnectionConfig({ mode: 'remote', remoteUrl: url })
@@ -606,14 +606,14 @@ test.describe('remote gateway session token at rest', () => {
     ).toEqual([])
 
     // …and not in any sibling file the app writes alongside it, nor in
-    // HERMES_HOME (desktop.log lives there).
+    // X19_HOME (desktop.log lives there).
     expect(
       scanTreeForSecret(userDataDir, needles),
       'the gateway session token leaked into a userData file',
     ).toEqual([])
     expect(
-      scanTreeForSecret(sandbox.hermesHome, needles),
-      'the gateway session token leaked into a HERMES_HOME file (logs included)',
+      scanTreeForSecret(sandbox.x19Home, needles),
+      'the gateway session token leaked into a X19_HOME file (logs included)',
     ).toEqual([])
 
     if (!capability.available) {
@@ -637,7 +637,7 @@ test.describe('remote gateway session token at rest', () => {
     ).toBe(userDataDir)
 
     const reread = await second.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { x19Desktop: any }).x19Desktop
 
       return desktop.getConnectionConfig()
     })
@@ -698,7 +698,7 @@ test.describe('remote gateway session token at rest', () => {
     app = second.app
 
     const reread = await second.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { x19Desktop: any }).x19Desktop
 
       return desktop.getConnectionConfig()
     })
@@ -779,7 +779,7 @@ test.describe('remote gateway session token at rest', () => {
     app = second.app
 
     const reread = await second.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { x19Desktop: any }).x19Desktop
 
       return desktop.getConnectionConfig()
     })
@@ -844,7 +844,7 @@ test.describe('remote gateway session token at rest', () => {
     app = launched.app
 
     const reread = await launched.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { x19Desktop: any }).x19Desktop
 
       return desktop.getConnectionConfig()
     })

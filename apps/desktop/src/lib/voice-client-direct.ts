@@ -1,5 +1,5 @@
 import { profileScoped } from '@/api/client'
-import { getApiRequestConnection, getApiRequestProfile, hermesApi } from '@/hermes'
+import { getApiRequestConnection, getApiRequestProfile, x19Api } from '@/x19'
 
 /**
  * Client-direct voice: call the active profile's STT/TTS providers straight
@@ -84,10 +84,10 @@ export async function fetchVoiceClientConfig(): Promise<null | VoiceClientConfig
 
   const promise = (async () => {
     try {
-      // hermesApi carries connectionScoped(); profileScoped() adds the
+      // x19Api carries connectionScoped(); profileScoped() adds the
       // profile — the same routing every relay audio call uses, so the
       // config comes from the backend the user is actually talking to.
-      const response = await hermesApi<{ ok: boolean } & VoiceClientConfig>({
+      const response = await x19Api<{ ok: boolean } & VoiceClientConfig>({
         ...profileScoped(),
         path: '/api/audio/voice-config'
       })

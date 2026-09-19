@@ -45,7 +45,7 @@ def _selected_tarball(tmp_path: Path, *, with_xz: bool, script: Path, fn: str, c
         (bin_dir / "xz").chmod(0o755)
     picked = tmp_path / f"picked-{with_xz}-{fn}"
     harness = ("log_info() { :; }; log_warn() { :; }; _nb_log() { :; }; _nb_warn() { :; }\n"
-               "HERMES_NODE_TARGET_MAJOR=26\n" + _function(script, fn) + call)
+               "X19_NODE_TARGET_MAJOR=26\n" + _function(script, fn) + call)
     env = {"PATH": str(bin_dir), "PICKED": str(picked), "HOME": str(tmp_path)}
     subprocess.run([shutil.which("bash") or "/bin/bash", "-c", harness], env=env, check=False, capture_output=True)
     return picked.read_text(encoding="utf-8").strip() if picked.exists() else ""

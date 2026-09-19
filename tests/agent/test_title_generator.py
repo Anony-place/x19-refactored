@@ -10,7 +10,7 @@ from agent.title_generator import (
     maybe_auto_title,
     _title_language,
 )
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 class TestGenerateTitle:
@@ -22,12 +22,12 @@ class TestGenerateTitle:
     def test_title_language_reads_config(self):
         cfg = {"auxiliary": {"title_generation": {"language": "  French "}}}
 
-        with patch("hermes_cli.config.load_config", return_value=cfg), patch("hermes_cli.config.load_config_readonly", return_value=cfg):
+        with patch("x19_cli.config.load_config", return_value=cfg), patch("x19_cli.config.load_config_readonly", return_value=cfg):
             assert _title_language() == "French"
-        with patch("hermes_cli.config.load_config", return_value={}), patch("hermes_cli.config.load_config_readonly", return_value={}):
+        with patch("x19_cli.config.load_config", return_value={}), patch("x19_cli.config.load_config_readonly", return_value={}):
             assert _title_language() == ""
-        with patch("hermes_cli.config.load_config", side_effect=RuntimeError("bad config")), \
-         patch("hermes_cli.config.load_config_readonly", side_effect=RuntimeError("bad config")):
+        with patch("x19_cli.config.load_config", side_effect=RuntimeError("bad config")), \
+         patch("x19_cli.config.load_config_readonly", side_effect=RuntimeError("bad config")):
             assert _title_language() == ""
 
     def test_default_timeout_delegates_to_auxiliary_config(self):
@@ -403,12 +403,12 @@ class TestMaybeAutoTitle:
 
     def test_kanban_worker_is_named_after_its_card_without_the_llm_thread(self, tmp_path, monkeypatch):
         """A worker's session takes the board card's title synchronously; no auxiliary model call (#111166)."""
-        from hermes_cli import kanban_db, kanban_db_connect
+        from x19_cli import kanban_db, kanban_db_connect
 
         with kanban_db_connect.connect_closing(board="default") as conn:
             task_id = kanban_db.create_task(conn, title="Fix flaky worker startup", board="default")
             conn.commit()
-        monkeypatch.setenv("HERMES_KANBAN_TASK", task_id)
+        monkeypatch.setenv("X19_KANBAN_TASK", task_id)
         db = SessionDB(tmp_path / "state.db")
         db.create_session(session_id="sess-1", source="kanban")
 
@@ -421,14 +421,14 @@ class TestMaybeAutoTitle:
 
     def test_kanban_worker_with_an_overlong_card_title_is_still_named(self, tmp_path, monkeypatch):
         """Cards have no length cap; the store rejects past MAX_TITLE_LENGTH, so the card title is trimmed, not dropped."""
-        from hermes_cli import kanban_db, kanban_db_connect
+        from x19_cli import kanban_db, kanban_db_connect
 
         card = "Investigate why the swap modal intermittently fails to render its confirmation step on mobile Safari after a retry"
         assert len(card) > SessionDB.MAX_TITLE_LENGTH
         with kanban_db_connect.connect_closing(board="default") as conn:
             task_id = kanban_db.create_task(conn, title=card, board="default")
             conn.commit()
-        monkeypatch.setenv("HERMES_KANBAN_TASK", task_id)
+        monkeypatch.setenv("X19_KANBAN_TASK", task_id)
         db = SessionDB(tmp_path / "state.db")
         for sid in ("sess-1", "sess-2"):  # a retried card must still get the ``#N`` suffix within the cap
             db.create_session(session_id=sid, source="kanban")
@@ -441,7 +441,7 @@ class TestMaybeAutoTitle:
         assert len(second) <= SessionDB.MAX_TITLE_LENGTH
 
     def test_kanban_worker_with_unreadable_card_falls_back_to_the_task_id(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_missing")
+        monkeypatch.setenv("X19_KANBAN_TASK", "t_missing")
         db = SessionDB(tmp_path / "state.db")
         db.create_session(session_id="sess-1", source="kanban")
 
@@ -452,11 +452,11 @@ class TestMaybeAutoTitle:
         mock_auto.assert_not_called()
 
     def test_delegated_child_of_a_worker_is_not_named_after_the_card(self, tmp_path, monkeypatch):
-        """A delegate_task child inherits ``HERMES_KANBAN_TASK`` but is not the card's session;
+        """A delegate_task child inherits ``X19_KANBAN_TASK`` but is not the card's session;
         it takes the ordinary title path instead of the parent's card title (#112817)."""
         from agent.delegation_context import delegated_child_context
 
-        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_parent")
+        monkeypatch.setenv("X19_KANBAN_TASK", "t_parent")
         db = SessionDB(tmp_path / "state.db")
         db.create_session(session_id="child-1", source="kanban")
 
@@ -485,7 +485,7 @@ class TestMaybeAutoTitle:
                 "enabled": True, "model_upgrade_enabled": False,
             }}
         }
-        with patch("hermes_cli.config.load_config_readonly", return_value=config), \
+        with patch("x19_cli.config.load_config_readonly", return_value=config), \
              patch("agent.memory_provider.spawn_context_thread") as thread, \
              patch("agent.title_generator.call_llm") as call_llm:
             maybe_auto_title(db, "sess-1", "repair startup memory routing", [])
@@ -494,11 +494,11 @@ class TestMaybeAutoTitle:
         thread.assert_not_called()
         call_llm.assert_not_called()
         # The toggle only silences the automatic upgrade: an explicit ``generate_title`` call
-        # (``hermes sessions retitle-skills``) still asks the model.
+        # (``x19 sessions retitle-skills``) still asks the model.
         resp = MagicMock()
         resp.choices = [MagicMock()]
         resp.choices[0].message.content = '{"title": "Repair startup memory routing"}'
-        with patch("hermes_cli.config.load_config_readonly", return_value=config), \
+        with patch("x19_cli.config.load_config_readonly", return_value=config), \
              patch("agent.title_generator.call_llm", return_value=resp):
             assert generate_title("repair startup memory routing") == "Repair startup memory routing"
 
@@ -510,7 +510,7 @@ class TestMaybeAutoTitle:
                 "enabled": False, "model_upgrade_enabled": True,
             }}
         }
-        with patch("hermes_cli.config.load_config_readonly", return_value=config), \
+        with patch("x19_cli.config.load_config_readonly", return_value=config), \
              patch("agent.memory_provider.spawn_context_thread") as thread, \
              patch("agent.title_generator.call_llm") as call_llm:
             maybe_auto_title(db, "sess-1", "repair startup memory routing", [])

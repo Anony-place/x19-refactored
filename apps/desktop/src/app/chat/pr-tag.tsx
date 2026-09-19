@@ -1,6 +1,6 @@
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
-import type { HermesBranchPullRequest } from '@/global'
+import type { X19BranchPullRequest } from '@/global'
 import { cn } from '@/lib/utils'
 import { pullRequestBucket } from '@/store/pull-requests'
 
@@ -14,9 +14,9 @@ const PR_STYLE: Record<string, { className: string; icon: string }> = {
   open: { className: 'text-(--ui-green)', icon: 'git-pull-request' }
 }
 
-export function openPullRequest(pr: HermesBranchPullRequest): void {
+export function openPullRequest(pr: X19BranchPullRequest): void {
   if (pr.url) {
-    void window.hermesDesktop?.openExternal?.(pr.url)
+    void window.x19Desktop?.openExternal?.(pr.url)
   }
 }
 
@@ -31,7 +31,7 @@ export function PrTag({
   showIcon = true
 }: {
   className?: string
-  pr: HermesBranchPullRequest
+  pr: X19BranchPullRequest
   showIcon?: boolean
 }) {
   const style = PR_STYLE[pullRequestBucket(pr)] ?? PR_STYLE.open

@@ -3,7 +3,7 @@ up background deliveries.
 
 Mechanism (traced on 85a55e2b30-era main, re-verified through 03b87d666d):
 
-* Background DMs deliver via a separate ``hermes -p <profile> chat``
+* Background DMs deliver via a separate ``x19 -p <profile> chat``
   subprocess (``tools/bot_relay.py::local_delivery_command``) that writes the
   turn straight to the session DB. No gateway stream event reaches the desktop.
 * The gateway broadcasts ``sessions.changed`` on state.db mtime movement, and

@@ -32,7 +32,7 @@ def _make_project(root: Path) -> None:
 def _ledger_on(monkeypatch):
     """The ledger is inert unless verify-on-stop is enabled; ``clear_verify_env`` (requested
     explicitly, so it runs after this) strips it again for the enabled()-logic tests."""
-    monkeypatch.setenv("HERMES_VERIFY_ON_STOP", "1")
+    monkeypatch.setenv("X19_VERIFY_ON_STOP", "1")
 
 
 @pytest.fixture
@@ -40,13 +40,13 @@ def clear_verify_env(monkeypatch):
     """Clear every env signal verify_on_stop_enabled consults.
 
     Tests then set only the variable they exercise, mirroring how the CLI/TUI
-    set HERMES_SESSION_SOURCE and the gateway sets HERMES_SESSION_PLATFORM.
+    set X19_SESSION_SOURCE and the gateway sets X19_SESSION_PLATFORM.
     """
     for var in (
-        "HERMES_VERIFY_ON_STOP",
-        "HERMES_PLATFORM",
-        "HERMES_SESSION_PLATFORM",
-        "HERMES_SESSION_SOURCE",
+        "X19_VERIFY_ON_STOP",
+        "X19_PLATFORM",
+        "X19_SESSION_PLATFORM",
+        "X19_SESSION_SOURCE",
     ):
         monkeypatch.delenv(var, raising=False)
     return monkeypatch
@@ -64,8 +64,8 @@ def clear_verify_env(monkeypatch):
 
 def test_verify_on_stop_env_can_enable(clear_verify_env):
     # Env "1" forces ON regardless of surface (here a messaging platform).
-    clear_verify_env.setenv("HERMES_VERIFY_ON_STOP", "1")
-    clear_verify_env.setenv("HERMES_SESSION_PLATFORM", "telegram")
+    clear_verify_env.setenv("X19_VERIFY_ON_STOP", "1")
+    clear_verify_env.setenv("X19_SESSION_PLATFORM", "telegram")
     assert verify_on_stop_enabled({"agent": {}}) is True
 
 
@@ -84,7 +84,7 @@ def test_verify_on_stop_env_can_enable(clear_verify_env):
 @pytest.mark.parametrize("source", ["cli", "tui", "desktop", "codex", "local"])
 def test_verify_on_stop_auto_on_for_interactive_surfaces(clear_verify_env, source):
     # Under "auto", CLI/TUI/desktop coding surfaces resolve ON.
-    clear_verify_env.setenv("HERMES_SESSION_SOURCE", source)
+    clear_verify_env.setenv("X19_SESSION_SOURCE", source)
     assert verify_on_stop_enabled({"agent": {"verify_on_stop": "auto"}}) is True
 
 
@@ -101,19 +101,19 @@ def test_verify_on_stop_default_path_through_load_config(tmp_path, clear_verify_
     # resolves through load_config() + DEFAULT_CONFIG. The default is now False
     # (opt-in): fresh installs must not fire the nudge on any surface. This is
     # the path the unit-level tests above cannot exercise.
-    clear_verify_env.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    clear_verify_env.setenv("X19_HOME", str(tmp_path / ".x19"))
 
-    from hermes_cli.config import load_config
+    from x19_cli.config import load_config
 
     merged = load_config()
     assert merged["agent"]["verify_on_stop"] is False
 
     # Interactive surface resolves OFF through the real loader (opt-in default).
-    clear_verify_env.setenv("HERMES_SESSION_SOURCE", "cli")
+    clear_verify_env.setenv("X19_SESSION_SOURCE", "cli")
     assert verify_on_stop_enabled() is False
 
     # A messaging platform also resolves OFF.
-    clear_verify_env.setenv("HERMES_SESSION_PLATFORM", "telegram")
+    clear_verify_env.setenv("X19_SESSION_PLATFORM", "telegram")
     assert verify_on_stop_enabled() is False
 
 
@@ -121,7 +121,7 @@ def test_verify_on_stop_missing_value_defaults_off(clear_verify_env):
     # A missing/unrecognized config value falls back OFF on every surface,
     # matching the opt-in DEFAULT_CONFIG default — only an explicit "auto"
     # opts into the legacy surface-aware behavior.
-    clear_verify_env.setenv("HERMES_SESSION_SOURCE", "cli")
+    clear_verify_env.setenv("X19_SESSION_SOURCE", "cli")
     assert verify_on_stop_enabled({"agent": {}}) is False
     assert verify_on_stop_enabled({"agent": {"verify_on_stop": "bogus"}}) is False
     assert verify_on_stop_enabled({}) is False
@@ -130,7 +130,7 @@ def test_verify_on_stop_missing_value_defaults_off(clear_verify_env):
 
 
 def test_nudge_checks_all_edited_workspaces(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     project_a = tmp_path / "a"
     project_b = tmp_path / "b"
     _make_project(project_a)
@@ -167,7 +167,7 @@ def test_nudge_checks_all_edited_workspaces(tmp_path, monkeypatch):
     reason="Symlinks require elevated privileges on Windows",
 )
 def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     project = tmp_path / "project"
     project.mkdir()
     (project / "package.json").write_text("{}", encoding="utf-8")
@@ -190,10 +190,10 @@ def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
 
 
 def test_ad_hoc_pass_satisfies_no_suite_stop_loop(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     changed = str(tmp_path / "src" / "app.ts")
-    script = Path(tempfile.gettempdir()) / f"hermes-ad-hoc-stop-{tmp_path.name}.py"
+    script = Path(tempfile.gettempdir()) / f"x19-ad-hoc-stop-{tmp_path.name}.py"
     script.write_text("print('ok')\n", encoding="utf-8")
     try:
         record_terminal_result(
@@ -210,7 +210,7 @@ def test_ad_hoc_pass_satisfies_no_suite_stop_loop(tmp_path, monkeypatch):
 
 
 def test_nudge_attempts_are_bounded(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     _node_project(tmp_path)
     changed = str(tmp_path / "src" / "app.ts")
     mark_workspace_edited(session_id="s1", cwd=tmp_path, paths=[changed])
@@ -231,7 +231,7 @@ def test_nudge_attempts_are_bounded(tmp_path, monkeypatch):
 
 
 def test_mixed_doc_and_code_edit_still_nudges(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path / ".x19"))
     _node_project(tmp_path)
     doc = str(tmp_path / "README.md")
     code = str(tmp_path / "src" / "app.ts")

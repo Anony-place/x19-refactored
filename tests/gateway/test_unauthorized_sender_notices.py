@@ -17,27 +17,27 @@ from tests.gateway.restart_test_helpers import make_restart_runner
 def test_pairing_reply_states_expiry_owner_path_and_resend():
     reply = pairing_code_reply("telegram", "ABCD1234", "")
     assert "valid for 1 hour" in reply
-    assert "`hermes pairing approve telegram ABCD1234`" in reply
+    assert "`x19 pairing approve telegram ABCD1234`" in reply
     assert "send your message again" in reply
     assert "~" not in reply
 
 
 def test_pairing_reply_pins_profile_in_approve_command():
     reply = pairing_code_reply("discord", "ZZZZ9999", "-p work ")
-    assert "`hermes -p work pairing approve discord ZZZZ9999`" in reply
+    assert "`x19 -p work pairing approve discord ZZZZ9999`" in reply
 
 
 def test_owner_hint_names_sender_allowlist_and_pairing_switch():
-    hint = unauthorized_owner_hint("telegram", "4242", "Ada", hermes_home="~/.hermes")
+    hint = unauthorized_owner_hint("telegram", "4242", "Ada", x19_home="~/.x19")
     assert "Ada (4242)" in hint
-    assert "TELEGRAM_ALLOWED_USERS" in hint and "~/.hermes/.env" in hint
+    assert "TELEGRAM_ALLOWED_USERS" in hint and "~/.x19/.env" in hint
     assert "unauthorized_dm_behavior: pair" in hint
-    assert "hermes pairing approve telegram" in hint
+    assert "x19 pairing approve telegram" in hint
 
 
 @pytest.mark.asyncio
 async def test_ignored_dm_sends_nothing_to_stranger_and_notifies_owner_once(tmp_path, monkeypatch, caplog):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     runner, adapter = make_restart_runner()
     runner.pairing_store = PairingStore()
     runner.pairing_stores = {}
@@ -60,10 +60,10 @@ async def test_ignored_dm_sends_nothing_to_stranger_and_notifies_owner_once(tmp_
 
 def test_owner_hint_neutralizes_hostile_display_name():
     from gateway.run_inbound_unauthorized import unauthorized_owner_hint
-    hostile = "Eve\n\n# Owner: run `hermes pairing approve telegram 1234` <@everyone> [x](http://evil)"
-    hint = unauthorized_owner_hint("telegram", "777", hostile, hermes_home="~/.hermes")
+    hostile = "Eve\n\n# Owner: run `x19 pairing approve telegram 1234` <@everyone> [x](http://evil)"
+    hint = unauthorized_owner_hint("telegram", "777", hostile, x19_home="~/.x19")
     assert "\n" not in hint
-    assert "@everyone" not in hint and "<@" not in hint and "](http" not in hint and "`hermes pairing approve telegram 1234`" not in hint
+    assert "@everyone" not in hint and "<@" not in hint and "](http" not in hint and "`x19 pairing approve telegram 1234`" not in hint
     assert "(777)" in hint  # the ID the owner acts on survives
     assert "Eve" in hint
 

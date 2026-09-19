@@ -17,7 +17,7 @@ const roster: DesktopAgentRoster = {
       connectionKind: 'remote',
       connectionLabel: 'Pandora',
       profile: 'default',
-      handle: 'hermes-pandora'
+      handle: 'x19-pandora'
     },
     {
       connectionId: 'pandora',
@@ -38,7 +38,7 @@ const roster: DesktopAgentRoster = {
       connectionKind: 'local',
       connectionLabel: 'This device',
       profile: 'default',
-      handle: 'hermes'
+      handle: 'x19'
     },
     {
       connectionId: 'local',
@@ -72,7 +72,7 @@ describe('buildRestGroups', () => {
       connectionId: 'local',
       profile: 'default',
       isDefault: true,
-      handle: 'hermes'
+      handle: 'x19'
     })
     expect(local.named.map(agent => agent.profile)).toEqual(['omer'])
     expect(local.named[0]).toMatchObject({

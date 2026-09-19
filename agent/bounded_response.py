@@ -1,6 +1,6 @@
 """Bounded reads of HTTP error response bodies.
 
-On a non-OK *streaming* response Hermes reads the body for a diagnostic (only ever shown truncated to
+On a non-OK *streaming* response X19 reads the body for a diagnostic (only ever shown truncated to
 a few hundred chars). A bare ``response.read()`` is unbounded two ways: arbitrarily large body
 (memory) or a body that stalls forever (hang). ``read_streaming_error_body`` caps bytes and enforces a
 hard wall-clock deadline; callers use the returned text instead of ``response.text`` (unbounded /
@@ -79,24 +79,3 @@ def read_streaming_error_body(
     return b"".join(chunks).decode("utf-8", errors="replace")
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Optional  # noqa: F401,E402
-
-def read_error_body_or_default(
-    response: httpx.Response,
-    *,
-    max_bytes: int = DEFAULT_ERROR_BODY_MAX_BYTES,
-    timeout_s: float = DEFAULT_ERROR_BODY_TIMEOUT_S,
-) -> Optional[str]:
-    """Like ``read_streaming_error_body`` but returns ``None`` on empty body.
-
-    Convenience for callers that distinguish "no body" from "empty string".
-    """
-    text = read_streaming_error_body(
-        response, max_bytes=max_bytes, timeout_s=timeout_s
-    )
-    return text or None
-# ---- END PLUGIN-COMPAT ----

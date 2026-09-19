@@ -7,7 +7,7 @@ license: MIT
 dependencies: []
 platforms: [linux, macos]
 metadata:
-  hermes:
+  x19:
     tags: [3d, games, webgl, threejs, image-generation, visual-fidelity, creative]
     category: creative
     related_skills: [p5js, claude-design, manim-video]

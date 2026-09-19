@@ -35,7 +35,7 @@ _TOPIC_RESTORE_STEPS = (
 
 
 def _collapse_title(title: str) -> str:
-    return re.sub(r"\s+", " ", str(title or "")).strip() or "Hermes Chat"
+    return re.sub(r"\s+", " ", str(title or "")).strip() or "X19 Chat"
 
 
 class GatewayTopicThreadsMixin:
@@ -128,24 +128,24 @@ class GatewayTopicThreadsMixin:
     def _telegram_topic_root_lobby_message(self) -> str:
         return (
             "This main chat is reserved for system commands.\n\n"
-            "To start a new Hermes chat, open the All Messages topic at the top "
+            "To start a new X19 chat, open the All Messages topic at the top "
             "of this bot interface and send any message there. Telegram will "
             "create a new topic for that message; each topic works as an "
-            "independent Hermes session."
+            "independent X19 session."
         )
 
     def _telegram_topic_root_new_message(self) -> str:
         return (
-            "To start a new parallel Hermes chat, open the All Messages topic "
+            "To start a new parallel X19 chat, open the All Messages topic "
             "at the top of this bot interface and send any message there. "
             "Telegram will create a new topic for it.\n\n"
-            "Each topic is an independent Hermes session. Use /new inside an "
+            "Each topic is an independent X19 session. Use /new inside an "
             "existing topic only if you want to replace that topic's current session."
         )
 
     def _telegram_topic_new_header(self, source: SessionSource) -> Optional[str]:
         return (
-            "Started a new Hermes session in this topic.\n\n"
+            "Started a new X19 session in this topic.\n\n"
             "Tip: for parallel work, open All Messages and send a message there "
             "to create a separate topic instead of using /new here. /new replaces "
             "the session attached to the current topic."
@@ -162,11 +162,11 @@ class GatewayTopicThreadsMixin:
             "  /topic <id>        Inside a topic: restore a previous session by ID\n"
             "\n"
             "How it works:\n"
-            "1. Run /topic once in this DM — Hermes checks BotFather Threads\n"
+            "1. Run /topic once in this DM — X19 checks BotFather Threads\n"
             "   Settings are enabled and flips on multi-session mode.\n"
             "2. Tap All Messages at the top of the bot and send any message.\n"
             "   Telegram creates a new topic for that message; each topic is\n"
-            "   an independent Hermes session (fresh history, fresh context).\n"
+            "   an independent X19 session (fresh history, fresh context).\n"
             "3. The root DM becomes a system lobby — send /topic, /status,\n"
             "   /help, /usage there. Normal prompts go in a topic.\n"
             "4. /new inside a topic resets just that topic's session.\n"
@@ -176,7 +176,7 @@ class GatewayTopicThreadsMixin:
     # ── Telegram topic bindings ─────────────────────────────────────────────────────────────
 
     def _record_telegram_topic_binding(self, source: SessionSource, session_entry) -> None:
-        """Persist the Telegram topic -> Hermes session binding for topic lanes (off-loop)."""
+        """Persist the Telegram topic -> X19 session binding for topic lanes (off-loop)."""
         session_db = self._sync_session_db()
         if session_db is None or not source.chat_id or not source.thread_id:
             return
@@ -191,7 +191,7 @@ class GatewayTopicThreadsMixin:
         compression rotation reloads the oversized parent next message, retriggering compression.
 
         Telegram topic lanes persist a (chat_id, thread_id) -> session_id row so reopening a topic in a
-        fresh process resumes the right Hermes session. See #20470, #29712, #33414.
+        fresh process resumes the right X19 session. See #20470, #29712, #33414.
         """
         if not self._is_telegram_topic_lane(source):
             return
@@ -266,7 +266,7 @@ class GatewayTopicThreadsMixin:
             return
         try:
             send_result = await adapter.send(
-                source.chat_id, "System topic for Hermes commands and status.", metadata={"thread_id": str(thread_id)},
+                source.chat_id, "System topic for X19 commands and status.", metadata={"thread_id": str(thread_id)},
             )
             message_id = getattr(send_result, "message_id", None)
         except Exception:
@@ -310,7 +310,7 @@ class GatewayTopicThreadsMixin:
     # ── Discord auto-thread lanes ───────────────────────────────────────────────────────────
 
     def _is_discord_auto_thread_lane(self, source: SessionSource) -> bool:
-        """Return True only for Discord threads Hermes just auto-created."""
+        """Return True only for Discord threads X19 just auto-created."""
         return (
             source.platform == Platform.DISCORD and source.chat_type == "thread"
             and bool(getattr(source, "auto_thread_created", False)) and bool(source.thread_id)
@@ -368,7 +368,7 @@ class GatewayTopicThreadsMixin:
         if not callable(wait_fn) or not source.chat_id:
             return None
         # 0 means the operator disabled the turn limit; the backstop still needs one.
-        timeout = _float_env("HERMES_AGENT_TIMEOUT", 1800) or 1800
+        timeout = _float_env("X19_AGENT_TIMEOUT", 1800) or 1800
         with suppress(Exception):
             return _as_thread_info(await wait_fn(str(source.chat_id), timeout))
         return None
@@ -493,7 +493,7 @@ class GatewayTopicThreadsMixin:
         return is_truthy_value((getattr(platform_cfg, "extra", None) or {}).get("disable_topic_auto_rename"))
 
     async def _rename_telegram_topic_for_session_title(self, source: SessionSource, session_id: str, title: str) -> None:
-        """Best-effort rename of a Telegram DM topic when Hermes auto-titles a session."""
+        """Best-effort rename of a Telegram DM topic when X19 auto-titles a session."""
         if not await asyncio.to_thread(self._is_telegram_topic_lane, source) or not source.chat_id or not source.thread_id:
             return
         # Operator kill-switch, e.g. user-managed topics (ad-hoc Threaded Mode) that auto-rename
@@ -549,7 +549,7 @@ class GatewayTopicThreadsMixin:
     async def _disable_telegram_topic_mode_for_chat(self, source: SessionSource) -> str:
         """Cleanly disable topic mode for a chat via /topic off."""
         if not self._session_db:
-            from hermes_state import format_session_db_unavailable
+            from x19_state import format_session_db_unavailable
             return format_session_db_unavailable(prefix=t("gateway.shared.session_db_unavailable_prefix"))
         chat_id = str(source.chat_id or "")
         if not chat_id:
@@ -578,14 +578,14 @@ class GatewayTopicThreadsMixin:
             "Multi-session topic mode is now OFF for this chat.\n\n"
             "Existing topics in Telegram aren't removed — they'll just stop "
             "being gated as independent sessions. The root DM works as a "
-            "normal Hermes chat again. Run /topic to re-enable later."
+            "normal X19 chat again. Run /topic to re-enable later."
         )
 
     async def _telegram_topic_root_status_message(self, source: SessionSource) -> str:
         lines = [
             "Telegram multi-session topics are enabled.",
             "",
-            "To create a new Hermes chat, open All Messages at the top of this "
+            "To create a new X19 chat, open All Messages at the top of this "
             "bot interface and send any message there. Telegram will create a "
             "new topic for it.",
             "",
@@ -612,7 +612,7 @@ class GatewayTopicThreadsMixin:
         return "\n".join(lines)
 
     async def _restore_telegram_topic_session(self, event: MessageEvent, raw_session_id: str) -> str:
-        """Restore an existing Telegram-owned Hermes session into this topic."""
+        """Restore an existing Telegram-owned X19 session into this topic."""
         source = event.source
         db = self._session_db
         session_id = await db.resolve_session_id(raw_session_id.strip())
@@ -652,4 +652,4 @@ class GatewayTopicThreadsMixin:
                     last_assistant = str(projected.get("content"))
                     break
         response = f"Session restored: {title}"
-        return response + (f"\n\nLast Hermes message:\n{last_assistant}" if last_assistant else "")
+        return response + (f"\n\nLast X19 message:\n{last_assistant}" if last_assistant else "")

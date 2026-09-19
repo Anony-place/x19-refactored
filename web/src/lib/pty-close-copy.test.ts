@@ -19,7 +19,7 @@ describe('pty close copy', () => {
 
     expect(PTY_TOKEN_MISSING_BANNER.action).toBe('reload')
     expect(PTY_TOKEN_MISSING_BANNER.text).not.toMatch(/session token/i)
-    expect(PTY_TOKEN_MISSING_BANNER.text).toContain('hermes dashboard')
+    expect(PTY_TOKEN_MISSING_BANNER.text).toContain('x19 dashboard')
   })
 
   it('never prints a WebSocket close code in user-facing text', () => {
@@ -42,7 +42,7 @@ describe('pty close copy', () => {
     expect(ptyReconnectExhausted(5, 5)).toBe(true)
     expect(ptyReconnectExhausted(4, 5)).toBe(false)
     expect(PTY_GAVE_UP_BANNER.action).toBe('check-server')
-    expect(PTY_GAVE_UP_BANNER.text).toContain('hermes dashboard')
+    expect(PTY_GAVE_UP_BANNER.text).toContain('x19 dashboard')
     expect(PTY_SESSION_ENDED_MESSAGE).toMatch(/crashed/i)
     expect(PTY_SESSION_ENDED_MESSAGE).toMatch(/logs/i)
   })

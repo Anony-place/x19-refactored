@@ -1,6 +1,6 @@
 """Tests for the clean shutdown marker that prevents unwanted session auto-resets.
 
-When the gateway shuts down gracefully (hermes update, gateway restart, /restart),
+When the gateway shuts down gracefully (x19 update, gateway restart, /restart),
 it writes a .clean_shutdown marker.  On the next startup, if the marker exists,
 suspend_recently_active() is skipped so users don't lose their sessions.
 
@@ -59,7 +59,7 @@ class TestCleanShutdownMarker:
 
     def test_marker_written_on_graceful_stop(self, tmp_path, monkeypatch):
         """stop() should write .clean_shutdown marker."""
-        monkeypatch.setattr("gateway.run._hermes_home", tmp_path)
+        monkeypatch.setattr("gateway.run._x19_home", tmp_path)
         marker = tmp_path / ".clean_shutdown"
         assert not marker.exists()
 
@@ -102,7 +102,7 @@ class TestCleanShutdownMarker:
 
     def test_no_marker_triggers_suspension(self, tmp_path, monkeypatch):
         """Without .clean_shutdown marker (crash), suspension should fire."""
-        monkeypatch.setattr("gateway.run._hermes_home", tmp_path)
+        monkeypatch.setattr("gateway.run._x19_home", tmp_path)
 
         marker = tmp_path / ".clean_shutdown"
         assert not marker.exists()

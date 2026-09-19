@@ -1,6 +1,6 @@
 """Tests for the strict gateway command-line matcher.
 
-Regression guard for the Windows ``hermes gateway restart`` silent-outage bug:
+Regression guard for the Windows ``x19 gateway restart`` silent-outage bug:
 the previous loose substring match (``"... gateway" in cmdline``) false-matched
 ``gateway status``/``dashboard`` siblings and unrelated processes such as
 ``python -m tui_gateway``, which let ``restart()`` race a still-draining old
@@ -18,35 +18,35 @@ from gateway.status import (
 
 
 ACCEPT = [
-    "pythonw.exe -m hermes_cli.main gateway run",
-    r"C:\Users\me\hermes\venv\Scripts\pythonw.exe -m hermes_cli.main gateway run",
-    "python -m hermes_cli.main --profile work gateway run",
-    "python -m hermes_cli.main gateway run --replace",
-    "python -m hermes_cli/main.py gateway run",
+    "pythonw.exe -m x19_cli.main gateway run",
+    r"C:\Users\me\x19\venv\Scripts\pythonw.exe -m x19_cli.main gateway run",
+    "python -m x19_cli.main --profile work gateway run",
+    "python -m x19_cli.main gateway run --replace",
+    "python -m x19_cli/main.py gateway run",
     "python gateway/run.py",
-    "hermes-gateway.exe",
-    "hermes gateway",          # bare `hermes gateway` defaults to run
-    "hermes gateway run",
+    "x19-gateway.exe",
+    "x19 gateway",          # bare `x19 gateway` defaults to run
+    "x19 gateway run",
     # profile selector AFTER the `gateway` token (argv is profile-position
     # agnostic — _apply_profile_override strips --profile/-p anywhere)
-    "hermes gateway --profile work run",
-    "python -m hermes_cli.main gateway -p work run",
-    "hermes gateway --profile=work run",
+    "x19 gateway --profile work run",
+    "python -m x19_cli.main gateway -p work run",
+    "x19 gateway --profile=work run",
     # a profile literally NAMED "gateway"
-    "hermes -p gateway gateway run",
-    "python -m hermes_cli.main --profile gateway gateway run",
+    "x19 -p gateway gateway run",
+    "python -m x19_cli.main --profile gateway gateway run",
     # quoted Windows paths with spaces (shlex-aware tokenization)
-    r'"C:\Program Files\Hermes\hermes-gateway.exe"',
-    r'"C:\Program Files\Hermes\gateway\run.py" run',
-    r'"C:\Program Files\Py\pythonw.exe" -m hermes_cli.main gateway run',
+    r'"C:\Program Files\X19\x19-gateway.exe"',
+    r'"C:\Program Files\X19\gateway\run.py" run',
+    r'"C:\Program Files\Py\pythonw.exe" -m x19_cli.main gateway run',
 ]
 
 REJECT = [
     "python -m tui_gateway",                              # unrelated module
-    "python -m hermes_cli.main gateway status",           # other subcommand
-    "python -m hermes_cli.main gateway restart",
-    "python -m hermes_cli.main gateway stop",
-    "python -m hermes_cli.main --profile x dashboard",    # non-gateway subcommand
+    "python -m x19_cli.main gateway status",           # other subcommand
+    "python -m x19_cli.main gateway restart",
+    "python -m x19_cli.main gateway stop",
+    "python -m x19_cli.main --profile x dashboard",    # non-gateway subcommand
     "some random python -m mygateway thing",
     "",
     None,

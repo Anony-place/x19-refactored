@@ -5,7 +5,7 @@ names to private ranges); cloud metadata hostnames/IPs are **always** blocked. A
 that answers DNS with a fake-ip block (Mihomo/Clash fake-ip, Surge enhanced) declares that block
 in ``security.fake_ip_ranges`` so its sentinel answers are dialable instead of looking private;
 the list is empty by default, so the sentinel stays blocked for everyone else. DNS rebinding
-(TOCTOU) is closed for Hermes-owned httpx paths by ``create_ssrf_safe_[async_]client()``, which
+(TOCTOU) is closed for X19-owned httpx paths by ``create_ssrf_safe_[async_]client()``, which
 re-apply the policy at TCP connect and dial the validated IP while preserving Host/SNI. Redirect
 bypass is mitigated by response hooks re-validating each target (``redirect_target_from_response``).
 """
@@ -20,7 +20,7 @@ from contextlib import contextmanager
 from typing import Any, Optional
 from urllib.parse import parse_qsl, quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-from hermes_constants import get_hermes_home_override
+from x19_constants import get_x19_home_override
 from utils import is_truthy_value
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def _proxy_is_configured() -> bool:
 
 
 def normalize_url_for_request(url: str) -> str:
-    """ASCII-safe HTTP URL for Hermes-owned URL tools (IRI -> URI, e.g. ``https://wttr.in/Köln``).
+    """ASCII-safe HTTP URL for X19-owned URL tools (IRI -> URI, e.g. ``https://wttr.in/Köln``).
     Preserves URL syntax and existing percent escapes while IDNA-encoding the host and
     percent-encoding non-ASCII path/query/fragment text. URL tool inputs only — never shell commands."""
     if not isinstance(url, str):
@@ -137,12 +137,12 @@ _fake_ip_resolved, _cached_fake_ip_ranges = False, ()
 
 
 def _global_allow_private_urls() -> bool:
-    """True when the user has opted out of private-IP blocking. Priority: ``HERMES_ALLOW_PRIVATE_URLS``
+    """True when the user has opted out of private-IP blocking. Priority: ``X19_ALLOW_PRIVATE_URLS``
     env, ``security.allow_private_urls``, legacy ``browser.allow_private_urls``. Profile-scoped turns
-    (``get_hermes_home_override()`` set) bypass the process-global cache — a multiplex gateway serves
+    (``get_x19_home_override()`` set) bypass the process-global cache — a multiplex gateway serves
     several profiles in one process; the first profile's opt-out must not disable blocking for later ones."""
     global _allow_private_resolved, _cached_allow_private
-    if get_hermes_home_override() is not None:
+    if get_x19_home_override() is not None:
         return _resolve_allow_private_urls()
     if not _allow_private_resolved:
         _allow_private_resolved, _cached_allow_private = True, _resolve_allow_private_urls()
@@ -151,13 +151,13 @@ def _global_allow_private_urls() -> bool:
 
 def _resolve_allow_private_urls() -> bool:
     """Resolve the effective private-URL toggle from the active config scope."""
-    env_val = os.getenv("HERMES_ALLOW_PRIVATE_URLS", "").strip().lower()
+    env_val = os.getenv("X19_ALLOW_PRIVATE_URLS", "").strip().lower()
     if env_val in {"true", "1", "yes"}:
         return True
     if env_val in {"false", "0", "no"}:
         return False  # explicit false does not fall through to config
     try:
-        from hermes_cli.config import read_raw_config
+        from x19_cli.config import read_raw_config
         cfg = read_raw_config()
         for section in ("security", "browser"):  # preferred, then legacy
             block = cfg.get(section, {})
@@ -185,7 +185,7 @@ def _resolve_fake_ip_ranges() -> tuple:
     declares one, and the sentinel range keeps the ordinary private-address verdict otherwise.
     """
     try:
-        from hermes_cli.config import read_raw_config
+        from x19_cli.config import read_raw_config
         block = read_raw_config().get("security", {})
         raw = block.get("fake_ip_ranges") if isinstance(block, dict) else None
     except Exception:
@@ -210,7 +210,7 @@ def _global_fake_ip_ranges() -> tuple:
     """Process-lifetime cache with the same profile-scope bypass as ``_global_allow_private_urls``:
     a multiplex gateway must not apply the first profile's declaration to later ones."""
     global _fake_ip_resolved, _cached_fake_ip_ranges
-    if get_hermes_home_override() is not None:
+    if get_x19_home_override() is not None:
         return _resolve_fake_ip_ranges()
     if not _fake_ip_resolved:
         _fake_ip_resolved, _cached_fake_ip_ranges = True, _resolve_fake_ip_ranges()
@@ -501,7 +501,7 @@ def _install_ssrf_guard_on_transport(transport: Any, schemes_by_origin_var: Any,
     """Swap the transport's pool network backend for the SSRF-guarded one (idempotent). Only the
     direct transport is guarded; proxy mounts delegate final-target resolution to the trusted proxy."""
     state = getattr(transport, "__dict__", {}) if transport is not None else {}
-    if transport is None or state.get("_hermes_ssrf_guarded", False):
+    if transport is None or state.get("_x19_ssrf_guarded", False):
         return
     label = "async httpx transport" if is_async else "httpx transport"
     pool = state.get("_pool")
@@ -522,13 +522,13 @@ def _install_ssrf_guard_on_transport(transport: Any, schemes_by_origin_var: Any,
         with _origin_scope(schemes_by_origin_var, request):
             return handle(request)
     setattr(transport, method_name, guarded_async if is_async else guarded_sync)
-    transport._hermes_ssrf_guarded = True
+    transport._x19_ssrf_guarded = True
 
 
 def _install_ssrf_guard_on_client(client: Any, *, is_async: bool = False) -> None:
     """Guard ``client._transport`` only; ``_mounts`` (env/explicit proxies) stay untouched."""
     import contextvars
-    var_name = "hermes_ssrf_async_origin_schemes" if is_async else "hermes_ssrf_origin_schemes"
+    var_name = "x19_ssrf_async_origin_schemes" if is_async else "x19_ssrf_origin_schemes"
     _install_ssrf_guard_on_transport(
         getattr(client, "__dict__", {}).get("_transport"), contextvars.ContextVar(var_name), is_async=is_async)
 
@@ -564,58 +564,3 @@ def redirect_target_from_response(response: Any) -> Optional[str]:
     return str(next_request.url) if next_request else None
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def has_sensitive_query_params(url: str) -> bool:
-    """Return True when ``url`` carries likely credential-bearing query params."""
-    return sensitive_query_param_name(url) is not None
-
-def ssrf_safe_async_http_transport(**kwargs: Any) -> Any:
-    """Return an httpx async transport that pins direct TCP connects to vetted IPs."""
-    import contextvars
-    import httpx
-
-    schemes_by_origin_var = contextvars.ContextVar("hermes_ssrf_async_origin_schemes")
-
-    class _Transport(httpx.AsyncHTTPTransport):
-        def __init__(self, **transport_kwargs: Any):
-            super().__init__(**transport_kwargs)
-            self._pool._network_backend = _SSRFGuardedAsyncNetworkBackend(  # type: ignore[attr-defined]
-                schemes_by_origin_var
-            )
-
-        async def handle_async_request(self, request: Any) -> Any:
-            token = schemes_by_origin_var.set(_origin_scheme_context(request))
-            try:
-                return await super().handle_async_request(request)
-            finally:
-                schemes_by_origin_var.reset(token)
-
-    return _Transport(**kwargs)
-
-def ssrf_safe_http_transport(**kwargs: Any) -> Any:
-    """Return an httpx sync transport that pins direct TCP connects to vetted IPs."""
-    import contextvars
-    import httpx
-
-    schemes_by_origin_var = contextvars.ContextVar("hermes_ssrf_origin_schemes")
-
-    class _Transport(httpx.HTTPTransport):
-        def __init__(self, **transport_kwargs: Any):
-            super().__init__(**transport_kwargs)
-            self._pool._network_backend = _SSRFGuardedNetworkBackend(  # type: ignore[attr-defined]
-                schemes_by_origin_var
-            )
-
-        def handle_request(self, request: Any) -> Any:
-            token = schemes_by_origin_var.set(_origin_scheme_context(request))
-            try:
-                return super().handle_request(request)
-            finally:
-                schemes_by_origin_var.reset(token)
-
-    return _Transport(**kwargs)
-# ---- END PLUGIN-COMPAT ----

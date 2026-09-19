@@ -1,6 +1,6 @@
 """Regression tests for install.sh browser setup.
 
-Browser automation is optional. The installer should not leave Hermes
+Browser automation is optional. The installer should not leave X19
 half-installed just because Playwright's managed Chromium download hangs on an
 unsupported distribution.
 """
@@ -211,7 +211,7 @@ def test_ensure_browser_no_longer_npm_installs_agent_browser() -> None:
     (tools/browser_tool.py::_find_agent_browser); this was the last place
     that still eagerly npm-installed a second, separately version-pinned
     copy of it. Removed: agent-browser acquisition now happens only via
-    `hermes update`'s npx cache warm or an actual browser-tool call's lazy
+    `x19 update`'s npx cache warm or an actual browser-tool call's lazy
     npx resolution (PR #44772 review)."""
     body = _extract_function_body(INSTALL_SH.read_text(), "ensure_browser")
 
@@ -241,7 +241,7 @@ def test_ensure_browser_no_longer_references_agent_browser_binary_path() -> None
     there by this function."""
     body = _extract_function_body(INSTALL_SH.read_text(), "ensure_browser")
 
-    assert "$HERMES_HOME/node/bin/agent-browser" not in body
+    assert "$X19_HOME/node/bin/agent-browser" not in body
 
 
 

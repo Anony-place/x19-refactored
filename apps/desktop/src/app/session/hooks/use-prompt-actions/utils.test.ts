@@ -385,7 +385,7 @@ describe('readFileDataUrlForAttach', () => {
   it('prefers the attachment-specific desktop reader over the preview reader', async () => {
     const previewReader = vi.fn(async () => 'preview')
     const attachmentReader = vi.fn(async () => 'data:application/zip;base64,UEs=')
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: { readFileDataUrl: previewReader, readFileDataUrlForAttach: attachmentReader }
     })
@@ -397,7 +397,7 @@ describe('readFileDataUrlForAttach', () => {
 
   it('falls back to the preview reader on older shells', async () => {
     const previewReader = vi.fn(async () => 'data:text/plain;base64,YQ==')
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'x19Desktop', {
       configurable: true,
       value: { readFileDataUrl: previewReader }
     })
@@ -508,15 +508,15 @@ describe('renderRpcResult', () => {
 
   describe('session.save', () => {
     it('echoes the saved file path', () => {
-      expect(renderRpcResult({ file: '/home/user/.hermes/sessions/saved/x.json' }, 'save')).toBe(
-        'Saved transcript to /home/user/.hermes/sessions/saved/x.json'
+      expect(renderRpcResult({ file: '/home/user/.x19/sessions/saved/x.json' }, 'save')).toBe(
+        'Saved transcript to /home/user/.x19/sessions/saved/x.json'
       )
     })
   })
 
   describe('session.status', () => {
     it('passes through the multi-line plain-text output verbatim', () => {
-      const output = 'Hermes TUI Status\n\nSession ID: s-1\nModel: nous-hermes-3 (unknown)'
+      const output = 'X19 TUI Status\n\nSession ID: s-1\nModel: nous-hermes-3 (unknown)'
       expect(renderRpcResult({ output }, 'status')).toBe(output)
     })
   })

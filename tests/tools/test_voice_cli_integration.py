@@ -11,15 +11,15 @@ import pytest
 
 
 def _make_voice_cli(**overrides):
-    """Create a minimal HermesCLI with only voice-related attrs initialized.
+    """Create a minimal X19CLI with only voice-related attrs initialized.
 
     Uses ``__new__()`` to bypass ``__init__`` so no config/env/API setup is
     needed.  Only the voice state attributes (from __init__ lines 3749-3758)
     are populated.
     """
-    from cli import HermesCLI
+    from cli import X19CLI
 
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = X19CLI.__new__(X19CLI)
     cli._voice_lock = threading.Lock()
     cli._voice_mode = False
     cli._voice_tts = False
@@ -114,7 +114,7 @@ class TestEnableVoiceModeReal:
     """Tests _enable_voice_mode with real CLI instance."""
 
     @patch("cli._cprint")
-    @patch("hermes_cli.config.load_config", return_value={"voice": {}})
+    @patch("x19_cli.config.load_config", return_value={"voice": {}})
     @patch("tools.voice_mode.check_voice_requirements",
            return_value={"available": True, "details": "OK"})
     @patch("tools.voice_mode.detect_audio_environment",
@@ -126,7 +126,7 @@ class TestEnableVoiceModeReal:
 
 
     @patch("cli._cprint")
-    @patch("hermes_cli.config.load_config", side_effect=Exception("broken config"))
+    @patch("x19_cli.config.load_config", side_effect=Exception("broken config"))
     @patch("tools.voice_mode.check_voice_requirements",
            return_value={"available": True, "details": "OK"})
     @patch("tools.voice_mode.detect_audio_environment",
@@ -140,7 +140,7 @@ class TestEnableVoiceModeReal:
 class TestVoiceBeepConfigReal:
     """Tests the CLI voice beep toggle."""
 
-    @patch("hermes_cli.config.load_config", return_value={"voice": {"beep_enabled": False}})
+    @patch("x19_cli.config.load_config", return_value={"voice": {"beep_enabled": False}})
     def test_beeps_can_be_disabled(self, _cfg):
         cli = _make_voice_cli()
         assert cli._voice_beeps_enabled() is False
@@ -160,7 +160,7 @@ class TestVoiceBeepConfigReal:
         },
     )
     @patch(
-        "hermes_cli.config.load_config",
+        "x19_cli.config.load_config",
         return_value={
             "voice": {
                 "beep_enabled": False,
@@ -207,7 +207,7 @@ class TestMaxRecordingSecondsConfigReal:
                      "missing_packages": [],
                  },
              ), \
-             patch("hermes_cli.config.load_config", return_value={"voice": voice_cfg}):
+             patch("x19_cli.config.load_config", return_value={"voice": voice_cfg}):
             recorder = MagicMock()
             recorder.supports_silence_autostop = True
             mock_create.return_value = recorder
@@ -334,7 +334,7 @@ class TestVoiceStopAndTranscribeReal:
     @patch("cli._cprint")
     @patch("cli.os.unlink")
     @patch("cli.os.path.isfile", return_value=True)
-    @patch("hermes_cli.config.load_config", return_value={"stt": {}})
+    @patch("x19_cli.config.load_config", return_value={"stt": {}})
     @patch("tools.voice_mode.transcribe_recording",
            return_value={"success": True, "transcript": "hello world"})
     @patch("tools.voice_mode.play_beep")
@@ -361,7 +361,7 @@ class TestVoiceStopAndTranscribeReal:
         with patch("cli._cprint") as mock_print, \
              patch("cli.os.path.isfile", return_value=False), \
              patch(
-                 "hermes_cli.config.load_config",
+                 "x19_cli.config.load_config",
                  return_value={"stt": {"provider": "openai", "model": "whisper-1"}},
              ), \
              patch("tools.voice_mode.transcribe_recording",
@@ -425,7 +425,7 @@ class TestVoiceBargeCaptureSubmit:
 
     def test_playback_phase_echo_of_own_tts_is_dropped(self, tmp_path, monkeypatch):
         """#75780: a playback-phase capture that closely matches the TTS
-        text Hermes just spoke is speaker bleed, not real user speech --
+        text X19 just spoke is speaker bleed, not real user speech --
         it must be dropped instead of queued as the next turn, and the mic
         handed back so continuous mode keeps listening."""
         cli = _make_voice_cli(_voice_mode=True, _voice_continuous=True)
@@ -513,7 +513,7 @@ class TestVoiceFullDuplexListener:
         )
         cli.agent = None
         monkeypatch.setattr(
-            "hermes_cli.config.load_config",
+            "x19_cli.config.load_config",
             lambda: {"voice": dict(voice_cfg or {"barge_in": True})},
         )
         monkeypatch.setattr("tools.voice_mode.full_duplex_listen", listen)

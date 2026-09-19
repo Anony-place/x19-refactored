@@ -10,17 +10,17 @@ session, their JSON schemas can consume a substantial fraction of the
 context window on every turn — even when only a few of them are relevant
 to what the user actually asked for.
 
-**Tool Search** is Hermes' opt-in progressive-disclosure layer for that
+**Tool Search** is X19' opt-in progressive-disclosure layer for that
 problem. When activated, MCP and plugin tools are replaced in the
 model-visible tools array by three bridge tools, and the model loads each
 specific tool's schema on demand.
 
-:::info Built-in Hermes tools never defer
-The tools that make up Hermes' core capability set (`terminal`,
+:::info Built-in X19 tools never defer
+The tools that make up X19' core capability set (`terminal`,
 `read_file`, `write_file`, `patch`, `search_files`, `todo`, `memory`,
 `browser_*`, `web_search`, `web_extract`, `clarify`, `execute_code`,
 `delegate_task`, `session_search`, and the rest of
-`_HERMES_CORE_TOOLS`) are *always* loaded directly. Only MCP tools and
+`_X19_CORE_TOOLS`) are *always* loaded directly. Only MCP tools and
 non-core plugin tools are eligible for deferral.
 :::
 
@@ -68,7 +68,7 @@ miss is not mistaken for a missing capability.
 `tool_describe` resolves every requested name in one call; unknown names
 are reported in `not_found` without failing the rest of the batch.
 
-When the model invokes `tool_call`, Hermes **unwraps the bridge** and
+When the model invokes `tool_call`, X19 **unwraps the bridge** and
 dispatches the underlying tool exactly as if the model had called it
 directly. Pre-tool-call hooks, guardrails, approval prompts, and
 post-tool-call hooks all run against the real tool name — not against
@@ -211,9 +211,9 @@ to any progressive-disclosure design, not specific to this implementation:
   prefix.
 - **No provider-native validation for deferred schemas.** `tool_describe`
   lets the model read a deferred tool's schema, but the provider still sees
-  only the generic `tool_call.arguments` object. Hermes therefore coerces and
+  only the generic `tool_call.arguments` object. X19 therefore coerces and
   validates the underlying arguments locally before dispatch; the concrete
-  tool or MCP server remains responsible for schemas Hermes cannot safely
+  tool or MCP server remains responsible for schemas X19 cannot safely
   validate, such as malformed schemas or external references.
 - **Model-quality dependence.** Tool Search assumes the model can write a
   reasonable search query for the tool it wants. Smaller models do this
@@ -264,7 +264,7 @@ to any progressive-disclosure design, not specific to this implementation:
   discover or call a tool outside that subset — the deferred catalog is
   the deferrable slice of the session's own enabled/disabled toolsets,
   not the whole process registry.
-- **No JS sandbox.** Hermes uses the simpler "structured tools" mode
+- **No JS sandbox.** X19 uses the simpler "structured tools" mode
   (search / describe / call as plain functions). The JS-sandbox "code
   mode" some other implementations offer is a large surface area; we
   skip it.

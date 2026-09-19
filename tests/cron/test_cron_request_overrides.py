@@ -32,12 +32,12 @@ class TestRunJobRequestOverrides:
             }
         }
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._x19_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("dotenv.load_dotenv"), \
-             patch("hermes_state_registry.acquire", return_value=fake_db), \
+             patch("x19_state_registry.acquire", return_value=fake_db), \
              patch(
-                 "hermes_cli.runtime_provider.resolve_runtime_provider",
+                 "x19_cli.runtime_provider.resolve_runtime_provider",
                  return_value={
                      "api_key": "test-key",
                      "base_url": "https://example.invalid/v1",

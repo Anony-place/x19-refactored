@@ -1,4 +1,4 @@
-"""Shared ``OAuthClientProvider`` customizations for Hermes MCP OAuth.
+"""Shared ``OAuthClientProvider`` customizations for X19 MCP OAuth.
 
 Two code paths build an SDK provider — ``tools.mcp_oauth.build_oauth_auth`` (legacy public
 API) and ``tools.mcp_oauth_manager.MCPOAuthManager`` — and both need the same real-world
@@ -12,7 +12,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from tools.mcp_oauth import HermesTokenStorage
+    from tools.mcp_oauth import X19TokenStorage
 logger = logging.getLogger(__name__)
 
 # Authorization servers that advertise ``authorization_response_iss_parameter_supported`` and then
@@ -24,9 +24,9 @@ _ISS_OMITTING_ISSUERS = frozenset({"https://api.figma.com"})
 class _RefreshCompletedByPeer(Exception):
     """Restart the SDK auth flow: a peer rotated the grant we were about to present."""
 
-class HermesProviderMixin:
+class X19ProviderMixin:
     """Token-endpoint fixes layered over the SDK's ``OAuthClientProvider`` (must precede it in
-    the MRO; subclasses set ``_hermes_logger`` to keep their own logger name).
+    the MRO; subclasses set ``_x19_logger`` to keep their own logger name).
 
     - Supabase-style dynamic registration returns a ``client_secret`` but omits
       ``token_endpoint_auth_method``; the SDK then treats the client as public and the token
@@ -35,23 +35,23 @@ class HermesProviderMixin:
       (some authorization servers/WAFs reject httpx's default).
     - Any 2xx token/refresh response is accepted; token bodies never leak into errors/logs."""
 
-    _hermes_logger: logging.Logger = logger
+    _x19_logger: logging.Logger = logger
 
     def __init__(self, *args: Any, token_user_agent: str | None = None, oauth_flow: str = "browser", **kwargs: Any):
         super().__init__(*args, **kwargs)
-        self._hermes_oauth_flow = oauth_flow
+        self._x19_oauth_flow = oauth_flow
         # oauth.user_agent — stamped onto token-endpoint requests only; some authorization servers/WAFs
         # reject httpx's default (#75576).
-        self._hermes_token_user_agent = token_user_agent
+        self._x19_token_user_agent = token_user_agent
 
     async def _perform_authorization(self):
         info = self.context.client_info
         grants = getattr(info, "grant_types", None) or []
-        if (getattr(self, "_hermes_oauth_flow", "browser") == "device"
+        if (getattr(self, "_x19_oauth_flow", "browser") == "device"
                 or ("urn:ietf:params:oauth:grant-type:device_code" in grants and "authorization_code" not in grants)):
             from tools.mcp_oauth import OAuthNonInteractiveError
             raise OAuthNonInteractiveError(
-                "MCP device authorization requires `hermes mcp login <server> --flow device`; "
+                "MCP device authorization requires `x19 mcp login <server> --flow device`; "
                 "background reconnects cannot start a device login")
         self._tolerate_missing_iss_for_known_server()
         return await super()._perform_authorization()
@@ -69,7 +69,7 @@ class HermesProviderMixin:
         async def _fill_iss():
             result = await inner()
             if getattr(result, "iss", None) is None and getattr(result, "code", None):
-                self._hermes_logger.warning(
+                self._x19_logger.warning(
                     "MCP OAuth: %s omitted the iss parameter it advertises; accepting the redirect for that issuer only", issuer)
                 result = result.model_copy(update={"iss": str(self.context.oauth_metadata.issuer)})
             return result
@@ -78,21 +78,21 @@ class HermesProviderMixin:
 
     def _prepare_token_request(self, request):
         """Stamp the configured User-Agent onto a token/refresh request."""
-        ua = getattr(self, "_hermes_token_user_agent", None)  # tests build via __new__
+        ua = getattr(self, "_x19_token_user_agent", None)  # tests build via __new__
         if ua:
             request.headers["User-Agent"] = ua
         return request
 
     def _coerce_client_secret_post(self) -> None:
-        """Same rule as ``HermesTokenStorage._coerce_secret_auth_method``, applied to the
+        """Same rule as ``X19TokenStorage._coerce_secret_auth_method``, applied to the
         in-memory client info BEFORE the SDK builds a token-endpoint request from it."""
         info = self.context.client_info
         if not info:
             return
         from mcp.shared.auth import OAuthClientInformationFull
-        from tools.mcp_oauth import HermesTokenStorage
+        from tools.mcp_oauth import X19TokenStorage
         data = info.model_dump(mode="json", exclude_none=True)
-        if HermesTokenStorage._coerce_secret_auth_method(data):
+        if X19TokenStorage._coerce_secret_auth_method(data):
             self.context.client_info = OAuthClientInformationFull.model_validate(data)
 
     async def _exchange_token_authorization_code(self, *args: Any, **kwargs: Any):
@@ -100,8 +100,8 @@ class HermesProviderMixin:
         return self._prepare_token_request(await super()._exchange_token_authorization_code(*args, **kwargs))
 
     # Locked descriptor while this provider owns the refresh fence; cleared by
-    # _hermes_release_refresh_fence. Never shared across instances.
-    _hermes_fence: int | None = None
+    # _x19_release_refresh_fence. Never shared across instances.
+    _x19_fence: int | None = None
 
     async def async_auth_flow(self, request):
         """Guarantee fence release even if the auth generator is abandoned.
@@ -147,7 +147,7 @@ class HermesProviderMixin:
                     except BaseException as exc:
                         sent, thrown = None, exc
             finally:
-                await self._hermes_release_refresh_fence()
+                await self._x19_release_refresh_fence()
 
     async def _refresh_token(self):
         """Take the refresh fence, then build the request from the token we own.
@@ -165,7 +165,7 @@ class HermesProviderMixin:
         refreshes inside one process.
         """
         self._coerce_client_secret_post()
-        await self._hermes_acquire_refresh_fence()
+        await self._x19_acquire_refresh_fence()
         try:
             # Re-read under the fence: a peer may have rotated while we waited
             # for it, in which case the token we were about to POST is dead.
@@ -173,14 +173,14 @@ class HermesProviderMixin:
             # the fence before us won this generation; its value is the only one
             # the provider will still accept, so install it even when its access
             # token has already expired (the POST we build needs the new grant).
-            candidate = await self._hermes_rotated_candidate()
+            candidate = await self._x19_rotated_candidate()
             if candidate is not None:
-                if not self._hermes_install_disk_pair(candidate):
+                if not self._x19_install_disk_pair(candidate):
                     # Issuer binding stripped the peer's refresh token: nothing
                     # left to POST. Restart the flow so the SDK lands in 401 ->
                     # full authorization instead of raising over a dead grant.
                     raise _RefreshCompletedByPeer
-                if self._hermes_live_ttl() and self.context.is_token_valid():
+                if self._x19_live_ttl() and self.context.is_token_valid():
                     # The peer's access token is live: presenting our copy of the
                     # refresh token would only burn a generation on a single-use
                     # provider. Skip the POST and let the flow restart.
@@ -188,14 +188,14 @@ class HermesProviderMixin:
             return self._prepare_token_request(await super()._refresh_token())
         except BaseException:
             # Never hold the fence when no POST will follow.
-            await self._hermes_release_refresh_fence()
+            await self._x19_release_refresh_fence()
             raise
 
-    def _hermes_live_ttl(self) -> bool:
+    def _x19_live_ttl(self) -> bool:
         """True when the installed token is not known to be past due.
 
         Storage clamps a past-due token to ``expires_in == 0`` on read (see
-        HermesTokenStorage.get_tokens); the SDK's is_token_valid() compares
+        X19TokenStorage.get_tokens); the SDK's is_token_valid() compares
         ``time.time() <= expiry`` and still reports True for that boundary,
         which would make us adopt a token the server rejects immediately.
         ``expires_in`` is optional in RFC 6749: None means no expiry was
@@ -206,7 +206,7 @@ class HermesProviderMixin:
         exp = getattr(self.context.current_tokens, "expires_in", None)
         return exp is None or int(exp) > 0
 
-    async def _hermes_acquire_refresh_fence(self) -> None:
+    async def _x19_acquire_refresh_fence(self) -> None:
         """Enter the fence, or let RefreshFenceTimeout abort this attempt.
 
         Fails closed on purpose: a refresh we are not certain we own must not
@@ -215,22 +215,22 @@ class HermesProviderMixin:
         """
         from tools.mcp_oauth import acquire_refresh_fence
 
-        await self._hermes_release_refresh_fence()
+        await self._x19_release_refresh_fence()
         storage = self.context.storage
         tokens_path = getattr(storage, "_tokens_path", None)
-        if tokens_path is None:  # pragma: no cover - non-Hermes storage
+        if tokens_path is None:  # pragma: no cover - non-X19 storage
             return
-        self._hermes_fence = await acquire_refresh_fence(tokens_path())
+        self._x19_fence = await acquire_refresh_fence(tokens_path())
 
-    async def _hermes_release_refresh_fence(self) -> None:
+    async def _x19_release_refresh_fence(self) -> None:
         """Release the fence if held. Idempotent and never raises."""
         from tools.mcp_oauth import release_refresh_fence
 
-        fd, self._hermes_fence = self._hermes_fence, None
+        fd, self._x19_fence = self._x19_fence, None
         if fd is not None:
             release_refresh_fence(fd)
 
-    async def _hermes_rotated_candidate(self):
+    async def _x19_rotated_candidate(self):
         """The on-disk pair, if a peer rotated it past the one we hold.
 
         A candidate must carry a refresh token different from ours (same
@@ -251,7 +251,7 @@ class HermesProviderMixin:
             return None
         return stored
 
-    def _hermes_install_disk_pair(self, tokens) -> bool:
+    def _x19_install_disk_pair(self, tokens) -> bool:
         """Publish a disk pair to the context and re-run issuer binding on it.
 
         Returns False when the enforcer strips the refresh token (the pair was
@@ -269,8 +269,8 @@ class HermesProviderMixin:
         then enforce refresh-token issuer binding."""
         await super()._initialize()
         storage = self.context.storage
-        from tools.mcp_oauth import HermesTokenStorage
-        if isinstance(storage, HermesTokenStorage) and self.context.oauth_metadata is None:
+        from tools.mcp_oauth import X19TokenStorage
+        if isinstance(storage, X19TokenStorage) and self.context.oauth_metadata is None:
             meta = storage.load_oauth_metadata()
             if meta is not None:
                 self.context.oauth_metadata = meta
@@ -302,20 +302,20 @@ class HermesProviderMixin:
         fenced section, whatever the outcome.
         """
         try:
-            return await self._hermes_handle_refresh_response(response)
+            return await self._x19_handle_refresh_response(response)
         finally:
-            await self._hermes_release_refresh_fence()
+            await self._x19_release_refresh_fence()
 
-    async def _hermes_handle_refresh_response(self, response) -> bool:
+    async def _x19_handle_refresh_response(self, response) -> bool:
         if not (200 <= response.status_code < 300):
-            self._hermes_logger.warning("Token refresh failed: %s", response.status_code)
-            # A writer outside the fence (interactive `hermes mcp login`, or a
-            # pre-fence Hermes sharing this HERMES_HOME) may have rotated the
+            self._x19_logger.warning("Token refresh failed: %s", response.status_code)
+            # A writer outside the fence (interactive `x19 mcp login`, or a
+            # pre-fence X19 sharing this X19_HOME) may have rotated the
             # grant and persisted the replacement. Providers issuing single-use
             # refresh tokens reject our stale copy with a 400. Re-read disk
             # before destroying the session.
-            if await self._hermes_reload_tokens_after_refresh_failure():
-                self._hermes_logger.info(
+            if await self._x19_reload_tokens_after_refresh_failure():
+                self._x19_logger.info(
                     "Recovered a peer-rotated refresh token instead of clearing the session"
                 )
                 return True
@@ -327,7 +327,7 @@ class HermesProviderMixin:
         try:
             token_response = OAuthToken.model_validate_json(await response.aread())
         except (HTTPError, ValidationError):
-            self._hermes_logger.warning("Invalid refresh response: %s", response.status_code)
+            self._x19_logger.warning("Invalid refresh response: %s", response.status_code)
             self.context.clear_tokens()
             return False
         # RFC 6749 §6: a refresh response may omit refresh_token (AS does not rotate) and scope
@@ -343,20 +343,20 @@ class HermesProviderMixin:
         await self._store_tokens(token_response)
         return True
 
-    async def _hermes_reload_tokens_after_refresh_failure(self) -> bool:
+    async def _x19_reload_tokens_after_refresh_failure(self) -> bool:
         """Re-read tokens from disk after a rejected refresh.
 
         Returns True only when disk holds a pair that is BOTH different from
         the one we just failed with AND still live. That is the signature of
-        a writer outside the fence (an interactive ``hermes mcp login`` or a
-        pre-fence Hermes) having rotated the grant between our read and our
+        a writer outside the fence (an interactive ``x19 mcp login`` or a
+        pre-fence X19) having rotated the grant between our read and our
         POST -- a recoverable race, not a dead credential.
 
         Returns False for the genuinely-expired case (nobody wrote a newer
         pair), so the caller still clears state and surfaces the reauth
         prompt.
         """
-        candidate = await self._hermes_rotated_candidate()
+        candidate = await self._x19_rotated_candidate()
         if candidate is None:
             return False
         # Publish, then restore on rejection. is_token_valid() reads the
@@ -365,8 +365,8 @@ class HermesProviderMixin:
         # exactly as it found it.
         previous_tokens = self.context.current_tokens
         if (
-            self._hermes_install_disk_pair(candidate)
-            and self._hermes_live_ttl()
+            self._x19_install_disk_pair(candidate)
+            and self._x19_live_ttl()
             and self.context.is_token_valid()
         ):
             return True
@@ -384,11 +384,11 @@ def _metadata_issuer(context: Any) -> str | None:
 
 def bind_issuer_from_context(context: Any) -> None:
     """Record the discovered issuer so the next ``storage.set_tokens`` (exchange or refresh) carries
-    it. No-op when metadata is not discovered yet or storage is not Hermes'."""
-    from tools.mcp_oauth import HermesTokenStorage
+    it. No-op when metadata is not discovered yet or storage is not X19'."""
+    from tools.mcp_oauth import X19TokenStorage
     storage = getattr(context, "storage", None)
     issuer = _metadata_issuer(context)
-    if isinstance(storage, HermesTokenStorage) and issuer:
+    if isinstance(storage, X19TokenStorage) and issuer:
         storage.bind_issuer(issuer)
 
 
@@ -401,10 +401,10 @@ def enforce_refresh_token_issuer(context: Any) -> None:
     access token stays usable; full re-authorization happens at expiry. Token files predating the field
     adopt the current issuer once rather than forcing a re-login. Runs after ``_initialize`` restored
     tokens + metadata, before the SDK's ``can_refresh_token()`` decision."""
-    from tools.mcp_oauth import HermesTokenStorage
+    from tools.mcp_oauth import X19TokenStorage
     storage = getattr(context, "storage", None)
     tokens = getattr(context, "current_tokens", None)
-    if not isinstance(storage, HermesTokenStorage) or tokens is None or not getattr(tokens, "refresh_token", None):
+    if not isinstance(storage, X19TokenStorage) or tokens is None or not getattr(tokens, "refresh_token", None):
         return
     current = _metadata_issuer(context)
     if current is None:  # not discovered yet; the SDK's 401-branch discovery + _store_tokens stamp it later
@@ -420,17 +420,17 @@ def enforce_refresh_token_issuer(context: Any) -> None:
         tokens.refresh_token = None
 
 
-def prepare_oauth_config(server_name: str, server_url: str, oauth_config: dict | None) -> tuple[dict, "HermesTokenStorage"]:
+def prepare_oauth_config(server_name: str, server_url: str, oauth_config: dict | None) -> tuple[dict, "X19TokenStorage"]:
     """Copy the ``oauth:`` block, apply provider defaults, open its token storage. The copy
     matters: later steps record ``_resolved_port`` / ``_cimd_url`` in the dict, which must
     never leak back into the caller's config."""
     from tools import mcp_oauth as mo
     cfg = dict(oauth_config or {})
     mo.apply_oauth_provider_defaults(cfg, server_name=server_name, server_url=server_url)
-    return cfg, mo.HermesTokenStorage(server_name)
+    return cfg, mo.X19TokenStorage(server_name)
 
 
-def build_provider_kwargs(cfg: dict, storage: "HermesTokenStorage", *, ssh_proxy_hint: bool) -> dict[str, Any]:
+def build_provider_kwargs(cfg: dict, storage: "X19TokenStorage", *, ssh_proxy_hint: bool) -> dict[str, Any]:
     """Resolve the callback port and return the shared provider constructor kwargs. Order
     matters: metadata needs the resolved port, pre-registration needs the metadata.
     ``ssh_proxy_hint`` lets the redirect handler tailor its remote-session hint to a configured

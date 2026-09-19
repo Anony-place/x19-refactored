@@ -419,7 +419,7 @@ class TestWatcherAttentionEscalation:
 
 class TestRuntimeStatusAttentionFields:
     def test_needs_attention_and_retrying_since_persisted(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         from gateway import status as status_module
 
         status_module.write_runtime_status(

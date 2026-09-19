@@ -78,7 +78,7 @@ def _gateway_room_grant_secret_for_home(home_value: str) -> bytes:
                 fsync_directory(home)
         finally:
             temporary.unlink(missing_ok=True)
-    return hmac.new(material, b"hermes-hosted-room-installation-grant-v1", hashlib.sha256).digest()
+    return hmac.new(material, b"x19-hosted-room-installation-grant-v1", hashlib.sha256).digest()
 
 
 def gateway_room_grant_secret(root: Path | str | None = None) -> bytes:
@@ -89,10 +89,10 @@ def gateway_room_grant_secret(root: Path | str | None = None) -> bytes:
     or capability RPCs, and is shared only by this installation's gateway processes.
     """
     if root is None:
-        from hermes_constants import get_hermes_home
-        # Profile routing uses a context-local HERMES_HOME override; the process environment
+        from x19_constants import get_x19_home
+        # Profile routing uses a context-local X19_HOME override; the process environment
         # retains the installation root and is the authority here.
-        root = os.environ.get("HERMES_HOME") or get_hermes_home()
+        root = os.environ.get("X19_HOME") or get_x19_home()
     return _gateway_room_grant_secret_for_home(str(Path(root).expanduser().resolve()))
 
 
@@ -103,7 +103,7 @@ def derive_room_grant_secret(api_key: str) -> bytes:
     """
     if not isinstance(api_key, str) or len(api_key) < 8:
         raise HostedRoomGrantError("room grants require a strong gateway API key")
-    return hmac.new(api_key.encode("utf-8"), b"hermes-hosted-room-grant-v1", hashlib.sha256).digest()
+    return hmac.new(api_key.encode("utf-8"), b"x19-hosted-room-grant-v1", hashlib.sha256).digest()
 
 
 def _identifier(value: Any, *, field: str) -> str:
@@ -248,8 +248,8 @@ def catalog_mapping(
     execution_policy: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Build a canonical catalog mapping with its digest."""
     # A Desktop-managed gateway exits with the app: the caller's flag is only an upper bound.
-    persistent_process = bool(persistent_process and os.getenv("HERMES_DESKTOP") != "1")
-    profile = str(target_profile or "").strip() or (os.getenv("HERMES_PROFILE") or "default").strip() or "default"
+    persistent_process = bool(persistent_process and os.getenv("X19_DESKTOP") != "1")
+    profile = str(target_profile or "").strip() or (os.getenv("X19_PROFILE") or "default").strip() or "default"
     checked_policy = RoomExecutionPolicy.from_mapping(
         execution_policy or execution_policy_mapping(target_profile=profile))
     # A RoomLink run is initiated by another installation. Process-wide YOLO mode bypasses the scoped
@@ -288,29 +288,29 @@ def local_room_link_endpoint(value: Any | None = None) -> dict[str, Any]:
 def _room_link_url_from_config(home: str) -> str | None:
     """Read the restart-scoped user setting without polling config on probes."""
     from gateway.config import load_gateway_config
-    from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
-    if str(get_hermes_home()) == home:
+    from x19_constants import get_x19_home, reset_x19_home_override, set_x19_home_override
+    if str(get_x19_home()) == home:
         value = load_gateway_config().room_link_url
     else:
-        token = set_hermes_home_override(home)
+        token = set_x19_home_override(home)
         try:
             value = load_gateway_config().room_link_url
         finally:
-            reset_hermes_home_override(token)
+            reset_x19_home_override(token)
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def _configured_room_link_url() -> str | None:
     """Resolve the explicit endpoint: env override > profile config > root config."""
-    if (override := os.getenv("HERMES_ROOM_LINK_URL")) is not None:
+    if (override := os.getenv("X19_ROOM_LINK_URL")) is not None:
         return override
-    from hermes_constants import get_default_hermes_root, get_hermes_home
-    home = get_hermes_home()
+    from x19_constants import get_default_x19_root, get_x19_home
+    home = get_x19_home()
     if configured := _room_link_url_from_config(str(home)):
         return configured
     # RoomLink is a gateway reachability property, not a Bot personality setting: named profiles may
     # override it but otherwise inherit the process gateway's root endpoint.
-    root = get_default_hermes_root()
+    root = get_default_x19_root()
     return _room_link_url_from_config(str(root)) if root != home else None
 
 
@@ -490,55 +490,3 @@ def room_grant_needs_dispatch_refresh(token: str, *, now: float | None = None, l
         return True
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import time  # noqa: F401,E402
-
-@dataclass(frozen=True)
-class RoomLinkProbe:
-    """One gateway-verified route candidate."""
-
-    mode: LinkMode
-    verified: bool
-    encrypted: bool
-    latency_ms: float
-
-_LINK_PRIORITY = {
-    "direct": 0,
-    "overlay": 1,
-    "relay": 2,
-    "pull": 3,
-    "desktop": 4,
-}
-
-def select_room_link(
-    probes: Iterable[RoomLinkProbe],
-    *,
-    desktop_available: bool,
-) -> RoomLinkProbe | None:
-    """Choose the fastest safe route without weakening encryption."""
-    candidates = [
-        probe
-        for probe in probes
-        if probe.verified
-        and probe.encrypted
-        and probe.mode != "desktop"
-        and math.isfinite(probe.latency_ms)
-        and probe.latency_ms >= 0
-    ]
-    if candidates:
-        return min(
-            candidates,
-            key=lambda item: (_LINK_PRIORITY[item.mode], item.latency_ms),
-        )
-    if desktop_available:
-        return RoomLinkProbe(
-            mode="desktop",
-            verified=True,
-            encrypted=True,
-            latency_ms=0,
-        )
-    return None
-# ---- END PLUGIN-COMPAT ----

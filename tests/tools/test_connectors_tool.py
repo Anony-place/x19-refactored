@@ -178,8 +178,8 @@ def _session_tool_names(enabled_toolsets, *, connectors, disabled_toolsets=None)
 
 
 def test_cli_session_gets_the_tool_outside_a_code_workspace(tmp_path, monkeypatch):
-    """The path a plain `hermes` run takes: _get_platform_tools, no git cwd."""
-    from hermes_cli.tools_config import _get_platform_tools
+    """The path a plain `x19` run takes: _get_platform_tools, no git cwd."""
+    from x19_cli.tools_config import _get_platform_tools
 
     monkeypatch.chdir(tmp_path)
     enabled = sorted(_get_platform_tools({}, "cli", include_default_mcp_servers=True))
@@ -192,7 +192,7 @@ def test_cli_session_gets_the_tool_inside_a_code_workspace(monkeypatch):
     """Same resolver, run from this repo — the surface the live miss was on."""
     from pathlib import Path
 
-    from hermes_cli.tools_config import _get_platform_tools
+    from x19_cli.tools_config import _get_platform_tools
 
     monkeypatch.chdir(Path(__file__).resolve().parents[2])
     enabled = sorted(_get_platform_tools({}, "cli", include_default_mcp_servers=True))
@@ -203,7 +203,7 @@ def test_tui_and_desktop_sessions_get_the_tool(monkeypatch):
     """The path the TUI/desktop gateway takes to build its selection."""
     from tui_gateway.server import _load_enabled_toolsets
 
-    monkeypatch.delenv("HERMES_TUI_TOOLSETS", raising=False)
+    monkeypatch.delenv("X19_TUI_TOOLSETS", raising=False)
     for platform in ("tui", "desktop"):
         selection = _load_enabled_toolsets(platform)
         names = _session_tool_names(selection, connectors=True)
@@ -230,12 +230,12 @@ def test_session_the_portal_has_not_enabled_never_receives_the_tool(tmp_path, mo
     for connectors does not get ``manage_connections`` in its schema on any surface, so the
     model cannot call it and read the gateway's 404 back to the user. The handler keeps the same
     gate for the direct RPC path."""
-    from hermes_cli.tools_config import _get_platform_tools
+    from x19_cli.tools_config import _get_platform_tools
     from tools.registry import registry
     from tui_gateway.server import _load_enabled_toolsets
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("HERMES_TUI_TOOLSETS", raising=False)
+    monkeypatch.delenv("X19_TUI_TOOLSETS", raising=False)
     selections = [
         sorted(_get_platform_tools({}, "cli", include_default_mcp_servers=True)),
         _load_enabled_toolsets("tui"),
@@ -257,7 +257,7 @@ def test_operator_can_still_turn_it_off(tmp_path, monkeypatch):
     like any other. Naming a platform composite instead must NOT strip it —
     that branch preserves core tools on purpose (#33924).
     """
-    from hermes_cli.tools_config import _get_platform_tools
+    from x19_cli.tools_config import _get_platform_tools
 
     monkeypatch.chdir(tmp_path)
     enabled = sorted(_get_platform_tools({}, "cli", include_default_mcp_servers=True))
@@ -266,7 +266,7 @@ def test_operator_can_still_turn_it_off(tmp_path, monkeypatch):
         enabled, connectors=True, disabled_toolsets=["connections"]
     )
     assert "manage_connections" in _session_tool_names(
-        enabled, connectors=True, disabled_toolsets=["hermes-cli"]
+        enabled, connectors=True, disabled_toolsets=["x19-cli"]
     )
 
 

@@ -4,13 +4,13 @@ import subprocess
 
 import pytest
 
-from hermes_state import SessionDB
+from x19_state import SessionDB
 from plugins.memory.honcho.client import HonchoClientConfig
 
 
 @pytest.mark.parametrize("strategy", ["per-repo", "per-directory", "global"])
 def test_seeded_desktop_branch_title_preserves_memory_strategy(monkeypatch, tmp_path, strategy):
-    monkeypatch.setattr("hermes_cli.banner.prefetch_update_check", lambda: None)
+    monkeypatch.setattr("x19_cli.banner.prefetch_update_check", lambda: None)
     from tui_gateway import server
 
     project = tmp_path / "example-project"

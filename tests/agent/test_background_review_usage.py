@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 
 from agent import background_review
-from hermes_state import SessionDB
+from x19_state import SessionDB
 
 
 @pytest.fixture
@@ -157,7 +157,7 @@ def test_classify_review_result():
 
 def test_enabled_config_failure_logs_warning(caplog):
     with patch(
-        "hermes_cli.config.load_config_readonly",
+        "x19_cli.config.load_config_readonly",
         side_effect=RuntimeError("boom"),
     ), caplog.at_level(logging.WARNING, logger="agent.background_review"):
         assert background_review.load_background_review_settings()[0] is True
@@ -172,7 +172,7 @@ def test_spawn_reuses_provided_task_cfg_without_rereading():
     task = {"enabled": True}
     agent = type("A", (), {})()
     with patch(
-        "hermes_cli.config.load_config_readonly",
+        "x19_cli.config.load_config_readonly",
         side_effect=AssertionError("config must not be re-read when task_cfg is passed"),
     ):
         _target, prompt = background_review.spawn_background_review_thread(

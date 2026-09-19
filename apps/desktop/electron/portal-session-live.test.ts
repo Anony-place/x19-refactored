@@ -27,7 +27,7 @@ const displayPrefix = (() => {
 test.skipIf(displayPrefix === null)(
   'real portal windows handle both providers, transitions and expired/rejected access',
   async () => {
-    const root = await mkdtemp(join(tmpdir(), 'hermes-portal-session-'))
+    const root = await mkdtemp(join(tmpdir(), 'x19-portal-session-'))
 
     try {
       const bundle = join(root, 'main.cjs')
@@ -58,7 +58,7 @@ test.skipIf(displayPrefix === null)(
       try {
         stdout = (
           await promisify(execFile)(command, args, {
-            env: { ...env, HERMES_HOME: join(root, '.hermes'), XDG_CONFIG_HOME: join(root, 'config') },
+            env: { ...env, X19_HOME: join(root, '.x19'), XDG_CONFIG_HOME: join(root, 'config') },
             timeout: 45_000
           })
         ).stdout

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 def test_nous_portal_tags_contains_product_and_client():
     """Every Nous Portal request gets BOTH the product tag and the version tag."""
-    from agent.portal_tags import hermes_client_tag, nous_portal_tags
+    from agent.portal_tags import x19_client_tag, nous_portal_tags
 
     tags = nous_portal_tags()
-    assert "product=hermes-agent" in tags
-    assert hermes_client_tag() in tags
+    assert "product=x19" in tags
+    assert x19_client_tag() in tags
     assert len(tags) == 2
 
 

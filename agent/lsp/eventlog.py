@@ -17,7 +17,7 @@ from typing import List, Tuple
 
 # Dedicated logger name so the documented grep recipe survives any
 # ``logging.getLogger(__name__)`` rename of internal modules.
-event_log = logging.getLogger("hermes.lint.lsp")
+event_log = logging.getLogger("x19.lint.lsp")
 
 _announce_lock = threading.Lock()
 _announced_active: set = set()        # keys: (server_id, workspace_root)
@@ -84,7 +84,7 @@ def log_server_unavailable(server_id: str, binary_or_pkg: str) -> None:
     _emit_once(
         _announced_unavailable, (server_id, binary_or_pkg), server_id, logging.WARNING,
         f"server unavailable: {binary_or_pkg} not found "
-        "(install via `hermes lsp install <id>` or set lsp.servers.<id>.command)",
+        "(install via `x19 lsp install <id>` or set lsp.servers.<id>.command)",
         f"server still unavailable: {binary_or_pkg}",
     )
 
@@ -130,27 +130,3 @@ __all__ = [
 ]
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-_announced_no_server: set = set()     # keys: (server_id,)
-
-def _announce_once(bucket: set, key: Tuple) -> bool:
-    """Return True if *key* has not been announced for *bucket* yet.
-
-    Atomically marks the key as announced so concurrent callers
-    cannot both win the race and double-log.
-    """
-    with _announce_lock:
-        if key in bucket:
-            return False
-        bucket.add(key)
-        return True
-
-def log_no_server_configured(server_id: str) -> None:
-    """No spawn recipe for this language.  WARNING once."""
-    if _announce_once(_announced_no_server, (server_id,)):
-        _emit(server_id, logging.WARNING, "no server configured")
-# ---- END PLUGIN-COMPAT ----

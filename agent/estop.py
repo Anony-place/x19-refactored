@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 # Same profile-aware / fleet-root resolvers the file-safety guards use (fail-open to ~/.x19).
-from agent.file_safety import _hermes_home_path as _hermes_home, _hermes_root_path as _canonical_root
+from agent.file_safety import _x19_home_path as _x19_home, _x19_root_path as _canonical_root
 
 SENTINEL_NAME = "ESTOP"
 
@@ -30,7 +30,7 @@ _logged_components: set[str] = set()
 
 def sentinel_path() -> Path:
     """Path of the ESTOP sentinel this process would write on `x19 pause`."""
-    return _hermes_home() / SENTINEL_NAME
+    return _x19_home() / SENTINEL_NAME
 
 
 def _candidate_sentinel_paths() -> list:
@@ -138,9 +138,3 @@ def check_paused(component: str, logger: logging.Logger) -> bool:
     return True
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import os  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

@@ -1,14 +1,14 @@
 ---
 sidebar_position: 11
 title: "Wake Word"
-description: "Hands-free 'Hey Hermes' wake word — start a voice session by speaking, the 'Hey Siri' way"
+description: "Hands-free 'Hey X19' wake word — start a voice session by speaking, the 'Hey Siri' way"
 ---
 
-# Wake Word ("Hey Hermes")
+# Wake Word ("Hey X19")
 
-The wake word turns Hermes into a hands-free assistant across the CLI, TUI, and
-desktop app: with one setting on, Hermes listens in the background for a spoken
-trigger phrase. Say it, and Hermes starts a fresh session, opens the microphone,
+The wake word turns X19 into a hands-free assistant across the CLI, TUI, and
+desktop app: with one setting on, X19 listens in the background for a spoken
+trigger phrase. Say it, and X19 starts a fresh session, opens the microphone,
 captures your command via the normal [voice pipeline](/user-guide/features/voice-mode),
 and answers — exactly like "Hey Siri" or "Alexa". Use `surface` to pick which
 one listens.
@@ -39,12 +39,12 @@ container" still goes through normally.
 
 ## Remote desktop (client capture)
 
-When the desktop app connects to a **remote** Hermes backend (for example a
+When the desktop app connects to a **remote** X19 backend (for example a
 headless Docker host or a machine in another room), the backend often has **no
 microphone**. Server-side PortAudio then fails with “Failed to open the
 wake-word microphone.”
 
-Hermes supports **client capture** for that case:
+X19 supports **client capture** for that case:
 
 1. The desktop arms wake with `capture: client` (automatic for the GUI when the
    backend has no local input device, or set explicitly below).
@@ -76,11 +76,11 @@ backend process.
 
 | Engine | Cost | API key | Notes |
 |--------|------|---------|-------|
-| **openWakeWord** (default) | Free | None | Local ONNX models. Ships a bundled **"hey hermes"** model (default); also supports `hey_jarvis`, `alexa`, `hey_mycroft`, … and custom models |
+| **openWakeWord** (default) | Free | None | Local ONNX models. Ships a bundled **"hey x19"** model (default); also supports `hey_jarvis`, `alexa`, `hey_mycroft`, … and custom models |
 | **sherpa** | Free | None | **Open vocabulary** — detects ANY typed phrase with zero training. Small English model auto-downloads on first use (~13 MB) |
 | **Porcupine** | Free tier / paid | `PORCUPINE_ACCESS_KEY` | Picovoice engine; built-in keywords + custom `.ppn` files |
 
-By default the phrase is **"hey hermes"** — a model for it ships with Hermes, so
+By default the phrase is **"hey x19"** — a model for it ships with X19, so
 it works out of the box with no training. (On first use, openWakeWord downloads
 its shared feature-extraction models — a small one-time fetch.)
 
@@ -89,13 +89,13 @@ installs made with `--include-desktop` pre-install them, so the ear works
 instantly). To install ahead of time:
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e ".[wake]"
+cd ~/.x19/x19 && uv pip install -e ".[wake]"
 ```
 
 ## Quick start
 
 ```bash
-# In an interactive `hermes` session:
+# In an interactive `x19` session:
 /wake on        # start listening (installs the engine on first use)
 /wake status    # show phrase, provider, and state
 /wake off       # stop listening
@@ -105,7 +105,7 @@ In the desktop app, hover the microphone in the composer and click the ear
 that fans out of it. The ear is solid when the wake word is listening.
 
 The toggle IS the setting: turning the wake word on or off — via `/wake` or the
-desktop ear button — also writes `wake_word.enabled` to `~/.hermes/config.yaml`,
+desktop ear button — also writes `wake_word.enabled` to `~/.x19/config.yaml`,
 so your choice persists across sessions. You can also flip it by hand:
 
 ```yaml
@@ -122,12 +122,12 @@ wake_word:
   input_device: null           # PortAudio input index or device-name substring; null = process default
   capture: auto               # auto | local | client — where PCM is captured (see Remote desktop)
   provider: openwakeword      # "openwakeword" (free, local) | "sherpa" (free, any phrase) | "porcupine"
-  phrase: "hey hermes"        # cosmetic label only — detection is keyed by the model/keyword below
+  phrase: "hey x19"        # cosmetic label only — detection is keyed by the model/keyword below
   sensitivity: 0.6            # 0.0-1.0 — higher = stricter (fewer false triggers), consistent across all engines
   confirmation_frames: 3      # openWakeWord only — consecutive over-threshold frames required to fire
   start_new_session: true     # start a fresh session on wake vs. continue the current one
   openwakeword:
-    model: hey_hermes         # bundled default; OR a built-in name OR a path to a custom .onnx/.tflite
+    model: hey_x19         # bundled default; OR a built-in name OR a path to a custom .onnx/.tflite
     inference_framework: ""   # "" (auto) | "onnx" | "tflite"
   porcupine:
     keyword: jarvis           # built-in keyword OR path to a custom .ppn
@@ -149,7 +149,7 @@ threshold and fire the wake word unintentionally. Two knobs control this:
 
 - **`confirmation_frames`** (default `3`, openWakeWord only) — how many
   *consecutive* over-threshold frames are required before the wake fires. A real
-  "hey hermes" holds a high score across several frames; an ambient blip spikes
+  "hey x19" holds a high score across several frames; an ambient blip spikes
   just one. Raise it (e.g. `4`–`5`) if you still get false triggers in a noisy
   room; the cost is a few tens of milliseconds of extra latency. `1` restores
   the old fire-on-first-frame behavior.
@@ -160,36 +160,36 @@ threshold and fire the wake word unintentionally. Two knobs control this:
   internally so "higher = stricter" holds there too. The `0.6` default sits
   above openWakeWord's permissive `0.5` baseline, which let near-misses like
   "hey hor" through; raise toward `0.8` if you still get false fires, lower it
-  if real "hey hermes" utterances are missed.
+  if real "hey x19" utterances are missed.
 
 The `sherpa` and `porcupine` engines decode the whole phrase internally, so they
 don't have the single-frame-spike problem and ignore `confirmation_frames`
 (but they still honor `sensitivity`).
 
 `inference_framework` picks the openWakeWord backend. Leave it empty (the
-default) to let Hermes choose per platform: **tflite on Apple Silicon**, onnx
+default) to let X19 choose per platform: **tflite on Apple Silicon**, onnx
 everywhere else. openWakeWord's onnx backend returns near-zero scores on macOS
 ARM64 ([openWakeWord#336](https://github.com/dscripka/openWakeWord/issues/336)),
 so a listener pinned to `onnx` there will arm, show as listening, and never
-fire. The tflite backend needs `ai-edge-litert` on macOS, which Hermes installs
+fire. The tflite backend needs `ai-edge-litert` on macOS, which X19 installs
 on demand alongside the other wake-word deps.
 
 ### Surfaces (CLI, TUI, GUI)
 
-The wake word works in all three Hermes surfaces, and `surface` picks which one
+The wake word works in all three X19 surfaces, and `surface` picks which one
 owns the listener and opens the new session when it fires:
 
 | `surface` | Behavior |
 |-----------|----------|
 | `auto` (default) | All local surfaces are eligible; the first one to arm owns the listener. |
-| `cli` | Only the classic `hermes` CLI. |
-| `tui` | Only `hermes --tui`. |
+| `cli` | Only the classic `x19` CLI. |
+| `tui` | Only `x19 --tui`. |
 | `gui` | Only the desktop app. |
 
 The detector is on-device and single-mic, so only one surface listens at a time,
-including when Hermes surfaces run in separate processes. Ownership is sticky:
+including when X19 surfaces run in separate processes. Ownership is sticky:
 the first eligible claimant keeps the listener until it stops, disconnects, or
-its process exits. Hermes does not silently fail over to another open surface.
+its process exits. X19 does not silently fail over to another open surface.
 Set `surface` when you want to pin ownership instead of using first-claim wins.
 The TUI and desktop GUI share the same Python backend (`tui_gateway`), which
 runs the detector server-side and yields the mic to voice capture while a
@@ -197,8 +197,8 @@ command records.
 
 ## Using a different phrase
 
-"Hey Hermes" works out of the box — the bundled openWakeWord model
-(`model: hey_hermes`) is the default. To wake on something else, the easiest
+"Hey X19" works out of the box — the bundled openWakeWord model
+(`model: hey_x19`) is the default. To wake on something else, the easiest
 path is the open-vocabulary engine:
 
 ### Option A — sherpa (any phrase, zero training)
@@ -224,14 +224,14 @@ phrase defaults to `hey <profile name>` when unset. Say a profile's phrase
 and the desktop app live-switches to that profile, opens a fresh session
 there, and starts hands-free voice:
 
-- "hey hermes" → default profile
+- "hey x19" → default profile
 - "hey coder" → the `coder` profile
 - "hey trader" → the `trader` profile
 
 Set `wake_word.profile_routing: false` on the listener's profile to opt out
 and listen only for its own phrase. The CLI and TUI are single-profile
 processes: a wake phrase belonging to another profile prints the switch
-command (`hermes -p <profile>`) instead of routing.
+command (`x19 -p <profile>`) instead of routing.
 
 Names are matched acoustically by their English subword sounds: two-word
 phrases with distinct, 2+ syllable names work best. Very short names, heavy
@@ -250,7 +250,7 @@ wake_word:
   provider: openwakeword
   phrase: "computer"
   openwakeword:
-    model: ~/.hermes/wakewords/computer.onnx   # or a built-in name like hey_jarvis
+    model: ~/.x19/wakewords/computer.onnx   # or a built-in name like hey_jarvis
 ```
 
 Training references:
@@ -260,25 +260,25 @@ Training references:
 
 :::tip Pick a distinctive phrase
 Wake phrases that don't collide with everyday speech generalize best. Two
-syllables with an uncommon word ("hermes" qualifies) beat common words like
+syllables with an uncommon word ("x19" qualifies) beat common words like
 "hello" or "stop".
 :::
 
 ### Option C — Porcupine (custom keyword in seconds)
 
-Create a "Hey Hermes" keyword in the [Picovoice Console](https://console.picovoice.ai/),
+Create a "Hey X19" keyword in the [Picovoice Console](https://console.picovoice.ai/),
 download the `.ppn`, and:
 
 ```yaml
 wake_word:
   enabled: true
   provider: porcupine
-  phrase: "hey hermes"
+  phrase: "hey x19"
   porcupine:
-    keyword: ~/.hermes/wakewords/hey_hermes.ppn
+    keyword: ~/.x19/wakewords/hey_x19.ppn
 ```
 
-Set your access key in `~/.hermes/.env`:
+Set your access key in `~/.x19/.env`:
 
 ```bash
 PORCUPINE_ACCESS_KEY=your-key-here
@@ -293,8 +293,8 @@ PORCUPINE_ACCESS_KEY=your-key-here
   full provider list.
 - A TTS provider for speaking the reply (the default `edge-tts` works with no
   key). The wake flow is fully hands-free, so the toggle refuses to arm until
-  both STT and TTS are ready — `hermes tools` (Voice section) sets them up.
-- The wake engine deps (auto-installed, or `hermes-agent[wake]`).
+  both STT and TTS are ready — `x19 tools` (Voice section) sets them up.
+- The wake engine deps (auto-installed, or `x19[wake]`).
 
 `/wake status` reports exactly what's missing if the listener won't start.
 
@@ -304,11 +304,11 @@ macOS grants microphone access per **process**. STT working in the desktop app
 proves the *renderer* has mic access — the wake listener runs in the Python
 *backend*, which needs its own grant. Without it, CoreAudio hands the backend a
 "working" stream that only ever delivers silence, so the ear shows listening
-but the phrase never fires. Hermes detects this (`/wake status` shows
+but the phrase never fires. X19 detects this (`/wake status` shows
 "mic delivers only silence"; the desktop's folded voice menu carries the same
 hint on its trigger).
-Fix: System Settings → Privacy & Security → Microphone → enable the Hermes
-backend (it may appear as your terminal, `python`, or Hermes), then toggle the
+Fix: System Settings → Privacy & Security → Microphone → enable the X19
+backend (it may appear as your terminal, `python`, or X19), then toggle the
 wake word off and on.
 
 ### "Listening" but receives silence (Windows)
@@ -323,13 +323,13 @@ When it reports silence, set `wake_word.input_device` to the numeric index or an
 unambiguous name of the working PortAudio input, then toggle the wake word:
 
 ```bash
-hermes config set wake_word.input_device "Microphone Array"
+x19 config set wake_word.input_device "Microphone Array"
 ```
 
 Use `null` to return to the process default:
 
 ```bash
-hermes config set wake_word.input_device null
+x19 config set wake_word.input_device null
 ```
 
 ## Notes & limits

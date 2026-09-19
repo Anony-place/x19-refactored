@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import type { ProfileScope } from '@/hermes'
+import type { ProfileScope } from '@/x19'
 import { useI18n } from '@/i18n'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { $hubActions, UPDATE_ALL_KEY, updateHubSkills } from '@/store/hub-actions'

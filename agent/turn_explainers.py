@@ -102,31 +102,31 @@ _PERSISTENCE_CAUSE_EXPLANATIONS: Dict[str, str] = {
         "session id, then send your message again."
     ),
     "turn_lease": (
-        "the turn was stopped because another Hermes process "
+        "the turn was stopped because another X19 process "
         "took over this session. Your reply was not saved — wait "
         "for the other process to finish, then send your message "
         "again."
     ),
     "locked": (
         "the turn was stopped because session storage was busy "
-        "(another Hermes process was writing to the state "
+        "(another X19 process was writing to the state "
         "database). Your message should already be saved — "
         "please send it again in a moment."
     ),
     # The forensic runbook for both (WAL generations, manifest.json, sidecars) lives in the
-    # logger.error at hermes_state.py::_raise_if_db_replaced — never in the chat reply.
+    # logger.error at x19_state.py::_raise_if_db_replaced — never in the chat reply.
     "replaced": (
-        "the session database file was replaced while Hermes was running, so this "
-        "message was not saved (a copy is kept in {home}/sessions/). Stop Hermes "
-        "(`hermes {profile_arg}gateway stop`), run `hermes {profile_arg}doctor` — not "
-        "`hermes {profile_arg}doctor --fix`, which would repair the wrong file in place — "
+        "the session database file was replaced while X19 was running, so this "
+        "message was not saved (a copy is kept in {home}/sessions/). Stop X19 "
+        "(`x19 {profile_arg}gateway stop`), run `x19 {profile_arg}doctor` — not "
+        "`x19 {profile_arg}doctor --fix`, which would repair the wrong file in place — "
         "then start it again and send your message once more. Advanced recovery steps are "
         "in the log."
     ),
     "deleted_wal": (
-        "the session database was changed or replaced while Hermes was running, so this "
-        "message was not saved (a copy is kept in {home}/sessions/). Stop Hermes "
-        "(`hermes {profile_arg}gateway stop`), run `hermes {profile_arg}doctor`, then start "
+        "the session database was changed or replaced while X19 was running, so this "
+        "message was not saved (a copy is kept in {home}/sessions/). Stop X19 "
+        "(`x19 {profile_arg}gateway stop`), run `x19 {profile_arg}doctor`, then start "
         "it again and send your message once more. Advanced recovery steps are in the log."
     ),
     "corrupt": (
@@ -134,10 +134,10 @@ _PERSISTENCE_CAUSE_EXPLANATIONS: Dict[str, str] = {
         "reported structural corruption (the transcript would "
         "have been lost on restart). Freeing disk space will "
         "not help. Recovery options:\n"
-        "1. Run `hermes {profile_arg}doctor --fix`\n"
+        "1. Run `x19 {profile_arg}doctor --fix`\n"
         "2. Stop the gateway, then recover with:\n"
-        "   hermes {profile_arg}sessions recover --source {db_path} --inspect-only\n"
-        "   (if it reports recoverable) hermes {profile_arg}sessions recover "
+        "   x19 {profile_arg}sessions recover --source {db_path} --inspect-only\n"
+        "   (if it reports recoverable) x19 {profile_arg}sessions recover "
         "--source {db_path} --output recovered-state.db\n"
         "   — recovery snapshots the damaged file first; do NOT "
         "run `sqlite3 ... \".recover\"` against the live "
@@ -152,20 +152,20 @@ _PERSISTENCE_CAUSE_EXPLANATIONS: Dict[str, str] = {
         "the turn was stopped because the session search index (FTS5) "
         "is corrupt and could not be detached, so this message was not "
         "saved. The message store itself is not damaged: do not run "
-        "recovery tools or restore a backup. Run `hermes {profile_arg}doctor --fix` "
-        "(or restart Hermes, which repairs the index on open), then "
+        "recovery tools or restore a backup. Run `x19 {profile_arg}doctor --fix` "
+        "(or restart X19, which repairs the index on open), then "
         "send your message again."
     ),
     "disk": (
-        "Hermes couldn't save this conversation to disk, so it stopped rather than lose "
+        "X19 couldn't save this conversation to disk, so it stopped rather than lose "
         "your messages. The disk is probably full: free some space (or fix the permissions "
         "on {home}/state.db), then send your message again."
     ),
 }
 _PERSISTENCE_DEFAULT_EXPLANATION = (
-    "Hermes couldn't save this conversation, so it stopped rather than lose your messages. "
-    "Possible causes: the drive is out of room, or another Hermes process is holding the "
-    "database. Close other Hermes windows, run `hermes {profile_arg}doctor` to check "
+    "X19 couldn't save this conversation, so it stopped rather than lose your messages. "
+    "Possible causes: the drive is out of room, or another X19 process is holding the "
+    "database. Close other X19 windows, run `x19 {profile_arg}doctor` to check "
     "storage, then send your message again."
 )
 
@@ -197,7 +197,7 @@ def _display_flag_enabled(agent, *, env_var: str, config_key: str, cache_attr: s
 
     ``env_var`` overrides on every call and is never cached. Reads the persisted config.yaml
     so gateway and CLI share the setting; ``load_config`` is imported lazily (startup cycle,
-    and tests patch it at ``hermes_cli.config``). Any failure → True (safe default: on)."""
+    and tests patch it at ``x19_cli.config``). Any failure → True (safe default: on)."""
     try:
         env = os.environ.get(env_var)
         if env is not None:
@@ -206,7 +206,7 @@ def _display_flag_enabled(agent, *, env_var: str, config_key: str, cache_attr: s
         if cached is not None:
             return cached
         try:
-            from hermes_cli.config import load_config as _load_config
+            from x19_cli.config import load_config as _load_config
             _cfg = _load_config() or {}
         except Exception:
             _cfg = {}
@@ -250,7 +250,7 @@ class TurnExplainersMixin:
             if changed is not None:
                 changed.update(landed_paths)
             # Feed the checkpoint agent-write ledger so /rollback's safe mode can tell
-            # Hermes-authored content from later user hand-edits.
+            # X19-authored content from later user hand-edits.
             mgr = getattr(self, "_checkpoint_mgr", None)
             if mgr is not None and getattr(mgr, "enabled", False):
                 for _p in landed_paths:
@@ -289,16 +289,16 @@ class TurnExplainersMixin:
         }
 
     def _file_mutation_verifier_enabled(self) -> bool:
-        """``display.file_mutation_verifier`` / ``HERMES_FILE_MUTATION_VERIFIER`` (a patchable seam)."""
+        """``display.file_mutation_verifier`` / ``X19_FILE_MUTATION_VERIFIER`` (a patchable seam)."""
         return _display_flag_enabled(
-            self, env_var="HERMES_FILE_MUTATION_VERIFIER", config_key="file_mutation_verifier",
+            self, env_var="X19_FILE_MUTATION_VERIFIER", config_key="file_mutation_verifier",
             cache_attr="_file_mutation_verifier_enabled_cache",
         )
 
     def _turn_completion_explainer_enabled(self) -> bool:
-        """``display.turn_completion_explainer`` / ``HERMES_TURN_COMPLETION_EXPLAINER``."""
+        """``display.turn_completion_explainer`` / ``X19_TURN_COMPLETION_EXPLAINER``."""
         return _display_flag_enabled(
-            self, env_var="HERMES_TURN_COMPLETION_EXPLAINER", config_key="turn_completion_explainer",
+            self, env_var="X19_TURN_COMPLETION_EXPLAINER", config_key="turn_completion_explainer",
             cache_attr="_turn_completion_explainer_enabled_cache",
         )
 
@@ -368,24 +368,24 @@ class TurnExplainersMixin:
         if body is not None and "{model}" in body:
             body = body.format(model=model or "The model")
         if body is None and reason == "session_persistence_failed":
-            from hermes_constants import display_hermes_home, profile_cli_selector
+            from x19_constants import display_x19_home, profile_cli_selector
 
-            # Copy-pasteable, so pin every `hermes` command to the profile whose store failed:
+            # Copy-pasteable, so pin every `x19` command to the profile whose store failed:
             # a multi-profile backend (Desktop serve) hosts sessions whose state.db is NOT the
-            # process default, and a bare `hermes` follows active_profile (#105887).
+            # process default, and a bare `x19` follows active_profile (#105887).
             body = (
                 _PERSISTENCE_CAUSE_EXPLANATIONS.get(
                     persistence_cause or "unknown", _PERSISTENCE_DEFAULT_EXPLANATION
                 )
-                .replace("{home}", display_hermes_home())
+                .replace("{home}", display_x19_home())
                 .replace("{profile_arg}", profile_cli_selector())
             )
             if persistence_cause in ("corrupt", "fts_index"):
-                from hermes_constants import get_default_hermes_root
-                from hermes_state import _default_db_path
+                from x19_constants import get_default_x19_root
+                from x19_state import _default_db_path
 
                 body = body.replace("{db_path}", str(db_path or _default_db_path()))
                 body = body.replace(
-                    "{backups_dir}", str(get_default_hermes_root() / "backups")
+                    "{backups_dir}", str(get_default_x19_root() / "backups")
                 )
         return _NO_REPLY + body if body else ""

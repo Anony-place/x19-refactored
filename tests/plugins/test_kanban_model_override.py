@@ -17,9 +17,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
+from x19_cli import kanban_db as kb
+from x19_cli import kanban_db_connect as kbc
+from x19_cli import kanban_db_dispatch as kbd
 
 
 # ---------------------------------------------------------------------------
@@ -29,9 +29,9 @@ from hermes_cli import kanban_db_dispatch as kbd
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -49,7 +49,7 @@ def _load_plugin_router():
     plugin_file = repo_root / "plugins" / "kanban" / "dashboard" / "plugin_api.py"
     assert plugin_file.exists(), f"plugin file missing: {plugin_file}"
     spec = importlib.util.spec_from_file_location(
-        "hermes_dashboard_plugin_kanban_model_override_test", plugin_file,
+        "x19_dashboard_plugin_kanban_model_override_test", plugin_file,
     )
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
@@ -120,7 +120,7 @@ def test_migration_adds_provider_override_column(conn):
 
 
 def _spawn_and_capture(monkeypatch, tmp_path, task):
-    monkeypatch.setattr(kbd, "_resolve_hermes_argv", lambda: ["hermes"])
+    monkeypatch.setattr(kbd, "_resolve_x19_argv", lambda: ["x19"])
     captured = {}
 
     class FakeProc:
@@ -272,7 +272,7 @@ def test_spawn_omits_reasoning_when_unset(monkeypatch, tmp_path, conn):
 def test_worker_cli_accepts_the_reasoning_flag():
     """The dispatcher's --reasoning must be a real flag on the worker's CLI —
     a spawn arg no parser accepts fails every dispatch."""
-    from hermes_cli._parser import build_top_level_parser
+    from x19_cli._parser import build_top_level_parser
 
     parser = build_top_level_parser()[0]
     args = parser.parse_args(["--cli", "chat", "-q", "hi", "--reasoning", "high"])

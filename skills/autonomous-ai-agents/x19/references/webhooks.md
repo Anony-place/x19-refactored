@@ -83,7 +83,7 @@ x19 webhook subscribe todoist-x19 \
   --deliver telegram --deliver-chat-id "12345"
 ```
 
-Full filter syntax: https://github.com/Anony-place/x19-refactored/tree/main/website/docs/user-guide/messaging/webhooks#payload-filters
+Full filter syntax: https://anony-place.github.io/x19-refactored/docs/user-guide/messaging/webhooks#payload-filters
 
 ### List subscriptions
 ```bash

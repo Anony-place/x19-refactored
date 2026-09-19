@@ -6,7 +6,7 @@ author: Harshyt Goel (adapted by Nous Research)
 license: MIT
 platforms: [linux, macos]
 metadata:
-  hermes:
+  x19:
     tags: [architecture, diagrams, isometric, documentation]
     category: creative
     related_skills: [architecture-diagram, excalidraw]

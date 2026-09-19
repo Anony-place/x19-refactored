@@ -20,7 +20,7 @@ def _make_local_embedded_provider(monkeypatch):
     monkeypatch.setattr(
         hindsight,
         "_load_config",
-        lambda: {"mode": "local_embedded", "profile": "hermes"},
+        lambda: {"mode": "local_embedded", "profile": "x19"},
     )
     # Pretend the local runtime imports cleanly so initialize() reaches the
     # daemon-start branch instead of bailing on a missing `hindsight` package.
@@ -93,7 +93,7 @@ def test_root_warning_stderr_fallback_honors_policy(tmp_path, monkeypatch, capsy
     the logger.warning is always recorded."""
     import json
     home = tmp_path / f"home-{setting}"; home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
     (home / "config.yaml").write_text(json.dumps({"display": {} if setting is None else {"suppress_warning_notifications": setting}}))
     provider = _make_local_embedded_provider(monkeypatch)
     monkeypatch.setattr(hindsight.os, "geteuid", lambda: 0, raising=False)

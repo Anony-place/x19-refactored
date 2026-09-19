@@ -43,28 +43,28 @@ def test_scrub_on_forwards_extra_like_sanitize_extra_env(monkeypatch):
 
 
 def test_no_scrub_inherit_profile_home_bridges_context_override(tmp_path):
-    from hermes_constants import set_hermes_home_override, reset_hermes_home_override
+    from x19_constants import set_x19_home_override, reset_x19_home_override
 
-    token = set_hermes_home_override(str(tmp_path))
+    token = set_x19_home_override(str(tmp_path))
     try:
         env = build_subprocess_env(
             {"PATH": "/bin"}, scrub_secrets=False, inherit_profile_home=True
         )
     finally:
-        reset_hermes_home_override(token)
-    assert env["HERMES_HOME"] == str(tmp_path)
+        reset_x19_home_override(token)
+    assert env["X19_HOME"] == str(tmp_path)
 
 
 # ---------------------------------------------------------------------------
 # E2E: real subprocess sees the factory's contract
 # ---------------------------------------------------------------------------
 
-def test_e2e_child_sees_hermes_home_and_no_planted_secret(tmp_path, monkeypatch):
-    """A real child spawned with a factory-built env must see HERMES_HOME
+def test_e2e_child_sees_x19_home_and_no_planted_secret(tmp_path, monkeypatch):
+    """A real child spawned with a factory-built env must see X19_HOME
     propagated and (with scrub on) a planted provider-style key absent."""
-    hermes_home = tmp_path / "hermes-home"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    x19_home = tmp_path / "x19-home"
+    x19_home.mkdir()
+    monkeypatch.setenv("X19_HOME", str(x19_home))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-FAKE-planted")
     monkeypatch.setenv("AUXILIARY_FAKE_API_KEY", "sk-FAKE-aux")
 
@@ -72,7 +72,7 @@ def test_e2e_child_sees_hermes_home_and_no_planted_secret(tmp_path, monkeypatch)
 
     code = (
         "import os, json; "
-        "print(json.dumps({'home': os.environ.get('HERMES_HOME'), "
+        "print(json.dumps({'home': os.environ.get('X19_HOME'), "
         "'k1': 'ANTHROPIC_API_KEY' in os.environ, "
         "'k2': 'AUXILIARY_FAKE_API_KEY' in os.environ}))"
     )
@@ -83,7 +83,7 @@ def test_e2e_child_sees_hermes_home_and_no_planted_secret(tmp_path, monkeypatch)
     import json
 
     result = json.loads(out.stdout)
-    assert result["home"] == str(hermes_home)
+    assert result["home"] == str(x19_home)
     assert result["k1"] is False
     assert result["k2"] is False
 
@@ -100,14 +100,14 @@ def test_e2e_no_scrub_child_keeps_planted_secret(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# E2E regression (#93082): cron/no_agent children keep bare `hermes` on PATH
+# E2E regression (#93082): cron/no_agent children keep bare `x19` on PATH
 # ---------------------------------------------------------------------------
 
 
-def test_e2e_scrubbed_env_resolves_bare_hermes_under_minimal_parent_path(monkeypatch):
+def test_e2e_scrubbed_env_resolves_bare_x19_under_minimal_parent_path(monkeypatch):
     """Regression for #92998/#93082: a gateway launched by systemd/cron with a
-    minimal PATH (no hermes console-script dir) must still hand cron job
-    children an env whose PATH resolves bare ``hermes``.
+    minimal PATH (no x19 console-script dir) must still hand cron job
+    children an env whose PATH resolves bare ``x19``.
 
     Exercises the REAL factory and the REAL bin-dir resolver — no mocks of the
     helpers. cron/scheduler._run_job_script builds its child env via exactly
@@ -117,22 +117,22 @@ def test_e2e_scrubbed_env_resolves_bare_hermes_under_minimal_parent_path(monkeyp
 
     from tools.environments import local as local_mod
 
-    bin_dir = local_mod._resolve_hermes_bin_dir()
+    bin_dir = local_mod._resolve_x19_bin_dir()
     if not bin_dir or not os.path.isfile(
-        os.path.join(bin_dir, "hermes.exe" if os.name == "nt" else "hermes")
+        os.path.join(bin_dir, "x19.exe" if os.name == "nt" else "x19")
     ):
-        pytest.skip("no real hermes console-script install available")
+        pytest.skip("no real x19 console-script install available")
 
-    # Simulate the service-manager minimal PATH: hermes dir absent.
+    # Simulate the service-manager minimal PATH: x19 dir absent.
     minimal_path = os.pathsep.join(["/usr/bin", "/bin"])
     monkeypatch.setenv("PATH", minimal_path)
-    assert shutil.which("hermes", path=minimal_path) is None
+    assert shutil.which("x19", path=minimal_path) is None
 
     env = build_subprocess_env(scrub_secrets=True)  # cron _run_job_script path
 
-    resolved = shutil.which("hermes", path=env.get("PATH", ""))
+    resolved = shutil.which("x19", path=env.get("PATH", ""))
     assert resolved is not None, (
-        f"bare 'hermes' must resolve from the child PATH {env.get('PATH')!r}"
+        f"bare 'x19' must resolve from the child PATH {env.get('PATH')!r}"
     )
     assert os.path.dirname(resolved) == bin_dir
     assert env["PATH"].split(os.pathsep)[0] == bin_dir

@@ -38,7 +38,7 @@ class _FakeResponse:
 
 def test_x_search_posts_responses_request(monkeypatch):
     from tools.x_search_tool import x_search_tool
-    from hermes_cli import __version__
+    from x19_cli import __version__
 
     captured = {}
 
@@ -69,7 +69,7 @@ def test_x_search_posts_responses_request(monkeypatch):
 
     tool_def = captured["json"]["tools"][0]
     assert captured["url"] == "https://api.x.ai/v1/responses"
-    assert captured["headers"]["User-Agent"] == f"Hermes-Agent/{__version__}"
+    assert captured["headers"]["User-Agent"] == f"X19/{__version__}"
     assert captured["json"]["model"] == "grok-4.5"
     assert captured["json"]["store"] is False
     assert "reasoning" not in captured["json"]
@@ -202,7 +202,7 @@ def test_x_search_returns_structured_http_error(monkeypatch):
 
 def _no_xai_env(monkeypatch):
     """Strip any XAI_* env vars so the resolver doesn't see a leaked dev key."""
-    for var in ("XAI_API_KEY", "XAI_BASE_URL", "HERMES_XAI_BASE_URL"):
+    for var in ("XAI_API_KEY", "XAI_BASE_URL", "X19_XAI_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -267,7 +267,7 @@ def test_x_search_returns_tool_error_when_no_credentials(monkeypatch):
     # surfaces a friendly error rather than an HTTP exception.
     result = x_search_tool(query="anything")
     assert "No xAI credentials available" in result
-    assert "hermes auth add xai-oauth" in result
+    assert "x19 auth add xai-oauth" in result
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ def test_x_search_prefers_explicit_api_key_over_oauth(monkeypatch):
 
     monkeypatch.delenv("XAI_API_KEY", raising=False)
     monkeypatch.setattr(
-        "hermes_cli.config.get_env_value",
+        "x19_cli.config.get_env_value",
         lambda name, default=None: {
             "XAI_API_KEY": paid_key,
         }.get(name, default),
@@ -396,7 +396,7 @@ def test_x_search_bearer_helper_falls_back_to_oauth_without_api_key(monkeypatch)
 
     monkeypatch.delenv("XAI_API_KEY", raising=False)
     monkeypatch.setattr(
-        "hermes_cli.config.get_env_value",
+        "x19_cli.config.get_env_value",
         lambda name, default=None: default,
     )
     _install_fake_oauth_pool(monkeypatch, oauth_token)

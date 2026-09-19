@@ -1,6 +1,6 @@
 # Context Compression and Caching
 
-Hermes Agent uses a dual compression system and Anthropic prompt caching to
+X19 uses a dual compression system and Anthropic prompt caching to
 manage context window usage efficiently across long conversations.
 
 Source files: `agent/context_engine.py` (ABC), `agent/context_compressor.py` (default engine),
@@ -19,10 +19,10 @@ Bedrock context resolution in `agent/model_metadata.py` uses this precedence:
 - **Legacy entries are revalidated.** Old scalar entries have no provenance and
   may be either probe results or fallbacks. Their size does not establish which.
 - **Failed probes use the current table without persisting it.** Failures have a
-  five-minute in-memory cooldown scoped to Hermes home, endpoint, model, and
+  five-minute in-memory cooldown scoped to X19 home, endpoint, model, and
   region. Expiry or explicit cache invalidation permits another attempt.
 
-The cache remains at `context_length_cache.yaml` under the active Hermes home.
+The cache remains at `context_length_cache.yaml` under the active X19 home.
 `context_lengths` retains scalar values for older readers. An additive
 `bedrock_confirmed_v1` map binds each confirmed key to its exact value in the
 same atomic write. Generic writes clear that key's provenance. Older writers
@@ -59,13 +59,13 @@ Selection is config-driven via `context.engine` in `config.yaml`. The resolution
 
 Plugin engines are **never auto-activated** — the user must explicitly set `context.engine` to the plugin's name. The default `"compressor"` always uses the built-in.
 
-Configure via `hermes plugins` → Provider Plugins → Context Engine, or edit `config.yaml` directly.
+Configure via `x19 plugins` → Provider Plugins → Context Engine, or edit `config.yaml` directly.
 
 For building a context engine plugin, see [Context Engine Plugins](/developer-guide/context-engine-plugin).
 
 ## Dual Compression System
 
-Hermes has two separate compression layers that operate independently:
+X19 has two separate compression layers that operate independently:
 
 ```
                      ┌──────────────────────────┐
@@ -164,7 +164,7 @@ Images are priced at the per-image cost **learned from the provider's usage**
 (`agent/image_token_cost.py`), not a vendor formula: on a response whose delta
 since the previous anchor introduced N images, the residual between the real
 `prompt_tokens` and the text-only projection is N × the provider's price. The
-value is kept per `model@host` in `~/.hermes/cache/image_token_costs.json` and
+value is kept per `model@host` in `~/.x19/cache/image_token_costs.json` and
 bound per turn so the trigger estimator, the tail-budget walk and gateway
 hygiene all use the same figure. Before the first vision turn a flat 1,500
 default applies.
@@ -222,7 +222,7 @@ compression:
   min_tail_user_messages: 1  # Real user messages guaranteed in the tail (default: 1)
   codex_gpt55_autoraise: true  # gpt-5.5 on Codex OAuth: raise trigger to 85% (default: true)
   codex_gpt55_autoraise_notice: true  # Show the one-time autoraise notice (default: true)
-  codex_app_server_auto: native  # native|hermes|off for Codex app-server thread compaction
+  codex_app_server_auto: native  # native|x19|off for Codex app-server thread compaction
   codex_responses_native: false  # gpt-5.6 on direct OpenAI/Codex: server-side compaction (opt-in)
   codex_responses_compact_threshold: null  # Automatic server compaction trigger
   in_place: true             # Compact on the same session id, no rotation (default: true)
@@ -249,7 +249,7 @@ auxiliary:
 | `idle_compact_after_seconds` | `0` | ≥0 seconds | Opt-in: compact up front when a session resumes after this many seconds idle (0 = disabled). Skips when context ≤ threshold × target_ratio; honors cooldown/anti-thrash/lock guards |
 | `codex_gpt55_autoraise` | `true` | bool | Raise the trigger to 85% for gpt-5.4/5.5/5.6 and gpt-6 Astra on the ChatGPT Codex OAuth route (see below). Set `false` to keep the global `threshold` |
 | `codex_gpt55_autoraise_notice` | `true` | bool | Show the one-time Codex gpt-5.5 autoraise notice. Set `false` to keep the 85% autoraise but suppress the banner |
-| `codex_app_server_auto` | `native` | `native`, `hermes`, `off` | Thread-compaction mode for Codex app-server sessions (see below) |
+| `codex_app_server_auto` | `native` | `native`, `x19`, `off` | Thread-compaction mode for Codex app-server sessions (see below) |
 | `codex_responses_native` | `false` | bool | Opt in to OpenAI's server-side compaction on the Responses API. Engages only for gpt-5.6-family models on the direct OpenAI API or a ChatGPT Codex subscription (see below) |
 | `codex_responses_compact_threshold` | `null` | `null` or positive integer | `null` follows the resolved local compression trigger with an 8,192 token safety margin. A positive integer remains absolute and only clamps downward when required. Invalid values use automatic behavior. Automatic mode falls back to `200000` when no usable local trigger exists |
 | `in_place` | `true` | bool | Compact on the same session id instead of rotating to a new one (see below) |
@@ -325,9 +325,9 @@ GitHub Copilot). At the default 50% trigger, compaction would fire at ~136K —
 half the window the model can actually use. When the active route is Codex
 OAuth (`provider: openai-codex`) and the model is one of those families (Astra
 matches any slug containing `astra`; the opt-in `-900k` picker variants are
-excluded because they already unlock the wider window), Hermes raises the
+excluded because they already unlock the wider window), X19 raises the
 trigger to **85%** (~231K) and shows a notice with the opt-out command. The
-notice is shown once per profile — a marker under `$HERMES_HOME`
+notice is shown once per profile — a marker under `$X19_HOME`
 (`.codex_gpt55_autoraise_notice`) records that it ran, so repeated agent/session
 inits (e.g. every inbound gateway message) don't re-emit it; if the raised
 threshold later changes it re-notifies once. Only this exact route is affected;
@@ -335,27 +335,27 @@ the same models on any other provider keep your global `threshold`. To opt back 
 the global value:
 
 ```bash
-hermes config set compression.codex_gpt55_autoraise false
+x19 config set compression.codex_gpt55_autoraise false
 ```
 
 To keep the 85% autoraise but hide only the one-time notice:
 
 ```bash
-hermes config set compression.codex_gpt55_autoraise_notice false
+x19 config set compression.codex_gpt55_autoraise_notice false
 ```
 
 ### Codex large-context `-900k` picker variants (opt-in)
 
 The ChatGPT Codex backend *advertises* a 272K window for the gpt-5.4 and
 gpt-5.6 (Sol/Terra/Luna) families, but actually accepts ~911K input tokens
-for ChatGPT-subscription accounts (live-verified Aug 2026). Hermes keeps the
+for ChatGPT-subscription accounts (live-verified Aug 2026). X19 keeps the
 **advertised 272K as the default** for the base slugs — a bigger window means
 more tokens per request and much faster subscription-usage burn, so the large
 window is strictly opt-in.
 
 To use the large window, pick the explicit `-900k` variant in `/model` (e.g.
 `gpt-5.6-sol-900k`, `gpt-5.6-terra-900k`, `gpt-5.6-luna-900k`,
-`gpt-5.4-900k`). These are Hermes-side aliases: the suffix is stripped before
+`gpt-5.4-900k`). These are X19-side aliases: the suffix is stripped before
 the model id is sent to the backend, and pricing/usage accounting treats them
 as the base model. Slugs that genuinely enforce 272K (gpt-5.5, gpt-5.4-mini)
 have no `-900k` variant.
@@ -369,7 +369,7 @@ wasting a small window, which a 900K window doesn't need.
 
 Codex app-server sessions (`api_mode: codex_app_server` — the codex CLI/agent
 runtime) are different from every other route: the codex agent owns the backing
-thread context, so Hermes' auxiliary summarizer cannot shrink it — rewriting the
+thread context, so X19' auxiliary summarizer cannot shrink it — rewriting the
 local transcript mirror leaves the real thread growing unbounded until a hard
 context reset. For this runtime, compaction goes through the app-server's own
 mechanism instead:
@@ -377,22 +377,22 @@ mechanism instead:
 - Manual compaction (`/compress`) asks the app-server to compact the thread
   (`thread/compact/start`) and waits for the compaction turn to complete.
 - Automatic compaction is controlled by `compression.codex_app_server_auto`:
-  the default `native` lets the app-server decide when to compact and Hermes
+  the default `native` lets the app-server decide when to compact and X19
   records the resulting compaction events (compression counters, session
-  events). Set `hermes` to let Hermes' compression threshold initiate
-  app-server compaction, or `off` to disable Hermes-initiated automatic
+  events). Set `x19` to let X19' compression threshold initiate
+  app-server compaction, or `off` to disable X19-initiated automatic
   compaction entirely (codex may still compact natively).
 
-Hermes' local transcript is never rewritten on this runtime — state.db records
+X19' local transcript is never rewritten on this runtime — state.db records
 the compaction boundary while the visible transcript stays intact. All other
-routes (including Codex OAuth chat sessions) keep Hermes' summary compressor.
+routes (including Codex OAuth chat sessions) keep X19' summary compressor.
 
 ### Native Responses compaction (gpt-5.6 on direct OpenAI / Codex subscription)
 
 OpenAI's Responses API supports server-side compaction: when a request includes
 `context_management: [{type: "compaction", compact_threshold: N}]` and the
 rendered input crosses N tokens, the server prunes older context into an opaque
-encrypted `compaction` output item. Hermes captures that item into the
+encrypted `compaction` output item. X19 captures that item into the
 assistant message's existing replay sidecar and sends it back on subsequent
 turns, standing in for the pruned history — long-horizon recall without a
 client-side summary pass, and ZDR-friendly (`store: false`, no
@@ -611,7 +611,7 @@ conversation prefix. Uses Anthropic's `cache_control` breakpoints.
 
 ### Strategy: system_and_3
 
-Anthropic allows a maximum of 4 `cache_control` breakpoints per request. Hermes
+Anthropic allows a maximum of 4 `cache_control` breakpoints per request. X19
 uses the "system_and_3" strategy:
 
 ```
@@ -664,7 +664,7 @@ The marker is applied differently based on content type:
    credential-pool rotation onto a different account — means the next request
    gets zero cache hits and re-reads the full conversation at undiscounted
    input price. This is inherent to how provider caches work, not something
-   Hermes can avoid; user-facing docs for `/model`, fallback providers, and
+   X19 can avoid; user-facing docs for `/model`, fallback providers, and
    credential pools carry cost warnings for this reason. Don't add features
    that silently swap the model or credentials mid-session.
 

@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from agent import nous_wire
-from hermes_cli import providers as _providers
+from x19_cli import providers as _providers
 
 
 def _resp(**kw):
@@ -118,7 +118,7 @@ class TestHook:
 
 def test_real_agent_usage_recorder_calls_the_hook_once(tmp_path, monkeypatch):
     """The wiring: record_response_usage on a real AIAgent invokes the hook on call 1 only."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("nous:\n  anthropic_wire: auto\n", encoding="utf-8")
     from run_agent import AIAgent
     from agent import turn_usage

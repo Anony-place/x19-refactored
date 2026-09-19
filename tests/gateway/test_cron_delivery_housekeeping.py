@@ -70,7 +70,7 @@ def test_multiplex_housekeeping_scopes_primary_and_drains_each_profile(
     secondary_home = tmp_path / "secondary"
     calls = []
 
-    monkeypatch.setattr(gateway_run, "get_hermes_home", lambda: root_home)
+    monkeypatch.setattr(gateway_run, "get_x19_home", lambda: root_home)
 
     monkeypatch.setattr(
         gateway_run,

@@ -36,7 +36,7 @@ def test_timeout_notice_names_wait_and_config_command(monkeypatch):
     monkeypatch.setattr(ctx, "_get_approval_timeout", lambda: 300)
     text = t("approval.timeout", **ctx.approval_timeout_notice_kwargs())
     assert "5 minutes" in text and "was not run" in text
-    assert "hermes config set approvals.timeout 900" in text
+    assert "x19 config set approvals.timeout 900" in text
     assert "{" not in text  # every placeholder filled
 
 

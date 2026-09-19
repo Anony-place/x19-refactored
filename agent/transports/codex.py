@@ -63,18 +63,18 @@ def _merge_extra_headers(kwargs: dict[str, Any], **headers: str) -> None:
 
 # Client-side ``web_search`` on xAI Responses collides with Grok's native tool
 # (incomplete hang / HTTP 400); it goes on the wire under this alias.
-_XAI_CLIENT_WEB_SEARCH_ALIAS = "hermes_web_search"
+_XAI_CLIENT_WEB_SEARCH_ALIAS = "x19_web_search"
 
 # OpenCode /v1/responses rejects client tools using these names (HTTP 400
 # "custom function name 'X' is reserved"); xAI reserves ``tool_search`` for
-# Grok's native Tool Search. Aliased as hermes_<name>.
+# Grok's native Tool Search. Aliased as x19_<name>.
 # OpenCode's /v1/responses endpoints (Zen and Go, including custom providers pointing at opencode.ai)
 # reserve certain function names server-side and reject client tools that use them with HTTP 400 ("custom
 # function name 'X' is reserved"). Same treatment as the xAI web_search collision: rename on the wire
-# (hermes_<name>), map back in normalize_response so Hermes dispatch is unaffected. See #85589.
+# (x19_<name>), map back in normalize_response so X19 dispatch is unaffected. See #85589.
 _OPENCODE_RESERVED_TOOL_NAMES = ("web_search", "search_files")
 _XAI_RESERVED_TOOL_NAMES = ("tool_search",)
-_RESERVED_TOOL_ALIAS_PREFIX = "hermes_"
+_RESERVED_TOOL_ALIAS_PREFIX = "x19_"
 
 # Reverse map used ONLY when normalize_response runs on a transport that never
 # built a request; real requests carry request-local ``_last_wire_aliases``.
@@ -88,7 +88,7 @@ _LEGACY_ALIAS_FALLBACK[_XAI_CLIENT_WEB_SEARCH_ALIAS] = "web_search"
 def _is_opencode_responses_backend(params: dict[str, Any]) -> bool:
     """True for opencode-zen/go providers, ``opencode-*`` families, or opencode.ai hosts."""
     try:
-        from hermes_cli.models import opencode_provider_family
+        from x19_cli.models import opencode_provider_family
 
         if opencode_provider_family(params.get("provider")) is not None:
             return True
@@ -158,7 +158,7 @@ def _alias_wire_tools(response_tools: Any, params: dict[str, Any], is_xai_respon
     """Apply provider-reserved tool-name aliasing; returns ``(tools, {alias: original})`` for THIS request.
 
     xAI: a client ``web_search`` collides with Grok's native search — native mode
-    swaps it 1:1 for the built-in, client mode keeps Hermes dispatch under an alias.
+    swaps it 1:1 for the built-in, client mode keeps X19 dispatch under an alias.
     """
     wire_aliases: dict[str, str] = {}
 
@@ -178,7 +178,7 @@ def _alias_wire_tools(response_tools: Any, params: dict[str, Any], is_xai_respon
     if response_tools and _is_opencode_responses_backend(params):
         response_tools, _oc_aliases = _alias_reserved_tools(response_tools, _OPENCODE_RESERVED_TOOL_NAMES)
         wire_aliases.update(_oc_aliases)
-    # xAI server-side web search vs Hermes web providers. grok models on xAI's /v1/responses surface have a
+    # xAI server-side web search vs X19 web providers. grok models on xAI's /v1/responses surface have a
     # *native*, server-executed web search. A client-side function literally named ``web_search`` collides
     # with that engine: declared as a plain ``function`` rather than ``{"type": "web_search"}``, the search
     # dispatches but never reconciles → incomplete turn + 3 retries. Verified live against
@@ -186,8 +186,8 @@ def _alias_wire_tools(response_tools: Any, params: dict[str, Any], is_xai_respon
     # config: 1. **Native** (active/configured backend is ``xai``, or resolution fails): drop the client
     # ``web_search`` function and declare xAI's built-in instead. 1:1 swap only when client ``web_search``
     # was already present — never an additive grant. 2. **Client** (Firecrawl / Tavily / Exa / … configured
-    # or resolved): keep Hermes dispatch so ``web.backend`` / ``web.search_backend`` is honored, but rename
-    # the wire tool to ``hermes_web_search`` so Grok cannot hijack the name. The alias is mapped back to
+    # or resolved): keep X19 dispatch so ``web.backend`` / ``web.search_backend`` is honored, but rename
+    # the wire tool to ``x19_web_search`` so Grok cannot hijack the name. The alias is mapped back to
     # ``web_search`` in ``normalize_response``. Request-local alias provenance: every wire alias THIS
     # request emits is recorded here and stashed on the transport, so the reverse rewrite in
     # ``normalize_response`` applies only to aliases that were actually sent (never to a real tool that
@@ -587,7 +587,7 @@ class ResponsesApiTransport(ProviderTransport):
         # An override may rewrite the wire model; provenance must be stamped with what actually goes out.
         wire_model = _strip_ctx_variant(request_overrides.get("model", model))
         kwargs = {
-            # ``-900k`` picker variants are Hermes-side aliases; the backend knows only the base slug.
+            # ``-900k`` picker variants are X19-side aliases; the backend knows only the base slug.
             "model": wire_model,
             "instructions": instructions,
             "input": self.convert_messages(
@@ -762,11 +762,3 @@ from agent.transports import register_transport  # noqa: E402
 register_transport("codex_responses", ResponsesApiTransport)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Dict  # noqa: F401,E402
-from typing import List  # noqa: F401,E402
-from typing import Tuple  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

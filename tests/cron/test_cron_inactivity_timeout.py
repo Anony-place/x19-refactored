@@ -3,8 +3,8 @@
 Tests cover:
 - Active agent runs indefinitely (no inactivity timeout)
 - Idle agent triggers inactivity timeout with diagnostic info
-- Unlimited timeout (HERMES_CRON_TIMEOUT=0)
-- Backward compat: HERMES_CRON_TIMEOUT env var still works
+- Unlimited timeout (X19_CRON_TIMEOUT=0)
+- Backward compat: X19_CRON_TIMEOUT env var still works
 - Error message includes activity summary
 """
 
@@ -154,7 +154,7 @@ class TestInactivityTimeout:
         assert result is None  # Never got a result — interrupted
 
     def test_unlimited_timeout(self):
-        """HERMES_CRON_TIMEOUT=0 means no timeout at all."""
+        """X19_CRON_TIMEOUT=0 means no timeout at all."""
         agent = FakeAgent(idle_seconds=0.0)
         _cron_inactivity_limit = None  # unlimited
 
@@ -177,9 +177,9 @@ class TestInactivityTimeout:
         return 600.0
 
     def test_timeout_env_var_parsing(self, monkeypatch):
-        """HERMES_CRON_TIMEOUT env var is respected."""
-        monkeypatch.setenv("HERMES_CRON_TIMEOUT", "1200")
-        raw = os.getenv("HERMES_CRON_TIMEOUT", "").strip()
+        """X19_CRON_TIMEOUT env var is respected."""
+        monkeypatch.setenv("X19_CRON_TIMEOUT", "1200")
+        raw = os.getenv("X19_CRON_TIMEOUT", "").strip()
         _cron_timeout = self._parse_cron_timeout(raw)
         assert _cron_timeout == 1200.0
 
@@ -230,11 +230,11 @@ class TestInactivityTimeout:
 class TestSysPathOrdering:
     """Test that sys.path is set before repo-level imports."""
 
-    def test_hermes_time_importable(self):
-        """hermes_time should be importable when cron.scheduler loads."""
+    def test_x19_time_importable(self):
+        """x19_time should be importable when cron.scheduler loads."""
         # This import would fail if sys.path.insert comes after the import
-        from cron.scheduler import _hermes_now
-        assert callable(_hermes_now)
+        from cron.scheduler import _x19_now
+        assert callable(_x19_now)
 
 
 class TestInactivityWatchdogLoop:

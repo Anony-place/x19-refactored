@@ -5,7 +5,7 @@ import json
 import threading
 import time
 
-from hermes_cli import mcp_startup
+from x19_cli import mcp_startup
 from tui_gateway import server
 from tui_gateway import ws as ws_mod
 

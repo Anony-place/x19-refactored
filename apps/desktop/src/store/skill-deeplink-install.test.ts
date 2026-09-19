@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setApiRequestConnection, setApiRequestProfile } from '@/hermes'
+import { setApiRequestConnection, setApiRequestProfile } from '@/x19'
 
 import { $confirmRequest, runConfirm, settleConfirm } from './confirm'
 import { $connectionsRegistry } from './connection-registry-state'

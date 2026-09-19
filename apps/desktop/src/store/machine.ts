@@ -15,7 +15,7 @@ export async function loadMachineProfile(): Promise<void> {
     return
   }
 
-  const profile = await window.hermesDesktop?.getMachineProfile?.().catch(() => null)
+  const profile = await window.x19Desktop?.getMachineProfile?.().catch(() => null)
 
   if (profile) {
     $machine.set(profile)

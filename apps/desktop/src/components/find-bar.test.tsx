@@ -31,7 +31,7 @@ vi.mock('@/themes/context', () => ({
 }))
 
 // ── Bridge double ───────────────────────────────────────────────────────────
-// Stands in for the preload `hermesDesktop` surface. The primary window's
+// Stands in for the preload `x19Desktop` surface. The primary window's
 // renderer-side walker no longer calls `findInPage` / `stopFindInPage`
 // (#81726); only `onFoundInPage` is still wired, for secondary session
 // windows that drive the search through Electron. `findInPage` /
@@ -55,7 +55,7 @@ function installBridge() {
     return () => subscribers.delete(callback)
   })
 
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+  ;(window as unknown as { x19Desktop: unknown }).x19Desktop = {
     findInPage,
     stopFindInPage,
     onFoundInPage
@@ -115,7 +115,7 @@ afterEach(() => {
   resetStore()
   drainListeners()
   vi.restoreAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
 })
 
 // ── Pure: match-count formatting ────────────────────────────────────────────

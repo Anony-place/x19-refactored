@@ -42,7 +42,7 @@ async function createAgent(page: MockBackendFixture['page'], name: string, title
 function seedWriterProfile(home: string): string {
   const writerHome = path.join(home, 'profiles', 'writer')
   fs.mkdirSync(writerHome, { recursive: true })
-  fs.writeFileSync(path.join(writerHome, 'profile.yaml'), 'description: Writes things\nui_meta:\n  hermes-bots:\n    title: Scribe\n', 'utf8')
+  fs.writeFileSync(path.join(writerHome, 'profile.yaml'), 'description: Writes things\nui_meta:\n  x19-bots:\n    title: Scribe\n', 'utf8')
   const base = fs.readFileSync(path.join(home, 'config.yaml'), 'utf8')
   fs.writeFileSync(
     path.join(writerHome, 'config.yaml'),
@@ -62,7 +62,7 @@ function sqlite(dbPath: string, sql: string): string {
 
 test.beforeAll(async () => {
   fixture = await setupMockBackend()
-  seedWriterProfile(fixture.sandbox.hermesHome)
+  seedWriterProfile(fixture.sandbox.x19Home)
   await waitForAppReady(fixture, 120_000)
 })
 
@@ -74,7 +74,7 @@ test.afterAll(async () => {
 test('a DM addressed by the friendly name lands in that bot\'s Bot Chat', async () => {
   test.setTimeout(600_000)
   const page = fixture!.page
-  const home = fixture!.sandbox.hermesHome
+  const home = fixture!.sandbox.x19Home
 
   await openBots(page)
   await expect(page.getByRole('button', { name: /^Scribe · @writer\b/ }).first()).toBeVisible({ timeout: 60_000 })
@@ -99,7 +99,7 @@ test('a DM addressed by the friendly name lands in that bot\'s Bot Chat', async 
   const toolResult = sqlite(senderDb, "SELECT content FROM messages WHERE role='tool' ORDER BY rowid DESC LIMIT 1")
   expect(toolResult).toContain('"to": "@writer"')
 
-  // The recipient turn is a full `hermes -p writer` CLI boot in the background; its
+  // The recipient turn is a full `x19 -p writer` CLI boot in the background; its
   // landing in writer/state.db is covered by tests/tools (delivery runner) — under a
   // saturated host it can outlast any sane spec budget, so it is not awaited here.
   await page.screenshot({ path: 'test-results/bot-chat-message-agent-friendly-name.png', fullPage: true })

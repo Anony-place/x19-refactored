@@ -136,8 +136,8 @@ class WeComAdapter(WeComStreamMixin, WeComMediaMixin, ChatSendQueueMixin, OwnAcc
         self._dedup, self._reply_req_ids = MessageDeduplicator(max_size=DEDUP_MAX_SIZE), {}
         # Text batching (clients split long messages ~4000 chars); attachment-only frames are held
         # for the merge window so the trailing text callback joins the same event (official: 800ms).
-        self._text_batch_delay_seconds = env_float("HERMES_WECOM_TEXT_BATCH_DELAY_SECONDS", 0.6)
-        self._text_batch_split_delay_seconds = env_float("HERMES_WECOM_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0)
+        self._text_batch_delay_seconds = env_float("X19_WECOM_TEXT_BATCH_DELAY_SECONDS", 0.6)
+        self._text_batch_split_delay_seconds = env_float("X19_WECOM_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0)
         self._attachment_text_merge_delay_seconds = _extra_float("attachment_text_merge_delay_seconds", 0.8)
         # Stream keep-alive config (see streaming.py STREAM_* constants).
         self._stream_safe_duration_seconds = _extra_float("stream_safe_duration_seconds", STREAM_SAFE_DURATION_SECONDS)
@@ -636,7 +636,7 @@ class WeComAdapter(WeComStreamMixin, WeComMediaMixin, ChatSendQueueMixin, OwnAcc
 
 _QR_GENERATE_URL = "https://work.weixin.qq.com/ai/qc/generate"
 _QR_QUERY_URL = "https://work.weixin.qq.com/ai/qc/query_result"
-_QR_CODE_PAGE = "https://work.weixin.qq.com/ai/qc/gen?source=hermes&scode="
+_QR_CODE_PAGE = "https://work.weixin.qq.com/ai/qc/gen?source=x19&scode="
 _QR_POLL_INTERVAL, _QR_POLL_TIMEOUT = 3, 300  # seconds (poll every 3s, give up after 5 minutes)
 
 
@@ -647,7 +647,7 @@ def qr_scan_for_bot_info(*, timeout_seconds: int = _QR_POLL_TIMEOUT) -> Optional
     import urllib.parse
 
     def _get_json(url: str, timeout: int) -> Dict[str, Any]:
-        req = urllib.request.Request(url, headers={"User-Agent": "HermesAgent/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "X19Agent/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
@@ -657,7 +657,7 @@ def qr_scan_for_bot_info(*, timeout_seconds: int = _QR_POLL_TIMEOUT) -> Optional
 
     print("  Connecting to WeCom...", end="", flush=True)
     try:
-        raw = _get_json(f"{_QR_GENERATE_URL}?source=hermes", 15)
+        raw = _get_json(f"{_QR_GENERATE_URL}?source=x19", 15)
     except Exception as exc:
         return _fail("WeCom QR: failed to fetch QR code: %s", exc, exc)
     scode, auth_url = (str((raw.get("data") or {}).get(k) or "").strip() for k in ("scode", "auth_url"))
@@ -674,7 +674,7 @@ def qr_scan_for_bot_info(*, timeout_seconds: int = _QR_POLL_TIMEOUT) -> Optional
         print(f"\n  Scan the QR code above, or open this URL directly:\n  {page_url}")
     except Exception:
         print(f"  Open this URL in WeCom on your phone:\n\n  {page_url}\n")
-        from hermes_cli.managed_uv import pip_install_hint
+        from x19_cli.managed_uv import pip_install_hint
         print(f"  Tip: {pip_install_hint('qrcode')}  to display a scannable QR code here next time")
     print("\n  Fetching configuration results...", end="", flush=True)
     deadline = time.monotonic() + timeout_seconds
@@ -748,18 +748,18 @@ _MANUAL_SETUP_STEPS = (
 _ACCESS_CHOICES = (
     ("Enable open access (anyone can message the bot)", (("WECOM_DM_POLICY", "open"), ("GATEWAY_ALLOW_ALL_USERS", "true")),
      (("warning", "Open access enabled — anyone can use your bot!"),)),
-    ("Use DM pairing (unknown users request access, you approve with 'hermes pairing approve')", (("WECOM_DM_POLICY", "pairing"),),
-     (("success", "DM pairing mode — users will receive a code to request access."), ("info", "Approve with: hermes pairing approve <platform> <code>"))),
+    ("Use DM pairing (unknown users request access, you approve with 'x19 pairing approve')", (("WECOM_DM_POLICY", "pairing"),),
+     (("success", "DM pairing mode — users will receive a code to request access."), ("info", "Approve with: x19 pairing approve <platform> <code>"))),
     ("Disable direct messages", (("WECOM_DM_POLICY", "disabled"),), (("warning", "Direct messages disabled."),)),
-    ("Skip for now (bot will deny all users until configured)", (), (("info", "Skipped — configure later with 'hermes gateway setup'"),)),
+    ("Skip for now (bot will deny all users until configured)", (), (("info", "Skipped — configure later with 'x19 gateway setup'"),)),
 )
 
 
 def interactive_setup() -> None:
-    from hermes_cli.config import remove_env_value, save_env_value
-    from hermes_cli.setup import prompt_choice
-    from hermes_cli.cli_output import prompt, print_header, print_info, print_success, print_warning
-    from hermes_cli.setup_platforms import declines_reconfigure
+    from x19_cli.config import remove_env_value, save_env_value
+    from x19_cli.setup import prompt_choice
+    from x19_cli.cli_output import prompt, print_header, print_info, print_success, print_warning
+    from x19_cli.setup_platforms import declines_reconfigure
     print_header("WeCom (Enterprise WeChat)")
     if declines_reconfigure("WeCom", "Reconfigure WeCom?", "WECOM_BOT_ID"):
         return
@@ -823,14 +823,13 @@ def _callback_is_connected(config) -> bool:
     return bool(extra.get("corp_id") or extra.get("apps"))
 
 
-
 def _build_callback_adapter(config):
     from plugins.platforms.wecom.callback_adapter import WecomCallbackAdapter
     return WecomCallbackAdapter(config)
 
 
 def register(ctx) -> None:
-    common = dict(install_hint="Run `hermes setup` to install WeCom support.", emoji="💼", allow_update_command=True)
+    common = dict(install_hint="Run `x19 setup` to install WeCom support.", emoji="💼", allow_update_command=True)
     ctx.register_platform(
         name="wecom", label="WeCom (Enterprise WeChat)", adapter_factory=WeComAdapter, check_fn=check_wecom_requirements,
         is_connected=_is_connected, validate_config=_is_connected, required_env=["WECOM_BOT_ID", "WECOM_SECRET"],
@@ -847,50 +846,3 @@ def register(ctx) -> None:
     )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from pathlib import Path  # noqa: F401,E402
-import base64  # noqa: F401,E402
-from dataclasses import dataclass  # noqa: F401,E402
-from collections import deque  # noqa: F401,E402
-import hashlib  # noqa: F401,E402
-import mimetypes  # noqa: F401,E402
-import os  # noqa: F401,E402
-from urllib.parse import unquote  # noqa: F401,E402
-from urllib.parse import urlparse  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'ABSOLUTE_MAX_BYTES': ('plugins.platforms.wecom.media', 'ABSOLUTE_MAX_BYTES'),
-    'APP_CMD_UPLOAD_MEDIA_CHUNK': ('plugins.platforms.wecom.media', 'APP_CMD_UPLOAD_MEDIA_CHUNK'),
-    'APP_CMD_UPLOAD_MEDIA_FINISH': ('plugins.platforms.wecom.media', 'APP_CMD_UPLOAD_MEDIA_FINISH'),
-    'APP_CMD_UPLOAD_MEDIA_INIT': ('plugins.platforms.wecom.media', 'APP_CMD_UPLOAD_MEDIA_INIT'),
-    'FILE_MAX_BYTES': ('plugins.platforms.wecom.media', 'FILE_MAX_BYTES'),
-    'IMAGE_MAX_BYTES': ('plugins.platforms.wecom.media', 'IMAGE_MAX_BYTES'),
-    'MAX_INTERMEDIATE_FRAMES': ('plugins.platforms.wecom.streaming', 'MAX_INTERMEDIATE_FRAMES'),
-    'MAX_UPLOAD_CHUNKS': ('plugins.platforms.wecom.media', 'MAX_UPLOAD_CHUNKS'),
-    'ReplyFrame': ('plugins.platforms.wecom.streaming', 'ReplyFrame'),
-    'STREAM_EXPIRED_ERRCODE': ('plugins.platforms.wecom.streaming', 'STREAM_EXPIRED_ERRCODE'),
-    'STREAM_REQUEST_EXPIRED_ERRCODE': ('plugins.platforms.wecom.streaming', 'STREAM_REQUEST_EXPIRED_ERRCODE'),
-    'STREAM_VERSION_CONFLICT_ERRCODE': ('plugins.platforms.wecom.streaming', 'STREAM_VERSION_CONFLICT_ERRCODE'),
-    'UPLOAD_CHUNK_SIZE': ('plugins.platforms.wecom.media', 'UPLOAD_CHUNK_SIZE'),
-    'VIDEO_MAX_BYTES': ('plugins.platforms.wecom.media', 'VIDEO_MAX_BYTES'),
-    'VOICE_MAX_BYTES': ('plugins.platforms.wecom.media', 'VOICE_MAX_BYTES'),
-    'VOICE_SUPPORTED_MIMES': ('plugins.platforms.wecom.media', 'VOICE_SUPPORTED_MIMES'),
-    'WeComStreamExpiredError': ('plugins.platforms.wecom.streaming', 'WeComStreamExpiredError'),
-    'cache_document_from_bytes_async': ('gateway.platforms.base', 'cache_document_from_bytes_async'),
-    'cache_image_from_bytes_async': ('gateway.platforms.base', 'cache_image_from_bytes_async'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from hermes_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

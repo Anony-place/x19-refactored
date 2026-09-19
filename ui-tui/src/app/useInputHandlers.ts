@@ -1,4 +1,4 @@
-import { forceRedraw, useInput } from '@hermes/ink'
+import { forceRedraw, useInput } from '@x19/ink'
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 
@@ -20,6 +20,7 @@ import {
   type InputHandlerResult,
   type OverlayState
 } from './interfaces.js'
+import { $orgDockCollapsed } from './orgStore.js'
 import { $isBlocked, $overlayState, patchOverlayState } from './overlayStore.js'
 import { respondToServerRequest } from './serverRequestStore.js'
 import { turnController } from './turnController.js'
@@ -644,6 +645,21 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
     // turn keeps streaming.
     if (event.keypress.name === 'f7' && !key.ctrl && !key.meta && !key.shift && !key.super) {
       $agentDockCollapsed.set(!$agentDockCollapsed.get())
+
+      return
+    }
+
+    // Ctrl+G (or F8) collapses/expands the X19 organization console — the
+    // docked view of the boss→manager→worker hierarchy and task graph. Purely
+    // presentation: the runtime keeps running and polling either way.
+    if (event.keypress.name === 'f8' && !key.ctrl && !key.meta && !key.shift && !key.super) {
+      $orgDockCollapsed.set(!$orgDockCollapsed.get())
+
+      return
+    }
+
+    if (isCtrl(key, ch, 'g')) {
+      $orgDockCollapsed.set(!$orgDockCollapsed.get())
 
       return
     }

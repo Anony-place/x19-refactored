@@ -443,7 +443,7 @@ class TestAgentInitConfig:
         assert agent.codex_responses_compact_threshold is None
 
     def test_public_config_default_selects_automatic_threshold(self):
-        from hermes_cli.config import DEFAULT_CONFIG
+        from x19_cli.config import DEFAULT_CONFIG
 
         assert (
             DEFAULT_CONFIG["compression"]["codex_responses_compact_threshold"] is None
@@ -466,13 +466,13 @@ class TestAgentInitConfig:
     ):
         from run_agent import AIAgent
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".x19"
         home.mkdir()
         lines = ["compression:", "  codex_responses_native: true"]
         if threshold_yaml is not None:
             lines.append(f"  codex_responses_compact_threshold: {threshold_yaml}")
         (home / "config.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("X19_HOME", str(home))
 
         agent = AIAgent(
             api_key="test-key",

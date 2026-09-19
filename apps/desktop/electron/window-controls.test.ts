@@ -122,12 +122,12 @@ describe('registerWindowControlIpc', () => {
     }
   }
 
-  test('registers the hermes:window-control channel', () => {
+  test('registers the x19:window-control channel', () => {
     const ipc = fakeIpc()
 
     registerWindowControlIpc(ipc as Parameters<typeof registerWindowControlIpc>[0], () => new FakeWindow())
 
-    assert.equal(ipc.handlers.has('hermes:window-control'), true)
+    assert.equal(ipc.handlers.has('x19:window-control'), true)
   })
 
   test('dispatches the incoming action to performWindowControl on the resolved window', () => {
@@ -141,7 +141,7 @@ describe('registerWindowControlIpc', () => {
       return win
     })
 
-    const handler = ipc.handlers.get('hermes:window-control')
+    const handler = ipc.handlers.get('x19:window-control')
 
     assert.ok(handler)
 
@@ -160,7 +160,7 @@ describe('registerWindowControlIpc', () => {
     const win = new FakeWindow()
 
     registerWindowControlIpc(ipc as Parameters<typeof registerWindowControlIpc>[0], () => win)
-    ipc.handlers.get('hermes:window-control')({ sender: {} }, { action: 'minimize' })
+    ipc.handlers.get('x19:window-control')({ sender: {} }, { action: 'minimize' })
     assert.equal(win.minimized, false)
   })
 })

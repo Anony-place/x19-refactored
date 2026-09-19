@@ -6,7 +6,7 @@ import { commandFocusedPreview } from '@/app/chat/right-rail/preview-nav'
 import { openSession } from '@/app/open-session'
 import { $diskPluginsScanPending } from '@/contrib/runtime-loader'
 import { resolveDeepLinkAction } from '@/lib/deeplink-routes'
-import { pathFromHermesDeepLink, resolveHermesOpenPath } from '@/lib/hermes-open-target'
+import { pathFromX19DeepLink, resolveX19OpenPath } from '@/lib/x19-open-target'
 import { storedSessionIdForNotification } from '@/lib/session-ids'
 import { requestMcpInstallFromDeepLink } from '@/store/mcp-deeplink-install'
 import { startMcpHealthChecker, stopMcpHealthChecker } from '@/store/mcp-health'
@@ -31,7 +31,7 @@ import { onSessionsChanged } from '@/store/session-sync'
 import { requestSkillInstallFromDeepLink } from '@/store/skill-deeplink-install'
 import { openUpdatesWindow, startUpdatePoller, stopUpdatePoller } from '@/store/updates'
 import { isBrowserWindow, isHudWindow, isSecondaryWindow } from '@/store/windows'
-import type { SessionInfo } from '@/types/hermes'
+import type { SessionInfo } from '@/types/x19'
 
 import { requestComposerFocus, requestComposerInsert } from '../../chat/composer/focus'
 import { appViewForPath, isOverlayView, NEW_CHAT_ROUTE, routeSessionId, sessionRoute } from '../../routes'
@@ -82,11 +82,11 @@ export function useDesktopIntegrations({
     // notifies on transitions into needs-auth/error with a Sign in action.
     startMcpHealthChecker()
     // The native "Check for Updates…" menu item lives in the app menu next to
-    // "About Hermes" — it is the OS-standard affordance for updating THIS app,
+    // "About X19" — it is the OS-standard affordance for updating THIS app,
     // so it always opens the client overlay. Inheriting the connection-mode
     // default pointed a Mac at its remote Linux backend and left the app itself
     // silently stale (#70266).
-    const unsubscribe = window.hermesDesktop?.onOpenUpdatesRequested?.(() => openUpdatesWindow('client'))
+    const unsubscribe = window.x19Desktop?.onOpenUpdatesRequested?.(() => openUpdatesWindow('client'))
 
     return () => {
       unsubscribe?.()
@@ -99,7 +99,7 @@ export function useDesktopIntegrations({
   // close the window, so claim it unconditionally — the menu then routes ⌘W
   // to us (close-preview-requested IPC) and we decide tab-vs-window.
   useEffect(() => {
-    window.hermesDesktop?.setPreviewShortcutActive?.(true)
+    window.x19Desktop?.setPreviewShortcutActive?.(true)
   }, [])
 
   const restoredRef = useRef(false)
@@ -221,7 +221,7 @@ export function useDesktopIntegrations({
   // on screen. Runtime id is translated to the stored id the chat route is
   // keyed by; action buttons resolve in place.
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onFocusSession?.(sessionId => {
+    const unsubscribe = window.x19Desktop?.onFocusSession?.(sessionId => {
       if (sessionId) {
         // Reloads and runtime recovery can leave only the shared mirror bound.
         const viaLocalMap = storedSessionIdForNotification(sessionId, runtimeIdByStoredSessionId.current)
@@ -248,7 +248,7 @@ export function useDesktopIntegrations({
   }, [locationPathname, navigate, runtimeIdByStoredSessionId])
 
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onNotificationAction?.(({ actionId, sessionId }) => {
+    const unsubscribe = window.x19Desktop?.onNotificationAction?.(({ actionId, sessionId }) => {
       void respondToApprovalAction(sessionId ?? null, actionId)
     })
 
@@ -257,9 +257,9 @@ export function useDesktopIntegrations({
 
   // Plugin OS notification body/action → optional callback + navigate. Activation
   // is user-driven (click), so this is offer-not-hijack. Paths share the
-  // hermes://index-network/intent/1 vocabulary with deep links.
+  // x19://index-network/intent/1 vocabulary with deep links.
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onNotificationActivate?.(payload => {
+    const unsubscribe = window.x19Desktop?.onNotificationActivate?.(payload => {
       if (!payload) {
         return
       }
@@ -272,9 +272,9 @@ export function useDesktopIntegrations({
 
       if (payload.activate) {
         // Defense-in-depth: re-resolve at the IPC boundary rather than trusting
-        // the pre-IPC validation — any future hermesDesktop.notify caller gets
+        // the pre-IPC validation — any future x19Desktop.notify caller gets
         // funneled through the same resolver.
-        const path = resolveHermesOpenPath(payload.activate)
+        const path = resolveX19OpenPath(payload.activate)
 
         if (path) {
           navigate(path)
@@ -287,7 +287,7 @@ export function useDesktopIntegrations({
     return () => unsubscribe?.()
   }, [navigate])
 
-  // hermes:// deep links:
+  // x19:// deep links:
   //  - mcp/install?… → pending MCP install (explicit confirm, never auto-install)
   //  - plugin/install?… (and legacy plugin-agent/plugin-desktop) → plugin install
   //    modal awaiting explicit confirmation. Never auto-installs.
@@ -296,7 +296,7 @@ export function useDesktopIntegrations({
   //  - <plugin>/<path>?… → in-app navigate (e.g. index-network/intent/1)
   //  - open/<path>?… → in-app navigate (generic)
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onDeepLink?.(payload => {
+    const unsubscribe = window.x19Desktop?.onDeepLink?.(payload => {
       if (!payload?.kind) {
         return
       }
@@ -349,16 +349,16 @@ export function useDesktopIntegrations({
       }
 
       // Not a core action — treat as a plugin-scoped or open/ navigation deep
-      // link (hermes://index-network/intent/1, hermes://open/…). The resolver
+      // link (x19://index-network/intent/1, x19://open/…). The resolver
       // rejects reserved kinds and unsafe paths.
-      const path = pathFromHermesDeepLink(payload.kind, payload.name || '', payload.params || {})
+      const path = pathFromX19DeepLink(payload.kind, payload.name || '', payload.params || {})
 
       if (path) {
         navigate(path)
       }
     })
 
-    void window.hermesDesktop?.signalDeepLinkReady?.()
+    void window.x19Desktop?.signalDeepLinkReady?.()
 
     return () => unsubscribe?.()
   }, [navigate])
@@ -368,7 +368,7 @@ export function useDesktopIntegrations({
   // OS-standard window close, esp. secondary windows). The Win/Linux keyboard
   // path is the `view.closeTab` keybind (use-keybinds), sharing closeActiveTab.
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onClosePreviewRequested?.(
+    const unsubscribe = window.x19Desktop?.onClosePreviewRequested?.(
       () => void closeActiveTab(id => navigate(sessionRoute(id)))
     )
 
@@ -380,7 +380,7 @@ export function useDesktopIntegrations({
   // answers those against the focused guest and never asks. Only ⌘R has an
   // app-level meaning to fall back to; an unfocused swipe is a no-op.
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onPreviewNav?.(command => {
+    const unsubscribe = window.x19Desktop?.onPreviewNav?.(command => {
       if (!commandFocusedPreview(command) && command === 'reload') {
         window.location.reload()
       }
@@ -391,7 +391,7 @@ export function useDesktopIntegrations({
 
   // File > Open Folder… — same open-folder-as-project upsert as the ⌘O keybind.
   useEffect(() => {
-    const unsubscribe = window.hermesDesktop?.onOpenFolderRequested?.(() => void openFolderAsProject())
+    const unsubscribe = window.x19Desktop?.onOpenFolderRequested?.(() => void openFolderAsProject())
 
     return () => unsubscribe?.()
   }, [])

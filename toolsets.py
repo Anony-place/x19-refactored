@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Set, Optional, Tuple
 # in `desktop_ui`/`project`, enabled per desktop-sourced session by the GUI gateway
 # (tui_gateway/server.py::_load_enabled_toolsets). HA, kanban and computer_use
 # entries are further gated by their tools' check_fns.
-_HERMES_CORE_TOOLS = [
+_X19_CORE_TOOLS = [
     "web_search", "web_extract",
     "terminal", "process_manage",
     "read_file", "write_file", "patch", "search_files",
@@ -25,6 +25,10 @@ _HERMES_CORE_TOOLS = [
     "session_search",
     "clarify",
     "execute_code", "delegate_task",
+    # X19 organization control: the run, task graph, roster and audit. Rides with
+    # delegate_task because it drives the same engine; blocked for leaf children
+    # (see tools/delegate_tool_toolsets.py) so workers cannot run the organization.
+    "x19_org",
     "cronjob_manage",
     "ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service",
     "kanban_show", "kanban_list",
@@ -40,7 +44,7 @@ _HERMES_CORE_TOOLS = [
 ]
 
 # Webhook payloads are untrusted third-party content: no file/system execution.
-_HERMES_WEBHOOK_SAFE_TOOLS = ["web_search", "web_extract", "vision_analyze", "clarify"]
+_X19_WEBHOOK_SAFE_TOOLS = ["web_search", "web_extract", "vision_analyze", "clarify"]
 _HA_TOOLS = ["ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service"]
 _FEISHU_TOOLS = [
     "feishu_doc_read", "feishu_drive_list_comments", "feishu_drive_list_comment_replies",
@@ -55,13 +59,13 @@ def _ts(description, tools=(), includes=(), **extra):
 
 
 def _bundle(description, extras=()):
-    """A `hermes-*` platform bundle: the shared core tools plus optional platform extras."""
-    return _ts(description, _HERMES_CORE_TOOLS + list(extras))
+    """A `x19-*` platform bundle: the shared core tools plus optional platform extras."""
+    return _ts(description, _X19_CORE_TOOLS + list(extras))
 
 
 def _core_without(*excluded, kanban=True):
-    """_HERMES_CORE_TOOLS minus *excluded* (and, unless kanban=True, every kanban_* tool); order preserved."""
-    return [t for t in _HERMES_CORE_TOOLS if t not in excluded and (kanban or not t.startswith("kanban_"))]
+    """_X19_CORE_TOOLS minus *excluded* (and, unless kanban=True, every kanban_* tool); order preserved."""
+    return [t for t in _X19_CORE_TOOLS if t not in excluded and (kanban or not t.startswith("kanban_"))]
 
 
 # Coding posture: everything you reach for while pairing on code; drops messaging,
@@ -77,7 +81,7 @@ TOOLSETS = {
         "Search X (Twitter) posts and threads via xAI's built-in x_search Responses "
         "tool. Read-only public X discovery; use the xurl skill for authenticated X "
         "API reads and account actions. Available when xAI credentials are configured "
-        "(SuperGrok OAuth or XAI_API_KEY). Off by default; enable in `hermes tools` → "
+        "(SuperGrok OAuth or XAI_API_KEY). Off by default; enable in `x19 tools` → "
         "X (Twitter) Search.",
         ["x_search"],
     ),
@@ -88,7 +92,7 @@ TOOLSETS = {
         "Video generation tools. Single ``video_generate`` tool covers text-to-video "
         "(prompt only) and image-to-video (prompt + image_url), plus "
         "reference-to-video. Provider-specific edit/extend workflows may appear as "
-        "separate tools. Configure via ``hermes tools`` → Video Generation.",
+        "separate tools. Configure via ``x19 tools`` → Video Generation.",
         ["video_generate", "xai_video_edit", "xai_video_extend"],
     ),
     "computer_use": _ts(
@@ -110,7 +114,7 @@ TOOLSETS = {
     "browser": _ts(
         "Browser automation for web interaction (navigate, click, type, scroll, "
         "iframes, hold-click)",
-        [t for t in _HERMES_CORE_TOOLS if t.startswith("browser_")],
+        [t for t in _X19_CORE_TOOLS if t.startswith("browser_")],
     ),
     "cronjob": _ts(
         "Cronjob management tool - create, list, update, pause, resume, remove, and "
@@ -147,13 +151,13 @@ TOOLSETS = {
     "homeassistant": _ts("Home Assistant smart home control and monitoring", _HA_TOOLS),
     "kanban": _ts(
         "Kanban multi-agent coordination — only active when the agent is spawned by "
-        "the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs "
+        "the kanban dispatcher (X19_KANBAN_TASK env set). The dispatcher runs "
         "inside the gateway by default; see `kanban.dispatch_in_gateway` in "
         "config.yaml. Lets workers mark tasks done with structured handoffs, enter "
         "first-class review (request_review — not a block), return review changes, "
         "block for human input, heartbeat during long ops, comment on threads, attach "
         "files, and (for orchestrators) list, unblock, and fan out tasks.",
-        [t for t in _HERMES_CORE_TOOLS if t.startswith("kanban_")],
+        [t for t in _X19_CORE_TOOLS if t.startswith("kanban_")],
     ),
     "discord": _ts("Discord read and participate tools (fetch messages, search members, create threads)", ["discord"]),
     "discord_admin": _ts("Discord server management (list channels/roles, pin messages, assign roles)", ["discord_admin"]),
@@ -173,7 +177,7 @@ TOOLSETS = {
     # Coding posture, auto-selected in a code workspace (agent/coding_context.py).
     # `desktop_ui` is folded in separately by the GUI gateway for desktop sessions.
     # posture=True: per-session posture, never auto-recovered into platform tool
-    # config (see the non-configurable-toolset recovery loop in hermes_cli/tools_config.py).
+    # config (see the non-configurable-toolset recovery loop in x19_cli/tools_config.py).
     "coding": _ts(
         "Coding-focused toolset: files, terminal, search, web docs, skills, todo, "
         "delegate, vision, browser",
@@ -181,125 +185,78 @@ TOOLSETS = {
         posture=True,
     ),
 
-    # Full Hermes toolsets (CLI + messaging platforms). All share the core tools;
-    # there is deliberately no agent-callable send_message tool. hermes-acp is the
+    # Full X19 toolsets (CLI + messaging platforms). All share the core tools;
+    # there is deliberately no agent-callable send_message tool. x19-acp is the
     # coding posture minus the interactive clarify UI.
-    "hermes-acp": _ts(
+    "x19-acp": _ts(
         "Editor integration (VS Code, Zed, JetBrains) — coding-focused tools without "
         "messaging, audio, or clarify UI",
         [t for t in _CODING_TOOLS if t != "clarify"],
     ),
-    "hermes-api-server": _ts(
+    "x19-api-server": _ts(
         "OpenAI-compatible API server — full agent tools accessible via HTTP (no "
         "interactive UI tools like clarify or send_message)",
         _core_without("text_to_speech", "clarify", "computer_use", kanban=False),
     ),
-    "hermes-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
+    "x19-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
 
-    # Mirrors hermes-cli; `hermes tools` platform config filters it down and
+    # Mirrors x19-cli; `x19 tools` platform config filters it down and
     # _get_platform_tools() drops _DEFAULT_OFF_TOOLSETS unless user-enabled.
-    "hermes-cron": _bundle("Default cron toolset - same core tools as hermes-cli; gated by `hermes tools`"),
-    "hermes-telegram": _bundle("Telegram bot toolset - full access for personal use (terminal has safety checks)"),
-    "hermes-discord": _bundle(
+    "x19-cron": _bundle("Default cron toolset - same core tools as x19-cli; gated by `x19 tools`"),
+    "x19-telegram": _bundle("Telegram bot toolset - full access for personal use (terminal has safety checks)"),
+    "x19-discord": _bundle(
         "Discord bot toolset - full access (terminal has safety checks via dangerous "
         "command approval)",
         ["discord", "discord_admin"],
     ),
-    "hermes-whatsapp": _bundle("WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)"),
-    "hermes-slack": _bundle("Slack bot toolset - full access for workspace use (terminal has safety checks)"),
-    "hermes-signal": _bundle("Signal bot toolset - encrypted messaging platform (full access)"),
-    "hermes-bluebubbles": _bundle("BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server"),
-    "hermes-homeassistant": _bundle("Home Assistant bot toolset - smart home event monitoring and control"),
-    "hermes-email": _bundle("Email bot toolset - interact with Hermes via email (IMAP/SMTP)"),
-    "hermes-mattermost": _bundle("Mattermost bot toolset - self-hosted team messaging (full access)"),
-    "hermes-matrix": _bundle("Matrix bot toolset - decentralized encrypted messaging (full access)"),
-    "hermes-dingtalk": _bundle("DingTalk bot toolset - enterprise messaging platform (full access)"),
-    "hermes-feishu": _bundle("Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)", _FEISHU_TOOLS),
-    "hermes-weixin": _bundle("Weixin bot toolset - personal WeChat messaging via iLink (full access)"),
-    "hermes-qqbot": _bundle("QQBot toolset - QQ messaging via Official Bot API v2 (full access)"),
-    "hermes-wecom": _bundle("WeCom bot toolset - enterprise WeChat messaging (full access)"),
-    "hermes-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
-    "hermes-yuanbao": {
+    "x19-whatsapp": _bundle("WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)"),
+    "x19-slack": _bundle("Slack bot toolset - full access for workspace use (terminal has safety checks)"),
+    "x19-signal": _bundle("Signal bot toolset - encrypted messaging platform (full access)"),
+    "x19-bluebubbles": _bundle("BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server"),
+    "x19-homeassistant": _bundle("Home Assistant bot toolset - smart home event monitoring and control"),
+    "x19-email": _bundle("Email bot toolset - interact with X19 via email (IMAP/SMTP)"),
+    "x19-mattermost": _bundle("Mattermost bot toolset - self-hosted team messaging (full access)"),
+    "x19-matrix": _bundle("Matrix bot toolset - decentralized encrypted messaging (full access)"),
+    "x19-dingtalk": _bundle("DingTalk bot toolset - enterprise messaging platform (full access)"),
+    "x19-feishu": _bundle("Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)", _FEISHU_TOOLS),
+    "x19-weixin": _bundle("Weixin bot toolset - personal WeChat messaging via iLink (full access)"),
+    "x19-qqbot": _bundle("QQBot toolset - QQ messaging via Official Bot API v2 (full access)"),
+    "x19-wecom": _bundle("WeCom bot toolset - enterprise WeChat messaging (full access)"),
+    "x19-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
+    "x19-yuanbao": {
         "description": "Yuanbao Bot 元宝消息平台工具集 - 群信息、成员查询、私聊、贴纸表情",
-        "tools": _HERMES_CORE_TOOLS + _YUANBAO_TOOLS,
+        "tools": _X19_CORE_TOOLS + _YUANBAO_TOOLS,
         "module": "tools.yuanbao_tools",
         "includes": [],
     },
-    "hermes-sms": _bundle("SMS bot toolset - interact with Hermes via SMS (Twilio)"),
-    "hermes-webhook": _ts("Webhook toolset - receive and process external webhook events", _HERMES_WEBHOOK_SAFE_TOOLS),
-    "hermes-gateway": _ts(
+    "x19-sms": _bundle("SMS bot toolset - interact with X19 via SMS (Twilio)"),
+    "x19-webhook": _ts("Webhook toolset - receive and process external webhook events", _X19_WEBHOOK_SAFE_TOOLS),
+    "x19-gateway": _ts(
         "Gateway toolset - union of all messaging platform tools",
         [],
         includes=[
-            "hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack",
-            "hermes-signal", "hermes-bluebubbles", "hermes-homeassistant", "hermes-email",
-            "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk",
-            "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin",
-            "hermes-qqbot", "hermes-webhook", "hermes-yuanbao",
+            "x19-telegram", "x19-discord", "x19-whatsapp", "x19-slack",
+            "x19-signal", "x19-bluebubbles", "x19-homeassistant", "x19-email",
+            "x19-sms", "x19-mattermost", "x19-matrix", "x19-dingtalk",
+            "x19-feishu", "x19-wecom", "x19-wecom-callback", "x19-weixin",
+            "x19-qqbot", "x19-webhook", "x19-yuanbao",
         ],
     ),
 
-    # ── X19 Security Operations Toolsets ──
-    # These toolsets map to X19 specialist roles and reuse Hermes tool infrastructure.
-    # Each specialist gets a tailored toolset via ROLE_TOOLSETS mapping.
+    # ── X19 organization ──
+    # Role toolsets. ``x19/org/roles.py`` declares which of these each role gets,
+    # and ``x19.org.delegation.build_dispatch`` passes them straight to
+    # ``delegate_task`` — so a role can never be handed a tool it is not given
+    # here, and renaming a role's capability means editing the role, not a bundle.
 
-    "x19-recon": _ts(
-        "X19 Recon — asset discovery, endpoint enumeration, tech fingerprint (read-only, low-risk)",
-        ["terminal", "web_search", "web_extract", "read_file", "write_file", "search_files"],
+    "core": _ts(
+        "Shared baseline for every X19 role: search, read, write and the task list",
+        ["web_search", "web_extract", "read_file", "write_file", "search_files", "todo_list"],
     ),
-    "x19-web": _ts(
-        "X19 Web Security — XSS, SQLi, SSTI, SSRF, XXE, open redirect, etc. with real tools",
-        ["terminal", "browser_navigate", "browser_snapshot", "web_search", "read_file", "write_file", "search_files"],
-    ),
-    "x19-api": _ts(
-        "X19 API Security — BOLA, BFLA, injection, mass assignment, excessive data exposure",
-        ["terminal", "web_search", "read_file", "write_file", "search_files"],
-    ),
-    "x19-auth": _ts(
-        "X19 Auth/AuthZ — auth bypass, IDOR, BOLA, BFLA, privilege escalation, session management",
-        ["terminal", "browser_navigate", "browser_snapshot", "web_search", "read_file", "write_file"],
-    ),
-    "x19-cloud": _ts(
-        "X19 Cloud/Infra — S3 exposure, IAM misconfig, metadata, open ports, exposed configs",
-        ["terminal", "web_search", "read_file", "write_file", "search_files"],
-    ),
-    "x19-vuln-research": _ts(
-        "X19 Vuln Research — correlate observations against CWE, OWASP, CVE, bug-bounty methodology",
-        ["web_search", "read_file", "write_file", "search_files", "skills_list", "skill_view"],
-    ),
-    "x19-bugbounty": _ts(
-        "X19 Bug-Bounty Research — program scope interpretation, impact assessment, report quality",
-        ["web_search", "read_file", "write_file", "search_files", "skills_list", "skill_view"],
-    ),
-    "x19-verification": _ts(
-        "X19 Exploit Verification — reproduce candidate findings, bypass exhaustion before false-positive dismissal",
-        ["terminal", "browser_navigate", "browser_snapshot", "web_search", "read_file", "write_file"],
-    ),
-    "x19-evidence": _ts(
-        "X19 Evidence/Reporting — collect evidence, prepare evidence-based reports, L3/L4 only for verified",
-        ["read_file", "write_file", "search_files", "todo_list"],
-    ),
-    "x19-defensive": _ts(
-        "X19 Defensive Validation — false-positive review, defensive validation, alternative explanations",
-        ["terminal", "web_search", "read_file", "write_file", "browser_navigate", "browser_snapshot"],
-    ),
-    "x19-boss": _ts(
-        "X19 Boss/Commander — owns mission, defines scope, splits assessment, delegates to Managers",
-        ["delegate_task", "todo_list", "read_file", "write_file", "search_files", "memory"],
-    ),
-    "x19-manager": _ts(
-        "X19 Security Manager — coordinates assessment domain, delegates to specialists",
-        ["delegate_task", "todo_list", "read_file", "write_file", "search_files", "terminal", "web_search"],
-    ),
-    # Composite X19 toolsets
-    "x19-all": _ts(
-        "X19 Full — all X19 security toolsets for Boss/Commander",
-        [],
-        includes=[
-            "x19-recon", "x19-web", "x19-api", "x19-auth", "x19-cloud",
-            "x19-vuln-research", "x19-bugbounty", "x19-verification", "x19-evidence", "x19-defensive",
-            "x19-boss", "x19-manager", "delegation", "todo", "file", "terminal", "web", "browser",
-        ],
+    "x19-org": _ts(
+        "X19 organization control — plan work, dispatch it through the real delegation "
+        "engine, and report status, blockers, failures and audit from recorded runtime state",
+        ["x19_org", "delegate_task"],
     ),
 }
 
@@ -371,13 +328,13 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
 
 
 def bundle_non_core_tools(toolset_name: str) -> Set[str]:
-    """A bundle's tools minus _HERMES_CORE_TOOLS (one level of includes).
+    """A bundle's tools minus _X19_CORE_TOOLS (one level of includes).
 
     Disabling a `core + extras` bundle must not strip the core tools every other
-    toolset shares. One `includes` pass suffices (only hermes-gateway nests
+    toolset shares. One `includes` pass suffices (only x19-gateway nests
     bundles). Unknown names: full resolution minus core.
     """
-    core = set(_HERMES_CORE_TOOLS)
+    core = set(_X19_CORE_TOOLS)
     ts_def = get_toolset(toolset_name)
     if not (ts_def and "tools" in ts_def):
         return set(resolve_toolset(toolset_name)) - core
@@ -396,18 +353,18 @@ _resolve_toolset_memo: Dict[Tuple[str, bool, int, int, str], List[str]] = {}
 
 
 def _plugin_platform_bundle(name: str) -> List[str]:
-    """Implicit `hermes-<platform>` bundle for a registered plugin platform: core
+    """Implicit `x19-<platform>` bundle for a registered plugin platform: core
     tools plus whatever the plugin registered under the platform name. [] otherwise."""
-    if not name.startswith("hermes-"):
+    if not name.startswith("x19-"):
         return []
-    platform_name = name[len("hermes-"):]
+    platform_name = name[len("x19-"):]
     try:
         from gateway.platform_registry import platform_registry
         if not platform_registry.is_registered(platform_name):
             return []
     except Exception:
         return []
-    tools = set(_HERMES_CORE_TOOLS)
+    tools = set(_X19_CORE_TOOLS)
     try:
         tools.update(e.name for e in _registry_call("get_all_entries", ()) if e.toolset == platform_name)
     except Exception:
@@ -523,26 +480,3 @@ def get_toolset_info(name: str) -> Dict[str, Any]:
     }
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def resolve_multiple_toolsets(toolset_names: List[str]) -> List[str]:
-    """
-    Resolve multiple toolsets and combine their tools.
-
-    Args:
-        toolset_names (List[str]): List of toolset names to resolve
-
-    Returns:
-        List[str]: Combined list of all tool names (deduplicated)
-    """
-    all_tools = set()
-
-    for name in toolset_names:
-        tools = resolve_toolset(name)
-        all_tools.update(tools)
-
-    return sorted(all_tools)
-# ---- END PLUGIN-COMPAT ----

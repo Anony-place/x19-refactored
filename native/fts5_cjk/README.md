@@ -19,6 +19,6 @@ storage discipline as the other indexes). On a populated database, run
 
 to backfill it; new messages are indexed live either way. Set
 `sessions.cjk_fts: false` in `~/.x19/config.yaml` to disable. Override
-the .so location with `HERMES_FTS5_CJK_SO`.
+the .so location with `X19_FTS5_CJK_SO`.
 
 Contributed by Soju06 (PR #65544).

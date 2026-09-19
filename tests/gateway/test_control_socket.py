@@ -30,7 +30,7 @@ def _run(coro):
 
 @pytest.fixture()
 def home(tmp_path: Path) -> Path:
-    d = tmp_path / "home" / ".hermes"
+    d = tmp_path / "home" / ".x19"
     d.mkdir(parents=True)
     return d
 
@@ -55,7 +55,7 @@ def test_short_home_binds_in_home(tmp_path: Path):
     except OSError:
         pytest.skip("/tmp not writable on this host")
     try:
-        short_home = short_root / ".hermes"
+        short_home = short_root / ".x19"
         short_home.mkdir()
         assert len(str(short_home / "gateway.sock").encode()) <= 100
         bind, pointer = resolve_server_socket_path(short_home)
@@ -68,7 +68,7 @@ def test_short_home_binds_in_home(tmp_path: Path):
 
 
 def test_long_home_uses_pointer_fallback(tmp_path: Path):
-    deep = tmp_path / ("x" * 120) / ".hermes"
+    deep = tmp_path / ("x" * 120) / ".x19"
     deep.mkdir(parents=True)
     bind, pointer = resolve_server_socket_path(deep)
     assert bind != deep / "gateway.sock"
@@ -92,7 +92,7 @@ def test_client_resolution_prefers_direct_then_pointer(home: Path, tmp_path: Pat
 def test_windows_pipe_name_is_stable_and_home_scoped(tmp_path: Path):
     a = windows_pipe_name(tmp_path / "a")
     b = windows_pipe_name(tmp_path / "b")
-    assert a.startswith(r"\\.\pipe\hermes-gateway-")
+    assert a.startswith(r"\\.\pipe\x19-gateway-")
     assert a != b
     assert a == windows_pipe_name(tmp_path / "a")
 
@@ -234,7 +234,7 @@ def test_stale_socket_file_is_replaced_on_bind(home: Path):
 
 
 def test_long_home_end_to_end_via_pointer(tmp_path: Path):
-    deep = tmp_path / ("p" * 120) / ".hermes"
+    deep = tmp_path / ("p" * 120) / ".x19"
     deep.mkdir(parents=True)
 
     async def scenario():
@@ -260,7 +260,7 @@ def test_no_socket_returns_none_fast(home: Path):
 
 def test_default_identify_payload_shape(home: Path, monkeypatch):
     """The real identify handler carries the fleet-consumer contract fields."""
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("X19_HOME", str(home))
 
     async def scenario():
         server = GatewayControlServer(home)  # default handlers
@@ -276,7 +276,7 @@ def test_default_identify_payload_shape(home: Path, monkeypatch):
     assert ident["protocol"] == CONTROL_PROTOCOL_VERSION
     assert ident["pid"] == __import__("os").getpid()
     # contract keys exist even when values are None/absent-degradable
-    for key in ("hermes_home", "supervisor", "kind", "start_time"):
+    for key in ("x19_home", "supervisor", "kind", "start_time"):
         assert key in ident
     assert ident["supervisor"] in {
         "systemd",
@@ -298,29 +298,29 @@ def _fake_identity(pid: int, sha: str):
         "code_sha": sha,
         "code_version": "9.9.9",
         "supervisor": "systemd",
-        "kind": "hermes-gateway",
+        "kind": "x19-gateway",
     }
 
 
 def test_collect_fleet_versions_prefers_socket(tmp_path: Path, monkeypatch):
-    import hermes_cli.update_receipt as ur
+    import x19_cli.update_receipt as ur
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
 
     monkeypatch.setattr(
-        "hermes_cli.build_info.get_code_identity",
+        "x19_cli.build_info.get_code_identity",
         lambda refresh=False: {"sha": "HEADSHA", "version": "1.0"},
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_default_hermes_home", lambda: home
+        "x19_cli.profiles._get_default_x19_home", lambda: home
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
+        "x19_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
     )
     # stale state file that would report a WRONG pid — socket must win
     (home / "gateway_state.json").write_text(
-        json.dumps({"pid": 1, "code_sha": "stalefile", "kind": "hermes-gateway"})
+        json.dumps({"pid": 1, "code_sha": "stalefile", "kind": "x19-gateway"})
     )
     monkeypatch.setattr(
         "gateway.control_socket.identify_gateway",
@@ -345,20 +345,20 @@ def test_collect_fleet_versions_falls_back_to_state_file(tmp_path: Path, monkeyp
     """
     import os
 
-    import hermes_cli.update_receipt as ur
+    import x19_cli.update_receipt as ur
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
 
     monkeypatch.setattr(
-        "hermes_cli.build_info.get_code_identity",
+        "x19_cli.build_info.get_code_identity",
         lambda refresh=False: {"sha": "HEADSHA", "version": "1.0"},
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_default_hermes_home", lambda: home
+        "x19_cli.profiles._get_default_x19_home", lambda: home
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
+        "x19_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
     )
     monkeypatch.setattr(
         "gateway.control_socket.identify_gateway", lambda h, **kw: None
@@ -368,7 +368,7 @@ def test_collect_fleet_versions_falls_back_to_state_file(tmp_path: Path, monkeyp
             {
                 "pid": os.getpid(),  # a live pid so _pid_exists passes
                 "code_sha": "OLDSHA",
-                "kind": "hermes-gateway",
+                "kind": "x19-gateway",
             }
         )
     )
@@ -395,24 +395,24 @@ def test_collect_fleet_versions_falls_back_to_state_file(tmp_path: Path, monkeyp
 def test_runtime_inventory_dedupes_same_pid_across_homes(tmp_path: Path, monkeypatch):
     """One multiplex gateway answering identify for two profile homes must
     yield exactly ONE runtime record (reviewer point on #92447)."""
-    import hermes_cli.update_inventory as ui
+    import x19_cli.update_inventory as ui
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
     profiles_root = tmp_path / "profiles"
     (profiles_root / "coder").mkdir(parents=True)
 
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_default_hermes_home", lambda: home
+        "x19_cli.profiles._get_default_x19_home", lambda: home
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_profiles_root", lambda: profiles_root
+        "x19_cli.profiles._get_profiles_root", lambda: profiles_root
     )
     monkeypatch.setattr(
-        "hermes_cli.gateway._get_service_pids", lambda all_profiles=False: set()
+        "x19_cli.gateway._get_service_pids", lambda all_profiles=False: set()
     )
     monkeypatch.setattr(
-        "hermes_cli.gateway.find_profile_gateway_processes", lambda: []
+        "x19_cli.gateway.find_profile_gateway_processes", lambda: []
     )
     monkeypatch.setattr(
         "gateway.control_socket.identify_gateway",
@@ -426,22 +426,22 @@ def test_runtime_inventory_dedupes_same_pid_across_homes(tmp_path: Path, monkeyp
 
 
 def test_runtime_inventory_prefers_socket_supervisor(tmp_path: Path, monkeypatch):
-    import hermes_cli.update_inventory as ui
+    import x19_cli.update_inventory as ui
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".x19"
     home.mkdir()
 
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_default_hermes_home", lambda: home
+        "x19_cli.profiles._get_default_x19_home", lambda: home
     )
     monkeypatch.setattr(
-        "hermes_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
+        "x19_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
     )
     monkeypatch.setattr(
-        "hermes_cli.gateway._get_service_pids", lambda all_profiles=False: set()
+        "x19_cli.gateway._get_service_pids", lambda all_profiles=False: set()
     )
     monkeypatch.setattr(
-        "hermes_cli.gateway.find_profile_gateway_processes", lambda: []
+        "x19_cli.gateway.find_profile_gateway_processes", lambda: []
     )
     monkeypatch.setattr(
         "gateway.control_socket.identify_gateway",

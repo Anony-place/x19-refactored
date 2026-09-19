@@ -1,6 +1,6 @@
 export const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 
-// Hermes blue: the app's --theme-primary (#0053fd), lightened for a dark background.
+// X19 blue: the app's --theme-primary (#0053fd), lightened for a dark background.
 export const BLUE = '#4d8dff'
 export const BLUE_DIM = 'rgba(77, 141, 255, 0.55)'
 export const BLUE_FAINT = 'rgba(77, 141, 255, 0.4)'

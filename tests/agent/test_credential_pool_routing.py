@@ -37,8 +37,8 @@ class TestCliTurnRoutePool:
             service_tier=None,
         )
 
-        from cli import HermesCLI
-        bound = HermesCLI._resolve_turn_agent_config.__get__(shell)
+        from cli import X19CLI
+        bound = X19CLI._resolve_turn_agent_config.__get__(shell)
         route = bound("test message")
 
         assert route["runtime"]["credential_pool"] is fake_pool
@@ -290,9 +290,9 @@ class TestApiKeyHintRealPool:
     def _seed_pool(self, tmp_path, monkeypatch):
         import json
 
-        hermes_home = tmp_path / "hermes"
-        hermes_home.mkdir(parents=True, exist_ok=True)
-        (hermes_home / "auth.json").write_text(
+        x19_home = tmp_path / "x19"
+        x19_home.mkdir(parents=True, exist_ok=True)
+        (x19_home / "auth.json").write_text(
             json.dumps(
                 {
                     "version": 1,
@@ -320,7 +320,7 @@ class TestApiKeyHintRealPool:
                 }
             )
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         from agent.credential_pool import load_pool
 
         return load_pool("openrouter")
@@ -371,9 +371,9 @@ class TestFailureAttribution:
     """
 
     def _make_pool(self, tmp_path, monkeypatch, entries):
-        hermes_home = tmp_path / "hermes"
-        hermes_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        x19_home = tmp_path / "x19"
+        x19_home.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("X19_HOME", str(x19_home))
         # Keep host Anthropic/Claude credentials out of this fixture. load_pool()
         # auto-seeds ~/.claude/.credentials.json and env keys when anthropic is
         # explicitly configured on the machine, which turns a deliberate
@@ -386,10 +386,10 @@ class TestFailureAttribution:
         ):
             monkeypatch.delenv(env_var, raising=False)
         monkeypatch.setattr(
-            "hermes_cli.auth.is_provider_explicitly_configured",
+            "x19_cli.auth.is_provider_explicitly_configured",
             lambda provider: False,
         )
-        (hermes_home / "auth.json").write_text(
+        (x19_home / "auth.json").write_text(
             json.dumps({"version": 1, "credential_pool": {"anthropic": entries}}),
             encoding="utf-8",
         )

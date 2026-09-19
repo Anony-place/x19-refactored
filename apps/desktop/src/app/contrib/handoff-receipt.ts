@@ -7,23 +7,23 @@ import type { HandoffReceipt } from './handoff-leg'
 const unsavedReceipts = new Map<string, HandoffReceipt>()
 
 export function markFirstBuildSession(storedId: string): void {
-  writeKey('hermes.onboarding.first-build.v1', storedId)
+  writeKey('x19.onboarding.first-build.v1', storedId)
 }
 
 export function endFirstBuildConnect(storedId: string): void {
-  writeKey('hermes.onboarding.first-build.done.v1', storedId)
+  writeKey('x19.onboarding.first-build.done.v1', storedId)
 }
 
 export function isFirstBuildSession(storedId: string | null | undefined): boolean {
   return (
     !!storedId &&
-    readKey('hermes.onboarding.first-build.v1') === storedId &&
-    readKey('hermes.onboarding.first-build.done.v1') !== storedId
+    readKey('x19.onboarding.first-build.v1') === storedId &&
+    readKey('x19.onboarding.first-build.done.v1') !== storedId
   )
 }
 
 export function handoffReceiptKey(connection: null | string, guideStoredId: string): string {
-  return `hermes.onboarding.handoff.v1.connection.${encodeURIComponent(connection ?? 'ambient')}.profile.default.guide.${encodeURIComponent(guideStoredId)}`
+  return `x19.onboarding.handoff.v1.connection.${encodeURIComponent(connection ?? 'ambient')}.profile.default.guide.${encodeURIComponent(guideStoredId)}`
 }
 
 export function readHandoffReceipt(key: string): HandoffReceipt | null {

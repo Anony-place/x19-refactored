@@ -1,4 +1,4 @@
-import { Box, Text, useInput, useStdout } from '@hermes/ink'
+import { Box, Text, useInput, useStdout } from '@x19/ink'
 import { useEffect, useState } from 'react'
 
 import { NO_SKILLS_INSTALLED } from '../app/userMessages.js'

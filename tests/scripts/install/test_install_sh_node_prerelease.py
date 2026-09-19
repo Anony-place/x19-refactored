@@ -111,7 +111,7 @@ def test_downloaded_tree_is_probed_before_it_replaces_anything() -> None:
     reject = text.index('if ! node_satisfies_build "$candidate_ver"; then', probe)
     # The probe has to run before the tree is moved into place, or a bad build
     # has already clobbered a working managed Node.
-    assert reject < text.index('mv "$extracted_dir" "$HERMES_HOME/node"', probe)
+    assert reject < text.index('mv "$extracted_dir" "$X19_HOME/node"', probe)
 
 
 def test_node_bootstrap_mirrors_the_prerelease_guard() -> None:

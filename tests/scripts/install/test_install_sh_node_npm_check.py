@@ -28,15 +28,15 @@ def test_check_node_requires_npm_alongside_node() -> None:
         "if command -v node &> /dev/null && command -v npm &> /dev/null \\" in text
     )
     # The "node found but npm missing" case has its own explicit branch that
-    # falls through to installing the Hermes-managed Node (which bundles npm).
+    # falls through to installing the X19-managed Node (which bundles npm).
     assert "node found but npm is not on PATH (stray node symlink?)" in text
 
 
 def test_check_node_managed_requires_npm() -> None:
-    """The Hermes-managed Node fallback also requires its npm to exist."""
+    """The X19-managed Node fallback also requires its npm to exist."""
     text = INSTALL_SH.read_text()
     assert (
-        '[ -x "$HERMES_HOME/node/bin/node" ] && [ -x "$HERMES_HOME/node/bin/npm" ] \\'
+        '[ -x "$X19_HOME/node/bin/node" ] && [ -x "$X19_HOME/node/bin/npm" ] \\'
         in text
     )
 

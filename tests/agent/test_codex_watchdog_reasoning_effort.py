@@ -16,11 +16,11 @@ _SMALL_PROMPT = {"model": "gpt-5.5", "input": [{"role": "user", "content": "x" *
 
 
 def _codex_agent(tmp_path: Path, monkeypatch, effort: str, *, enabled: bool = True):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     (tmp_path / ".env").write_text("", encoding="utf-8")
     (tmp_path / "config.yaml").write_text("{}\n", encoding="utf-8")
-    for var in ("HERMES_API_CALL_STALE_TIMEOUT", "HERMES_CODEX_TTFB_TIMEOUT_SECONDS",
-                "HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "HERMES_CODEX_TTFB_MAX_SECONDS"):
+    for var in ("X19_API_CALL_STALE_TIMEOUT", "X19_CODEX_TTFB_TIMEOUT_SECONDS",
+                "X19_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "X19_CODEX_TTFB_MAX_SECONDS"):
         monkeypatch.delenv(var, raising=False)
     from run_agent import AIAgent
 
@@ -58,9 +58,9 @@ def test_default_effort_tiers_and_explicit_operator_values_are_untouched(tmp_pat
     assert (disabled.idle_timeout, disabled.ttfb_timeout, disabled.stale_timeout) == (12.0, 120.0, 90.0)
 
     agent = _codex_agent(tmp_path, monkeypatch, "high")
-    monkeypatch.setenv("HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "20")
-    monkeypatch.setenv("HERMES_CODEX_TTFB_TIMEOUT_SECONDS", "45")
-    monkeypatch.setenv("HERMES_API_CALL_STALE_TIMEOUT", "75")
+    monkeypatch.setenv("X19_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("X19_CODEX_TTFB_TIMEOUT_SECONDS", "45")
+    monkeypatch.setenv("X19_API_CALL_STALE_TIMEOUT", "75")
     explicit = _resolve_nonstream_watchdogs(agent, _SMALL_PROMPT)
     assert (explicit.idle_timeout, explicit.ttfb_timeout, explicit.stale_timeout) == (20.0, 45.0, 75.0)
 

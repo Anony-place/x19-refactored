@@ -13,7 +13,7 @@ def test_dashboard_flow_exposes_authorization_url_and_accepts_callback():
         flow_id="flow-1",
         server_name="reports",
         profile=None,
-        hermes_home="/tmp/hermes-test",
+        x19_home="/tmp/x19-test",
         redirect_uri="https://agent.example/mcp/oauth/callback/flow-1",
     )
 
@@ -39,7 +39,7 @@ def test_dashboard_flow_preserves_rfc9207_iss():
         flow_id="flow-iss",
         server_name="cloudflare",
         profile=None,
-        hermes_home="/tmp/hermes-test",
+        x19_home="/tmp/x19-test",
         redirect_uri="https://agent.example/mcp/oauth/callback/flow-iss",
     )
     asyncio.run(flow.publish_authorization_url("https://idp.example/authorize?state=s1"))
@@ -55,7 +55,7 @@ def test_dashboard_flow_accepts_only_one_concurrent_callback():
         flow_id="flow-race",
         server_name="reports",
         profile=None,
-        hermes_home="/tmp/hermes-test",
+        x19_home="/tmp/x19-test",
         redirect_uri="https://agent.example/mcp/oauth/callback/flow-race",
     )
     asyncio.run(flow.publish_authorization_url("https://idp.example/authorize?state=state"))
@@ -84,7 +84,7 @@ def test_dashboard_flow_accepts_only_one_concurrent_callback():
 def test_mcp_oauth_helpers_use_dashboard_flow_without_loopback_port():
     from tools.mcp_dashboard_oauth import DashboardOAuthFlow, dashboard_oauth_flow
     from tools.mcp_oauth import (
-        HermesTokenStorage,
+        X19TokenStorage,
         _build_client_metadata,
         _configure_callback_port,
         _make_callback_waiter,
@@ -95,12 +95,12 @@ def test_mcp_oauth_helpers_use_dashboard_flow_without_loopback_port():
         flow_id="flow-4",
         server_name="reports",
         profile=None,
-        hermes_home="/tmp/hermes-test",
+        x19_home="/tmp/x19-test",
         redirect_uri="https://agent.example/mcp/oauth/callback/flow-4",
     )
     cfg = {}
     with dashboard_oauth_flow(flow):
-        assert _configure_callback_port(cfg, HermesTokenStorage("reports")) == 0
+        assert _configure_callback_port(cfg, X19TokenStorage("reports")) == 0
         metadata = _build_client_metadata(cfg)
         assert str(metadata.redirect_uris[0]) == flow.redirect_uri
 
@@ -119,10 +119,10 @@ def test_mcp_oauth_helpers_use_dashboard_flow_without_loopback_port():
 
 
 def test_failed_reauth_rollback_preserves_newer_oauth_state(tmp_path, monkeypatch):
-    from tools.mcp_oauth import HermesTokenStorage
+    from tools.mcp_oauth import X19TokenStorage
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    storage = HermesTokenStorage("reports")
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
+    storage = X19TokenStorage("reports")
     storage._tokens_path().parent.mkdir(parents=True)
     storage._tokens_path().write_text("OLD")
     backup = storage.snapshot()

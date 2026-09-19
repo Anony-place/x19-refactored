@@ -13,7 +13,7 @@ from datetime import timedelta
 
 import pytest
 
-from cron.jobs import _hermes_now, create_job, get_job, load_jobs, save_jobs
+from cron.jobs import _x19_now, create_job, get_job, load_jobs, save_jobs
 from cron.scheduler_provider import (
     CronScheduler,
     InProcessCronScheduler,
@@ -61,7 +61,7 @@ def _park_in_past(job_id, minutes):
     for j in jobs:
         if j["id"] == job_id:
             j["next_run_at"] = (
-                _hermes_now() - timedelta(minutes=minutes)
+                _x19_now() - timedelta(minutes=minutes)
             ).isoformat()
     save_jobs(jobs)
 
@@ -139,7 +139,7 @@ class TestFireOverdueJobs:
         assert provider.wait_fired()
 
         stamped = get_job(job["id"])
-        assert stamped["next_run_at"] > _hermes_now().isoformat()
+        assert stamped["next_run_at"] > _x19_now().isoformat()
 
         provider2 = RecordingProvider()
         assert fire_overdue_jobs(provider2) == 0
@@ -165,12 +165,12 @@ class TestFireOverdueJobs:
     def test_estop_skips_sweep_and_next_sweep_after_resume_catches_up(
         self, tmp_cron_dir, tmp_path, monkeypatch
     ):
-        """`hermes pause` must silence the backstop too — otherwise it force-fires every job
-        that ESTOP held back. Nothing to unwind: the first sweep after `hermes resume`
+        """`x19 pause` must silence the backstop too — otherwise it force-fires every job
+        that ESTOP held back. Nothing to unwind: the first sweep after `x19 resume`
         catches up through the ordinary claim_fire path."""
         from agent import estop
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         estop._logged_components.clear()
         job = create_job(prompt="p", schedule="every 1h")
         _park_in_past(job["id"], minutes=30)

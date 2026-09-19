@@ -95,7 +95,7 @@ beforeEach(() => {
     windowButtonPosition: null,
     wsUrl: 'ws://localhost:7070'
   })
-  window.hermesDesktop = { profile: { setDefault: async (route: DesktopProfileRoute) => route } } as never
+  window.x19Desktop = { profile: { setDefault: async (route: DesktopProfileRoute) => route } } as never
   vi.mocked(requestGatewayForAgent).mockReset()
   vi.mocked(requestGatewayForAgent).mockResolvedValue({
     session_id: 'created',

@@ -1,6 +1,6 @@
 """Standalone-vs-served parity for the kanban dispatcher and notifier under
 ``gateway.multiplex_profiles``: a worker spawned for served profile X gets the env a standalone
-``hermes -p X`` dispatcher would build, and X's notifications are rendered/filtered under X's
+``x19 -p X`` dispatcher would build, and X's notifications are rendered/filtered under X's
 config.
 """
 
@@ -14,28 +14,28 @@ import pytest
 from agent.secret_scope import set_multiplex_active
 from gateway.config import Platform
 from gateway.run import GatewayRunner
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_db_notify as kbn
-from hermes_constants import get_hermes_home
+from x19_cli import kanban_db as kb
+from x19_cli import kanban_db_connect as kbc
+from x19_cli import kanban_db_dispatch as kbd
+from x19_cli import kanban_db_notify as kbn
+from x19_constants import get_x19_home
 
 
 @pytest.fixture
 def served(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".x19"
     alpha = root / "profiles" / "alpha"
     alpha.mkdir(parents=True)
-    (root / ".env").write_text("HERMES_MODEL=default-model\nTERMINAL_ENV=docker\n")
+    (root / ".env").write_text("X19_MODEL=default-model\nTERMINAL_ENV=docker\n")
     (root / "config.yaml").write_text("gateway:\n  multiplex_profiles: true\nterminal:\n  backend: docker\n")
     (alpha / ".env").write_text("")
     (alpha / "config.yaml").write_text("display:\n  language: zh\n")
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    monkeypatch.setenv("HERMES_MODEL", "default-model")
+    monkeypatch.setenv("X19_HOME", str(root))
+    monkeypatch.setenv("X19_MODEL", "default-model")
     monkeypatch.setenv("TERMINAL_ENV", "docker")
-    monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "board.db"))
+    monkeypatch.setenv("X19_KANBAN_DB", str(tmp_path / "board.db"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr("hermes_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("x19_constants.get_default_x19_root", lambda: root)
     set_multiplex_active(True)
     try:
         yield SimpleNamespace(root=root, alpha=alpha)
@@ -62,12 +62,12 @@ def test_worker_for_served_profile_gets_its_own_env_and_toolset_pin(served, monk
 
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     monkeypatch.setattr(kbd, "_open_worker_log", lambda task, board: open("/dev/null", "w"))
-    monkeypatch.setattr(kbd, "_hermes_argv", lambda: ["hermes"], raising=False)
+    monkeypatch.setattr(kbd, "_x19_argv", lambda: ["x19"], raising=False)
     kbd._default_spawn(task, str(served.alpha), board=None)
 
     env = spawned["env"]
-    assert env["HERMES_HOME"] == str(served.alpha)
-    assert "HERMES_MODEL" not in env and "TERMINAL_ENV" not in env
+    assert env["X19_HOME"] == str(served.alpha)
+    assert "X19_MODEL" not in env and "TERMINAL_ENV" not in env
     assert "--toolsets" in spawned["argv"]
 
 
@@ -77,7 +77,7 @@ class RecordingAdapter:
 
     async def send(self, chat_id, text, metadata=None):
         from gateway.media_policy import media_delivery_strict
-        self.sent.append({"text": text, "home": str(get_hermes_home()), "strict": media_delivery_strict()})
+        self.sent.append({"text": text, "home": str(get_x19_home()), "strict": media_delivery_strict()})
         return SimpleNamespace(success=True, error=None)
 
     async def handle_message(self, event):

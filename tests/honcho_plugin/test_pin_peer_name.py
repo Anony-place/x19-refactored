@@ -1,6 +1,6 @@
 """Tests for the ``pinPeerName`` / ``pinUserPeer`` config flag.
 
-Under a gateway (Telegram, Discord, Slack, ...) Hermes passes the
+Under a gateway (Telegram, Discord, Slack, ...) X19 passes the
 platform-native user ID as ``runtime_user_peer_name`` into
 ``HonchoSessionManager``.  By default that ID wins over any configured
 ``peer_name`` so multi-user bots scope memory per user.
@@ -43,7 +43,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": True,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("X19_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -56,10 +56,10 @@ class TestPinPeerNameConfigParsing:
             "apiKey": "k",
             "peerName": "Igor",
             "hosts": {
-                "hermes": {"pinPeerName": True},
+                "x19": {"pinPeerName": True},
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("X19_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -72,7 +72,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": False,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("X19_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is False
@@ -370,7 +370,7 @@ class TestPeerResolutionOrder:
 
 
 class TestCrossPlatformMemoryUnification:
-    """The same physical user talking to Hermes via Telegram AND Discord
+    """The same physical user talking to X19 via Telegram AND Discord
     lands on ONE peer when ``pinPeerName`` is opted in.
     """
 
@@ -457,7 +457,7 @@ class TestPinUserPeerAlias:
         config_file.write_text(json.dumps({
             "apiKey": "***",
             "peerName": "eri",
-            "hosts": {"hermes": {"pinPeerName": True}},
+            "hosts": {"x19": {"pinPeerName": True}},
         }))
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -538,7 +538,7 @@ class TestPinTransition:
         from gateway.run_agent_cache import GatewayAgentCacheMixin
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
         monkeypatch.setattr(GatewayAgentCacheMixin, "_MEMORY_IDENTITY_PROVIDER_MEMO", {})
 
         cfg_path.write_text(json.dumps({"apiKey": "k", "peerName": "Igor", "pinPeerName": True}))
@@ -557,8 +557,8 @@ class TestPinTransition:
         from plugins.memory.honcho import HonchoMemoryProvider
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "hermes"}
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "x19"}
         provider = HonchoMemoryProvider()
 
         cfg_path.write_text(json.dumps({**base, "sessionPeerPrefix": True, "sessionAiPeerPrefix": False}))
@@ -569,28 +569,28 @@ class TestPinTransition:
         assert sig_user_only != sig_both
 
     def test_identity_signature_reflects_a_repointed_host_workspace(self, tmp_path, monkeypatch):
-        """``hermes honcho peers map`` can repoint a host block's workspace; the cached agent's manager
+        """``x19 honcho peers map`` can repoint a host block's workspace; the cached agent's manager
         is bound to the old one until the signature changes."""
         from plugins.memory.honcho import HonchoMemoryProvider
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "hermes"}
+        monkeypatch.setenv("X19_HOME", str(tmp_path))
+        base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "x19"}
         provider = HonchoMemoryProvider()
 
-        cfg_path.write_text(json.dumps({**base, "hosts": {"hermes": {"workspace": "old"}}}))
+        cfg_path.write_text(json.dumps({**base, "hosts": {"x19": {"workspace": "old"}}}))
         sig_old = provider.identity_signature()["workspace"]
-        cfg_path.write_text(json.dumps({**base, "hosts": {"hermes": {"workspace": "new"}}}))
+        cfg_path.write_text(json.dumps({**base, "hosts": {"x19": {"workspace": "new"}}}))
         sig_new = provider.identity_signature()["workspace"]
 
         assert (sig_old, sig_new) == ("old", "new")
 
 
 class TestProfilePeerUniqueness:
-    """Each Hermes profile can pin to its own unique peerName.
+    """Each X19 profile can pin to its own unique peerName.
 
     Profile cloning copies host blocks, but operators routinely diverge them
-    afterwards (e.g. `hermes -p partner` pinned to a different person's peer).
+    afterwards (e.g. `x19 -p partner` pinned to a different person's peer).
     The resolver must honor host-level ``peerName`` so two profiles in the
     same workspace stay scoped to different Honcho peers.
     """

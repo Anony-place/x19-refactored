@@ -20,7 +20,7 @@ def _reset_computer_use_state():
     reset_backend_for_tests()
 
 
-def test_normal_hermes_session_maps_to_standard_mode():
+def test_normal_x19_session_maps_to_standard_mode():
     from tools.computer_use import tool as computer_use
 
     with patch(
@@ -30,7 +30,7 @@ def test_normal_hermes_session_maps_to_standard_mode():
         assert computer_use._cua_permission_mode("session-a") == "standard"
 
 
-def test_any_explicit_hermes_bypass_maps_to_unrestricted_mode():
+def test_any_explicit_x19_bypass_maps_to_unrestricted_mode():
     from tools.computer_use import tool as computer_use
 
     with patch(
@@ -220,7 +220,7 @@ def test_retired_browser_grant_cannot_change_standard_runtime(tmp_path, monkeypa
         "computer_use:\n  grant_existing_profile: true\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     session = _CuaDriverSession(_AsyncBridge())
     captured = {}
 

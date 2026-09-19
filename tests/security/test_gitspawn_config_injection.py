@@ -3,13 +3,13 @@
 A repository delivered as files (zip, sync folder, USB) can carry a
 ``.git/config`` that names a command in an execution-sink git setting —
 ``core.fsmonitor``, ``core.hooksPath`` hooks, or an attribute-scoped
-``[diff "x"] command=/textconv=`` driver. Hermes gathers workspace context by
+``[diff "x"] command=/textconv=`` driver. X19 gathers workspace context by
 running git against the session directory automatically, before any prompt,
 approval, or trust gate, so an unhardened probe would execute that command on
 the host as the user.
 
 These tests build a real malicious repo and assert that every automatic
-context-gathering git path Hermes runs neutralizes every sink. They use a real
+context-gathering git path X19 runs neutralizes every sink. They use a real
 ``git`` and skip if it is unavailable.
 """
 
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli._subprocess_compat import (
+from x19_cli._subprocess_compat import (
     NO_DRIVER_DIFF_FLAGS,
     harden_git_argv,
     noninteractive_git_env,
@@ -161,7 +161,7 @@ def test_working_diff_is_safe(malicious_repo):
 
 
 def test_web_git_diff_is_safe(malicious_repo):
-    from hermes_cli import web_git
+    from x19_cli import web_git
     repo, marker = malicious_repo
     web_git._git(str(repo), ["status", "--porcelain=v2", "-z"])
     web_git._git_out(str(repo), ["diff", "HEAD"])

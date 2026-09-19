@@ -4,7 +4,7 @@ import { setApiRequestConnection, setApiRequestProfile } from '@/api/client'
 import { $activeGatewayRoute } from '@/store/gateway'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import { $connection } from '@/store/session'
-import type { LocalRuntimeJob } from '@/types/hermes'
+import type { LocalRuntimeJob } from '@/types/x19'
 
 import {
   $localRuntimeInstallStarting,
@@ -61,7 +61,7 @@ beforeEach(() => {
   setApiRequestProfile('default')
   $activeGatewayRoute.set('default')
   $localRuntimeJobs.set([])
-  window.hermesDesktop = { api } as never
+  window.x19Desktop = { api } as never
 })
 afterEach(async () => {
   api.mockResolvedValue({ jobs: [] })

@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import { cancelOAuthSession, listOAuthProviders, pollOAuthSession, startOAuthLogin } from '@/hermes'
+import { cancelOAuthSession, listOAuthProviders, pollOAuthSession, startOAuthLogin } from '@/x19'
 
 import { type FreeTierRequester, NOUS_PROVIDER_ID, refreshFreeTierStatus } from './free-tier'
 
@@ -124,7 +124,7 @@ export function closeFreeTierSignIn() {
 
 // The reasons the backend names on a non-approved terminal poll: the transfer's
 // own outcomes, and the account service's `anon_*` verdicts when it was busy,
-// unreachable or refused mid sign-in (`hermes_cli/anon_sign_in.py`). Anything
+// unreachable or refused mid sign-in (`x19_cli/anon_sign_in.py`). Anything
 // else falls through to the generic error screen, which shows the backend's
 // own message.
 const FAILURE_BY_REASON: Record<string, FreeTierSignInFailure> = {
@@ -152,9 +152,9 @@ export function signInFailureKind(reason: null | string | undefined): FreeTierSi
 // when the bridge isn't there (dev preview, tests) so the flow never strands in
 // a waiting state. Same contract as the onboarding store's opener.
 async function openSignInUrl(url: string) {
-  if (window.hermesDesktop?.openExternal) {
+  if (window.x19Desktop?.openExternal) {
     try {
-      await window.hermesDesktop.openExternal(url)
+      await window.x19Desktop.openExternal(url)
 
       return
     } catch {
@@ -166,7 +166,7 @@ async function openSignInUrl(url: string) {
 }
 
 /**
- * Drive one sign-in attempt end to end: resolve what identity this Hermes is
+ * Drive one sign-in attempt end to end: resolve what identity this X19 is
  * on, start the transfer, open the consent page, then poll until it resolves.
  * Safe to call again from a "Try again" button — it clears any previous timers
  * first.

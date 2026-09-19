@@ -100,7 +100,7 @@ def test_room_grant_secret_stays_gateway_owned_on_named_profile(
 
     adapter = api_server.APIServerAdapter.__new__(api_server.APIServerAdapter)
     adapter._api_key = "gateway-api-key-1234567890"
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     profile_token = api_server._api_request_profile.set("reviewer")
     try:
         assert adapter._room_grant_secret() == gateway_room_grant_secret()
@@ -115,7 +115,7 @@ def test_superseded_room_authority_cannot_reuse_its_grant(tmp_path, monkeypatch)
         issue_room_grant,
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     secret = gateway_room_grant_secret()
     now = time.time()
     common = {
@@ -153,7 +153,7 @@ def test_superseded_room_authority_cannot_reuse_its_grant(tmp_path, monkeypatch)
     )
 
     adapter = api_server.APIServerAdapter.__new__(api_server.APIServerAdapter)
-    request = MagicMock(headers={"Authorization": f"HermesRoom {old_grant}"})
+    request = MagicMock(headers={"Authorization": f"X19Room {old_grant}"})
     assert adapter._room_grant_claims(request, permission="status")[
         "authority_gateway_id"
     ] == "gateway-old"
@@ -203,7 +203,7 @@ async def test_capability_handler_uses_legacy_claims_monkeypatch(monkeypatch):
 
     body = json.loads(response.text)
     assert response.status == 200
-    assert body["object"] == "hermes.room_member.capabilities"
+    assert body["object"] == "x19.room_member.capabilities"
     assert body["target_profile"] == "worker"
     adapter._room_grant_claims.assert_called_once_with(
         request,

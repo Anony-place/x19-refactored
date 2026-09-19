@@ -11,7 +11,7 @@ import {
 
 const ACTION_NAMES: Record<SystemAction, string> = {
   restart: "gateway-restart",
-  update: "hermes-update",
+  update: "x19-update",
 };
 
 export function SystemActionsProvider({
@@ -82,7 +82,7 @@ export function SystemActionsProvider({
           await api.restartGateway();
           setActiveAction(action);
         } else {
-          const resp = await api.updateHermes();
+          const resp = await api.updateX19();
           // Some installs cannot apply updates from inside the dashboard. The
           // endpoint returns a structured {ok:false, message, update_command}
           // envelope instead of spawning the action; surface that guidance

@@ -1,7 +1,7 @@
 """Regression: Windows Desktop update steps must drain and terminate reliably.
 
 ``scripts/desktop-update/windows.ps1`` runs each update step through
-``Invoke-HermesStep``, which starts the step with ``RedirectStandardOutput`` /
+``Invoke-X19Step``, which starts the step with ``RedirectStandardOutput`` /
 ``RedirectStandardError``. Reading those pipes back has two failure modes, and
 this fixture covers both because they pull in opposite directions.
 
@@ -10,16 +10,16 @@ this fixture covers both because they pull in opposite directions.
 it returns when the *pipe* reaches EOF. On Windows the write end of a redirected
 pipe is handed to the child as an inheritable handle, so every descendant
 spawned without its own redirection holds a duplicate, and EOF waits for the
-last of them to close it. ``hermes update`` deliberately runs build steps with
-stdout inherited (the tee-stderr runner in ``hermes_cli/main.py``), so the
+last of them to close it. ``x19 update`` deliberately runs build steps with
+stdout inherited (the tee-stderr runner in ``x19_cli/main.py``), so the
 process tree under a step is arbitrarily deep and not something the hand-off can
 enumerate. When one of those descendants is a resident gateway, the pipe never
-closes and ``Invoke-HermesStep`` blocks for the life of the gateway.
+closes and ``Invoke-X19Step`` blocks for the life of the gateway.
 
 Everything the hand-off owes the Desktop is downstream of that call:
-``.hermes-update-result.json`` is never written, ``.hermes-update-in-progress``
+``.x19-update-result.json`` is never written, ``.x19-update-in-progress``
 is never cleared, and the Desktop is never relaunched -- so the app sits on
-"Updating Hermes" until the user kills the gateway by hand, and the stale marker
+"Updating X19" until the user kills the gateway by hand, and the stale marker
 then refuses the next update too.
 
 **Trickling toward EOF.** The fix reads in chunks so an abandoned pipe still
@@ -28,7 +28,7 @@ is metered at one buffer per tick (16 KiB / 150ms ~ 107 KB/s), and because the
 pipe then backs up that is backpressure on the *running* step, not just a slow
 read -- a chatty step blocks on ``write()`` waiting for the reader. Measured on
 this fixture's own flood arm: 4 MiB took 39.1s metered vs 0.09s unmetered, and a
-step writing to both pipes took 18.3s vs 0.29s. ``hermes update`` is exactly this
+step writing to both pipes took 18.3s vs 0.29s. ``x19 update`` is exactly this
 shape; the Electron/vite build alone is megabytes.
 
 **Live child stall (#95589).** A step can also finish its visible update work
@@ -59,9 +59,9 @@ WINDOWS_PS1 = REPO_ROOT / "scripts" / "desktop-update" / "windows.ps1"
 class TestIdleWatchdogCountsUpdateLogGrowth:
     """The idle watchdog must count logs/update.log growth as progress.
 
-    Real updates are stdout-silent for 40+ minutes: ``hermes update`` captures
+    Real updates are stdout-silent for 40+ minutes: ``x19 update`` captures
     the (very loud) Electron/vite build into ``logs/update.log`` — NOT the
-    child's stdout (``hermes_cli/update_cmd.py``, the update-log tee) — so the
+    child's stdout (``x19_cli/update_cmd.py``, the update-log tee) — so the
     step's pipes go quiet for the whole build while the update is demonstrably
     progressing. A no-output ceiling that watches only stdout/stderr would
     kill every healthy large update at ``StepIdleTimeoutSeconds`` and mark it
@@ -73,7 +73,7 @@ class TestIdleWatchdogCountsUpdateLogGrowth:
     drain loop consults update-log growth before terminating the tree.
     Sabotage-proof: removing the ``Get-StepProgressLogStamp`` consult from
     the stall branch, dropping the ``logstall`` self-test arm, or dropping
-    the ``HERMES_UPDATE_STEP_IDLE_SECONDS`` override each fails a test here.
+    the ``X19_UPDATE_STEP_IDLE_SECONDS`` override each fails a test here.
     """
 
     def _src(self) -> str:
@@ -84,11 +84,11 @@ class TestIdleWatchdogCountsUpdateLogGrowth:
         assert '$script:StepProgressLogPath = Join-Path $LogDir "update.log"' in src
 
     def test_progress_log_overridable_for_self_test(self):
-        assert "HERMES_UPDATE_PROGRESS_LOG" in self._src()
+        assert "X19_UPDATE_PROGRESS_LOG" in self._src()
 
     def test_idle_override_env_retained(self):
         # The user/test-facing idle override must survive the amendment.
-        assert "HERMES_UPDATE_STEP_IDLE_SECONDS" in self._src()
+        assert "X19_UPDATE_STEP_IDLE_SECONDS" in self._src()
 
     def test_stall_branch_consults_log_growth_before_terminating(self):
         src = self._src()
@@ -131,12 +131,12 @@ def test_update_step_survives_pipe_leak_flood_and_live_child_stall(
     """Execute the real hand-off runner against all three step shapes.
 
     ``-SelfTestPipeDrain`` runs three steps through the real
-    ``Invoke-HermesStep``:
+    ``Invoke-X19Step``:
 
     *leak* -- a step that spawns a grandchild with ``UseShellExecute = $false``
     and no redirection (the shape that makes the grandchild inherit the step's
     stdout/stderr), then exits 7 while the grandchild sleeps on. The fixture
-    asserts the grandchild was **still alive** when ``Invoke-HermesStep``
+    asserts the grandchild was **still alive** when ``Invoke-X19Step``
     returned, so a pass cannot be a timing coincidence, and that the exit code
     and the step's output both survived the abandonment.
 
@@ -153,7 +153,7 @@ def test_update_step_survives_pipe_leak_flood_and_live_child_stall(
 
     *logstall* -- a step that is silent on its pipes but appends to the
     progress log (pointed at the fixture's own file) every second, exiting 3.
-    This is the shape of every real ``hermes update`` build: output streams to
+    This is the shape of every real ``x19 update`` build: output streams to
     ``logs/update.log``, not stdout, for 40+ minutes. The idle watchdog must
     count that growth as progress and let the step run to its natural exit
     instead of killing it at the ceiling with 124.
@@ -177,9 +177,9 @@ def test_update_step_survives_pipe_leak_flood_and_live_child_stall(
         # Keep the test quick. The grace is what the fix bounds; the hold is
         # how long the leaking grandchild lives. hold >> grace is what makes a
         # regression measurable rather than lucky.
-        "HERMES_UPDATE_PIPE_DRAIN_SECONDS": "3",
-        "HERMES_UPDATE_STEP_IDLE_SECONDS": "3",
-        "HERMES_SELFTEST_HOLD_SECONDS": "45",
+        "X19_UPDATE_PIPE_DRAIN_SECONDS": "3",
+        "X19_UPDATE_STEP_IDLE_SECONDS": "3",
+        "X19_SELFTEST_HOLD_SECONDS": "45",
     }
 
     result = subprocess.run(
@@ -205,7 +205,7 @@ def test_update_step_survives_pipe_leak_flood_and_live_child_stall(
     assert "PIPE-DRAIN SELF-TEST: PASS" in result.stdout, (
         "The Windows update hand-off's step drain regressed: it either waited "
         "on a descendant holding the pipe open (the Desktop parks on 'Updating "
-        "Hermes' forever) or metered a chatty step (backpressure on the running "
+        "X19' forever) or metered a chatty step (backpressure on the running "
         f"update). Fixture diagnosis follows.\n--- stdout ---\n{result.stdout}\n"
         f"--- stderr ---\n{result.stderr}"
     )

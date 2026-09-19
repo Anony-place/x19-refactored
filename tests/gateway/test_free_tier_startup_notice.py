@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock
 import gateway.run as gateway_run
 from gateway.config import HomeChannel, Platform
 from gateway.platforms.base import SendResult
-from hermes_cli import anon_auth
-from hermes_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
+from x19_cli import anon_auth
+from x19_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
 from tests.gateway.restart_test_helpers import make_restart_runner
 
 FREE_TIER_LINE = "Inference: Nous free tier (nous/welcome). Sign in for more: /login"
@@ -40,15 +40,15 @@ def _guest_state() -> dict:
 
 
 def _account_state() -> dict:
-    return {"auth_method": "oauth", "access_token": _jwt(client_id="hermes-cli", account_tier="pro"),
+    return {"auth_method": "oauth", "access_token": _jwt(client_id="x19-cli", account_tier="pro"),
             "refresh_token": "rt", "expires_at": "2999-01-01T00:00:00+00:00"}
 
 
 @pytest.fixture
 def nous_runner(tmp_path, monkeypatch):
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
+    monkeypatch.setenv("X19_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("X19_GUEST_ONBOARDING", "1")
     # Provider precedence gates the line and is answered from persisted state only (no network at boot).
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
@@ -75,7 +75,7 @@ async def test_guest_inference_adds_exactly_one_free_tier_line(nous_runner):
     message = await _startup_message(runner, adapter)
 
     lines = message.splitlines()
-    assert lines[0] == "♻️ Gateway online — Hermes is back and ready."
+    assert lines[0] == "♻️ Gateway online — X19 is back and ready."
     assert lines[1:] == [FREE_TIER_LINE]
     assert "guest" not in message.lower() and "anonymous" not in message.lower()
 
@@ -88,7 +88,7 @@ async def test_signed_in_account_keeps_the_plain_online_notice(nous_runner):
 
     message = await _startup_message(runner, adapter)
 
-    assert message == "♻️ Gateway online — Hermes is back and ready."
+    assert message == "♻️ Gateway online — X19 is back and ready."
 
 
 @pytest.mark.asyncio
@@ -99,4 +99,4 @@ async def test_non_nous_provider_never_mentions_the_free_tier(nous_runner, monke
 
     message = await _startup_message(runner, adapter)
 
-    assert message == "♻️ Gateway online — Hermes is back and ready."
+    assert message == "♻️ Gateway online — X19 is back and ready."

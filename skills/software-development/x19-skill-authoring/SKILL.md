@@ -6,7 +6,7 @@ author: X19
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
+  x19:
     tags: [skills, authoring, x19, conventions, skill-md]
     related_skills: [requesting-code-review]
 ---
@@ -62,7 +62,7 @@ author: Real Name (github-handle), X19
 license: MIT
 platforms: [linux, macos, windows]   # audit, don't guess — see Platform Gating
 metadata:
-  hermes:
+  x19:
     tags: [Short, Descriptive, Tags]
     related_skills: [other-in-repo-skill]
 ---
@@ -199,7 +199,7 @@ A skill exists to make the agent's process more predictable — the agent reliab
 - [ ] Tier decided deliberately (bundled bar: 5+ sessions/month; else `optional-skills/`)
 - [ ] File at `skills/<category>/<name>/SKILL.md` or `optional-skills/<category>/<name>/SKILL.md`
 - [ ] Frontmatter starts at byte 0 with `---`, closes with `\n---\n`
-- [ ] `name`, `description`, `version`, `author`, `license`, `platforms`, `metadata.hermes.{tags, related_skills}` all present
+- [ ] `name`, `description`, `version`, `author`, `license`, `platforms`, `metadata.x19.{tags, related_skills}` all present
 - [ ] Description ≤ 60 chars, one sentence, ends with a period, no marketing words
 - [ ] `author` credits the human contributor first
 - [ ] `platforms:` audited against actual prose/scripts, not copied from a sibling

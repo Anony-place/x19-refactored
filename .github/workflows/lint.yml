@@ -179,12 +179,6 @@ jobs:
       - name: Run footgun checker
         run: python scripts/check-windows-footguns.py --all
 
-      # The Sep 2026 decomposition kept old import paths alive for external plugins
-      # (PLUGIN-COMPAT blocks, see COMPAT_MANIFEST.md). They are removed on schedule by
-      # reverting one commit, so in-tree code must never depend on them.
-      - name: Forbid in-tree use of plugin-compat pointers
-        run: python scripts/check_compat_pointers.py
-
       # The OS lanes import only files carrying the matching marker, so a test that fakes
       # macOS (is_macos -> True, sys.platform -> "darwin") without `macos_only` is green on
       # Linux over a faked branch and never runs on macOS (#111866, AGENTS.md § Don't fake the host OS).

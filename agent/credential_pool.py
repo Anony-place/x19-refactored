@@ -17,8 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
-from hermes_constants import OPENROUTER_BASE_URL
-from hermes_cli.config import load_env
+from x19_constants import OPENROUTER_BASE_URL
+from x19_cli.config import load_env
 from agent.secret_scope import get_secret as _get_secret
 from agent.retry_utils import reset_delay_from_message
 from agent.credential_persistence import (
@@ -26,8 +26,8 @@ from agent.credential_persistence import (
     is_borrowed_credential_source,
     sanitize_borrowed_credential_payload,
 )
-import hermes_cli.auth as auth_mod
-from hermes_cli.auth import (
+import x19_cli.auth as auth_mod
+from x19_cli.auth import (
     CODEX_ACCESS_TOKEN_REFRESH_SKEW_SECONDS,
     PROVIDER_REGISTRY,
     SINGLE_USE_REFRESH_POOL_PROVIDERS,
@@ -56,7 +56,7 @@ def _load_config_safe() -> Optional[dict]:
     that copy the dominant cost of ``model.options``.
     """
     try:
-        from hermes_cli.config import load_config_readonly
+        from x19_cli.config import load_config_readonly
 
         return load_config_readonly()
     except Exception:
@@ -64,9 +64,9 @@ def _load_config_safe() -> Optional[dict]:
 
 
 def _is_source_suppressed_fn() -> Callable[[str, str], bool]:
-    """``hermes_cli.auth.is_source_suppressed`` (late-bound), or an always-False stub."""
+    """``x19_cli.auth.is_source_suppressed`` (late-bound), or an always-False stub."""
     try:
-        from hermes_cli.auth import is_source_suppressed
+        from x19_cli.auth import is_source_suppressed
         return is_source_suppressed
     except ImportError:
         return lambda _p, _s: False
@@ -100,7 +100,7 @@ _TERMINAL_AUTH_REASONS = frozenset({
 CREDENTIAL_PERSIST_FAILED_REASON = "credential_persist_failed"
 
 # DEAD ``manual:*`` entries are pruned after this quiet window — they have no
-# singleton to re-seed from and the user can re-add via ``hermes auth add``.
+# singleton to re-seed from and the user can re-add via ``x19 auth add``.
 # Singleton-seeded entries (device_code, claude_code) are NOT pruned because
 # ``_seed_from_singletons`` would re-create them from the same stale tokens.
 DEAD_MANUAL_PRUNE_TTL_SECONDS = 24 * 60 * 60
@@ -149,10 +149,10 @@ FAILURE_REASON_BILLING_UNVERIFIED = "billing_unverified"
 # core, and stalled the event loop (Desktop backend readiness timeouts).
 # Credential selection runs on a hot path (every model call, plus auxiliary tasks like
 # compression/moa/titles), so when a pool is empty or fully exhausted the un-throttled log fires on *every*
-# selection. On Windows several Hermes processes share one rotating log guarded by concurrent-log-handler's
+# selection. On Windows several X19 processes share one rotating log guarded by concurrent-log-handler's
 # cross-process lock; that per-selection volume storms the lock (``RuntimeError: Cannot acquire lock after
 # 20 attempts``), pegs a core, and stalls the asyncio event loop long enough to fail the Desktop backend
-# readiness handshake ("Timed out connecting to Hermes backend after 15000ms"). Logging the condition at
+# readiness handshake ("Timed out connecting to X19 backend after 15000ms"). Logging the condition at
 # most once per window preserves the signal while removing the storm — same class of fix as the warn-once
 # dedup in #58265.
 NO_AVAILABLE_ENTRIES_LOG_THROTTLE_SECONDS = 60.0
@@ -428,7 +428,7 @@ def _iter_custom_providers(config: Optional[dict] = None):
     if config is None:
         return
     try:
-        from hermes_cli.config import get_compatible_custom_providers
+        from x19_cli.config import get_compatible_custom_providers
 
         custom_providers = get_compatible_custom_providers(config)
     except Exception:
@@ -473,7 +473,7 @@ def custom_provider_pool_key_candidates(
 ) -> List[str]:
     """Return pool keys to try for a custom endpoint.
 
-    ``hermes auth add <key>`` stores ``providers.<key>`` credentials under the
+    ``x19 auth add <key>`` stores ``providers.<key>`` credentials under the
     durable config slug; older rows and legacy ``custom_providers:`` entries
     live under ``custom:<display-name>``. Try the slug first, then the legacy
     namespace, so a populated pool is not skipped in favour of the
@@ -680,7 +680,7 @@ DEFAULT_MAX_CONCURRENT_PER_CREDENTIAL = 1
 #
 # Providers whose OAuth singleton lives in auth.json ``providers.<id>.tokens``
 # (Codex, xAI): log names (sync-message form, "<name> OAuth" form),
-# ``hermes_cli.auth`` refresh function and terminal-error predicate (looked
+# ``x19_cli.auth`` refresh function and terminal-error predicate (looked
 # up at call time so tests can patch them).
 _TOKENS_SINGLETON_PROVIDERS: Dict[str, Tuple[str, str, str, str]] = {
     "openai-codex": ("Codex", "Codex", "refresh_codex_oauth_pure", "_is_terminal_codex_oauth_refresh_error"),
@@ -696,8 +696,8 @@ REFRESHABLE_OAUTH_PROVIDERS = frozenset({"anthropic", "nous", *_TOKENS_SINGLETON
 _SINGLE_USE_REFRESH_PROVIDERS = ("openai-codex", "xai-oauth", "anthropic")
 
 _REFRESH_TIMEOUT_ENV_VARS = {
-    "openai-codex": "HERMES_CODEX_REFRESH_TIMEOUT_SECONDS",
-    "xai-oauth": "HERMES_XAI_REFRESH_TIMEOUT_SECONDS",
+    "openai-codex": "X19_CODEX_REFRESH_TIMEOUT_SECONDS",
+    "xai-oauth": "X19_XAI_REFRESH_TIMEOUT_SECONDS",
 }
 
 # Singleton-seeded source whose exhausted/DEAD pool row may be revived by a
@@ -1022,7 +1022,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
     def _sync_entry_from_auth_store(self, entry: PooledCredential) -> PooledCredential:
         """Sync a Codex / xAI device_code entry from auth.json ``providers.<id>.tokens``.
 
-        A fresh ``hermes model`` / ``hermes auth`` login writes new tokens
+        A fresh ``x19 model`` / ``x19 auth`` login writes new tokens
         under ``_auth_store_lock`` while the pool entry may sit frozen behind
         a ``last_error_reset_at`` hours in the future; without this sync every
         request fails with "no available entries" despite fresh credentials on
@@ -1178,7 +1178,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
             return self._refresh_entry_impl(entry, force=force)
 
         # Single-use refresh tokens: sync -> POST -> write-back must be atomic
-        # across Hermes processes, or two processes adopt the same on-disk
+        # across X19 processes, or two processes adopt the same on-disk
         # token, both POST it, and the loser gets ``refresh_token_reused`` /
         # ``invalid_grant`` (for Anthropic sources other than claude_code
         # there was no recovery path at all). Serialize through the shared
@@ -1232,7 +1232,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
     ) -> None:
         """Quarantine an entry whose rotated pair never reached its store.
 
-        For ``claude_code`` / ``hermes_pkce`` the singleton file — not
+        For ``claude_code`` / ``x19_pkce`` the singleton file — not
         auth.json — is authoritative: ``_seed_from_singletons()`` re-reads it
         on every ``load_pool()``. When the refresh POST succeeded but the
         singleton write failed, the replacement pair exists only in memory
@@ -1277,7 +1277,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
 
     def _single_use_refresh_lock_timeout(self) -> float:
         """Configured refresh POST timeout plus margin, so a slow token endpoint cannot starve the flock."""
-        env_var = _REFRESH_TIMEOUT_ENV_VARS.get(self.provider, "HERMES_ANTHROPIC_REFRESH_TIMEOUT_SECONDS")
+        env_var = _REFRESH_TIMEOUT_ENV_VARS.get(self.provider, "X19_ANTHROPIC_REFRESH_TIMEOUT_SECONDS")
         refresh_timeout_seconds = auth_mod.env_float(env_var, 20)
         return max(float(auth_mod.AUTH_LOCK_TIMEOUT_SECONDS), float(refresh_timeout_seconds) + 5.0)
 
@@ -1287,15 +1287,15 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
         """Write a rotated Anthropic pair to its authoritative singleton, or fail closed.
 
         claude_code -> ~/.claude/.credentials.json (so the fallback resolver
-        and other profiles see it). hermes_pkce -> <HERMES_HOME>/.anthropic_oauth.json
+        and other profiles see it). x19_pkce -> <X19_HOME>/.anthropic_oauth.json
         (``_seed_from_singletons`` re-seeds it every load). Not ``endswith``:
-        manual:hermes_pkce is pool-owned and a singleton for it would be a second
+        manual:x19_pkce is pool-owned and a singleton for it would be a second
         authority for the same refresh-token family.
         """
         if entry.source == "claude_code":
             store = "~/.claude/.credentials.json"
-        elif entry.source == "hermes_pkce":
-            store = "~/.hermes/.anthropic_oauth.json"
+        elif entry.source == "x19_pkce":
+            store = "~/.x19/.anthropic_oauth.json"
         else:
             return
         try:
@@ -1304,7 +1304,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
             if entry.source == "claude_code":
                 ac._write_claude_code_credentials(*args)
             else:
-                ac._write_hermes_oauth_credentials(*args)
+                ac._write_x19_oauth_credentials(*args)
         except Exception as wexc:
             # Authoritative commit failed: do not mark, persist or return the
             # rotation as successful, and bypass the re-POST recovery path —
@@ -1333,7 +1333,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
                 ),
                 store=str(source_path or "credential store"),
             ))
-        refreshed = refresh_anthropic_oauth_pure(entry.refresh_token, use_json=entry.source.endswith("hermes_pkce"))
+        refreshed = refresh_anthropic_oauth_pure(entry.refresh_token, use_json=entry.source.endswith("x19_pkce"))
         updated = replace(
             entry,
             access_token=refreshed["access_token"],
@@ -1410,7 +1410,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
                     try:
                         from agent.anthropic_credentials import refresh_anthropic_oauth_pure
                         refreshed = refresh_anthropic_oauth_pure(
-                            synced.refresh_token, use_json=synced.source.endswith("hermes_pkce"),
+                            synced.refresh_token, use_json=synced.source.endswith("x19_pkce"),
                         )
                         # Commit to the authoritative singleton BEFORE marking or
                         # persisting the pool row, or a failed write leaves an
@@ -1433,7 +1433,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
                     logger.debug("Credentials file has valid token, using without refresh")
                     return synced
             else:
-                # Backstop for pool-owned sources (hermes_pkce, manual:dashboard_pkce):
+                # Backstop for pool-owned sources (x19_pkce, manual:dashboard_pkce):
                 # the winner may have persisted between our pre-check and our POST.
                 synced = self._sync_entry_from_pool_store(entry)
                 if synced.refresh_token != entry.refresh_token:
@@ -1443,10 +1443,10 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
             if is_terminal_anthropic_refresh_error(exc):
                 # A dead grant is not "exhausted": benching it for a TTL replays the dead token every
                 # hour at DEBUG, so the lost login left no trace (#113023). Never touch the external
-                # CLI's credentials file here — only Hermes' own row goes DEAD.
+                # CLI's credentials file here — only X19' own row goes DEAD.
                 logger.warning(
                     "Anthropic OAuth refresh token for %s is terminally invalid (%s); the credential "
-                    "leaves rotation. Re-run 'hermes auth add anthropic' to sign in again.",
+                    "leaves rotation. Re-run 'x19 auth add anthropic' to sign in again.",
                     entry.label or entry.id[:8], exc)
                 self._mark_dead_refresh_grant(entry, exc)
                 return None
@@ -1462,10 +1462,10 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
             # entries from the pool (mirrors the Nous quarantine path).
             if getattr(auth_mod, terminal_fn_name)(exc):
                 # WARNING, not debug: this is the moment a login is lost. At the default log level a
-                # silent quarantine looked like "I logged in once and Hermes keeps failing" (#113023).
+                # silent quarantine looked like "I logged in once and X19 keeps failing" (#113023).
                 logger.warning(
                     "%s OAuth refresh token is terminally invalid (%s); clearing local token state. "
-                    "Re-run 'hermes auth add %s' to sign in again.", display, exc, self.provider)
+                    "Re-run 'x19 auth add %s' to sign in again.", display, exc, self.provider)
                 self._clear_terminal_tokens_state(entry, exc)
                 self._quarantine_sources(entry, {"device_code"})
                 self._mark_dead_refresh_grant(entry, exc)
@@ -1487,7 +1487,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
             if auth_mod._is_terminal_nous_refresh_error(exc):
                 logger.warning(
                     "Nous refresh token is terminally invalid (%s); clearing local token state. "
-                    "Re-run 'hermes auth add nous' to sign in again.", exc)
+                    "Re-run 'x19 auth add nous' to sign in again.", exc)
                 self._clear_terminal_nous_state(entry, exc)
                 self._quarantine_sources(
                     entry,
@@ -1502,7 +1502,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
         """Mark a row whose refresh token was terminally rejected DEAD, if the quarantine kept it.
 
         ``_quarantine_sources`` drops only singleton-seeded rows; an independent ``manual:*`` login
-        (``hermes auth add``) survives, and an unmarked survivor re-enters rotation and re-fires the
+        (``x19 auth add``) survives, and an unmarked survivor re-enters rotation and re-fires the
         terminal WARNING on every later refresh attempt. DEAD leaves rotation until a write-side
         re-auth sync clears it (never via TTL).
         """
@@ -1638,7 +1638,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
     def _resync_stale_entry(self, entry: PooledCredential) -> PooledCredential:
         """Re-read an exhausted/DEAD singleton-seeded entry from its token authority.
 
-        The user may have re-authed (``hermes model`` / ``hermes auth``, the
+        The user may have re-authed (``x19 model`` / ``x19 auth``, the
         Claude Code CLI, another profile) leaving fresh tokens on disk while
         the pool entry is frozen behind ``last_error_reset_at``.
         """
@@ -1688,7 +1688,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
                     if dead_at and now - dead_at > DEAD_MANUAL_PRUNE_TTL_SECONDS:
                         logger.warning(
                             "credential pool: pruning DEAD manual entry %s "
-                            "(reason=%s, age=%.1fh) — re-add via `hermes auth add %s`",
+                            "(reason=%s, age=%.1fh) — re-add via `x19 auth add %s`",
                             entry.label or entry.id[:8],
                             entry.last_error_reason or "unknown",
                             (now - dead_at) / 3600.0,
@@ -2073,7 +2073,7 @@ def _upsert_entry(entries: List[PooledCredential], provider: str, source: str, p
 _ANTHROPIC_SOURCE_RANK = {
     "env:ANTHROPIC_TOKEN": 0,
     "env:CLAUDE_CODE_OAUTH_TOKEN": 1,
-    "hermes_pkce": 2,
+    "x19_pkce": 2,
     "claude_code": 3,
     "env:ANTHROPIC_API_KEY": 4,
 }
@@ -2123,7 +2123,7 @@ class _Seeder:
         self.is_suppressed = _is_source_suppressed_fn()
 
     def upsert(self, source: str, payload: Dict[str, Any]) -> bool:
-        """Upsert unless suppressed (``hermes auth remove`` must stay stable across loads)."""
+        """Upsert unless suppressed (``x19 auth remove`` must stay stable across loads)."""
         if self.is_suppressed(self.provider, source):
             return False
         self.active_sources.add(source)
@@ -2137,23 +2137,23 @@ class _Seeder:
 
 
 def _seed_anthropic_singletons(seed: _Seeder) -> None:
-    # Only auto-discover external credentials (Claude Code, Hermes PKCE) when
+    # Only auto-discover external credentials (Claude Code, X19 PKCE) when
     # the user explicitly configured anthropic; otherwise auxiliary fallback
     # chains would read ~/.claude/.credentials.json without consent (PR #4210).
     try:
-        from hermes_cli.auth import is_provider_explicitly_configured
+        from x19_cli.auth import is_provider_explicitly_configured
         if not is_provider_explicitly_configured("anthropic"):
             return
     except ImportError:
         pass
 
-    # API-key vs OAuth is a user-visible choice at `hermes setup`. The API-key
+    # API-key vs OAuth is a user-visible choice at `x19 setup`. The API-key
     # signal is ANTHROPIC_API_KEY set AND no OAuth env vars (the save_* helpers
     # zero the other side). Then we MUST NOT seed autodiscovered OAuth tokens:
     # rotation on a 401/429 would silently flip the session onto OAuth, which
     # forces the Claude Code identity injection, `mcp_` tool-name rewrite and
     # claude-cli User-Agent the user explicitly opted out of. Prefer
-    # ~/.hermes/.env over os.environ, as `_seed_from_env` does.
+    # ~/.x19/.env over os.environ, as `_seed_from_env` does.
     _env_file = load_env()
 
     def _env_val(key: str) -> str:
@@ -2163,16 +2163,16 @@ def _seed_anthropic_singletons(seed: _Seeder) -> None:
     if _env_val("ANTHROPIC_API_KEY") and not anthropic_oauth_env:
         # Prune stale autodiscovered OAuth entries from a previous OAuth
         # session so a transient 401 cannot revive them.
-        seed.changed |= _retain_sources_not_in(seed.entries, {"hermes_pkce", "claude_code"})
+        seed.changed |= _retain_sources_not_in(seed.entries, {"x19_pkce", "claude_code"})
         return
 
     from agent.anthropic_credentials import (
         read_claude_code_credentials,
-        read_hermes_oauth_credentials,
+        read_x19_oauth_credentials,
     )
 
     for source_name, creds in (
-        ("hermes_pkce", read_hermes_oauth_credentials()),
+        ("x19_pkce", read_x19_oauth_credentials()),
         ("claude_code", read_claude_code_credentials()),
     ):
         if creds and creds.get("accessToken"):
@@ -2195,7 +2195,7 @@ def _seed_nous_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
         seed.changed |= _retain_sources_not_in(seed.entries, {"device_code", "manual:device_code"})
     if not (state and has_runtime_material):
         return
-    # Prefer a user-supplied label embedded in the singleton state (``hermes
+    # Prefer a user-supplied label embedded in the singleton state (``x19
     # auth add nous --label <name>``) over the token-derived fingerprint.
     custom_label = str(state.get("label") or "").strip()
     seed.upsert("device_code", {
@@ -2223,7 +2223,7 @@ def _seed_copilot_singleton(seed: _Seeder) -> None:
     # Copilot tokens are resolved dynamically via `gh auth token` or env vars
     # (COPILOT_GITHUB_TOKEN / GH_TOKEN); they don't live in the auth store.
     try:
-        from hermes_cli.copilot_auth import (
+        from x19_cli.copilot_auth import (
             COPILOT_ENV_VARS,
             resolve_copilot_token,
             get_copilot_api_token,
@@ -2270,7 +2270,7 @@ def _seed_qwen_singleton(seed: _Seeder) -> None:
     # Qwen OAuth tokens live in ~/.qwen/oauth_creds.json (written by the Qwen
     # CLI). refresh_if_expiring=False avoids network calls during pool loading.
     try:
-        from hermes_cli.auth import resolve_qwen_runtime_credentials
+        from x19_cli.auth import resolve_qwen_runtime_credentials
         creds = resolve_qwen_runtime_credentials(refresh_if_expiring=False)
         token = creds.get("api_key", "")
         if token:
@@ -2290,7 +2290,7 @@ def _seed_minimax_singleton(seed: _Seeder) -> None:
     # Read the raw auth.json state rather than resolve_minimax_oauth_runtime_credentials,
     # which always refreshes on expiry (surprise network calls during discovery).
     try:
-        from hermes_cli.auth import get_provider_auth_state
+        from x19_cli.auth import get_provider_auth_state
         state = get_provider_auth_state("minimax-oauth")
         if not (state and state.get("access_token")):
             return
@@ -2316,10 +2316,10 @@ def _seed_minimax_singleton(seed: _Seeder) -> None:
 def _seed_tokens_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
     """Codex / xAI: surface the auth.json ``providers.<id>.tokens`` singleton as ``device_code``.
 
-    Hermes owns its own Codex auth state and does NOT auto-import
+    X19 owns its own Codex auth state and does NOT auto-import
     ~/.codex/auth.json: refresh tokens are single-use, so sharing them with
     Codex CLI / VS Code causes refresh_token_reused races. Adoption is an
-    explicit one-time prompt via `hermes auth openai-codex`.
+    explicit one-time prompt via `x19 auth openai-codex`.
     """
     state = _load_provider_state(auth_store, seed.provider)
     tokens = state.get("tokens") if isinstance(state, dict) else None
@@ -2355,7 +2355,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
     elif provider == "minimax-oauth":
         _seed_minimax_singleton(seed)
     elif provider in _TOKENS_SINGLETON_PROVIDERS:
-        # `hermes auth remove openai-codex` suppresses device_code; without
+        # `x19 auth remove openai-codex` suppresses device_code; without
         # this gate the removal is undone on the next load_pool().
         if provider == "openai-codex" and seed.is_suppressed(provider, "device_code"):
             return seed.result
@@ -2364,7 +2364,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
 
 
 def get_env_prefer_dotenv(key: str) -> str:
-    """Resolve a credential env var, preferring ~/.hermes/.env over os.environ.
+    """Resolve a credential env var, preferring ~/.x19/.env over os.environ.
 
     The user's config file is authoritative; stale env vars from parent
     processes (Codex CLI, test scripts) must not override deliberate .env
@@ -2400,7 +2400,7 @@ def _warn_env_ingestion_once(provider: str, env_var: str) -> None:
     logger.warning(
         "Ingested %s from environment into the %s credential pool — this "
         "enables %s spend. Remove the key or run "
-        "hermes auth remove %s <n> to suppress.",
+        "x19 auth remove %s <n> to suppress.",
         env_var,
         provider,
         "OpenRouter" if provider == "openrouter" else provider,
@@ -2416,7 +2416,7 @@ def _env_payload(*, env_var: str, token: str, base_url: str) -> Dict[str, Any]:
         "label": env_var,
     }
     try:
-        from hermes_cli.env_loader import get_secret_source
+        from x19_cli.env_loader import get_secret_source
         source_label = get_secret_source(env_var)
     except Exception:
         source_label = None
@@ -2514,11 +2514,11 @@ def _prune_stale_seeded_entries(
         # ``env:*`` entries are persisted references re-hydrated on every load.
         # A process that merely lacks the env var must NOT delete the on-disk
         # entry for every other process (#9331); prune only when explicitly
-        # requested (an `hermes auth` command that confirmed the source is gone).
+        # requested (an `x19 auth` command that confirmed the source is gone).
         if entry.source.startswith("env:"):
             return prune_env_sources
-        # File-backed singletons and Hermes PKCE disappear when their backing file is gone.
-        return is_borrowed_credential_source(entry.source, entry.provider) or entry.source == "hermes_pkce"
+        # File-backed singletons and X19 PKCE disappear when their backing file is gone.
+        return is_borrowed_credential_source(entry.source, entry.provider) or entry.source == "x19_pkce"
 
     retained = [
         entry

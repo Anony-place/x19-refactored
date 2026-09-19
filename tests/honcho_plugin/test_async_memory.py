@@ -35,7 +35,7 @@ def _make_session(**kwargs) -> HonchoSession:
     return HonchoSession(
         key=kwargs.get("key", "cli:test"),
         user_peer_id=kwargs.get("user_peer_id", "eri"),
-        assistant_peer_id=kwargs.get("assistant_peer_id", "hermes"),
+        assistant_peer_id=kwargs.get("assistant_peer_id", "x19"),
         honcho_session_id=kwargs.get("honcho_session_id", "cli-test"),
         messages=kwargs.get("messages", []),
     )
@@ -108,7 +108,7 @@ class TestWriteFrequencyParsing:
         cfg_file.write_text(json.dumps({
             "apiKey": "k",
             "writeFrequency": "turn",
-            "hosts": {"hermes": {"writeFrequency": "session"}},
+            "hosts": {"x19": {"writeFrequency": "session"}},
         }))
         cfg = HonchoClientConfig.from_global_config(config_path=cfg_file)
         assert cfg.write_frequency == "session"

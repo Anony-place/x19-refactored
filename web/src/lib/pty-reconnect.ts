@@ -1,4 +1,4 @@
-import { reconnectBackoffDelayMs } from '@hermes/shared'
+import { reconnectBackoffDelayMs } from '@x19/shared'
 
 export type PtyConnectionState = 'connecting' | 'open' | 'reconnecting' | 'closed' | 'ended'
 

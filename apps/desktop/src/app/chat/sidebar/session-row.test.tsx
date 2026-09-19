@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 import type * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { SessionInfo } from '@/hermes'
+import type { SessionInfo } from '@/x19'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import type * as ChatRuntime from '@/lib/chat-runtime'
 import type * as Time from '@/lib/time'
@@ -245,7 +245,7 @@ describe('SidebarSessionRow', () => {
         onPin={noop}
         onResume={noop}
         onToggleUnread={noop}
-        session={makeSession({ title: 'Hermes doctor health check results' })}
+        session={makeSession({ title: 'X19 doctor health check results' })}
         unread={false}
       />
     )

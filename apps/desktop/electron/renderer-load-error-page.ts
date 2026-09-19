@@ -3,7 +3,7 @@
  *
  * The white-screen failure modes this exists for:
  *
- * 1. TORN BUNDLE after an update (#95575): `hermes update` replaces the app
+ * 1. TORN BUNDLE after an update (#95575): `x19 update` replaces the app
  *    while its files are locked (antivirus, a still-running instance, an
  *    interrupted Windows replace), leaving index.html and its hashed chunks
  *    from DIFFERENT generations. The window loads, then dies on the first
@@ -31,7 +31,7 @@ export interface RendererLoadErrorDetails {
   url?: string
   /** Module files index.html declares but that are missing on disk. */
   missingAssets?: string[]
-  /** Repair command hint, e.g. `hermes desktop --force-build`. */
+  /** Repair command hint, e.g. `x19 desktop --force-build`. */
   repairHint?: string
   /**
    * URL to navigate to when the user clicks Reload. On a data: page
@@ -102,10 +102,10 @@ export function buildRendererLoadErrorPage(details: RendererLoadErrorDetails = {
   const code =
     details.errorCode === undefined || details.errorCode === null ? '' : ` (${escapeHtml(details.errorCode)})`
 
-  const title = 'Hermes couldn\u2019t start the desktop UI'
+  const title = 'X19 couldn\u2019t start the desktop UI'
   const description = escapeHtml(details.errorDescription || 'The desktop renderer failed to load.')
   const url = details.url ? `<p><code>${escapeHtml(details.url)}</code></p>` : ''
-  const repair = details.repairHint ? `<p>Repair with: <code>hermes desktop --force-build</code></p>` : ''
+  const repair = details.repairHint ? `<p>Repair with: <code>x19 desktop --force-build</code></p>` : ''
 
   return `<!doctype html>
 <html lang="en">
@@ -164,7 +164,7 @@ export function buildRendererLoadErrorPage(details: RendererLoadErrorDetails = {
   ${missingAssetsList(details.missingAssets)}
   ${repair}
   <p>If this keeps happening, check <code>logs/desktop.log</code> and try
-  <code>hermes desktop --force-build</code>, then restart the app.</p>
+  <code>x19 desktop --force-build</code>, then restart the app.</p>
   ${reloadButtonJs(details)}
 </main>
 </body>

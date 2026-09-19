@@ -9,7 +9,7 @@ from .base import JsonValue, Params, Payload, Result, WireEnum
 
 class OpenModel(Result):
     """A result/payload row whose known fields are typed but which the producer may extend
-    (the closed set is owned elsewhere: hermes_state rows, provider inventories)."""
+    (the closed set is owned elsewhere: x19_state rows, provider inventories)."""
 
     model_config = Result.model_config | {"extra": "allow"}
 
@@ -94,7 +94,7 @@ class SessionLiveInfo(OpenModel):
 
 
 class StoredSessionRow(OpenModel):
-    """One ``sessions`` row as ``hermes_state`` lists it (``session.list`` / ``session.info`` rows /
+    """One ``sessions`` row as ``x19_state`` lists it (``session.list`` / ``session.info`` rows /
     ``sessions.changed``)."""
 
     id: str
@@ -179,7 +179,7 @@ class PendingApproval(OpenModel):
 
 
 class MessageReaction(OpenModel):
-    """One persisted reaction row (``hermes_state_messages.set_message_reaction``); ``seen`` is
+    """One persisted reaction row (``x19_state_messages.set_message_reaction``); ``seen`` is
     stamped once announced."""
 
     emoji: str

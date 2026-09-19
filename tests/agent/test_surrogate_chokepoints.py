@@ -46,7 +46,7 @@ def test_finalize_turn_scrubs_lone_surrogate_from_final_response(monkeypatch):
     — not the sanitized history copy — so without the chokepoint a lone
     surrogate reaches oneshot stdout / gateway delivery and crashes there.
     """
-    monkeypatch.setattr("hermes_cli.plugins.invoke_hook", lambda *_a, **_kw: [])
+    monkeypatch.setattr("x19_cli.plugins.invoke_hook", lambda *_a, **_kw: [])
     agent = FakeAgent()
     dirty = f"answer {LONE_HIGH} and {LONE_LOW} here"
     messages = [
@@ -79,7 +79,7 @@ def test_finalize_turn_scrubs_lone_surrogate_from_final_response(monkeypatch):
 
 
 def test_finalize_turn_leaves_non_string_final_response_alone(monkeypatch):
-    monkeypatch.setattr("hermes_cli.plugins.invoke_hook", lambda *_a, **_kw: [])
+    monkeypatch.setattr("x19_cli.plugins.invoke_hook", lambda *_a, **_kw: [])
     agent = FakeAgent()
     result = finalize_turn(
         agent,

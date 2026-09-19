@@ -70,7 +70,7 @@ const bundle = await build({
   format: 'esm',
   platform: 'browser',
   jsx: 'automatic',
-  alias: { '@': repo + '/apps/desktop/src', '@hermes/shared': repo + '/apps/shared/src' },
+  alias: { '@': repo + '/apps/desktop/src', '@x19/shared': repo + '/apps/shared/src' },
   define: {
     'process.env.NODE_ENV': '"production"',
     'import.meta.env': '{}',
@@ -116,7 +116,7 @@ try {
   })
   await page.exposeFunction('nativeOAuth', async (action, id) => {
     nativeCalls.push({ action, id })
-    return handlers.get('hermes:mcp-oauth:' + action)({}, id)
+    return handlers.get('x19:mcp-oauth:' + action)({}, id)
   })
   await page.exposeFunction('fixtureConnection', async scope => {
     nativeCalls.push({ action: 'connection', scope })
@@ -132,7 +132,7 @@ try {
     await fetch(u.searchParams.get('redirect_uri') + '?code=fixture-code&state=' + u.searchParams.get('state'))
   })
   await page.addInitScript(() => {
-    window.hermesDesktop = {
+    window.x19Desktop = {
       api: r => window.recordRequest(r),
       getConnectionFor: r => window.fixtureConnection(r),
       mcpOauth: {

@@ -80,7 +80,7 @@ describe('DiffusionCanvas scheduling', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
   })
 
   it('keeps animating while unfocused but cancels its loop while minimized', () => {
@@ -160,7 +160,7 @@ describe('DiffusionCanvas frame budget', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { x19Desktop?: unknown }).x19Desktop
   })
 
   it('paints at most ~15fps: frames inside the interval reschedule without redrawing', () => {

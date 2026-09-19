@@ -9,7 +9,7 @@ import pytest
 from agent.think_scrubber import THINK_CLOSE_TAGS, THINK_OPEN_TAGS, THINK_TAG_NAMES
 from gateway.stream_consumer import GatewayStreamConsumer, StreamConsumerConfig
 from gateway.stream_consumer_think import StreamThinkFilterMixin
-from hermes_cli import cli_stream_mixin
+from x19_cli import cli_stream_mixin
 
 
 def test_stream_send_metadata_carries_original_reply_anchor():
@@ -253,7 +253,7 @@ class TestStreamRunMediaStripping:
 
         # Feed deltas
         consumer.on_delta("Here is your generated image\n")
-        consumer.on_delta("MEDIA:/home/user/.hermes/cache/images/abc123.png")
+        consumer.on_delta("MEDIA:/home/user/.x19/cache/images/abc123.png")
         consumer.finish()
 
         await consumer.run()
@@ -1223,7 +1223,7 @@ class TestUtf16OverflowDetection:
 
         # The fix: stream consumer detects UTF-16 overflow using the adapter's
         # length function.  Without that, len() would return 2200 (under the
-        # limit) and Hermes would attempt a single over-limit Telegram send.
+        # limit) and X19 would attempt a single over-limit Telegram send.
         sent_texts = [call.kwargs["content"] for call in adapter.send.call_args_list]
         assert len(sent_texts) == 2, (
             "UTF-16 overflow not detected — emoji text bypassed split path"

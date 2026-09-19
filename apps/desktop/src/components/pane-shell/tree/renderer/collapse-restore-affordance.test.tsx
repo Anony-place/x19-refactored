@@ -92,11 +92,11 @@ const zoneAt = (index: number) => {
 describe('Sessions/Bots strip — #91223', () => {
   beforeEach(() => {
     registerPane('sessions', { hideOnly: true, placement: 'left' }, 'Sessions')
-    registerPane('hermes-bots:pane', { hideOnly: true, placement: 'left' }, 'Bots')
+    registerPane('x19-bots:pane', { hideOnly: true, placement: 'left' }, 'Bots')
     registerPane('workspace', { placement: 'main', uncloseable: true }, 'Chat')
     $layoutTree.set(
       split('row', [
-        group(['sessions', 'hermes-bots:pane'], { active: 'sessions', id: 'g-side' }),
+        group(['sessions', 'x19-bots:pane'], { active: 'sessions', id: 'g-side' }),
         group(['workspace'], { active: 'workspace', id: 'g-main' })
       ])
     )
@@ -109,7 +109,7 @@ describe('Sessions/Bots strip — #91223', () => {
 
     expect(tablist()).toBeTruthy()
     expect(tabEl('sessions')).toBeTruthy()
-    expect(tabEl('hermes-bots:pane')).toBeTruthy()
+    expect(tabEl('x19-bots:pane')).toBeTruthy()
     expect(zoneAt(0).minimized).toBeFalsy()
     expect(zoneAt(0).tabStrip).toBeUndefined()
   })
@@ -117,12 +117,12 @@ describe('Sessions/Bots strip — #91223', () => {
   it('double-clicking the Bots tab leaves the strip too', () => {
     render(<LiveTreeGroup parentAxis="row" />)
 
-    tap(tabEl('hermes-bots:pane')!)
-    doubleTap(tabEl('hermes-bots:pane')!)
+    tap(tabEl('x19-bots:pane')!)
+    doubleTap(tabEl('x19-bots:pane')!)
 
     expect(tablist()).toBeTruthy()
     expect(tabEl('sessions')).toBeTruthy()
-    expect(tabEl('hermes-bots:pane')).toBeTruthy()
+    expect(tabEl('x19-bots:pane')).toBeTruthy()
   })
 
   it('tapping the strip gutter does not collapse the sidebar', () => {
@@ -132,7 +132,7 @@ describe('Sessions/Bots strip — #91223', () => {
 
     expect(zoneAt(0).minimized).toBeFalsy()
     expect(tabEl('sessions')).toBeTruthy()
-    expect(tabEl('hermes-bots:pane')).toBeTruthy()
+    expect(tabEl('x19-bots:pane')).toBeTruthy()
   })
 
   it('an explicit never hides the sessions/Bots strip', () => {
@@ -148,11 +148,11 @@ describe('Sessions/Bots strip — #91223', () => {
 describe('docked tool tile — collapsing keeps the restore chip', () => {
   beforeEach(() => {
     registerPane('workspace', { placement: 'main', uncloseable: true }, 'Chat')
-    registerPane('hermes-bots:routines', { placement: 'main', width: '250px' }, 'Cronjobs')
+    registerPane('x19-bots:routines', { placement: 'main', width: '250px' }, 'Cronjobs')
     $layoutTree.set(
       split('row', [
         group(['workspace'], { active: 'workspace', id: 'g-main' }),
-        group(['hermes-bots:routines'], { active: 'hermes-bots:routines', id: 'g-routines' })
+        group(['x19-bots:routines'], { active: 'x19-bots:routines', id: 'g-routines' })
       ])
     )
   })
@@ -160,12 +160,12 @@ describe('docked tool tile — collapsing keeps the restore chip', () => {
   it('clicking the active tab does not collapse the tile or drop its label', () => {
     render(<LiveTreeGroup index={1} parentAxis="row" />)
 
-    expect(tabEl('hermes-bots:routines')).toBeTruthy()
-    tap(tabEl('hermes-bots:routines')!)
+    expect(tabEl('x19-bots:routines')).toBeTruthy()
+    tap(tabEl('x19-bots:routines')!)
 
     expect(zoneAt(1).minimized).toBeFalsy()
-    expect(tabEl('hermes-bots:routines')).toBeTruthy()
-    expect(tabEl('hermes-bots:routines')?.textContent).toMatch(/cronjobs/i)
+    expect(tabEl('x19-bots:routines')).toBeTruthy()
+    expect(tabEl('x19-bots:routines')?.textContent).toMatch(/cronjobs/i)
   })
 
   it('tapping the strip gutter does not collapse a lone docked tile', () => {
@@ -174,7 +174,7 @@ describe('docked tool tile — collapsing keeps the restore chip', () => {
     tap(globalThis.document.querySelector('[data-zone-tabstrip="g-routines"]')!)
 
     expect(zoneAt(1).minimized).toBeFalsy()
-    expect(tabEl('hermes-bots:routines')).toBeTruthy()
+    expect(tabEl('x19-bots:routines')).toBeTruthy()
   })
 
   it('chevron-collapse of a row-docked tile keeps the tab as a restore handle', () => {
@@ -183,20 +183,20 @@ describe('docked tool tile — collapsing keeps the restore chip', () => {
     fireEvent.click(globalThis.document.querySelector('[data-tree-group="g-routines"] button[aria-label="Minimize"]')!)
 
     expect(zoneAt(1).minimized).toBe(true)
-    expect(tabEl('hermes-bots:routines')).toBeTruthy()
-    expect(tabEl('hermes-bots:routines')?.textContent).toMatch(/cronjobs/i)
+    expect(tabEl('x19-bots:routines')).toBeTruthy()
+    expect(tabEl('x19-bots:routines')?.textContent).toMatch(/cronjobs/i)
   })
 
   it('collapsing via the store does not dismiss the pane from the tree', () => {
-    collapseTreePane('hermes-bots:routines')
+    collapseTreePane('x19-bots:routines')
 
     expect(zoneAt(1).minimized).toBe(true)
-    expect($dismissedPanes.get().has('hermes-bots:routines')).toBe(false)
-    expect(zoneAt(1).panes).toContain('hermes-bots:routines')
+    expect($dismissedPanes.get().has('x19-bots:routines')).toBe(false)
+    expect(zoneAt(1).panes).toContain('x19-bots:routines')
 
     render(<LiveTreeGroup index={1} parentAxis="row" />)
 
-    expect(tabEl('hermes-bots:routines')).toBeTruthy()
+    expect(tabEl('x19-bots:routines')).toBeTruthy()
   })
 })
 

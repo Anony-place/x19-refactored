@@ -22,15 +22,15 @@ import jwt
 import pytest
 from starlette.testclient import TestClient
 
-from hermes_cli import web_server
-from hermes_cli.dashboard_auth import (
+from x19_cli import web_server
+from x19_cli.dashboard_auth import (
     InvalidCodeError,
     ProviderError,
     classify_jwks_lookup_error,
     clear_providers,
     register_provider,
 )
-from hermes_cli.dashboard_auth.cookies import SESSION_AT_COOKIE
+from x19_cli.dashboard_auth.cookies import SESSION_AT_COOKIE
 import plugins.dashboard_auth.nous as nous_plugin
 
 OPAQUE_PEER_KEY = "hk_live_opaque_peer_key_0123456789abcdef"
@@ -117,7 +117,7 @@ def test_self_hosted_provider_shares_the_classification(empty_jwks_server, monke
 
     provider = object.__new__(sh.SelfHostedOIDCProvider)
     provider._jwks_client = None
-    provider._client_id = "hermes"
+    provider._client_id = "x19"
     monkeypatch.setattr(
         provider, "_get_discovery",
         lambda: {"jwks_uri": f"{empty_jwks_server}/jwks", "issuer": empty_jwks_server},

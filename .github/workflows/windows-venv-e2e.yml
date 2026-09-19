@@ -3,7 +3,7 @@ name: Windows venv-holder live E2E
 # ON-DEMAND ONLY (fleet-update #91277, venv-holder consolidation work).
 #
 # Runs the live venv-holder E2E suite on a real windows-latest runner:
-# spawns actual processes with realistic Hermes argv shapes and drives the
+# spawns actual processes with realistic X19 argv shapes and drives the
 # REAL detection/classification/exemption code against the live process
 # table — the coverage that cannot exist on the Linux lanes and that the
 # maintainer cannot exercise locally before the work reaches main.
@@ -57,10 +57,10 @@ jobs:
         run: |
           set -uo pipefail
           uv run --no-sync python -m pytest \
-            tests/hermes_cli/test_venv_holder_windows_live.py \
-            tests/hermes_cli/test_taskkill_identity_windows_live.py \
-            tests/hermes_cli/test_git_trampoline_windows_live.py \
-            tests/hermes_cli/test_managed_uv_windows_cutover.py \
+            tests/x19_cli/test_venv_holder_windows_live.py \
+            tests/x19_cli/test_taskkill_identity_windows_live.py \
+            tests/x19_cli/test_git_trampoline_windows_live.py \
+            tests/x19_cli/test_managed_uv_windows_cutover.py \
             -o addopts= -v -p no:cacheprovider
 
       - name: Run Telegram CLOSE-WAIT reconnect live E2E (#87057)

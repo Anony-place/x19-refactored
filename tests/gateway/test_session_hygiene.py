@@ -302,7 +302,7 @@ async def test_session_hygiene_preserves_transcript_when_no_rotation(monkeypatch
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -464,7 +464,7 @@ async def test_session_hygiene_preserves_transcript_when_in_place_configured_but
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -501,7 +501,7 @@ async def test_session_hygiene_timeout_continues_to_agent_and_sets_cooldown(monk
     timeout must fence its eventual commit, continue to the live agent, and
     clean up the temporary agent only after the worker actually returns.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
@@ -604,7 +604,7 @@ async def test_session_hygiene_timeout_continues_to_agent_and_sets_cooldown(monk
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -771,7 +771,7 @@ async def test_session_hygiene_turn_hold_budget_abandons_streaming_wait(
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -810,9 +810,9 @@ async def test_session_hygiene_turn_hold_budget_abandons_streaming_wait(
     # Behavior witness 1: turn-hold expiry must NOT stamp the idle-timeout
     # provenance or send the "no output" user message.
     sent_contents = [m["content"] for m in adapter.sent]
-    # The idle-timeout copy is the only one that adds the `hermes doctor` pointer.
+    # The idle-timeout copy is the only one that adds the `x19 doctor` pointer.
     assert not any(
-        "took too long" in c.lower() and "hermes doctor" in c.lower()
+        "took too long" in c.lower() and "x19 doctor" in c.lower()
         for c in sent_contents
     ), f"turn-hold must not send idle-timeout message, got: {sent_contents}"
     assert any(
@@ -949,7 +949,7 @@ async def test_session_hygiene_idle_timeout_still_takes_failure_path(
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -978,12 +978,12 @@ async def test_session_hygiene_idle_timeout_still_takes_failure_path(
     assert worker_started.is_set()
     assert runner._run_agent.await_count == 1
 
-    # Behavior witness: idle timeout MUST send the idle-timeout message (with the `hermes doctor` pointer).
+    # Behavior witness: idle timeout MUST send the idle-timeout message (with the `x19 doctor` pointer).
     sent_contents = [m["content"] for m in adapter.sent]
     assert any(
-        "took too long" in c.lower() and "hermes doctor" in c.lower()
+        "took too long" in c.lower() and "x19 doctor" in c.lower()
         for c in sent_contents
-    ), f"idle timeout must send the took-too-long + hermes doctor message, got: {sent_contents}"
+    ), f"idle timeout must send the took-too-long + x19 doctor message, got: {sent_contents}"
 
     # Behavior witness: idle timeout MUST advance the failure cooldown.
     # The gateway calls _hygiene_cooldown_for_failure + _record_hygiene_cooldown.
@@ -1015,7 +1015,7 @@ async def test_session_hygiene_forces_in_place_compaction_with_bound_session_db(
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
 
     stored_system_prompt = (
-        "You are Hermes.\n\n"
+        "You are X19.\n\n"
         "<memory_provider_context>\n"
         "Pinboard provider instructions\n"
         "</memory_provider_context>"
@@ -1104,7 +1104,7 @@ async def test_session_hygiene_forces_in_place_compaction_with_bound_session_db(
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(
         gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"}
     )
@@ -1240,7 +1240,7 @@ async def test_session_hygiene_honors_configurable_hard_message_limit(
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(
         gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"}
     )
@@ -1331,7 +1331,7 @@ def _make_progress_runner(monkeypatch, tmp_path, agent_cls, cfg_text):
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -1361,7 +1361,7 @@ def _make_cooldown_runner(monkeypatch, tmp_path, agent_cls, session_db, session_
     """Scaffolding for the restart-persistence tests: a fresh GatewayRunner
     wired to a REAL AsyncSessionDB facade (not a MagicMock) so the hygiene
     cooldown check/write paths exercise the actual SQLite-backed methods."""
-    from hermes_state import AsyncSessionDB
+    from x19_state import AsyncSessionDB
 
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
@@ -1422,7 +1422,7 @@ def _make_cooldown_runner(monkeypatch, tmp_path, agent_cls, session_db, session_
         }
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"})
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -1454,7 +1454,7 @@ async def test_hygiene_compression_cooldown_survives_gateway_restart(
     assert the second runner still honors the cooldown — i.e. it does not
     re-instantiate a compression agent for the same failing session.
     """
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     gateway_run = importlib.import_module("gateway.run")
     session_id = "sess-restart"
@@ -1576,7 +1576,7 @@ async def test_hygiene_fence_cancel_records_cooldown_without_abort_flag(
     That used to skip the abort-cooldown block, so the next turn immediately
     re-armed hygiene and waited up to the 600s ceiling behind a doomed attempt.
     """
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     gateway_run = importlib.import_module("gateway.run")
     session_id = "sess-fence-cancel"
@@ -1656,7 +1656,7 @@ async def test_hygiene_does_not_wait_ceiling_after_fence_cancel(
     """Once the commit fence is cancelled, the host must stop extending the
     wait — even if the shielded worker is still alive and touching progress.
     """
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     worker_started = threading.Event()
     release_worker = threading.Event()
@@ -1729,7 +1729,7 @@ async def test_hygiene_skips_when_compression_already_in_flight(
     monkeypatch, tmp_path
 ):
     """Do not spawn a sibling hygiene compressor while a lock is already held."""
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     session_id = "sess-in-flight"
 
@@ -1770,7 +1770,7 @@ async def test_hygiene_unwind_records_cooldown(monkeypatch, tmp_path):
     ``except BaseException`` used to revoke the fence and re-raise with no
     cooldown, so the next turn after /restart re-triggered hygiene immediately.
     """
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     worker_started = threading.Event()
     release_worker = threading.Event()
@@ -1858,7 +1858,7 @@ def _turn_payload(runner):
 
 def _make_bound_runner(monkeypatch, tmp_path, agent_cls, cfg_text, transcript):
     """``_make_cooldown_runner`` with a >hard-limit transcript and a lowered hard limit."""
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
 
     db = SessionDB(db_path=tmp_path / "state.db")
     db.create_session("sess-bound", "telegram")

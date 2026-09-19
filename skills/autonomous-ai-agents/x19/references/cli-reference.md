@@ -1,7 +1,7 @@
 # X19 CLI Reference
 
 Live sources when anything looks stale: `x19 --help`, `x19 <command> --help`,
-https://x19.nousresearch.com/docs/reference/cli-commands
+https://anony-place.github.io/x19-refactored/docs/reference/cli-commands
 
 ### Global Flags
 
@@ -79,7 +79,7 @@ x19 gateway run|install|start|stop|restart|status|setup
 ```
 
 20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `x19 photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
-Docs: https://x19.nousresearch.com/docs/user-guide/messaging/
+Docs: https://anony-place.github.io/x19-refactored/docs/user-guide/messaging/
 
 ### Sessions
 
@@ -142,10 +142,10 @@ Plugin- and provider-supplied subcommands (e.g. `x19 photon setup`) only appear 
 
 | Looking for... | Location |
 |---|---|
-| Config options | `x19 config edit` · [Configuration docs](https://x19.nousresearch.com/docs/user-guide/configuration) |
-| Tools / toolsets | `x19 tools list` · [Tools reference](https://x19.nousresearch.com/docs/reference/tools-reference) |
-| Skills catalog | `x19 skills browse` · [Skills catalog](https://x19.nousresearch.com/docs/reference/skills-catalog) |
-| Provider setup | `x19 model` · [Providers guide](https://x19.nousresearch.com/docs/integrations/providers) |
-| Env variables | `x19 config env-path` · [Env vars reference](https://x19.nousresearch.com/docs/reference/environment-variables) |
+| Config options | `x19 config edit` · [Configuration docs](https://anony-place.github.io/x19-refactored/docs/user-guide/configuration) |
+| Tools / toolsets | `x19 tools list` · [Tools reference](https://anony-place.github.io/x19-refactored/docs/reference/tools-reference) |
+| Skills catalog | `x19 skills browse` · [Skills catalog](https://anony-place.github.io/x19-refactored/docs/reference/skills-catalog) |
+| Provider setup | `x19 model` · [Providers guide](https://anony-place.github.io/x19-refactored/docs/integrations/providers) |
+| Env variables | `x19 config env-path` · [Env vars reference](https://anony-place.github.io/x19-refactored/docs/reference/environment-variables) |
 | Gateway logs | `~/.x19/logs/gateway.log` (or `x19 logs`) |
 | Sessions | `x19 sessions browse` (reads state.db) |

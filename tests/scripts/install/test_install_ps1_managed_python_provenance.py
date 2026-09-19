@@ -1,4 +1,4 @@
-"""Behavioral regression for Hermes-managed Python provenance on Windows."""
+"""Behavioral regression for X19-managed Python provenance on Windows."""
 
 from __future__ import annotations
 
@@ -35,8 +35,8 @@ def test_fresh_install_manifest_orders_repo_before_checkout_scoped_python(
             "-File",
             str(_INSTALL_PS1),
             "-Manifest",
-            "-HermesHome",
-            str(tmp_path / "hermes-home"),
+            "-X19Home",
+            str(tmp_path / "x19-home"),
             "-InstallDir",
             str(install_dir),
         ],
@@ -61,7 +61,7 @@ def test_fresh_install_manifest_orders_repo_before_checkout_scoped_python(
 def _run_venv_stage(
     powershell: str,
     tmp_path: Path,
-    hermes_home: Path,
+    x19_home: Path,
     install_dir: Path,
     env: dict[str, str],
 ) -> subprocess.CompletedProcess[str]:
@@ -75,8 +75,8 @@ def _run_venv_stage(
             str(_INSTALL_PS1),
             "-Stage",
             "venv",
-            "-HermesHome",
-            str(hermes_home),
+            "-X19Home",
+            str(x19_home),
             "-InstallDir",
             str(install_dir),
         ],
@@ -96,13 +96,13 @@ def test_venv_stage_rejects_third_party_python_and_uses_managed_path(
     if not powershell:
         pytest.skip("Windows PowerShell is required")
 
-    hermes_home = tmp_path / "hermes-home"
+    x19_home = tmp_path / "x19-home"
     install_dir = tmp_path / "install"
-    managed_root = install_dir / ".hermes-runtime" / "python"
+    managed_root = install_dir / ".x19-runtime" / "python"
     managed_python = managed_root / "cpython-3.11" / "python.exe"
     third_party = tmp_path / "KiCad" / "bin" / "python.exe"
     log = tmp_path / "uv.log"
-    uv = hermes_home / "bin" / "uv.exe"
+    uv = x19_home / "bin" / "uv.exe"
     uv.parent.mkdir(parents=True)
     install_dir.mkdir()
     managed_python.parent.mkdir(parents=True)
@@ -120,7 +120,7 @@ def test_venv_stage_rejects_third_party_python_and_uses_managed_path(
         "UV_NO_MANAGED_PYTHON": "1",
         "UV_SYSTEM_PYTHON": "1",
     }
-    run = _run_venv_stage(powershell, tmp_path, hermes_home, install_dir, env)
+    run = _run_venv_stage(powershell, tmp_path, x19_home, install_dir, env)
     installer_stdout = run.stdout
     installer_stderr = run.stderr
     frames = [
@@ -146,12 +146,12 @@ def test_fallback_minor_is_reported_from_resolved_managed_interpreter(
     if not powershell:
         pytest.skip("Windows PowerShell is required")
 
-    hermes_home = tmp_path / "hermes-home"
+    x19_home = tmp_path / "x19-home"
     install_dir = tmp_path / "install"
     managed_python = (
-        install_dir / ".hermes-runtime" / "python" / "cpython-3.12" / "python.exe"
+        install_dir / ".x19-runtime" / "python" / "cpython-3.12" / "python.exe"
     )
-    uv = hermes_home / "bin" / "uv.exe"
+    uv = x19_home / "bin" / "uv.exe"
     uv.parent.mkdir(parents=True)
     managed_python.parent.mkdir(parents=True)
     install_dir.mkdir(exist_ok=True)
@@ -165,7 +165,7 @@ def test_fallback_minor_is_reported_from_resolved_managed_interpreter(
         "FAKE_PYTHON_VERSION": "Python 3.12.13",
     }
 
-    run = _run_venv_stage(powershell, tmp_path, hermes_home, install_dir, env)
+    run = _run_venv_stage(powershell, tmp_path, x19_home, install_dir, env)
 
     assert run.returncode == 0, run.stdout + run.stderr
     assert "Creating virtual environment with Python 3.12" in run.stdout
@@ -186,12 +186,12 @@ def test_python_find_drains_large_stderr_without_deadlock(tmp_path: Path) -> Non
     if not powershell:
         pytest.skip("Windows PowerShell is required")
 
-    hermes_home = tmp_path / "hermes-home"
+    x19_home = tmp_path / "x19-home"
     install_dir = tmp_path / "install"
     managed_python = (
-        install_dir / ".hermes-runtime" / "python" / "cpython-3.11" / "python.exe"
+        install_dir / ".x19-runtime" / "python" / "cpython-3.11" / "python.exe"
     )
-    uv = hermes_home / "bin" / "uv.exe"
+    uv = x19_home / "bin" / "uv.exe"
     uv.parent.mkdir(parents=True)
     managed_python.parent.mkdir(parents=True)
     compile_fake_uv(powershell, uv)
@@ -203,7 +203,7 @@ def test_python_find_drains_large_stderr_without_deadlock(tmp_path: Path) -> Non
         "FAKE_UV_FIND_STDERR_BYTES": str(1024 * 1024),
     }
 
-    run = _run_venv_stage(powershell, tmp_path, hermes_home, install_dir, env)
+    run = _run_venv_stage(powershell, tmp_path, x19_home, install_dir, env)
 
     assert run.returncode == 0, run.stdout + run.stderr
     assert "Creating virtual environment with Python 3.11" in run.stdout
@@ -214,9 +214,9 @@ def test_python_find_timeout_kills_uv_and_fails_stage(tmp_path: Path) -> None:
     if not powershell:
         pytest.skip("Windows PowerShell is required")
 
-    hermes_home = tmp_path / "hermes-home"
+    x19_home = tmp_path / "x19-home"
     install_dir = tmp_path / "install"
-    uv = hermes_home / "bin" / "uv.exe"
+    uv = x19_home / "bin" / "uv.exe"
     uv.parent.mkdir(parents=True)
     install_dir.mkdir()
     compile_fake_uv(powershell, uv)
@@ -226,7 +226,7 @@ def test_python_find_timeout_kills_uv_and_fails_stage(tmp_path: Path) -> None:
         "FAKE_UV_FIND_DELAY_MS": "60000",
     }
 
-    run = _run_venv_stage(powershell, tmp_path, hermes_home, install_dir, env)
+    run = _run_venv_stage(powershell, tmp_path, x19_home, install_dir, env)
 
     assert run.returncode != 0
     assert "uv python find 3.11 timed out after 30000 ms" in (run.stdout + run.stderr)
@@ -239,13 +239,13 @@ def test_venv_failure_fails_stage_and_restores_existing_environment(
     if not powershell:
         pytest.skip("Windows PowerShell is required")
 
-    hermes_home = tmp_path / "hermes-home"
+    x19_home = tmp_path / "x19-home"
     install_dir = tmp_path / "install"
     managed_python = (
-        install_dir / ".hermes-runtime" / "python" / "cpython-3.11" / "python.exe"
+        install_dir / ".x19-runtime" / "python" / "cpython-3.11" / "python.exe"
     )
     old_python = install_dir / "venv" / "Scripts" / "python.exe"
-    uv = hermes_home / "bin" / "uv.exe"
+    uv = x19_home / "bin" / "uv.exe"
     for directory in (uv.parent, managed_python.parent, old_python.parent):
         directory.mkdir(parents=True, exist_ok=True)
     old_python.write_text("previous environment", encoding="ascii")
@@ -258,7 +258,7 @@ def test_venv_failure_fails_stage_and_restores_existing_environment(
         "FAKE_UV_VENV_EXIT": "37",
     }
 
-    run = _run_venv_stage(powershell, tmp_path, hermes_home, install_dir, env)
+    run = _run_venv_stage(powershell, tmp_path, x19_home, install_dir, env)
 
     assert run.returncode != 0
     assert "Failed to create virtual environment (uv venv exited with 37)" in (

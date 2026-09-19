@@ -1,9 +1,9 @@
 """Anthropic credential sources, OAuth flows, and token resolution.
 
 ``resolve_anthropic_token()`` order: ``ANTHROPIC_TOKEN`` / ``CLAUDE_CODE_OAUTH_TOKEN``,
-``ANTHROPIC_API_KEY``, Hermes-owned OAuth grants in the ``auth.json`` credential
+``ANTHROPIC_API_KEY``, X19-owned OAuth grants in the ``auth.json`` credential
 pool, then ``~/.claude/.credentials.json`` / macOS Keychain as a borrowed fallback.
-``~/.hermes/.anthropic_oauth.json`` (Hermes PKCE) and
+``~/.x19/.anthropic_oauth.json`` (X19 PKCE) and
 the Claude Code file are *singletons*: ``credential_pool._seed_from_singletons()``
 re-reads them on every ``load_pool()``, so a failed write here is a failed refresh
 (``CredentialPersistError``), not a cache miss.
@@ -25,7 +25,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 from utils import atomic_json_write
 from agent.secret_scope import get_secret as _get_secret
 
@@ -107,14 +107,14 @@ _SPENT_ROTATION_FINGERPRINTS: "OrderedDict[str, None]" = OrderedDict()
 _SPENT_ROTATION_MAX_TRACKED = 64
 _SPENT_ROTATION_SIDECAR_COMMENT = (
     "Non-secret one-way fingerprints of Anthropic OAuth credentials whose rotation was "
-    "consumed server-side but never durably committed. Written by Hermes so sibling "
+    "consumed server-side but never durably committed. Written by X19 so sibling "
     "processes sharing this credential source fail closed instead of replaying a spent "
     "single-use refresh token."
 )
 
 
 def _spent_rotation_sidecar_path(source_path: Path) -> Path:
-    return source_path.with_name(source_path.name + ".hermes-spent-rotations.json")
+    return source_path.with_name(source_path.name + ".x19-spent-rotations.json")
 
 
 def spent_rotation_source_path(source: Any) -> Optional[Path]:
@@ -188,7 +188,7 @@ def is_rotation_consumed_uncommitted(secret: Any, *, source_path: Optional[Path]
 # ── Claude Code credentials (Keychain / ~/.claude/.credentials.json) ──
 # Only singleton-backed pool sources have a cross-process authority boundary.
 _SINGLETON_SOURCE_PATHS = {
-    "claude_code": lambda: claude_code_credentials_path(), "hermes_pkce": lambda: _get_hermes_oauth_file()
+    "claude_code": lambda: claude_code_credentials_path(), "x19_pkce": lambda: _get_x19_oauth_file()
 }
 
 
@@ -229,8 +229,8 @@ def _read_claude_code_credentials_from_keychain() -> Optional[Dict[str, Any]]:
 
 def claude_code_credentials_path() -> Path:
     """Claude Code's shared OAuth file; every profile reads/writes this same path. Honours ``CLAUDE_CONFIG_DIR``
-    like the Claude CLI itself (blank = unset, as in ``hermes_cli.foreign_sessions``), so pointing it at an
-    empty directory opts a Hermes process out of borrowing the login."""
+    like the Claude CLI itself (blank = unset, as in ``x19_cli.foreign_sessions``), so pointing it at an
+    empty directory opts a X19 process out of borrowing the login."""
     override = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
     root = Path(override).expanduser() if override else Path.home() / ".claude"
     return root / ".credentials.json"
@@ -355,8 +355,8 @@ def _refresh_oauth_token(creds: Dict[str, Any]) -> Optional[str]:
     token instead of racing it into ``invalid_grant``. Read, decision, POST and write-back share the pool's
     path-keyed cross-process lock (else two profiles can spend one refresh token)."""
     try:
-        from hermes_cli.auth import AUTH_LOCK_TIMEOUT_SECONDS, _auth_store_lock, env_float
-        refresh_timeout_seconds = env_float("HERMES_ANTHROPIC_REFRESH_TIMEOUT_SECONDS", 20)
+        from x19_cli.auth import AUTH_LOCK_TIMEOUT_SECONDS, _auth_store_lock, env_float
+        refresh_timeout_seconds = env_float("X19_ANTHROPIC_REFRESH_TIMEOUT_SECONDS", 20)
         lock_timeout_seconds = max(float(AUTH_LOCK_TIMEOUT_SECONDS), float(refresh_timeout_seconds) + 5.0)
         cred_path = claude_code_credentials_path()
         with _auth_store_lock(timeout_seconds=lock_timeout_seconds, target_path=cred_path):
@@ -375,7 +375,7 @@ def _refresh_oauth_token(creds: Dict[str, Any]) -> Optional[str]:
             # Another process may have spent this token and lost the commit; its sidecar verdict is authoritative.
             if is_rotation_consumed_uncommitted(refresh_token, source_path=cred_path):
                 logger.debug("Refresh token was already consumed by an uncommitted rotation "
-                             "- refusing to replay it; run 'hermes auth add anthropic'")
+                             "- refusing to replay it; run 'x19 auth add anthropic'")
                 return None
             fingerprint = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()[:32]
             if fingerprint in _DEAD_REFRESH_TOKEN_FINGERPRINTS:
@@ -387,8 +387,8 @@ def _refresh_oauth_token(creds: Dict[str, Any]) -> Optional[str]:
                 if is_terminal_anthropic_refresh_error(e):
                     _DEAD_REFRESH_TOKEN_FINGERPRINTS.add(fingerprint)
                     logger.warning(
-                        "Claude Code OAuth refresh token is terminally invalid (%s); Hermes cannot use this "
-                        "login. Run 'hermes auth add anthropic' to give Hermes its own login.", e)
+                        "Claude Code OAuth refresh token is terminally invalid (%s); X19 cannot use this "
+                        "login. Run 'x19 auth add anthropic' to give X19 its own login.", e)
                 else:
                     logger.debug("Failed to refresh Claude Code token: %s", e)
                 return None
@@ -400,7 +400,7 @@ def _refresh_oauth_token(creds: Dict[str, Any]) -> Optional[str]:
                 logger.error(
                     "Anthropic OAuth refresh rotated the single-use token but could not "
                     "commit it to %s (%s) — treating the refresh as failed; "
-                    "run 'hermes auth add anthropic' to give Hermes its own login",
+                    "run 'x19 auth add anthropic' to give X19 its own login",
                     cred_path, e,
                 )
                 mark_rotation_consumed_uncommitted(
@@ -455,12 +455,12 @@ def _resolve_claude_code_token_from_credentials(creds: Optional[Dict[str, Any]] 
     logger.debug("Claude Code credentials expired — attempting refresh")
     refreshed = _refresh_oauth_token(creds)
     if not refreshed:
-        logger.debug("Token refresh failed — run 'hermes auth add anthropic' to give Hermes its own login")
+        logger.debug("Token refresh failed — run 'x19 auth add anthropic' to give X19 its own login")
     return refreshed or None
 
 
 def _prefer_refreshable_claude_code_token(env_token: str, creds: Optional[Dict[str, Any]]) -> Optional[str]:
-    """Prefer refreshable Claude Code creds over a static env OAuth token: Hermes historically persisted setup tokens
+    """Prefer refreshable Claude Code creds over a static env OAuth token: X19 historically persisted setup tokens
     into ANTHROPIC_TOKEN, and that static token would otherwise win before the refreshable file is inspected."""
     if not (env_token and _is_oauth_token(env_token) and isinstance(creds, dict) and creds.get("refreshToken")):
         return None
@@ -473,7 +473,7 @@ def _prefer_refreshable_claude_code_token(env_token: str, creds: Optional[Dict[s
 
 def _resolve_anthropic_pool_token(*, skip_borrowed: bool = False) -> Optional[str]:
     """First available Anthropic OAuth token from credential_pool, read-only: enumerates with ``clear_expired=False,
-    refresh=False`` (never ``select()``) so diagnostic call sites (account_usage, ``hermes models``) never mutate
+    refresh=False`` (never ``select()``) so diagnostic call sites (account_usage, ``x19 models``) never mutate
     auth.json or hit the network; refresh-on-expiry belongs to the API call path's pool recovery."""
     try:
         from agent.credential_pool import AUTH_TYPE_OAUTH, load_pool
@@ -558,11 +558,11 @@ def run_oauth_setup_token() -> Optional[str]:
     return _first_env("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_TOKEN") or None
 
 
-# ── Hermes-native PKCE OAuth flow (~/.hermes/.anthropic_oauth.json); mirrors Claude Code / pi-ai / OpenCode ──
+# ── X19-native PKCE OAuth flow (~/.x19/.anthropic_oauth.json); mirrors Claude Code / pi-ai / OpenCode ──
 
 
-def _get_hermes_oauth_file() -> Path:
-    return get_hermes_home() / ".anthropic_oauth.json"
+def _get_x19_oauth_file() -> Path:
+    return get_x19_home() / ".anthropic_oauth.json"
 
 
 def _generate_pkce() -> tuple:
@@ -572,8 +572,8 @@ def _generate_pkce() -> tuple:
     return verifier, challenge
 
 
-def run_hermes_oauth_login_pure() -> Optional[Dict[str, Any]]:
-    """Run Hermes-native OAuth PKCE flow and return credential state."""
+def run_x19_oauth_login_pure() -> Optional[Dict[str, Any]]:
+    """Run X19-native OAuth PKCE flow and return credential state."""
     import webbrowser
     from urllib.parse import urlencode
     verifier, challenge = _generate_pkce()
@@ -584,7 +584,7 @@ def run_hermes_oauth_login_pure() -> Optional[Dict[str, Any]]:
     }
     auth_url = f"https://claude.ai/oauth/authorize?{urlencode(params)}"
     print("\n".join([
-        "", "Authorize Hermes with your Claude Pro/Max subscription.", "",
+        "", "Authorize X19 with your Claude Pro/Max subscription.", "",
         "╭─ Claude Pro/Max Authorization ────────────────────╮",
         "│                                                   │",
         "│  Open this link in your browser:                  │",
@@ -592,7 +592,7 @@ def run_hermes_oauth_login_pure() -> Optional[Dict[str, Any]]:
         "", f"  {auth_url}", "",
     ]))
     try:
-        from hermes_cli.auth import _can_open_graphical_browser as _can_open_gui
+        from x19_cli.auth import _can_open_graphical_browser as _can_open_gui
     except Exception:
         _can_open_gui = lambda: True  # noqa: E731 — degrade to prior behavior
     if _can_open_gui():
@@ -627,20 +627,20 @@ def run_hermes_oauth_login_pure() -> Optional[Dict[str, Any]]:
     return _oauth_token_state(result)
 
 
-def read_hermes_oauth_credentials() -> Optional[Dict[str, Any]]:
-    """Read Hermes-managed OAuth credentials from ~/.hermes/.anthropic_oauth.json."""
-    data = _load_json_if_exists(_get_hermes_oauth_file(), "Hermes OAuth credentials")
+def read_x19_oauth_credentials() -> Optional[Dict[str, Any]]:
+    """Read X19-managed OAuth credentials from ~/.x19/.anthropic_oauth.json."""
+    data = _load_json_if_exists(_get_x19_oauth_file(), "X19 OAuth credentials")
     return data if data is not None and data.get("accessToken") else None
 
 
-def _write_hermes_oauth_credentials(
+def _write_x19_oauth_credentials(
     access_token: str, refresh_token: Optional[str], expires_at_ms: Optional[int],
 ) -> None:
-    """Commit refreshed hermes_pkce tokens to ``<HERMES_HOME>/.anthropic_oauth.json`` (``CredentialPersistError``
+    """Commit refreshed x19_pkce tokens to ``<X19_HOME>/.anthropic_oauth.json`` (``CredentialPersistError``
     on failure); without it the next ``load_pool()`` re-seeds the stale (consumed) pair from the file over the
     rotated pool entry."""
     _commit_private_json(
-        _get_hermes_oauth_file(),
+        _get_x19_oauth_file(),
         {"accessToken": access_token, "refreshToken": refresh_token, "expiresAt": expires_at_ms},
-        "Hermes OAuth credentials",
+        "X19 OAuth credentials",
     )

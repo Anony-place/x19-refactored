@@ -13,7 +13,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 
-from hermes_constants import get_hermes_dir
+from x19_constants import get_x19_dir
 
 logger = logging.getLogger("tools.vision_tools")
 
@@ -97,7 +97,7 @@ def _supported_media_types() -> frozenset:
     so the set is narrowed there and normalization converts those formats to PNG."""
     try:
         from agent.auxiliary_client import _runtime_main_value as _v
-        from hermes_cli.local_runtime.capabilities import ACCEPTED_IMAGE_MIMES, is_managed_provider
+        from x19_cli.local_runtime.capabilities import ACCEPTED_IMAGE_MIMES, is_managed_provider
         if is_managed_provider(str(_v("provider") or ""), str(_v("base_url") or "")):
             return ACCEPTED_IMAGE_MIMES
     except Exception:  # best-effort narrowing only
@@ -149,7 +149,7 @@ def _normalize_to_supported_image(
     Pillow-readable rasters (BMP, TIFF) re-encode to PNG."""
     if detected_mime in _supported_media_types():
         return image_path, detected_mime, None
-    out_dir = get_hermes_dir("cache/vision", "temp_vision_images")
+    out_dir = get_x19_dir("cache/vision", "temp_vision_images")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"converted_{uuid.uuid4()}.png"
     if detected_mime == "image/svg+xml":

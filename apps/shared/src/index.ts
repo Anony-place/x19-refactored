@@ -109,7 +109,7 @@ export {
 export { reconnectBackoffDelayMs, type ReconnectBackoffOptions } from './reconnect-backoff'
 export { skillInvocationText } from './skill-scaffold'
 export {
-  type HermesSkin,
+  type X19Skin,
   SKIN_BRANDING_TOKENS,
   SKIN_COLOR_TOKENS,
   type SkinBranding,
@@ -169,12 +169,12 @@ export {
   type WindowsBackgroundMaterial
 } from './translucency'
 export {
-  buildHermesWebSocketUrl,
+  buildX19WebSocketUrl,
   type GatewayAuthMode,
   GatewayReauthRequiredError,
   type GatewayWsConnection,
   type GatewayWsUrlResult,
-  type HermesWebSocketUrlOptions,
+  type X19WebSocketUrlOptions,
   isGatewayReauthRequired,
   resolveGatewayWsUrl,
   type ResolveGatewayWsUrlDeps,

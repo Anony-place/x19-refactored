@@ -186,7 +186,7 @@ describe('main.ts wiring for #90812', () => {
   })
 
   it('routes the connections update-all dispatch through the single-owner claim', () => {
-    const handlerStart = mainSource.indexOf("ipcMain.handle('hermes:connections:update-all',")
+    const handlerStart = mainSource.indexOf("ipcMain.handle('x19:connections:update-all',")
     expect(handlerStart).toBeGreaterThan(-1)
     // The handler grew on main (renderer-side exclusions + the managed-SSH
     // dispatch branch) — keep the scan window comfortably past the dial.
@@ -194,10 +194,10 @@ describe('main.ts wiring for #90812', () => {
 
     expect(body).toContain('backendDialClaims.run(backendScopeKey(connection.id, null)')
     expect(body).toContain('ensureRegistryBackend(connection.id, null)')
-    expect(body).toContain("postJsonForBackend(descriptor, '/api/hermes/update'")
+    expect(body).toContain("postJsonForBackend(descriptor, '/api/x19/update'")
   })
 
-  it('routes every registry-scoped REST dispatch (hermes:api) through the single-owner claim', () => {
+  it('routes every registry-scoped REST dispatch (x19:api) through the single-owner claim', () => {
     const handlerStart = mainSource.indexOf('async function dispatchRegistryApiRequest(')
     expect(handlerStart).toBeGreaterThan(-1)
     const body = mainSource.slice(handlerStart, handlerStart + 1_000)

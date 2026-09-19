@@ -33,7 +33,7 @@ class AdmittingHandler(AsyncMock):
 @pytest.fixture(autouse=True)
 def isolated_registry(tmp_path, monkeypatch):
     """Any current/future durable compatibility path must stay in tmp state."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("X19_HOME", str(tmp_path))
     import tools.process_registry as pr_module
 
     monkeypatch.setattr(pr_module, "CHECKPOINT_PATH", tmp_path / "processes.json")
@@ -74,7 +74,7 @@ def _async_event(delegation_id="deleg_duplicate"):
         # PR #62479 stamps these on gateway-owned events. They must not
         # change the producer identity used for queue replay.
         "origin_profile": "default",
-        "origin_hermes_home": "/tmp/hermes-default",
+        "origin_x19_home": "/tmp/x19-default",
     }
 
 
@@ -899,7 +899,7 @@ def test_sibling_claimed_by_other_consumer_is_not_double_delivered(
 @pytest.mark.parametrize("batch_size", [1, 2])
 def test_unavailable_delivery_preserves_budget_across_restarts(tmp_path, unavailable, batch_size):
     """Unavailable owners/transports cannot consume any sibling's durable attempts."""
-    from hermes_state import SessionDB
+    from x19_state import SessionDB
     from tools import async_delegation
 
     events = [_async_event(f"deleg_unavailable_{i}") for i in range(batch_size)]

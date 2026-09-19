@@ -52,11 +52,11 @@ function window(id: number, url = 'http://127.0.0.1:5174/') {
 }
 
 async function setup() {
-  electron.directory = await mkdtemp(path.join(os.tmpdir(), 'hermes-screenshot-'))
+  electron.directory = await mkdtemp(path.join(os.tmpdir(), 'x19-screenshot-'))
   cleanups.push(installCommandScreenshot({ rendererUrl: 'http://127.0.0.1:5174/' }))
 }
 
-const call = (channel: string, event: unknown, ...args: unknown[]) => electron.handlers.get(`hermes:screenshot:${channel}`)(event, ...args)
+const call = (channel: string, event: unknown, ...args: unknown[]) => electron.handlers.get(`x19:screenshot:${channel}`)(event, ...args)
 
 describe.skipIf(process.platform !== 'darwin')('Command screenshot native bridge', () => {
   it('persists opt-in, routes to the last focused subscribed window while backgrounded, and revokes on disable', async () => {
@@ -66,8 +66,8 @@ describe.skipIf(process.platform !== 'darwin')('Command screenshot native bridge
     expect(await call('settings:get', first.event)).toEqual({ enabled: false, state: 'disabled' })
     expect(native.start).not.toHaveBeenCalled()
     ipcMain.emit('subscribe', first.event) // unrelated IPC grants nothing
-    ipcMain.emit('hermes:screenshot:subscribe', first.event, true)
-    ipcMain.emit('hermes:screenshot:subscribe', second.event, true)
+    ipcMain.emit('x19:screenshot:subscribe', first.event, true)
+    ipcMain.emit('x19:screenshot:subscribe', second.event, true)
     app.emit('browser-window-focus', {}, second.win)
     electron.focused = null
     await call('settings:set', first.event, true)
@@ -75,19 +75,19 @@ describe.skipIf(process.platform !== 'darwin')('Command screenshot native bridge
     const [capture, status] = native.start.mock.calls.at(-1)!
     status({ type: 'ready' })
     capture({ type: 'capture', windowId: 42, width: 600, height: 400 })
-    const requests = second.wc.send.mock.calls.filter(([channel]) => channel === 'hermes:screenshot:request')
+    const requests = second.wc.send.mock.calls.filter(([channel]) => channel === 'x19:screenshot:request')
     expect(requests).toHaveLength(1)
-    expect(first.wc.send.mock.calls.some(([channel]) => channel === 'hermes:screenshot:request')).toBe(false)
+    expect(first.wc.send.mock.calls.some(([channel]) => channel === 'x19:screenshot:request')).toBe(false)
     expect(await call('capture', first.event, requests[0]![1])).toEqual({ ok: false, reason: 'expired' })
     await call('settings:set', second.event, false)
     expect(await call('capture', second.event, requests[0]![1])).toEqual({ ok: false, reason: 'expired' })
     expect(native.stop).toHaveBeenCalled()
     for (let i = 0; i < 3; i += 1) {
-      ipcMain.emit('hermes:screenshot:subscribe', second.event, false)
-      ipcMain.emit('hermes:screenshot:subscribe', second.event, true)
+      ipcMain.emit('x19:screenshot:subscribe', second.event, false)
+      ipcMain.emit('x19:screenshot:subscribe', second.event, true)
     }
     expect(second.wc.listenerCount('destroyed')).toBe(1)
-    ipcMain.emit('hermes:screenshot:subscribe', second.event, false)
+    ipcMain.emit('x19:screenshot:subscribe', second.event, false)
     expect(second.wc.listenerCount('destroyed')).toBe(0)
   })
 

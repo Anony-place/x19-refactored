@@ -1,5 +1,5 @@
 """Starter bank templates for the Hindsight setup wizard: fetch the Bank Templates
-catalog, filter to the ``hermes`` integration, apply a manifest via
+catalog, filter to the ``x19`` integration, apply a manifest via
 ``POST /v1/default/banks/{bank}/import`` (creates the bank if missing).
 Catalog source overridable with ``HINDSIGHT_TEMPLATES_URL`` (pin/mirror).
 """
@@ -12,7 +12,7 @@ import os
 import urllib.request
 from urllib.parse import urljoin
 
-from hermes_cli.urllib_security import open_credentialed_url
+from x19_cli.urllib_security import open_credentialed_url
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +41,11 @@ def _get_json(url: str) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def fetch_hermes_templates(url: str | None = None) -> list[dict]:
-    """Return catalog entries tagged for the ``hermes`` integration."""
+def fetch_x19_templates(url: str | None = None) -> list[dict]:
+    """Return catalog entries tagged for the ``x19`` integration."""
     catalog = _get_json(url or catalog_url())
     entries = catalog.get("templates", []) if isinstance(catalog, dict) else []
-    return [e for e in entries if "hermes" in (e.get("integrations") or [])]
+    return [e for e in entries if "x19" in (e.get("integrations") or [])]
 
 
 def fetch_manifest(entry: dict, url: str | None = None) -> dict:
@@ -88,7 +88,7 @@ def run_template_step(*, api_url: str, bank_id: str, api_key: str | None, select
     is the picker (injected: testable without curses). Returns the applied template
     id, or None if skipped/blank/failed. Never raises — a template is a nice-to-have."""
     try:
-        entries = fetch_hermes_templates()
+        entries = fetch_x19_templates()
     except Exception as e:  # network/parse — non-fatal
         logger.debug("Hindsight: could not fetch templates: %s", e)
         return None

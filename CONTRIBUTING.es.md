@@ -55,7 +55,7 @@ Si tu habilidad es especializada, contribuida por la comunidad o de nicho, es me
 
 Los plugins de memoria independientes:
 
-- Implementan el mismo ABC `MemoryProvider` (`agent/memory_provider.py`) — `sync_turn`, `prefetch`, `shutdown` y opcionalmente `post_setup(hermes_home, config)` para integración con el asistente de configuración
+- Implementan el mismo ABC `MemoryProvider` (`agent/memory_provider.py`) — `sync_turn`, `prefetch`, `shutdown` y opcionalmente `post_setup(x19_home, config)` para integración con el asistente de configuración
 - Usan el mismo sistema de descubrimiento — `discover_memory_providers()` los recoge desde directorios de plugins de usuario/proyecto y entry points de pip
 - Se integran con `x19 memory setup` a través de `post_setup()` — sin necesidad de tocar el código base
 - Pueden registrar sus propios subcomandos CLI a través de `register_cli(subparser)` en un archivo `cli.py`
@@ -81,7 +81,7 @@ Esto no es una barra de calidad — es una decisión de acoplamiento y mantenimi
 ### Clonar e instalar
 
 ```bash
-git clone https://github.com/NousResearch/x19.git
+git clone https://github.com/Anony-place/x19-refactored.git
 cd x19
 
 # Crear venv con Python 3.11
@@ -111,7 +111,7 @@ echo "OPENROUTER_API_KEY=***" >> ~/.x19/.env
 ```bash
 # Enlace simbólico para acceso global
 mkdir -p ~/.local/bin
-ln -sf "$(pwd)/venv/bin/hermes" ~/.local/bin/hermes
+ln -sf "$(pwd)/venv/bin/x19" ~/.local/bin/x19
 
 # Verificar
 x19 doctor
@@ -138,8 +138,8 @@ x19/
 ├── run_agent.py              # Clase AIAgent — bucle de conversación central, despacho de herramientas, persistencia de sesión
 ├── cli.py                    # Clase X19CLI — TUI interactiva, integración prompt_toolkit
 ├── model_tools.py            # Orquestación de herramientas (capa delgada sobre tools/registry.py)
-├── toolsets.py               # Agrupaciones y presets de herramientas (hermes-cli, hermes-telegram, etc.)
-├── hermes_state.py           # Base de datos de sesiones SQLite con búsqueda de texto completo FTS5, títulos de sesión
+├── toolsets.py               # Agrupaciones y presets de herramientas (x19-cli, x19-telegram, etc.)
+├── x19_state.py           # Base de datos de sesiones SQLite con búsqueda de texto completo FTS5, títulos de sesión
 ├── batch_runner.py           # Procesamiento en lote paralelo para generación de trayectorias
 │
 ├── agent/                    # Internos del agente (módulos extraídos)
@@ -150,7 +150,7 @@ x19/
 │   ├── model_metadata.py         # Longitudes de contexto del modelo, estimación de tokens
 │   └── trajectory.py             # Ayudantes para guardar trayectorias
 │
-├── hermes_cli/               # Implementaciones de comandos CLI
+├── x19_cli/               # Implementaciones de comandos CLI
 │   ├── main.py                   # Punto de entrada, análisis de argumentos, despacho de comandos
 │   ├── config.py                 # Gestión de configuración, migración, definiciones de variables de entorno
 │   ├── setup.py                  # Asistente de configuración interactivo
@@ -194,7 +194,7 @@ x19/
 ├── skills/                   # Habilidades incluidas (copiadas a ~/.x19/skills/ en la instalación)
 ├── optional-skills/          # Habilidades opcionales oficiales (descubribles vía hub, no activadas por defecto)
 ├── tests/                    # Suite de tests
-├── website/                  # Sitio de documentación (x19.nousresearch.com)
+├── website/                  # Sitio de documentación (anony-place.github.io/x19-refactored)
 │
 ├── cli-config.yaml.example   # Configuración de ejemplo (copiada a ~/.x19/config.yaml)
 └── AGENTS.md                 # Guía de desarrollo para asistentes de codificación IA
@@ -311,7 +311,7 @@ importado por `discover_builtin_tools()` en `tools/registry.py` cuando `model_to
 se carga. **No** hay una lista de importaciones manual en `model_tools.py` que mantener.
 
 Todavía debes añadir el nombre de la herramienta a la lista apropiada en `toolsets.py`
-(por ejemplo `_HERMES_CORE_TOOLS` o un toolset dedicado); de lo contrario la herramienta
+(por ejemplo `_X19_CORE_TOOLS` o un toolset dedicado); de lo contrario la herramienta
 se registra pero nunca se expone al agente.
 
 Consulta `AGENTS.md` (sección **Adding New Tools**) para rutas conscientes del perfil y
@@ -357,7 +357,7 @@ prerequisites:                     # Requisitos de tiempo de ejecución heredado
   env_vars: [MY_API_KEY]
   commands: [curl, jq]
 metadata:
-  hermes:
+  x19:
     tags: [Categoría, Subcategoría, Palabras clave]
     related_skills: [other-skill-name]
     fallback_for_toolsets: [web]
@@ -581,7 +581,7 @@ test(tools): añadir tests unitarios para file_operations
 
 ## Reportar Issues
 
-- Usa [GitHub Issues](https://github.com/NousResearch/x19/issues)
+- Usa [GitHub Issues](https://github.com/Anony-place/x19-refactored/issues)
 - Incluye: SO, versión de Python, versión de X19 (`x19 --version`), traza de error completa
 - Incluye pasos para reproducir
 - Verifica los issues existentes antes de crear duplicados

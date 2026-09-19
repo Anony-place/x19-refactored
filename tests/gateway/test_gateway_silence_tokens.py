@@ -67,7 +67,7 @@ def _runner(monkeypatch, tmp_path):
     runner.session_store.append_to_transcript = MagicMock()
     runner.session_store.update_session = MagicMock()
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_x19_home", tmp_path)
     monkeypatch.setattr(
         gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"}
     )

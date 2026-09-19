@@ -118,7 +118,7 @@ def _run_install_node(tmp_path: Path, node_body: str) -> tuple[int, str, str, li
         "OS=linux\n"
         "DISTRO=ubuntu\n"
         "NODE_VERSION=26\n"
-        f"HERMES_HOME={home}\n"
+        f"X19_HOME={home}\n"
         "HAS_NODE=maybe\n"
         "log_info()    { printf 'INFO %s\\n' \"$*\"; }\n"
         "log_success() { printf 'OK %s\\n' \"$*\"; }\n"

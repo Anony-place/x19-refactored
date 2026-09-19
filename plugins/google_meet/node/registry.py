@@ -1,6 +1,6 @@
 """Local JSON registry of approved remote meet nodes.
 
-``$HERMES_HOME/workspace/meetings/nodes.json``::
+``$X19_HOME/workspace/meetings/nodes.json``::
 
     {"nodes": {"<name>": {"url": "ws://host:port", "token": "...", "added_at": <epoch>}}}
 """
@@ -11,14 +11,14 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from hermes_constants import get_hermes_home
+from x19_constants import get_x19_home
 
 from plugins.google_meet._jsonfile import read_json
 from utils import atomic_json_write
 
 
 def _default_path() -> Path:
-    return Path(get_hermes_home()) / "workspace" / "meetings" / "nodes.json"
+    return Path(get_x19_home()) / "workspace" / "meetings" / "nodes.json"
 
 
 class NodeRegistry:
@@ -68,9 +68,3 @@ class NodeRegistry:
         return nodes[0] if len(nodes) == 1 else None
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import json  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

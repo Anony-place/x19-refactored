@@ -6,7 +6,7 @@ author: Coldtea AI (adapted by Nous Research)
 license: MIT
 platforms: [linux, macos]
 metadata:
-  hermes:
+  x19:
     tags: [diagrams, pull-requests, code-review, svg]
     category: software-development
     related_skills: []

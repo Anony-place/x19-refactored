@@ -22,7 +22,7 @@ from agent.provider_base import ProviderBase
 
 
 def get_provider_env(name: str) -> str:
-    """Config-aware env lookup (``os.environ`` first, then ``~/.hermes/.env``) so
+    """Config-aware env lookup (``os.environ`` first, then ``~/.x19/.env``) so
     credentials set through the config layer are visible in gateway sessions /
     delegate children / subprocess runs. Stripped value, or ``""`` when unset.
 
@@ -30,7 +30,7 @@ def get_provider_env(name: str) -> str:
     import contexts). See #40190.
     """
     try:
-        from hermes_cli.config import get_env_value
+        from x19_cli.config import get_env_value
 
         val = get_env_value(name)
     except Exception:  # noqa: BLE001 — config layer optional here
@@ -47,7 +47,7 @@ class WebSearchProvider(ProviderBase):
     @abc.abstractmethod
     def is_available(self) -> bool:
         """True when this provider can service calls. Cheap check only (env var, importable
-        dep, instance URL) — NO network; runs at tool registration and on every ``hermes tools`` paint."""
+        dep, instance URL) — NO network; runs at tool registration and on every ``x19 tools`` paint."""
 
     def supports_search(self) -> bool:
         """True if this provider implements :meth:`search`."""
@@ -80,9 +80,3 @@ class WebSearchProvider(ProviderBase):
         )
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Optional  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

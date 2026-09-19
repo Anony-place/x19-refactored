@@ -1,4 +1,4 @@
-import { isRecord } from '@hermes/shared/i18n'
+import { isRecord } from '@x19/shared/i18n'
 
 import { TRANSLATIONS } from './catalog'
 import { DEFAULT_LOCALE } from './languages'

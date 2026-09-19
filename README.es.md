@@ -4,7 +4,7 @@
 
 # X19 ☤
 <p align="center">
-  <a href="https://x19.security.local/">X19</a> | <a href="https://x19.security.local/">X19 Desktop</a>
+  <a href="https://anony-place.github.io/x19-refactored/">X19</a> | <a href="https://anony-place.github.io/x19-refactored/">X19 Desktop</a>
 </p>
 <p align="center">
   <a href="https://github.com/Anony-place/x19-refactored/tree/main/website"><img src="https://img.shields.io/badge/Docs-x19-docs-FFD700?style=for-the-badge" alt="Documentación"></a>
@@ -37,7 +37,7 @@ Usa cualquier modelo que quieras — [Nous Portal](https://portal.nousresearch.c
 ### Linux, macOS, WSL2, Termux
 
 ```bash
-curl -fsSL https://x19.security.local/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Anony-place/x19-refactored/main/scripts/install.sh | bash
 ```
 
 ### Windows (nativo, PowerShell)
@@ -47,14 +47,14 @@ curl -fsSL https://x19.security.local/install.sh | bash
 Ejecuta esto en PowerShell:
 
 ```powershell
-iex (irm https://x19.security.local/install.ps1)
+iex (irm https://raw.githubusercontent.com/Anony-place/x19-refactored/main/scripts/install.ps1)
 ```
 
 El instalador se encarga de todo: uv, Python 3.11, Node.js, ripgrep, ffmpeg, **y un Git Bash portátil** (MinGit, descomprimido en `%LOCALAPPDATA%\x19\git` — no requiere administrador, completamente aislado de cualquier instalación de Git del sistema). X19 usa este Git Bash incluido para ejecutar comandos de shell.
 
 Si ya tienes Git instalado, el instalador lo detecta y lo usa en su lugar. De lo contrario, una descarga de ~45MB de MinGit es todo lo que necesitas — no tocará ni interferirá con ningún Git del sistema.
 
-> **Android / Termux:** La ruta manual probada está documentada en la [guía de Termux](https://github.com/Anony-place/x19-refactored/tree/main/websitegetting-started/termux). En Termux, X19 instala el extra `.[termux]` curado porque el extra completo `.[all]` actualmente incluye dependencias de voz incompatibles con Android.
+> **Android / Termux:** La ruta manual probada está documentada en la [guía de Termux](https://anony-place.github.io/x19-refactored/docs/getting-started/termux). En Termux, X19 instala el extra `.[termux]` curado porque el extra completo `.[all]` actualmente incluye dependencias de voz incompatibles con Android.
 >
 > **Windows:** Windows nativo es totalmente compatible — el comando de PowerShell de arriba instala todo. Si prefieres usar WSL2, el comando de Linux también funciona allí. La instalación nativa de Windows se encuentra en `%LOCALAPPDATA%\x19`; WSL2 instala en `~/.x19` como en Linux.
 
@@ -98,7 +98,7 @@ Un comando desde una instalación nueva:
 x19 setup --portal
 ```
 
-Esto te autentica vía OAuth, establece Nous como tu proveedor y activa el Tool Gateway. Comprueba qué está conectado en cualquier momento con `x19 portal info`. Detalles completos en la [página de documentación del Tool Gateway](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/tool-gateway).
+Esto te autentica vía OAuth, establece Nous como tu proveedor y activa el Tool Gateway. Comprueba qué está conectado en cualquier momento con `x19 portal info`. Detalles completos en la [página de documentación del Tool Gateway](https://anony-place.github.io/x19-refactored/docs/user-guide/features/tool-gateway).
 
 Puedes seguir usando tus propias claves por herramienta cuando quieras — el gateway es por backend, no todo o nada.
 
@@ -120,31 +120,31 @@ X19 tiene dos puntos de entrada: inicia la interfaz de terminal con `x19`, o eje
 | Interrumpir trabajo actual          | `Ctrl+C` o enviar un nuevo mensaje            | `/stop` o enviar un nuevo mensaje                                                 |
 | Estado específico de plataforma     | `/platforms`                                  | `/status`, `/sethome`                                                             |
 
-Para las listas de comandos completas, consulta la [guía de CLI](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/cli) y la [guía del Gateway de Mensajería](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/messaging).
+Para las listas de comandos completas, consulta la [guía de CLI](https://anony-place.github.io/x19-refactored/docs/user-guide/cli) y la [guía del Gateway de Mensajería](https://anony-place.github.io/x19-refactored/docs/user-guide/messaging).
 
 ---
 
 ## Documentación
 
-Toda la documentación está en **[x19.security.local/docs](https://github.com/Anony-place/x19-refactored/tree/main/website)**:
+Toda la documentación está en **[anony-place.github.io/x19-refactored/docs](https://github.com/Anony-place/x19-refactored/tree/main/website/docs)**:
 
 | Sección                                                                                             | Contenido                                                    |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [Inicio rápido](https://github.com/Anony-place/x19-refactored/tree/main/websitegetting-started/quickstart)              | Instalar → configurar → primera conversación en 2 minutos   |
-| [Uso de CLI](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/cli)                             | Comandos, atajos de teclado, personalidades, sesiones        |
-| [Configuración](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/configuration)               | Archivo de configuración, proveedores, modelos, todas las opciones |
-| [Gateway de Mensajería](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/messaging)           | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant   |
-| [Seguridad](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/security)                        | Aprobación de comandos, emparejamiento por DM, aislamiento en contenedor |
-| [Herramientas y Toolsets](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/tools)   | Más de 40 herramientas, sistema de toolsets, backends de terminal |
-| [Sistema de Habilidades](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/skills)   | Memoria procedimental, Skills Hub, creación de habilidades   |
-| [Memoria](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/memory)                   | Memoria persistente, perfiles de usuario, mejores prácticas  |
-| [Integración MCP](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/mcp)              | Conecta cualquier servidor MCP para capacidades extendidas   |
-| [Programación Cron](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/cron)           | Tareas programadas con entrega a plataforma                  |
-| [Archivos de Contexto](https://github.com/Anony-place/x19-refactored/tree/main/websiteuser-guide/features/context-files) | Contexto de proyecto que da forma a cada conversación      |
-| [Arquitectura](https://github.com/Anony-place/x19-refactored/tree/main/websitedeveloper-guide/architecture)            | Estructura del proyecto, bucle del agente, clases principales |
-| [Contribuir](https://github.com/Anony-place/x19-refactored/tree/main/websitedeveloper-guide/contributing)              | Configuración de desarrollo, proceso de PR, estilo de código |
-| [Referencia de CLI](https://github.com/Anony-place/x19-refactored/tree/main/websitereference/cli-commands)             | Todos los comandos y flags                                   |
-| [Variables de Entorno](https://github.com/Anony-place/x19-refactored/tree/main/websitereference/environment-variables) | Referencia completa de variables de entorno                  |
+| [Inicio rápido](https://anony-place.github.io/x19-refactored/docs/getting-started/quickstart)              | Instalar → configurar → primera conversación en 2 minutos   |
+| [Uso de CLI](https://anony-place.github.io/x19-refactored/docs/user-guide/cli)                             | Comandos, atajos de teclado, personalidades, sesiones        |
+| [Configuración](https://anony-place.github.io/x19-refactored/docs/user-guide/configuration)               | Archivo de configuración, proveedores, modelos, todas las opciones |
+| [Gateway de Mensajería](https://anony-place.github.io/x19-refactored/docs/user-guide/messaging)           | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant   |
+| [Seguridad](https://anony-place.github.io/x19-refactored/docs/user-guide/security)                        | Aprobación de comandos, emparejamiento por DM, aislamiento en contenedor |
+| [Herramientas y Toolsets](https://anony-place.github.io/x19-refactored/docs/user-guide/features/tools)   | Más de 40 herramientas, sistema de toolsets, backends de terminal |
+| [Sistema de Habilidades](https://anony-place.github.io/x19-refactored/docs/user-guide/features/skills)   | Memoria procedimental, Skills Hub, creación de habilidades   |
+| [Memoria](https://anony-place.github.io/x19-refactored/docs/user-guide/features/memory)                   | Memoria persistente, perfiles de usuario, mejores prácticas  |
+| [Integración MCP](https://anony-place.github.io/x19-refactored/docs/user-guide/features/mcp)              | Conecta cualquier servidor MCP para capacidades extendidas   |
+| [Programación Cron](https://anony-place.github.io/x19-refactored/docs/user-guide/features/cron)           | Tareas programadas con entrega a plataforma                  |
+| [Archivos de Contexto](https://anony-place.github.io/x19-refactored/docs/user-guide/features/context-files) | Contexto de proyecto que da forma a cada conversación      |
+| [Arquitectura](https://anony-place.github.io/x19-refactored/docs/developer-guide/architecture)            | Estructura del proyecto, bucle del agente, clases principales |
+| [Contribuir](https://anony-place.github.io/x19-refactored/docs/developer-guide/contributing)              | Configuración de desarrollo, proceso de PR, estilo de código |
+| [Referencia de CLI](https://anony-place.github.io/x19-refactored/docs/reference/cli-commands)             | Todos los comandos y flags                                   |
+| [Variables de Entorno](https://anony-place.github.io/x19-refactored/docs/reference/environment-variables) | Referencia completa de variables de entorno                  |
 
 ---
 
@@ -209,7 +209,7 @@ scripts/run_tests.sh
 - 📚 [Skills Hub](https://agentskills.io)
 - 🐛 [Issues](https://github.com/Anony-place/x19-refactored/issues)
 - 🔌 [computer-use-linux](https://github.com/avifenesh/computer-use-linux) — Servidor MCP de control de escritorio Linux para X19 y otros hosts MCP, con árboles de accesibilidad AT-SPI, entrada Wayland/X11, capturas de pantalla y targeting de ventanas del compositor.
-- 🔌 [X19Claw](https://github.com/AaronWong1999/x19claw) — Puente WeChat comunitario: Ejecuta X19 y OpenClaw en la misma cuenta de WeChat.
+- 🔌 [HermesClaw](https://github.com/AaronWong1999/hermesclaw) — Puente WeChat comunitario: Ejecuta X19 y OpenClaw en la misma cuenta de WeChat.
 
 ---
 

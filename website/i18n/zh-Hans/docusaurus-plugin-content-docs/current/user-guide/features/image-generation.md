@@ -1,13 +1,13 @@
 ---
 title: 文生图（Image Generation）
-description: 通过 FAL.ai 文生图；支持 8 个模型，含 FLUX 2、GPT-Image、Nano Banana Pro、Ideogram、Recraft V4 Pro 等，可用 hermes tools 切换。
+description: 通过 FAL.ai 文生图；支持 8 个模型，含 FLUX 2、GPT-Image、Nano Banana Pro、Ideogram、Recraft V4 Pro 等，可用 x19 tools 切换。
 sidebar_label: 文生图
 sidebar_position: 6
 ---
 
 # 文生图（Image Generation）
 
-Hermes Agent 通过 FAL.ai 根据文字提示生成图像。默认内置 8 个模型，在速度、画质与成本上各有取舍。当前模型可通过 `hermes tools` 配置，并持久化在 `config.yaml`。
+X19 通过 FAL.ai 根据文字提示生成图像。默认内置 8 个模型，在速度、画质与成本上各有取舍。当前模型可通过 `x19 tools` 配置，并持久化在 `config.yaml`。
 
 ## 支持的模型
 
@@ -42,7 +42,7 @@ Hermes Agent 通过 FAL.ai 根据文字提示生成图像。默认内置 8 个�
 执行：
 
 ```bash
-hermes tools
+x19 tools
 ```
 
 进入 **🎨 Image Generation**，选择后端（Nous Subscription 或 FAL.ai），随后在表格中用方向键选择模型，回车确认：
@@ -63,7 +63,7 @@ image_gen:
   model: fal-ai/flux-2/klein/9b
 ```
 
-`image_gen.provider` 是唯一的选择键：`nous` 走托管网关，厂商名（如 `fal`）走直连。运行时始终按该选择路由——`provider: nous` 时 `.env` 里的 `FAL_KEY` 会被忽略；`provider: fal` 而缺少 `FAL_KEY` 会直接报错并提示运行 `hermes tools`，不会静默回退。（旧的 `use_gateway` 键已废弃，读取时 `true` 等同于 `nous`。）
+`image_gen.provider` 是唯一的选择键：`nous` 走托管网关，厂商名（如 `fal`）走直连。运行时始终按该选择路由——`provider: nous` 时 `.env` 里的 `FAL_KEY` 会被忽略；`provider: fal` 而缺少 `FAL_KEY` 会直接报错并提示运行 `x19 tools`，不会静默回退。（旧的 `use_gateway` 键已废弃，读取时 `true` 等同于 `nous`。）
 
 ### GPT-Image 画质档位
 

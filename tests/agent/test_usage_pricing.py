@@ -113,7 +113,7 @@ def test_deepseek_v4_pro_pricing_entry_exists():
     """Regression test: deepseek-v4-pro must have a pricing entry.
 
     Before this fix, deepseek-v4-pro sessions showed as unknown cost
-    in hermes insights because the _OFFICIAL_DOCS_PRICING table had no
+    in x19 insights because the _OFFICIAL_DOCS_PRICING table had no
     entry for that model.  See #24218.  Rates track the 2026-07 price cut
     ($1.74/$3.48 → $0.435/$0.87).
     """
@@ -389,7 +389,7 @@ def test_curated_google_flash_models_resolve_official_snapshot_pricing(monkeypat
     direct Gemini and Vertex routes — a model pickable via the aggregators but
     ``unknown`` to Google-route accounting is a catalog/pricing drift.
     """
-    from hermes_cli.models_catalog_static import OPENROUTER_MODELS, _PROVIDER_MODELS
+    from x19_cli.models_catalog_static import OPENROUTER_MODELS, _PROVIDER_MODELS
 
     monkeypatch.setattr(
         "agent.usage_pricing.fetch_endpoint_model_metadata",

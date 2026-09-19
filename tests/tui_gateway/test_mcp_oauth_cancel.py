@@ -34,7 +34,7 @@ def test_cancel_is_scoped_idempotent_and_releases_worker(
 
     monkeypatch.setattr(sessions, "_worker", worker)
     home = str(tmp_path / "origin")
-    monkeypatch.setenv("HERMES_HOME", home)
+    monkeypatch.setenv("X19_HOME", home)
     result = sessions.start_flow(
         home,
         "reports",
@@ -82,7 +82,7 @@ def test_cancel_is_scoped_idempotent_and_releases_worker(
 
 @pytest.mark.parametrize("operation", ["poll", "callback", "cancel"])
 def test_session_operations_require_resolved_owner(tmp_path, monkeypatch, operation):
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from x19_constants import reset_x19_home_override, set_x19_home_override
 
     home = str(tmp_path / "owner")
     flow = DashboardOAuthFlow(
@@ -90,7 +90,7 @@ def test_session_operations_require_resolved_owner(tmp_path, monkeypatch, operat
     )
     asyncio.run(flow.publish_authorization_url("https://idp.example/authorize?state=test"))
     monkeypatch.setattr(sessions, "_sessions", {
-        "owned": {"flow": flow, "server_name": "reports", "hermes_home": home, "httpd": None}
+        "owned": {"flow": flow, "server_name": "reports", "x19_home": home, "httpd": None}
     })
 
     def invoke():
@@ -98,22 +98,22 @@ def test_session_operations_require_resolved_owner(tmp_path, monkeypatch, operat
             return sessions.poll_flow("owned", "reports")
         if operation == "callback":
             return sessions.deliver_callback_flow("owned", "reports", code="valid", state="test")
-        from hermes_constants import get_hermes_home
-        return sessions.cancel_flow("owned", "reports", str(get_hermes_home()))
+        from x19_constants import get_x19_home
+        return sessions.cancel_flow("owned", "reports", str(get_x19_home()))
 
-    token = set_hermes_home_override(tmp_path / "other")
+    token = set_x19_home_override(tmp_path / "other")
     try:
         rejected = invoke()
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
     assert "profile mismatch" in (rejected.get("error_message") or "")
     assert "auth_url" not in rejected
     assert flow.snapshot()["status"] == "authorization_required"
-    token = set_hermes_home_override(home)
+    token = set_x19_home_override(home)
     try:
         accepted = invoke()
     finally:
-        reset_hermes_home_override(token)
+        reset_x19_home_override(token)
     assert accepted.get("ok", accepted.get("status") == "pending") is True
 
 
@@ -131,7 +131,7 @@ def test_cancel_does_not_revoke_an_approved_flow(tmp_path, monkeypatch):
             "approved": {
                 "flow": flow,
                 "server_name": "reports",
-                "hermes_home": home,
+                "x19_home": home,
                 "httpd": None,
             }
         },

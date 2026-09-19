@@ -14,9 +14,9 @@ from acp_adapter.session import SessionState, _expand_acp_enabled_toolsets
 logger = logging.getLogger("acp_adapter.server")
 
 try:
-    from hermes_cli import __version__ as HERMES_VERSION
+    from x19_cli import __version__ as X19_VERSION
 except Exception:
-    HERMES_VERSION = "0.0.0"
+    X19_VERSION = "0.0.0"
 
 
 def _estimate_tokens(history: list, agent: Any, system_prompt: str | None = None, tools: Any = None) -> int:
@@ -37,7 +37,7 @@ def _queue_prompt(state: SessionState, text: str) -> int:
 
 
 class SlashCommandsMixin:
-    """Slash-command surface for ``HermesACPAgent``; relies on ``_conn``, ``_send``, ``_schedule_soon``,
+    """Slash-command surface for ``X19ACPAgent``; relies on ``_conn``, ``_send``, ``_schedule_soon``,
     ``session_manager`` and ``_switch_model`` from the host class."""
 
     # name -> (help text, advertised description, input hint)
@@ -62,7 +62,7 @@ class SlashCommandsMixin:
             "Queue a prompt to run after the current turn finishes",
             "prompt to run next",
         ),
-        "version": ("Show Hermes version", "Show Hermes version", None),
+        "version": ("Show X19 version", "Show X19 version", None),
     }
 
 
@@ -96,7 +96,7 @@ class SlashCommandsMixin:
         handler = getattr(self, f"_cmd_{cmd}")
 
         # Handlers run outside the per-turn cwd-pinning context. ``/compress``
-        # and ``/model`` REBUILD the system prompt, so unpinned they'd bake the Hermes install tree
+        # and ``/model`` REBUILD the system prompt, so unpinned they'd bake the X19 install tree
         # into the persisted cached prompt. Pin inside a fresh context: no leak, no teardown.
         def _dispatch() -> str | None:
             try:
@@ -136,7 +136,7 @@ class SlashCommandsMixin:
             from types import SimpleNamespace
             from agent.memory_manager import inject_memory_provider_tools
 
-            toolsets = _expand_acp_enabled_toolsets(getattr(state.agent, "enabled_toolsets", None) or ["hermes-acp"])
+            toolsets = _expand_acp_enabled_toolsets(getattr(state.agent, "enabled_toolsets", None) or ["x19-acp"])
             tools = get_tool_definitions(enabled_toolsets=toolsets, quiet_mode=True)
             tool_view = SimpleNamespace(
                 tools=list(tools or []),
@@ -284,4 +284,4 @@ class SlashCommandsMixin:
         return f"Queued for the next turn. ({_queue_prompt(state, queued_text)} queued)"
 
     def _cmd_version(self, args: str, state: SessionState) -> str:
-        return f"Hermes Agent v{HERMES_VERSION}"
+        return f"X19 v{X19_VERSION}"

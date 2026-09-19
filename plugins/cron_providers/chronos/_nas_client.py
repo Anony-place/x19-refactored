@@ -28,7 +28,7 @@ class NasCronClient:
 
     def _headers(self) -> Dict[str, str]:
         """Bearer auth with the agent's existing Nous Portal access token (refresh-aware)."""
-        from hermes_cli.auth import resolve_nous_access_token
+        from x19_cli.auth import resolve_nous_access_token
         return {"Authorization": f"Bearer {resolve_nous_access_token()}",
                 "Content-Type": "application/json"}
 
@@ -65,9 +65,3 @@ class NasCronClient:
         return items if isinstance(items, list) else []
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Optional  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

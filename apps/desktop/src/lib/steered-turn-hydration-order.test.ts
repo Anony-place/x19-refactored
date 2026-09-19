@@ -12,7 +12,7 @@
 // clean here — that projection is pinned in chat-messages.test.ts.
 import { describe, expect, it } from 'vitest'
 
-import type { SessionMessage } from '@/types/hermes'
+import type { SessionMessage } from '@/types/x19'
 
 import { chatMessageText, toChatMessages } from './chat-messages'
 

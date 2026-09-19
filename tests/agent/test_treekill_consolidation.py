@@ -4,7 +4,7 @@ Each migrated wrapper keeps its caller-facing contract (signature, all
 failures swallowed, ``None`` return) while routing the actual tree
 termination through :func:`agent.deadline.kill_process_tree`:
 
-* ``hermes_cli._subprocess_compat.kill_process_tree(proc)`` — also consumed
+* ``x19_cli._subprocess_compat.kill_process_tree(proc)`` — also consumed
   by ``agent.shell_hooks`` by name; falls back to
   ``_legacy_kill_process_tree`` when delegation fails.
 * ``tools.browser_tool_lifecycle._kill_process_tree(proc)`` — same pattern.
@@ -39,12 +39,12 @@ class _FakeProc:
 
 
 # ---------------------------------------------------------------------------
-# (1) hermes_cli._subprocess_compat.kill_process_tree
+# (1) x19_cli._subprocess_compat.kill_process_tree
 # ---------------------------------------------------------------------------
 
 class TestSubprocessCompatDelegation:
     def test_delegates_with_proc_pid(self, monkeypatch):
-        from hermes_cli import _subprocess_compat
+        from x19_cli import _subprocess_compat
 
         calls = []
         monkeypatch.setattr(
@@ -55,7 +55,7 @@ class TestSubprocessCompatDelegation:
         assert calls == [1111]
 
     def test_swallows_delegation_raise_and_falls_back_to_legacy(self, monkeypatch):
-        from hermes_cli import _subprocess_compat
+        from x19_cli import _subprocess_compat
 
         def _boom(pid, **kw):
             raise RuntimeError("delegation broken")
@@ -71,7 +71,7 @@ class TestSubprocessCompatDelegation:
 
     def test_shell_hooks_consumer_still_imports_by_name(self):
         import agent.shell_hooks as shell_hooks
-        from hermes_cli import _subprocess_compat
+        from x19_cli import _subprocess_compat
 
         assert shell_hooks.kill_process_tree is _subprocess_compat.kill_process_tree
 
@@ -185,7 +185,7 @@ def test_e2e_setsid_grandchild_killed_via_compat_wrapper(tmp_path):
     pytest.importorskip("psutil")
     import psutil
 
-    from hermes_cli._subprocess_compat import kill_process_tree
+    from x19_cli._subprocess_compat import kill_process_tree
 
     started = tmp_path / "grandchild_started"
     marker = tmp_path / "grandchild_survived"

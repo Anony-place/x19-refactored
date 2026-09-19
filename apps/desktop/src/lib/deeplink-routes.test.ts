@@ -26,7 +26,7 @@ describe('resolveDeepLinkAction', () => {
       sha: '0123456789abcdef0123456789abcdef01234567',
       enable: '1'
     }
-    const url = new URL(`hermes://plugin/install?${new URLSearchParams(params)}`)
+    const url = new URL(`x19://plugin/install?${new URLSearchParams(params)}`)
 
     expect(resolveDeepLinkAction({
       kind: url.hostname,
@@ -55,7 +55,7 @@ describe('resolveDeepLinkAction', () => {
 
   it('only routes skill installs with an explicit, unchanged identifier', () => {
     const identifier = 'skills-sh/owner/repo/a skill?mode=one&two#readme'
-    const url = new URL(`hermes://skill/install?${new URLSearchParams({ identifier })}`)
+    const url = new URL(`x19://skill/install?${new URLSearchParams({ identifier })}`)
 
     expect(resolveDeepLinkAction({
       kind: url.hostname,

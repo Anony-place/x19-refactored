@@ -1,5 +1,5 @@
 /** Native Electron main -> real headless serve, without an app/renderer build.
- * Opt in with HERMES_TEST_REAL_SERVE=1; see pool-retirement-live-fixture/README.md.
+ * Opt in with X19_TEST_REAL_SERVE=1; see pool-retirement-live-fixture/README.md.
  */
 import assert from 'node:assert/strict'
 import { type ChildProcess, spawn } from 'node:child_process'
@@ -26,10 +26,10 @@ function isolatedEnv(root: string): NodeJS.ProcessEnv {
     if (process.env[name]) {env[name] = process.env[name]}
   }
 
-  return { ...env, HOME: root, USERPROFILE: root, HERMES_HOME: join(root, '.hermes'),
+  return { ...env, HOME: root, USERPROFILE: root, X19_HOME: join(root, '.x19'),
     XDG_CONFIG_HOME: join(root, 'config'), XDG_CACHE_HOME: join(root, 'cache'),
     TMPDIR: root, TEMP: root, TMP: root, TZ: 'UTC', LANG: 'C.UTF-8',
-    HERMES_DESKTOP_CDP_PORT: 'off', HERMES_DESKTOP_USER_DATA_DIR: join(root, 'user-data') }
+    X19_DESKTOP_CDP_PORT: 'off', X19_DESKTOP_USER_DATA_DIR: join(root, 'user-data') }
 }
 
 function waitForExit(child: ChildProcess, timeoutMs: number): Promise<number | null> {
@@ -40,20 +40,20 @@ function waitForExit(child: ChildProcess, timeoutMs: number): Promise<number | n
   })
 }
 
-test.skipIf(process.env.HERMES_TEST_REAL_SERVE !== '1' || process.platform === 'win32')(
+test.skipIf(process.env.X19_TEST_REAL_SERVE !== '1' || process.platform === 'win32')(
   'native retirement preserves backend-only cron and hands both waiters capacity only after real child exit',
   async () => {
-    const python = process.env.HERMES_TEST_PYTHON
-    assert.ok(python && existsSync(python), 'Set HERMES_TEST_PYTHON to an installed Hermes Python environment')
-    const electron = process.env.HERMES_TEST_ELECTRON || require('electron') as string
-    assert.ok(existsSync(electron), 'HERMES_TEST_ELECTRON must name a real native Electron executable')
-    const root = mkdtempSync(join(tmpdir(), 'hermes-pool-retirement-live-'))
+    const python = process.env.X19_TEST_PYTHON
+    assert.ok(python && existsSync(python), 'Set X19_TEST_PYTHON to an installed X19 Python environment')
+    const electron = process.env.X19_TEST_ELECTRON || require('electron') as string
+    assert.ok(existsSync(electron), 'X19_TEST_ELECTRON must name a real native Electron executable')
+    const root = mkdtempSync(join(tmpdir(), 'x19-pool-retirement-live-'))
     const resultPath = join(root, 'result.json')
     let child: ChildProcess | undefined
     let output = ''
 
     try {
-      mkdirSync(join(root, '.hermes'))
+      mkdirSync(join(root, '.x19'))
       const bundle = join(root, 'main.cjs')
       await build({ entryPoints: [join(fixture, 'main.ts')], outfile: bundle,
         bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron'] })
@@ -61,7 +61,7 @@ test.skipIf(process.env.HERMES_TEST_REAL_SERVE !== '1' || process.platform === '
         bundle: true, platform: 'node', format: 'cjs', external: ['electron'] })
       await build({ entryPoints: [join(desktop, 'src/test/pool-retirement-renderer.ts')], outfile: join(root, 'renderer.js'),
         bundle: true, platform: 'browser', format: 'iife',
-        alias: { '@': join(desktop, 'src'), '@hermes/shared': join(repo, 'apps/shared/src') },
+        alias: { '@': join(desktop, 'src'), '@x19/shared': join(repo, 'apps/shared/src') },
         define: { 'import.meta.env': '{}', 'import.meta.hot': 'undefined' } })
       writeFileSync(join(root, 'renderer.html'), '<!doctype html><meta charset="utf-8"><title>Retirement seam fixture</title><script src="./renderer.js"></script>')
       child = spawn(electron, [bundle, root, repo, python, fixture], {

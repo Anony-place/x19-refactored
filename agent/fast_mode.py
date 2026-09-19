@@ -40,7 +40,7 @@ def effective_request_overrides(agent: Any) -> dict[str, Any]:
     overrides = dict(getattr(agent, "request_overrides", None) or {})
     if getattr(agent, "service_tier", None) not in BOUNDED_MODES or time.monotonic() >= getattr(agent, "_fast_until", 0.0):
         return overrides
-    from hermes_cli.models import resolve_fast_mode_overrides
+    from x19_cli.models import resolve_fast_mode_overrides
     base_url = getattr(agent, "base_url", None)
     if getattr(agent, "api_mode", None) == "anthropic_messages":
         base_url = getattr(agent, "_anthropic_base_url", None) or base_url

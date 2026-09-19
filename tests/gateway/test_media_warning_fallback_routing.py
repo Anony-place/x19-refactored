@@ -6,7 +6,7 @@ from gateway.config import Platform
 
 
 def _cfg(tmp_path, monkeypatch, setting):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path)); monkeypatch.setenv("HERMES_MANAGED_DIR", str(tmp_path / "managed"))
+    monkeypatch.setenv("X19_HOME", str(tmp_path)); monkeypatch.setenv("X19_MANAGED_DIR", str(tmp_path / "managed"))
     cfg = {} if setting is None else {"display": {"suppress_warning_notifications": setting}}
     (tmp_path / "config.yaml").write_text(json.dumps(cfg))
 

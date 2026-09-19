@@ -68,7 +68,7 @@ class Tier1Report:
 def tier1_advisory_enabled() -> bool:
     """``skills.tier1_advisory`` (default True; safe because the scan is a no-op without the binary)."""
     try:
-        from hermes_cli.config import load_config
+        from x19_cli.config import load_config
         skills_cfg = load_config().get("skills") or {}
         value = skills_cfg.get("tier1_advisory", True) if isinstance(skills_cfg, dict) else True
         return value.strip().lower() not in ("false", "0", "no", "off") if isinstance(value, str) else bool(value)
@@ -141,14 +141,3 @@ def format_tier1_report(report: Tier1Report, limit: int = 10) -> str:
     return "\n".join(lines)
 
 
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Optional  # noqa: F401,E402
-
-SCANNER_NAME = "skillevaluator-tier1"
-
-def scanner_available() -> bool:
-    return shutil.which(SCANNER_BIN) is not None
-# ---- END PLUGIN-COMPAT ----
