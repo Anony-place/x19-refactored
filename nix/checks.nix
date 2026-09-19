@@ -992,7 +992,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           set -e
           echo "=== Checking binaries ==="
           test -x ${x19}/bin/x19 || (echo "FAIL: x19 binary missing"; exit 1)
-          test -x ${x19}/bin/x19 || (echo "FAIL: x19 binary missing"; exit 1)
+          test -x ${x19}/bin/x19-agent || (echo "FAIL: x19-agent binary missing"; exit 1)
           echo "PASS: All binaries present"
 
           echo "=== Checking version ==="
@@ -1008,7 +1008,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
         entry-points-sync = pkgs.runCommand "x19-entry-points-sync" { } ''
           set -e
           echo "=== Checking entry points match pyproject.toml [project.scripts] ==="
-          for bin in x19 x19 x19-acp; do
+          for bin in x19 x19-agent x19-acp; do
             test -x ${x19}/bin/$bin || (echo "FAIL: $bin binary missing from Nix package"; exit 1)
             echo "PASS: $bin present"
           done

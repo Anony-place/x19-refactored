@@ -38,7 +38,7 @@ CI gate. `--json` emits the same data machine-readably.
 | --- | --- |
 | Token searched | `hermes`, case-insensitive |
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
-| Corpus | every git-tracked file: **13,911** |
+| Corpus | every git-tracked file: **13,912** |
 | Files with a match | **94** |
 | Lines with a match | **329** |
 | Non-Latin matches | **0**, outside the detector and this report |
@@ -55,7 +55,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 94 files and 329 lines over the same 13,911 tracked files. Two
+   the same 94 files and 329 lines over the same 13,912 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
@@ -478,6 +478,29 @@ expected set from `[project.scripts]` in `pyproject.toml`, which makes adding an
 entrypoint without teaching holder detection about it a test failure. Reverting
 the one-line fix fails three of its eight tests.
 
+**The same set was collapsed in the Nix packaging, three times over.**
+`nix/x19.nix` builds `$out/bin/<name>` by mapping `makeWrapper` over a literal
+list, and that list read `["x19" "x19" "x19-acp"]`, so the package wrapped the CLI
+twice and never created `bin/x19-agent`. Both derivations that exist to notice
+that were collapsed identically: `package-contents` ran `test -x ${x19}/bin/x19`
+twice, and `entry-points-sync` — whose own comment reads "Verify every
+pyproject.toml [project.scripts] entry has a wrapped binary" — iterated
+`for bin in x19 x19 x19-acp`. The packaging lost a binary and the two guards that
+would have reported it were broken in the same way, so the Nix build passed. All
+three restored to `x19` / `x19-agent` / `x19-acp`, matching `[project.scripts]`,
+along with the `nix-setup.md` row that described the check as verifying that
+"`x19` and `x19` binaries exist". `tests/x19_cli/test_nix_package_entrypoints.py`
+now derives every expectation from `[project.scripts]` and reads the Nix files as
+text, because `nix` cannot run in every CI environment; 7 of its 9 tests fail
+against the collapsed lists.
+
+The collapse reached the fixtures as well. `tests/x19_cli/test_verify_console_scripts.py`
+built a fake `pyproject.toml` whose `[project.scripts]` table declared `x19` twice
+and `x19-agent` not at all, while the assertions in the same class expected three
+shims — so the fixture contradicted the test that used it. A TOML pass over the
+tracked tree could not have found it: there are only two `.toml` files and both
+are clean, because this table was a string inside a Python file.
+
 **The Docker group remap addressed a user that does not exist.** `Dockerfile`
 creates the runtime user with `useradd -u 10000 -m -d /opt/data x19`, but
 `docker/stage2-hook.sh` ran `groupmod -o -g "$X19_GID" hermes`, `id -G hermes`
@@ -516,6 +539,8 @@ twice in one scope:
 | YAML keys | 349 | every mapping, nested | 0 |
 | JS/TS object-literal keys | 3,544 | every object literal | 0 |
 | JS/TS class, interface, enum, function members | 3,544 | every declaration | 2 — both overload lists |
+| TOML keys | 2 | every table | 0 |
+| Shell / Nix / PowerShell word lists and arrays | 82 | every `for … in` list and bracketed string array | 2 — both fixed |
 
 Two more real duplicates came out of that sweep, both the same shape: a member
 written twice where the second silently wins. `tools/cronjob_tools.py` declared

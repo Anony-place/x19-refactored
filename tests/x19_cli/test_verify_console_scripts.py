@@ -22,7 +22,7 @@ def temp_pyproject(tmp_path, monkeypatch):
 
         [project.scripts]
         x19 = "x19_cli.main:main"
-        x19 = "run_agent:main"
+        x19-agent = "run_agent:main"
         x19-acp = "acp_adapter.entry:main"
     """
         )

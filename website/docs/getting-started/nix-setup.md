@@ -942,7 +942,7 @@ nix build .#checks.x86_64-linux.config-roundtrip    # merge script preserves use
 
 | Check | What it tests |
 |---|---|
-| `package-contents` | `x19` and `x19` binaries exist and `x19 --version` runs |
+| `package-contents` | `x19` and `x19-agent` binaries exist and `x19 --version` runs |
 | `entry-points-sync` | Every `[project.scripts]` entry in `pyproject.toml` has a wrapped binary in the Nix package |
 | `cli-commands` | `x19 --help` exposes `gateway` and `config` subcommands |
 | `managed-guard` | `X19_MANAGED=true x19 config set ...` prints the NixOS error |

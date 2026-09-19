@@ -209,7 +209,7 @@ stdenv.mkDerivation (finalAttrs: {
       '')
       [
         "x19"
-        "x19"
+        "x19-agent"
         "x19-acp"
       ]
     }
