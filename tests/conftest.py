@@ -13,6 +13,11 @@ Hermetic-test invariants enforced here (see AGENTS.md for rationale):
 3. **Deterministic runtime.** TZ=UTC, LANG=C.UTF-8, PYTHONHASHSEED=0.
 4. **No X19_SESSION_* inheritance** — the agent's current gateway
    session must not leak into tests.
+5. **No destructive git against this checkout.** The update tail defaults its
+   git cwd to ``PROJECT_ROOT``, which under a test run is the repository the
+   suite lives in. Read-only git is allowed; anything that moves HEAD, the
+   index or the worktree is refused. See
+   ``_block_destructive_git_on_the_host_checkout``.
 
 These invariants make the local test run match CI closely. Gaps that
 remain (CPU count, xdist worker count) are addressed by the canonical
@@ -631,6 +636,155 @@ def _neutralize_git_safe_directory_read(request, monkeypatch):
     except Exception:
         return
     monkeypatch.setattr(_subprocess_compat, "_user_safe_directories", lambda base_env: [], raising=False)
+
+
+# The checkout this suite runs inside. Destructive git against it is never a
+# legitimate test side effect; read-only git is, because tests legitimately
+# inspect the repository they live in.
+_HOST_CHECKOUT = Path(__file__).resolve().parents[1]
+
+# Subcommands that move HEAD, the index or the worktree. Read-only ones
+# (rev-parse, status, log, rev-list, ls-files, diff, show, describe) are
+# deliberately absent.
+_DESTRUCTIVE_GIT_VERBS = frozenset({
+    "checkout", "switch", "reset", "clean", "restore", "merge", "rebase",
+    "pull", "push", "fetch", "commit", "add", "rm", "mv", "cherry-pick",
+    "revert", "apply", "am", "stash", "tag", "branch", "worktree", "init",
+    "clone",
+})
+# ``stash list``/``stash show`` and ``branch --list`` read state; the rest of
+# those two families mutate it.
+_READ_ONLY_GIT_SUBACTIONS = frozenset({"list", "show"})
+_BRANCH_MODIFY_FLAGS = frozenset({"-d", "-D", "-m", "-M", "-c", "-C",
+                                  "--delete", "--move", "--copy"})
+
+
+def _host_git_is_destructive(args) -> bool:
+    """True when a git argv would mutate the repository it runs in."""
+    argv = [str(a) for a in (args or ())]
+    words = [a for a in argv if not a.startswith("-")]
+    if not words or words[0] not in _DESTRUCTIVE_GIT_VERBS:
+        return False
+    verb = words[0]
+    if verb == "stash":
+        return not (len(words) > 1 and words[1] in _READ_ONLY_GIT_SUBACTIONS)
+    if verb == "branch":
+        return bool(_BRANCH_MODIFY_FLAGS & set(argv)) or (
+            len(words) > 1 and words[1] not in _READ_ONLY_GIT_SUBACTIONS
+        )
+    return True
+
+
+def _effective_git_cwd(args, positional, keyword_cwd, *, forced_args, default_cwd):
+    """The cwd a git runner will actually use, given how it was called.
+
+    The runners disagree about where the cwd lives. ``_git_run(git_cmd, args,
+    cwd=None)`` carries it third, so it arrives in ``positional`` or as a
+    keyword; ``_reset_hard(git_cmd, cwd)`` and
+    ``_stash_local_changes_if_needed(git_cmd, cwd)`` carry it *second*, where a
+    wrapper written for the first signature reads it as the argv. Getting this
+    wrong yields no cwd at all, which reads as "not the host checkout" and lets
+    the call through — the first version of this guard did exactly that and a
+    real ``git reset --hard HEAD`` ran against the working tree.
+    """
+    effective = positional[0] if positional else keyword_cwd
+    if effective is None and forced_args is not None:
+        effective = args  # (git_cmd, cwd, ...) signature: the second positional
+    if effective is None and default_cwd is not None:
+        effective = default_cwd()
+    return effective
+
+
+def _refuse_host_git_mutation(args, effective_cwd) -> None:
+    """Raise instead of letting a test mutate the checkout the suite lives in."""
+    if effective_cwd is None:
+        return
+    try:
+        resolved = Path(effective_cwd).resolve()
+    except Exception:
+        return
+    if resolved != _HOST_CHECKOUT and _HOST_CHECKOUT not in resolved.parents:
+        return
+    if not _host_git_is_destructive(args):
+        return
+    raise AssertionError(
+        "a test tried to run destructive git inside the checkout the suite lives in: "
+        f"`git {' '.join(str(a) for a in args)}` with cwd={resolved}. "
+        "x19_cli.update_cmd._git_run defaults its cwd to PROJECT_ROOT, so a test that "
+        "drives the update tail without the isolated_update_runtime fixture stashes, "
+        "resets --hard and switches branches on the developer's real working tree — and "
+        "still passes, so nothing notices. Request that fixture, point the flow at a "
+        "tmp_path checkout, or, only when moving the host checkout is the point of the "
+        "test, mark it @pytest.mark.real_host_git."
+    )
+
+
+@pytest.fixture(autouse=True)
+def _block_destructive_git_on_the_host_checkout(request, monkeypatch):
+    """Circuit breaker: no test may stash, reset or switch branches on this checkout.
+
+    Root cause of incident 20260919: ``tests/x19_cli/conftest.py`` installs an
+    autouse stub (``_inline_post_swap_handoff``) that runs the update's post-swap
+    tail in-process rather than spawning a child interpreter, because "a mocked
+    updater flow must not spawn that child (it would run a real dependency sync
+    against the worktree)". The fixture that keeps that in-process tail off the
+    host checkout — ``isolated_update_runtime``, which repoints ``PROJECT_ROOT``
+    at a tmp dir — is *not* autouse. So any test that reaches the tail without
+    asking for it runs the real thing here: it stashed a session's uncommitted
+    work under an ``x19-update-autostash-<timestamp>`` label, ran
+    ``git reset --hard HEAD`` five times and checked out ``main``, discarding a
+    tree that was mid-edit. Every test still passed, which is why nothing caught
+    it for forty minutes.
+
+    Guarding ``PROJECT_ROOT`` itself is not an option: plenty of tests read real
+    repository files through it. So the guard sits at the choke point instead —
+    ``update_cmd._git_run``, whose default cwd *is* ``PROJECT_ROOT``, and which
+    ``update_cmd_stash`` also reaches (it imports the runner inside each
+    function, so patching the one attribute covers both modules). The two
+    helpers that shell out to git directly rather than through the runner are
+    wrapped as well. Read-only git still runs against this checkout; destructive
+    subcommands are refused only when the effective cwd resolves inside it, so a
+    test that builds its own repository under ``tmp_path`` passes straight
+    through.
+    """
+    if request.node.get_closest_marker("real_host_git"):
+        return
+    try:
+        from x19_cli import update_cmd, update_cmd_stash
+    except Exception:
+        return
+
+    def _project_root():
+        try:
+            return update_cmd._m().PROJECT_ROOT
+        except Exception:
+            return None
+
+    def _wrap(module, name, default_cwd=None, forced_args=None):
+        original = getattr(module, name, None)
+        if original is None or getattr(original, "_x19_host_git_guarded", False):
+            return
+
+        def guarded(git_cmd, args=None, *positional, **keyword):
+            payload = forced_args if forced_args is not None else args
+            effective = _effective_git_cwd(
+                args, positional, keyword.get("cwd"),
+                forced_args=forced_args, default_cwd=default_cwd,
+            )
+            _refuse_host_git_mutation(payload, effective)
+            return original(git_cmd, *(() if args is None else (args,)),
+                            *positional, **keyword)
+
+        guarded._x19_host_git_guarded = True
+        monkeypatch.setattr(module, name, guarded, raising=False)
+
+    _wrap(update_cmd, "_git_run", default_cwd=_project_root)
+    _wrap(update_cmd_stash, "_git_quiet")
+    _wrap(update_cmd_stash, "_reset_hard", forced_args=["reset", "--hard", "HEAD"])
+    # Clears an unmerged index with a bare `git reset` before stashing, and its
+    # whole purpose is to mutate, so it is refused outright on the host checkout.
+    _wrap(update_cmd_stash, "_stash_local_changes_if_needed",
+          forced_args=["stash", "push"])
 
 
 @pytest.fixture(autouse=True)
