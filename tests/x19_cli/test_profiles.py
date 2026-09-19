@@ -598,7 +598,7 @@ class TestDeleteProfile:
         x19-notes.py, x19-unrelated-tool) must NOT be misidentified as
         the console-script shim just because argv[0] is a python interpreter
         and argv[1]'s basename starts with "x19" -- only the actual known
-        console-script entry points (x19, x19, x19-acp) count.
+        console-script entry points (x19, x19-agent, x19-acp) count.
         """
         create_profile("coder", no_alias=True)
         profile_dir = get_profile_dir("coder")

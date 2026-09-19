@@ -44,7 +44,7 @@ x19 setup
 x19 chat
 ```
 
-执行 `nix profile install` 后，`x19`、`x19` 和 `x19-acp` 将出现在你的 PATH 中。之后的工作流与[标准安装](./installation.md)完全相同——`x19 setup` 引导你完成提供商选择，`x19 gateway install` 设置 launchd（macOS）或 systemd 用户服务，配置存放在 `~/.x19/`。
+执行 `nix profile install` 后，`x19`、`x19-agent` 和 `x19-acp` 将出现在你的 PATH 中。之后的工作流与[标准安装](./installation.md)完全相同——`x19 setup` 引导你完成提供商选择，`x19 gateway install` 设置 launchd（macOS）或 systemd 用户服务，配置存放在 `~/.x19/`。
 
 <details>
 <summary><strong>从本地克隆构建</strong></summary>

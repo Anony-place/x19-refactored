@@ -26,7 +26,7 @@ from x19_cli import main as cli_main
 from x19_cli import update_cmd
 from x19_cli import main_install_repair
 
-SHIM_NAMES = ["x19.exe", "x19.exe", "x19-acp.exe", "x19-gateway.exe"]
+SHIM_NAMES = ["x19.exe", "x19-agent.exe", "x19-acp.exe", "x19-gateway.exe"]
 
 
 @pytest.fixture

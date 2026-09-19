@@ -10,14 +10,13 @@ checked into the repository so the result can be re-verified at any time.
 
 ```
 $ python scripts/x19_residue_audit.py --strict
-
 X19 legacy-identity residue audit
 ==============================================================
 tracked files containing 'hermes': 94
-total occurrences (lines):          329
+total occurrences (lines):          333
 
   model-identifier              169 line(s) across 59 file(s)
-  audit-tooling                 114 line(s) across 2 file(s)
+  audit-tooling                 118 line(s) across 2 file(s)
   third-party-url                30 line(s) across 23 file(s)
   contributor-attribution         6 line(s) across 6 file(s)
   third-party-dependency          6 line(s) across 1 file(s)
@@ -40,7 +39,7 @@ CI gate. `--json` emits the same data machine-readably.
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
 | Corpus | every git-tracked file: **13,912** |
 | Files with a match | **94** |
-| Lines with a match | **329** |
+| Lines with a match | **333** |
 | Non-Latin matches | **0**, outside the detector and this report |
 | Unjustified | **0** |
 
@@ -55,7 +54,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 94 files and 329 lines over the same 13,912 tracked files. Two
+   the same 94 files and 333 lines over the same 13,912 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
@@ -100,9 +99,9 @@ One line in this class deserves specific mention because it was the site of a
 real bug — see
 [the model-family detector](#4-the-model-family-detector-could-never-fire).
 
-### `audit-tooling` — 114 lines / 2 files
+### `audit-tooling` — 118 lines / 2 files
 
-The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (90
+The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (94
 lines). A detector must spell the thing it detects: the token appears in
 `TOKEN`, in every classification pattern, and in the comments explaining them.
 This document quotes the occurrences it classifies — including the adversarial
@@ -110,7 +109,7 @@ probes that must keep failing — so it contains the token by construction.
 
 Both are reported as their own class rather than excluded from the scan, so the
 accounting stays complete and the totals keep matching a plain `git grep`: all
-329 lines are classified, none are silently dropped. Excluding them instead
+333 lines are classified, none are silently dropped. Excluding them instead
 would make the headline numbers unverifiable by anyone running the obvious
 command.
 
@@ -501,6 +500,42 @@ shims — so the fixture contradicted the test that used it. A TOML pass over th
 tracked tree could not have found it: there are only two `.toml` files and both
 are clean, because this table was a string inside a Python file.
 
+**The same list was collapsed in the documentation and in the launcher tests.**
+Searching for files that mention `x19-acp` without ever mentioning `x19-agent`
+— the distinctive third name is a proxy for "this file talks about the entry-point
+set" — found `nix-setup.md` telling users that after `nix profile install`,
+"`x19`, `x19`, and `x19-acp` are on your PATH", and the same sentence in its
+`zh-Hans` translation, where the separators are `、` and `和` rather than `,` and
+`and`, so a punctuation-agnostic pattern was needed to see it. Both restored to
+name all three, which now matches what the fixed wrapper list actually produces.
+`x19_bootstrap.py` opened with "Import this module first in every entry point
+(``x19``, ``x19``, ``x19-acp``, …)", and two test docstrings mirrored it
+(`tests/test_x19_bootstrap.py`, and `tests/x19_cli/test_profiles.py` describing
+"the actual known console-script entry points (x19, x19, x19-acp)" — the very set
+that test exists to enforce). All three restored.
+
+One of these was not cosmetic. `tests/scripts/install/test_install_sh_acp_launcher.py`
+is named for the `x19-agent` launcher, its helpers are `_run_x19_agent_block` and
+`_extract_x19_agent_shim_block`, and it returns `command_link_dir / "x19-agent"` —
+but twelve strings inside it had collapsed, and one of the twelve was load-bearing:
+`test_x19_agent_launcher_cleanup_on_uninstall` created `.local/bin/x19` and wrote
+`exec x19` into it, then asserted that `remove_wrapper_script()` removed it. Since
+`x19` is always in the uninstaller's set, the test passed whether or not the
+uninstaller knew about `x19-agent` — it verified the one launcher whose removal was
+never in question and never exercised the one this section is about. It now builds
+the `x19-agent` wrapper, and is non-vacuous: dropping `x19-agent` from the tuple in
+`x19_cli/uninstall.py:123` fails it, and restoring it passes.
+
+The last was a coverage hole with no visible symptom at all.
+`tests/x19_cli/test_update_shim_self_lock.py` parametrizes over
+`SHIM_NAMES`, which read `["x19.exe", "x19.exe", "x19-acp.exe", "x19-gateway.exe"]`.
+Pytest gives duplicate parameters distinct IDs, so the collected cases were
+`x19.exe0`, `x19.exe1`, `x19-acp.exe`, `x19-gateway.exe`: the CLI shim was
+self-lock-tested twice and `x19-agent.exe` was never tested, while the count stayed
+at 26 and nothing looked missing. Production's shim set has four members —
+`x19_cli/_install_repair.py:375` adds `x19-gateway` to the console-script names —
+so the list is restored to all four distinct `.exe` names.
+
 **The Docker group remap addressed a user that does not exist.** `Dockerfile`
 creates the runtime user with `useradd -u 10000 -m -d /opt/data x19`, but
 `docker/stage2-hook.sh` ran `groupmod -o -g "$X19_GID" hermes`, `id -G hermes`
@@ -541,6 +576,8 @@ twice in one scope:
 | JS/TS class, interface, enum, function members | 3,544 | every declaration | 2 — both overload lists |
 | TOML keys | 2 | every table | 0 |
 | Shell / Nix / PowerShell word lists and arrays | 82 | every `for … in` list and bracketed string array | 2 — both fixed |
+| Python list/tuple/set members containing a product name | 6,624 | every collection with ≥2 `x19*` members | 4 — 1 fixed (`SHIM_NAMES`), 3 benign |
+| Adjacent duplicate product names in prose (all files, CJK-aware) | 13,912 | every line | 28 — 4 fixed, 24 benign |
 
 Two more real duplicates came out of that sweep, both the same shape: a member
 written twice where the second silently wins. `tools/cronjob_tools.py` declared
@@ -552,12 +589,39 @@ assertion, so the set held 38 distinct members written as 45. Both duplicates
 removed; the 76 cron schema and tool tests pass, as does the skin-engine test
 that owns the set.
 
-Lists and tuples were scanned too — 49,878 and 76,716 of them — and are excluded
-from the table deliberately: a repeated member there is ordinary data, not a
-collapse, since position carries meaning. Only dict keys and set members are
-places where a duplicate *removes* information. The JSON pass used TypeScript's
+Lists and tuples were scanned too — 49,878 and 76,716 of them. An earlier version
+of this report excluded them from the table outright, on the grounds that a
+repeated member there is ordinary data since position carries meaning, and that
+only dict keys and set members are places where a duplicate *removes* information.
+That reasoning was too strong, and the two rows above are why: 707 lists and
+tuples contain an adjacent repeated string, and nearly all of them are benign —
+help-text pairs, empty placeholders, a resolver mapping a path to itself — but
+filtering the same pass to collections whose members are product names found
+`SHIM_NAMES`, which had silently dropped `x19-agent.exe` from a parametrize list,
+and the Nix wrapper list, which had silently dropped a binary from the package. A
+duplicate in a list removes information whenever the list is a *set of names*
+being iterated, which is exactly what an entry-point list is. Position carrying
+meaning does not make repetition safe. The JSON pass used TypeScript's
 JSON parser rather than `json.loads` because three `tsconfig` files contain
 comments, which strict JSON rejects; all 140 parse clean under it.
+
+Most of what those two new detectors reported was checked and left alone, and the
+distinctions matter more than the hit count. Twenty-four lines read `x19 x19`
+because they are `docker exec <container> <command>` or `s6-setuidgid <user>
+<command>` — upstream was `docker exec hermes hermes …` with `--name hermes`, so
+both tokens are correctly `x19`. `NO_PROXY=x19,x19-dashboard` lists two hostnames.
+Four test files build a temporary install root at `tmp_path / "x19"` where upstream
+said `hermes-agent`; that is not a collapse but the deliberate standardization of a
+dist-derived path, and it agrees with production — `x19_cli/gui_uninstall.py:41`
+resolves the managed root as `x19_home / "x19"`, and `install.sh` sets
+`INSTALL_DIR="$X19_HOME/x19"`. `scripts/install.ps1` stages only `@("x19",
+"x19-acp")` on PATH, which is faithful: upstream staged `@("hermes",
+"hermes-acp")` and never exposed the agent launcher on Windows either. The macOS
+launcher test differs from a mechanical rename because the launcher now runs
+`-m x19_cli.main` instead of executing `$INSTALL_DIR/x19` as a script — a design
+change with a comment explaining it, not damage. Two remaining duplicate-member
+collections are legitimate data: a Matrix case where an MXID is both sender and
+expected sender, and a project-tree resolver mapping `/www/x19` to itself.
 
 The benign and intentional counts are worth naming, because they are what a
 naive sweep reports and what a reader must not mistake for defects: 74 duplicate

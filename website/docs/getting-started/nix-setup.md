@@ -57,7 +57,7 @@ x19 setup
 x19 --tui
 ```
 
-After `nix profile install`, `x19`, `x19`, and `x19-acp` are on your PATH. From here, the workflow is identical to the [standard installation](./installation.md) — `x19 setup` walks you through provider selection, `x19 gateway install` sets up a launchd (macOS) or systemd user service, and config lives in `~/.x19/`.
+After `nix profile install`, `x19`, `x19-agent`, and `x19-acp` are on your PATH. From here, the workflow is identical to the [standard installation](./installation.md) — `x19 setup` walks you through provider selection, `x19 gateway install` sets up a launchd (macOS) or systemd user service, and config lives in `~/.x19/`.
 
 :::warning Messaging platforms (Discord, Telegram, Slack)
 The default package includes ALL libraries x19 might need. if you want a smaller variant, check the other flake outputs. 

@@ -1,7 +1,7 @@
 """Tests for x19_bootstrap — Windows UTF-8 stdio shim.
 
 The bootstrap module is imported at the top of every X19 entry point
-(x19, x19, x19-acp, gateway, batch_runner, cli.py).  It
+(x19, x19-agent, x19-acp, gateway, batch_runner, cli.py).  It
 fixes Python's Windows UTF-8 defaults so print("café") doesn't crash and
 subprocess children inherit UTF-8 mode.
 

@@ -130,7 +130,7 @@ def test_acp_launcher_does_not_follow_a_symlink_into_the_venv(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# x19 launcher regression (#74819)
+# x19-agent launcher regression (#74819)
 # ---------------------------------------------------------------------------
 
 X19_AGENT_BLOCK = re.compile(
@@ -143,16 +143,16 @@ X19_AGENT_BLOCK = re.compile(
 def _extract_x19_agent_shim_block() -> str:
     match = X19_AGENT_BLOCK.search(INSTALL_SH.read_text(encoding="utf-8"))
     assert match, (
-        "could not locate the x19 launcher block in scripts/install.sh — "
+        "could not locate the x19-agent launcher block in scripts/install.sh — "
         "if it was renamed, update this test with it"
     )
     return match.group(1)
 
 
 def _run_x19_agent_block(tmp_path: Path, use_venv: str) -> Path | None:
-    """Execute the extracted x19 block with the env vars setup_path() sets."""
+    """Execute the extracted x19-agent block with the env vars setup_path() sets."""
     if use_venv == "false":
-        # --no-venv: x19 is NOT installed by this block (handled
+        # --no-venv: x19-agent is NOT installed by this block (handled
         # elsewhere), so there's nothing to test here.
         return None
 
@@ -180,13 +180,13 @@ def _run_x19_agent_block(tmp_path: Path, use_venv: str) -> Path | None:
         cwd=tmp_path,
     )
     assert result.returncode == 0, (
-        f"x19 shim block failed:\nstdout={result.stdout}\nstderr={result.stderr}"
+        f"x19-agent shim block failed:\nstdout={result.stdout}\nstderr={result.stderr}"
     )
     return command_link_dir / "x19-agent"
 
 
 def test_venv_install_writes_executable_x19_agent_launcher(tmp_path):
-    """venv install must write a user-executable x19 launcher."""
+    """venv install must write a user-executable x19-agent launcher."""
     shim = _run_x19_agent_block(tmp_path, "true")
     assert shim is not None
     assert shim.is_file()
@@ -195,20 +195,20 @@ def test_venv_install_writes_executable_x19_agent_launcher(tmp_path):
     text = shim.read_text(encoding="utf-8")
     assert "unset PYTHONPATH" in text
     assert "unset PYTHONHOME" in text
-    assert "run_agent.py" in text, "x19 must dispatch to run_agent.py"
+    assert "run_agent.py" in text, "x19-agent must dispatch to run_agent.py"
 
 
 def test_x19_agent_launcher_cleanup_on_uninstall(tmp_path):
-    """uninstall.remove_wrapper_script() must remove x19 alongside
+    """uninstall.remove_wrapper_script() must remove x19-agent alongside
     x19 and x19-acp."""
     from x19_cli.uninstall import remove_wrapper_script
 
-    # Simulate a x19 wrapper in the user-local location
-    local_shim = tmp_path / ".local" / "bin" / "x19"
+    # Simulate an x19-agent wrapper in the user-local location
+    local_shim = tmp_path / ".local" / "bin" / "x19-agent"
     local_shim.parent.mkdir(parents=True)
-    local_shim.write_text("#!/usr/bin/env bash\nexec x19\n", encoding="utf-8")
+    local_shim.write_text("#!/usr/bin/env bash\nexec x19-agent\n", encoding="utf-8")
 
     with patch.object(Path, "home", return_value=tmp_path):
         removed = remove_wrapper_script()
 
-    assert local_shim in removed, "local x19 wrapper must be removed"
+    assert local_shim in removed, "local x19-agent wrapper must be removed"
