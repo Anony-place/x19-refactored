@@ -8,13 +8,13 @@ import sqlite3
 from pathlib import Path
 from typing import Sequence
 
-from hermes_constants import get_hermes_home
-from hermes_state_common import (FTS_CJK_STALE_KEY, FTS_STALE_KEY, _FTS_CJK_TRIGGERS, _FTS_TRIGGERS,
+from x19_constants import get_x19_home
+from x19_state_common import (FTS_CJK_STALE_KEY, FTS_STALE_KEY, _FTS_CJK_TRIGGERS, _FTS_TRIGGERS,
     routed_sessions_setting)
-from hermes_state_errors import is_fts_scoped_corruption_error
+from x19_state_errors import is_fts_scoped_corruption_error
 
-# caplog tests pin the "hermes_state" logger name.
-logger = logging.getLogger("hermes_state")
+# caplog tests pin the "x19_state" logger name.
+logger = logging.getLogger("x19_state")
 
 # ── CJK-bigram FTS index (replaces the trigram index when available) ────
 # Trigram needs >=3 chars per term, so 1-2 char CJK terms fell through to a LIKE
@@ -99,7 +99,7 @@ END;
 def fts5_cjk_so_path() -> Path:
     """Location of the cjk_unicode61 loadable extension."""
     env = os.getenv("HERMES_FTS5_CJK_SO")
-    return Path(env).expanduser() if env else get_hermes_home() / "lib" / "libfts5_cjk.so"
+    return Path(env).expanduser() if env else get_x19_home() / "lib" / "libfts5_cjk.so"
 
 
 def _cjk_fts_config_enabled() -> bool:
@@ -233,7 +233,7 @@ class SessionFtsSetupMixin:
         self._fts_unavailable_warned = True
         logger.warning(
             "SQLite FTS5 unavailable for %s; full-text session search "
-            "disabled. Run `hermes update` to rebuild the venv with a "
+            "disabled. Run `x19 update` to rebuild the venv with a "
             "current Python (managed uv guarantees FTS5). (underlying error: %s)",
             self.db_path,
             exc,
@@ -263,7 +263,7 @@ class SessionFtsSetupMixin:
                             "cjk_unicode61 tokenizer is unavailable (%s) — "
                             "dropping the cjk triggers so message writes keep "
                             "working. CJK search falls back to trigram/LIKE; "
-                            "run `hermes sessions optimize-storage` on a host "
+                            "run `x19 sessions optimize-storage` on a host "
                             "with the extension to rebuild.",
                             fts5_cjk_so_path(),
                         )
@@ -347,7 +347,7 @@ class SessionFtsSetupMixin:
         """Corruption SQLite identifies as FTS-scoped (SQLITE_CORRUPT_VTAB, or an ``fts5:``
         report naming ``messages_fts*`` on builds without result codes); a bare malformed
         image is structural. One rule, shared with ``classify_persistence_error`` and the
-        gateway transcript retry: see :func:`hermes_state_errors.is_fts_scoped_corruption_error`."""
+        gateway transcript retry: see :func:`x19_state_errors.is_fts_scoped_corruption_error`."""
         return is_fts_scoped_corruption_error(exc)
 
     def _enter_fts_fail_open(self, exc: sqlite3.DatabaseError) -> bool:
