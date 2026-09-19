@@ -1,7 +1,7 @@
 """Process and descriptor authority for state.db structural maintenance.
 
 This module owns the proof that no foreign process still holds the active or
-an unlinked SQLite DB/WAL/SHM generation.  ``hermes_state`` supplies only the
+an unlinked SQLite DB/WAL/SHM generation.  ``x19_state`` supplies only the
 SQLite connection factory needed by the final lock probe.
 """
 
@@ -30,7 +30,7 @@ def read_only_db_uri(db_path) -> str:
 logger = logging.getLogger(__name__)
 
 _IS_WINDOWS = sys.platform == "win32"
-_HERMES_EXECUTABLES = frozenset({"hermes", "hermes-agent", "hermes-acp"})
+_HERMES_EXECUTABLES = frozenset({"hermes", "x19", "hermes-acp"})
 _HERMES_PYTHON_MODULES = frozenset({"acp_adapter", "hermes_cli.main"})
 _HERMES_PYTHON_SCRIPTS = frozenset({"hermes_cli/main.py", "run_agent.py"})
 _PYTHON_SHORT_OPTIONS_WITH_OPERANDS = frozenset({"Q", "W", "X"})
@@ -105,7 +105,7 @@ def _python_execution_target(argv: Sequence[str]) -> Optional[Tuple[str, str]]:
 
 
 def _looks_like_hermes(argv: Sequence[str]) -> bool:
-    """Return whether argv identifies a supported Hermes execution target."""
+    """Return whether argv identifies a supported X19 execution target."""
     if not argv:
         return False
     program = os.path.basename(argv[0]).lower().removesuffix(".exe")
@@ -134,13 +134,13 @@ def canonical_sqlite_path(path: str) -> str:
 def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
     """Return whether argv proves the process belongs to a DIFFERENT instance.
 
-    ``state.db`` lives at the HERMES_HOME root, so an absolute-path token
+    ``state.db`` lives at the X19_HOME root, so an absolute-path token
     containing a ``/.hermes`` segment (or naming a ``state.db``/WAL/SHM under
-    some other parent) identifies that token's own Hermes home.  When at least
+    some other parent) identifies that token's own X19 home.  When at least
     one such token exists AND no token references this instance's state.db,
     its sidecars, or its home directory, the process provably works on a
     different generation and must not be counted as an uninspectable holder
-    of ours (issue #92401: a second gateway under /home/demo/.hermes deferred
+    of ours (issue #92401: a second gateway under /home/demo/.x19 deferred
     this instance's stale-FTS rebuild forever despite lsof proving zero open
     handles).  Ambiguous argv without absolute-path tokens returns False and
     keeps the fail-closed suspicion.
@@ -195,7 +195,7 @@ def foreign_state_db_holders(db_path: Path) -> List[Tuple[int, str]]:
         return []
 
     # realpath, not abspath: psutil/libproc report the kernel-resolved pathname, so a symlinked
-    # HERMES_HOME would otherwise make every holder invisible and let maintenance proceed.
+    # X19_HOME would otherwise make every holder invisible and let maintenance proceed.
     db_path_str = os.path.realpath(os.fspath(db_path))
     watched = {
         canonical_sqlite_path(db_path_str),
