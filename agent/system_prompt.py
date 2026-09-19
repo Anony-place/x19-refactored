@@ -382,7 +382,7 @@ def _active_profile_line(agent: Any) -> str:
         # Without one, keep the ambient (patchable) resolution byte-identical.
         _root_str = str(get_default_hermes_root() if _agent_home_path is not None else get_hermes_home())
         return (
-            "Active Hermes profile: default. Other profiles (if any) live "
+            "Active X19 profile: default. Other profiles (if any) live "
             "under " + _root_str + "/profiles/<name>/. Each profile has its own "
             "skills/, plugins/, cron/, and memories/ that affect a different "
             "session than this one. Do not modify another profile's "
@@ -399,7 +399,7 @@ def _active_profile_line(agent: Any) -> str:
     # NOT get_hermes_home().
     default_root = get_default_hermes_root()
     return (
-        f"Active Hermes profile: {active_profile}. This session reads "
+        f"Active X19 profile: {active_profile}. This session reads "
         f"and writes {profile_home}/. The default "
         f"profile's data lives at {default_root}/skills/, {default_root}/plugins/, "
         f"{default_root}/cron/, {default_root}/memories/ — those belong to a "
@@ -540,7 +540,7 @@ def _memory_parts(agent: Any) -> List[str]:
 
 
 def _get_x19_identity_if_enabled() -> Optional[str]:
-    """Return X19 identity if X19 mode is enabled, else None. Fail-open to Hermes default."""
+    """Return X19 identity if X19 mode is enabled, else None. Fail-open to the legacy default."""
     try:
         from x19.identity import is_x19_enabled, get_x19_identity
         if is_x19_enabled():
@@ -584,7 +584,7 @@ def _guidance_parts(agent: Any) -> List[str]:
     """Universal + tool-aware + model-gated guidance blocks, each gated by its config.yaml key.
 
     X19 extension: injects X19 security, evidence, team, operator, and mission guidance when X19 mode enabled.
-    This implements X19 personality through Hermes' actual prompt architecture, not fake templates.
+    This implements X19 personality through the existing prompt architecture, not fake templates.
     """
     parts: List[str] = []
     if agent.valid_tool_names:
@@ -712,15 +712,15 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     # ── Stable tier ────────────────────────────────────────────────
     stable_parts, _soul_loaded = _identity_parts(agent, _ctx_len)
     # The skill_view() pointer dangles without skill tools OR without the
-    # hermes-agent skill installed, so the variant is chosen after the skills
+    # X19 skill installed, so the variant is chosen after the skills
     # index is built; this slot holds its position.
     _help_guidance_slot = len(stable_parts)
     stable_parts.append(HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS)
     stable_parts.extend(_guidance_parts(agent))
     skills_prompt = _skills_prompt(agent)
-    # Skill-pointer variant requires BOTH skill_view AND the hermes-agent skill
+    # Skill-pointer variant requires BOTH skill_view AND the X19 skill
     # in the rendered index (pure string check — inherits the index's stability).
-    if "skill_view" in (agent.valid_tool_names or set()) and "- hermes-agent:" in skills_prompt:
+    if "skill_view" in (agent.valid_tool_names or set()) and "- x19:" in skills_prompt:
         stable_parts[_help_guidance_slot] = HERMES_AGENT_HELP_GUIDANCE
     stable_parts.extend(_alibaba_identity_part(agent))
     # Pinned skills are per-agent constants (resolved once), so they live in the stable prefix.
