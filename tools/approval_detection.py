@@ -389,7 +389,7 @@ DANGEROUS_PATTERNS = [
     (rf'\bsed\s+--in-place\b.*\s{_SYSTEM_CONFIG_PATH}', "in-place edit of system config (long flag)"),
     # sed -i on X19 config/.env bypasses the redirection/tee rules; pairs the file_tools
     # write_file/patch deny so the terminal side is not an open door.
-    # In-place edit of a X19-managed security file (~/.x19/config.yaml or .env). sed -i bypasses the
+    # In-place edit of an X19-managed security file (~/.x19/config.yaml or .env). sed -i bypasses the
     # redirection/tee patterns above because it mutates the file directly. See #14639.
     (rf'\bsed\s+-[^\s]*i.*(?:{_X19_CONFIG_PATH}|{_X19_ENV_PATH})', "in-place edit of X19 config/env"),
     (rf'\bsed\s+--in-place\b.*(?:{_X19_CONFIG_PATH}|{_X19_ENV_PATH})', "in-place edit of X19 config/env (long flag)"),

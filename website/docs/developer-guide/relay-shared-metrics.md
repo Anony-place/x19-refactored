@@ -7,7 +7,7 @@ description: "NeMo Relay shared metrics: what is exported, consent and retention
 
 X19 includes NeMo Relay as a normal runtime dependency on platforms for
 which Relay publishes a native wheel. The shared-metrics integration is built
-into X19 and does not require a X19 observability plugin. X19 remains
+into X19 and does not require an X19 observability plugin. X19 remains
 importable without Relay on other native targets. Those targets use an
 explicit reduced-capability no-op host:
 X19 execution remains available, while Relay scopes, middleware, plugins,
@@ -101,7 +101,7 @@ retain the same `session_id` and add `x19.session.segment` plus
 
 ## Process-Wide Plugin Policy and Profile Isolation
 
-Relay plugin configuration is a process-level deployment choice, not a X19
+Relay plugin configuration is a process-level deployment choice, not an X19
 profile setting. The first hosted profile triggers lazy initialization, and
 every additional profile hosted by that X19 process shares the resulting
 static middleware, dynamic plugins, subscribers, exporters, and guardrail

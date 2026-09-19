@@ -904,7 +904,7 @@ class TestCatalogProviderAlias:
         assert info is not None and info.provider_id == "deepseek" and info.context_window == 128000
 
     def test_mistyped_alias_warns_once_and_keeps_the_configured_slug(self, caplog):
-        """``catalog_provider: deepsek`` is neither a X19 provider id nor a models.dev id: warn
+        """``catalog_provider: deepsek`` is neither an X19 provider id nor a models.dev id: warn
         once (per process, like the unknown-key warning) and keep ``ModelInfo.provider_id`` on the
         configured slug instead of leaking the typo as a vendor id."""
         import logging

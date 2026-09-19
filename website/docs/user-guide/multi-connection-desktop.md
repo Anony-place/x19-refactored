@@ -41,8 +41,8 @@ Each entry is a *connection*:
 | Kind | What it is | Auth |
 |---|---|---|
 | **Local** | "The X19 runtime managed by this app." | automatic |
-| **Remote gateway** | "A X19 gateway reachable over HTTP(S) — LAN, Tailscale, or the internet." | session token or OAuth |
-| **SSH** | "A X19 install reached over SSH." The app opens the tunnel and starts the dashboard for you | SSH key + adopted token |
+| **Remote gateway** | "An X19 gateway reachable over HTTP(S) — LAN, Tailscale, or the internet." | session token or OAuth |
+| **SSH** | "An X19 install reached over SSH." The app opens the tunnel and starts the dashboard for you | SSH key + adopted token |
 | **X19 Cloud** | "A hosted instance discovered through your X19 Cloud account." | portal sign-in |
 
 Rules worth knowing:

@@ -504,7 +504,7 @@ get_command_link_display_dir() {
     fi
 }
 
-# Point a X19-managed Node's `npm install -g` at a directory that is on
+# Point an X19-managed Node's `npm install -g` at a directory that is on
 # PATH. npm's default global prefix for a bundled Node is the Node dir itself,
 # so global package binaries land in $X19_HOME/node/bin — which is NOT on
 # PATH (only the command link dir is) and is wiped on every Node upgrade.
@@ -1047,7 +1047,7 @@ check_node() {
         return
     fi
 
-    # Prefer a X19-managed Node from a previous run over a too-old system one.
+    # Prefer an X19-managed Node from a previous run over a too-old system one.
     if [ -x "$X19_HOME/node/bin/node" ] && [ -x "$X19_HOME/node/bin/npm" ] \
         && node_satisfies_build "$("$X19_HOME/node/bin/node" --version)"; then
         export PATH="$X19_HOME/node/bin:$PATH"

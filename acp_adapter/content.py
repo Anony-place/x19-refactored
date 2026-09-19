@@ -247,7 +247,7 @@ def _append_parts(parts: list, text_parts: list[str], new_parts: list[dict[str, 
 
 
 def _content_blocks_to_openai_user_content(prompt: list[PromptBlock]) -> str | list[dict[str, Any]]:
-    """Convert ACP prompt blocks into a X19/OpenAI-compatible user content payload."""
+    """Convert ACP prompt blocks into an X19/OpenAI-compatible user content payload."""
     parts: list[dict[str, Any]] = []
     text_parts: list[str] = []
 

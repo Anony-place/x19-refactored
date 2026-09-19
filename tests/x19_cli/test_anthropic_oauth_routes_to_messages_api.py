@@ -34,7 +34,7 @@ class TestExplicitRuntimeForAnthropic:
     always return ``api_mode='anthropic_messages'`` regardless of
     base_url shape or stale persisted ``model.api_mode`` values.
 
-    Exercised whenever the user (or a X19 subcommand) passes an
+    Exercised whenever the user (or an X19 subcommand) passes an
     explicit ``--api-key`` / ``--base-url`` override to the runtime
     resolver.
     """

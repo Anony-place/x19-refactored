@@ -179,7 +179,7 @@ X19 CLI 支持 `clarify` 工具进行交互式提示，但有以下限制：
 - `{"question":"Your existing SOUL.md conflicts with the imported one. What should I do?","choices":["keep existing","overwrite with backup","review first"]}`
 - `{"question":"One or more imported OpenClaw skills already exist in X19. How should I handle those skill conflicts?","choices":["keep existing skills","overwrite conflicting skills with backup","import conflicting skills under renamed folders"]}`
 - `{"question":"Choose migration mode: migrate only user data, or run the full compatible migration including allowlisted secrets?","choices":["user-data only","full compatible migration","cancel"]}`
-- `{"question":"Do you want to copy the OpenClaw workspace instructions file into a X19 workspace?","choices":["skip workspace instructions","copy to a workspace path","decide later"]}`
+- `{"question":"Do you want to copy the OpenClaw workspace instructions file into an X19 workspace?","choices":["skip workspace instructions","copy to a workspace path","decide later"]}`
 - `{"question":"Please provide an absolute path where the workspace instructions should be copied."}`
 
 ## 决策到命令的映射

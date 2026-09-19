@@ -57,7 +57,7 @@ _nb_get_link_dir() {
     fi
 }
 
-# Redirect a X19-managed Node's `npm install -g` to the command link dir
+# Redirect an X19-managed Node's `npm install -g` to the command link dir
 # (already on PATH) instead of the default $X19_HOME/node/bin, which is off
 # PATH and wiped on every Node upgrade. Scoped to the managed Node via its
 # prefix-local global npmrc; the user's other Node installs / ~/.npmrc are

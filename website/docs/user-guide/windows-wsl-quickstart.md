@@ -221,7 +221,7 @@ This is the reverse direction and is less documented elsewhere, but it's what yo
 
 On **Windows 11 22H2+ with mirrored mode enabled**, there is nothing to do. A process in WSL that binds to `0.0.0.0:8080` (or even `127.0.0.1:8080`) is reachable from a Windows browser at `http://localhost:8080`. WSL publishes the bind back to the host automatically.
 
-On **NAT mode** (Windows 10 / older Windows 11), the default "localhost forwarding" in WSL2 will generally forward Linux-side `127.0.0.1` binds to Windows `localhost`, so a X19 service started with `--host 127.0.0.1` is usually reachable as `http://localhost:PORT` from Windows. If it isn't:
+On **NAT mode** (Windows 10 / older Windows 11), the default "localhost forwarding" in WSL2 will generally forward Linux-side `127.0.0.1` binds to Windows `localhost`, so an X19 service started with `--host 127.0.0.1` is usually reachable as `http://localhost:PORT` from Windows. If it isn't:
 
 - Bind to `0.0.0.0` explicitly inside WSL.
 - Find the WSL VM's IP with `ip -4 addr show eth0 | grep inet` and hit that from Windows.

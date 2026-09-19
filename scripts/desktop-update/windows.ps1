@@ -1579,7 +1579,7 @@ try {
     # When the rename loses that race there is no recovery: `uv pip install -e .`
     # exits 2 and the ZIP fallback repeats the identical sequence, so the desktop
     # build stage is never reached and apps/desktop/release is left missing -- an
-    # install whose Start Menu shortcut points at a X19.exe that no longer
+    # install whose Start Menu shortcut points at an X19.exe that no longer
     # exists. (A reboot-deferred rename was the old last resort here; it needed
     # elevation a Desktop-driven update does not have, and freed nothing for the
     # install already in flight.)

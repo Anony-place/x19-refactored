@@ -300,7 +300,7 @@ class TestRuntimeFtsRebuild:
         self, db, tmp_path, monkeypatch
     ):
         """A process whose fd table is unreadable (different user) is still
-        flagged when /proc/<pid>/cmdline identifies it as a X19 process."""
+        flagged when /proc/<pid>/cmdline identifies it as an X19 process."""
         db_path = tmp_path / "state.db"
 
         proc_root = tmp_path / "proc"

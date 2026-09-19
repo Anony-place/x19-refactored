@@ -2122,7 +2122,7 @@ class TestMcpInvocationResolution:
     """Surface 8 (Anony-place/x19-refactored#47072): instead of hardcoding
     `["mcp"]` as the cua-driver subcommand, we ask the driver via its
     `manifest` JSON (trycua/cua#1961) so a future rename or relocation of
-    the MCP subcommand doesn't require a X19 patch.
+    the MCP subcommand doesn't require an X19 patch.
 
     The discovery hop must NEVER prevent the wrapper from starting — every
     failure mode (no manifest verb, non-zero exit, junk JSON, missing

@@ -27,7 +27,7 @@ desktop app** (`x19 desktop`) SDK — the `@x19/plugin-sdk` module and
 its own, unrelated plugin system on `window.__X19_PLUGIN_SDK__` with a
 `manifest.json` — documented at
 [Extending the Dashboard](/user-guide/features/extending-the-dashboard). Python
-CLI/gateway plugins are documented at [Build a X19 Plugin](/developer-guide/plugins).
+CLI/gateway plugins are documented at [Build an X19 Plugin](/developer-guide/plugins).
 The three do not share code, APIs, or delivery. Only the backend `plugin_api.py`
 namespace (`/api/plugins/<id>`) is shared between the desktop and dashboard SDKs.
 :::

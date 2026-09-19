@@ -29,7 +29,7 @@ interface VoiceLiveConversationOptions {
    *  delegation supersedes one still running. */
   onInterrupt?: () => Promise<void> | void
   onStopWord?: () => void
-  /** Submit a X19 turn: `text` is the user's last words (the bubble and the
+  /** Submit an X19 turn: `text` is the user's last words (the bubble and the
    *  persisted row), `voiceContext` the recent spoken exchange for the model. */
   onSubmit: (text: string, voiceContext: string) => Promise<void> | void
   pendingResponse: () => PendingVoiceResponse | null

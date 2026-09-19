@@ -85,7 +85,7 @@ They are **not recommended for use inside X19**, however. Hermes 4 is tuned for 
 /model deepseek/deepseek-v4-pro        # cost-effective coder
 ```
 
-The Portal's own [model info page](https://portal.nousresearch.com/info) carries the same warning, so this isn't a X19-side opinion — it's the official guidance from Nous Research.
+The Portal's own [model info page](https://portal.nousresearch.com/info) carries the same warning, so this isn't an X19-side opinion — it's the official guidance from Nous Research.
 
 ## Setup
 

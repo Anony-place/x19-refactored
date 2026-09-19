@@ -79,7 +79,7 @@ def build_relay_command_manifest() -> List[Dict[str, Any]]:
              _opt("scope", "Approval scope", choices=["once", "session", "always", "all"])),
         _cmd("deny", "Deny a pending dangerous command",
              _opt("reason", "Why (relayed to the agent)")),
-        _cmd("thread", "Create a new thread and start a X19 session in it",
+        _cmd("thread", "Create a new thread and start an X19 session in it",
              _opt("name", "Thread name")),
         _cmd("queue", "Queue a prompt for the next turn (doesn't interrupt)",
              _opt("text", "The prompt to queue")),

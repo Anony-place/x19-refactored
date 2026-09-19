@@ -1088,9 +1088,9 @@ export const en: Translations = {
       kindCloud: 'X19 Cloud',
       kindSsh: 'SSH',
       kindLocalDesc: 'The X19 runtime managed by this app.',
-      kindRemoteDesc: 'A X19 gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
+      kindRemoteDesc: 'An X19 gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
       kindCloudDesc: 'A hosted instance discovered through your X19 Cloud account.',
-      kindSshDesc: 'A X19 install reached over SSH.',
+      kindSshDesc: 'An X19 install reached over SSH.',
       labelTitle: 'Name',
       labelDesc: 'Required. Shown everywhere this instance appears; must be unique (e.g. “Homelab”, “Work laptop”).',
       labelPlaceholder: 'Homelab',
@@ -1140,7 +1140,7 @@ export const en: Translations = {
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
-        'Local by default. Use remote when this app should drive a X19 backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
+        'Local by default. Use remote when this app should drive an X19 backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
       envOverrideTitle: 'This connection was fixed by the way X19 was launched.',
       envOverrideDesc:
         'A startup setting outside the app chose this connection, so the options below are read-only. Restart X19 without that setting — or ask whoever set it up — to change it here.',
@@ -3381,7 +3381,7 @@ export const en: Translations = {
     retryAfterRun: 'I’ve run it -- retry',
     setupChoiceTitle: 'Set up X19 Desktop',
     setupChoiceDesc:
-      'Connect this app to a X19 gateway you already run, or install X19 locally on this computer.',
+      'Connect this app to an X19 gateway you already run, or install X19 locally on this computer.',
     connectExistingTitle: 'Connect to existing X19',
     connectExistingShort: 'Connect existing',
     connectExistingDesc: 'Use a remote backend with a session token or browser sign-in. No local install will start.',

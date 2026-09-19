@@ -79,7 +79,7 @@ SQLITE3_CLI_GUIDANCE = (
 # routinely in the vulnerable band (e.g. 3.45.1), and #100368's forensics
 # caught exactly this shell converting a live X19 state.db into two
 # generations. A salvage shell must therefore be version-gated, not just
-# capability-gated, before it is pointed at (a copy of) a X19 database.
+# capability-gated, before it is pointed at (a copy of) an X19 database.
 #
 # The predicate lives in x19_cli.sqlite_runtime (stdlib-only, shared with
 # the installer/update gates) so the embedded runtime and the salvage shell
@@ -87,7 +87,7 @@ SQLITE3_CLI_GUIDANCE = (
 from x19_cli.sqlite_runtime import is_sqlite_wal_reset_vulnerable as _wal_reset_vulnerable  # noqa: E502
 
 _WAL_RESET_VULNERABLE_GUIDANCE = (
-    "salvage against a X19 database with the WAL-reset bug "
+    "salvage against an X19 database with the WAL-reset bug "
     "(https://sqlite.org/wal.html#walresetbug, fixed in 3.51.3+ / backports "
     "3.50.7 / 3.44.6; the vulnerable fresh-opener can unlink a live WAL/SHM "
     "pair and split the database into two generations, losing acknowledged "

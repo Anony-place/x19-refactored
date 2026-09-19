@@ -131,7 +131,7 @@ def resolve_status_phrase_catalog(user_config: Mapping[str, Any] | None,
 
 def classify_status_context(kind: str, *, tool_name: str | None = None, preview: str | None = None,
                             args: Any = None) -> str:
-    """Classify an internal gateway event into a X19 UI-surface bucket."""
+    """Classify an internal gateway event into an X19 UI-surface bucket."""
     if str(kind or "").strip().lower() in {"heartbeat", "waiting", "long_running", "status"}:
         return "status"
     return "generic"

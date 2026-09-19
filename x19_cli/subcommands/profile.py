@@ -128,7 +128,7 @@ def build_profile_parser(subparsers, *, cmd_profile: Callable) -> None:
     # ---------- Distribution subcommands (issue #20456) ----------
     profile_install = profile_subparsers.add_parser(
         "install", help="Install a profile distribution from a git URL or local directory",
-        description="Install a X19 profile distribution. SOURCE can be a git URL "
+        description="Install an X19 profile distribution. SOURCE can be a git URL "
             "(github.com/user/repo, https://..., git@...) or a local "
             "directory containing distribution.yaml at its root.")
     profile_install.add_argument("source", help="Distribution source (git URL or local directory)")

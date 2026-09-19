@@ -58,7 +58,7 @@ test('managed Node dirs lead with the platform-native layout but always offer bo
   ])
 })
 
-test('managed Node dirs are empty without a X19 home', () => {
+test('managed Node dirs are empty without an X19 home', () => {
   assert.deepEqual(x19ManagedNodePathEntries(undefined, { platform: 'darwin', pathModule: path.posix }), [])
   assert.deepEqual(x19ManagedNodePathEntries('', { platform: 'win32', pathModule: path.win32 }), [])
 })

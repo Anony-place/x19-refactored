@@ -6,7 +6,7 @@ It interoperates with any A2A-compliant peer — another X19, LangChain, CrewAI,
 
 ## When to use A2A
 
-- **X19 ↔ X19 across machines** — let your desktop agent hand tasks to a X19 on a server, or vice versa, each with its own memory, tools, and credentials.
+- **X19 ↔ X19 across machines** — let your desktop agent hand tasks to an X19 on a server, or vice versa, each with its own memory, tools, and credentials.
 - **Delegating to specialist agents** — a peer that advertises `web_search`/`research`/`coding` skills on its Agent Card can be discovered and called mid-conversation.
 - **Being a callable service** — expose your X19 so other frameworks' agents can send it tasks.
 

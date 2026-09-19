@@ -152,7 +152,7 @@ _NATIVE_SLASH_COMMANDS: tuple = (
      (("scope", str, "", "Optional: 'all' to deny all pending commands", None),),
      "/deny {scope}", None),
     # /thread: template None -> registered by _register_thread_slash (auth-gated defer).
-    ("thread", "Create a new thread and start a X19 session in it", (), None, None),
+    ("thread", "Create a new thread and start an X19 session in it", (), None, None),
     ("queue", "Queue a prompt for the next turn (doesn't interrupt)",
      (("prompt", str, _REQUIRED, "The prompt to queue", None),),
      "/queue {prompt}", "Queued for the next turn."),
@@ -4487,7 +4487,7 @@ class DiscordAdapter(DiscordMediaMixin, BasePlatformAdapter):
                 _desc, cmd_key = entry
                 await self._run_simple_slash(interaction, f"{cmd_key} {args}".strip())
             cmd = discord.app_commands.Command(
-                name="skill", description="Run a X19 skill", callback=_skill_handler,
+                name="skill", description="Run an X19 skill", callback=_skill_handler,
             )
             tree.add_command(cmd)
             logger.info(

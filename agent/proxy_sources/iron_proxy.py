@@ -398,7 +398,7 @@ def ensure_management_token(*, force: bool = False) -> str:
 
 
 def _yaml():
-    """PyYAML module or None (it is a X19 dep, but never a hard requirement here)."""
+    """PyYAML module or None (it is an X19 dep, but never a hard requirement here)."""
     try:
         import yaml
         return yaml

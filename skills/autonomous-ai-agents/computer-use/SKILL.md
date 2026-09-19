@@ -27,8 +27,8 @@ Anthropic-native schema to learn.
 X19 drives [cua-driver](https://github.com/trycua/cua) under the hood.
 This skill teaches the X19 `computer_use` **action vocabulary**, which is
 NOT the driver's raw MCP vocabulary. Call the actions documented below and
-never the driver's tools by name: `capture` is a X19 action that maps to
-the driver's `get_window_state`; `element=N` is a X19 argument that the
+never the driver's tools by name: `capture` is an X19 action that maps to
+the driver's `get_window_state`; `element=N` is an X19 argument that the
 wrapper translates into the driver's `element_token` handle. If you see a
 driver-side error mentioning `snapshot_id`, `element_token`, or "no reviewed
 risk classification", you (or a stale description) called the raw driver

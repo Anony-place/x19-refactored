@@ -1480,7 +1480,7 @@ class TestWebServerEndpoints:
 
     def test_model_set_maps_unknown_vendor_to_aggregator(self, monkeypatch):
         """A bare vendor name from analytics rows (no billing_provider) is not
-        a X19 provider — keep the user's aggregator instead of writing a
+        an X19 provider — keep the user's aggregator instead of writing a
         provider that can never resolve credentials."""
         monkeypatch.setattr(
             "x19_cli.model_cost_guard.expensive_model_warning",

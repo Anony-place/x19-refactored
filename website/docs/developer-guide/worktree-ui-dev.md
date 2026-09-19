@@ -41,7 +41,7 @@ The Ink TUI has a dev path already: `x19 --tui --dev` runs the TypeScript source
 ```bash
 htui() {
   local root
-  root="$(_x19_root)" || { echo "htui: not in a X19 checkout" >&2; return 1; }
+  root="$(_x19_root)" || { echo "htui: not in an X19 checkout" >&2; return 1; }
   ( cd "$root" && PYTHONPATH="$root" \
       "$X19_MAIN_CHECKOUT/.venv/bin/python" -m x19_cli.main --tui --dev "$@" )
 }
@@ -72,7 +72,7 @@ hgui() (
     fi
   done
 
-  root="$(_x19_root)" || { print -u2 'hgui: not in a X19 checkout'; return 1; }
+  root="$(_x19_root)" || { print -u2 'hgui: not in an X19 checkout'; return 1; }
   deps="${X19_GUI_DEPS_CHECKOUT:-$X19_MAIN_CHECKOUT}"
   desktop="$root/apps/desktop"
 
@@ -118,7 +118,7 @@ Slot `0` uses ports `5174`/`9222`; slot `1` uses `5175`/`9223`. Slots are caller
 
 | Variable | Role in `hgui` |
 |----------|----------------|
-| `HGUI_SLOT` | Helper-only slot number, `0`–`9`; not a X19 setting. |
+| `HGUI_SLOT` | Helper-only slot number, `0`–`9`; not an X19 setting. |
 | `X19_DESKTOP_X19_ROOT` | Runs the backend from this worktree, not the packaged/PATH runtime. |
 | `X19_DESKTOP_PYTHON` | Reuses the main checkout's Python environment. Adjust for an installation that uses `venv` rather than `.venv`. |
 | `X19_DESKTOP_CWD` | Roots new desktop work in the worktree. |

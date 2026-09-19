@@ -329,7 +329,7 @@ def _snapshot_and_inspect(
                 "The source database bundle changed while it was being copied. Stop every X19 process using this "
                 "profile and retry. This includes the interactive `x19` CLI session this command may have been "
                 "launched from: a running parent CLI writes session bookkeeping (compression ticks, context "
-                "tracking) to state.db in the background and counts as a X19 process even after the gateway is "
+                "tracking) to state.db in the background and counts as an X19 process even after the gateway is "
                 "stopped. Run the recovery from a fresh shell with no `x19` session open, or point --source at an "
                 "immutable snapshot copy of the database."
             )

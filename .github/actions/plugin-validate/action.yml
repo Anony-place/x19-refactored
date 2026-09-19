@@ -1,6 +1,6 @@
 name: X19 Plugin Validate
 description: >-
-  Validate a X19 plugin (plugin.yaml manifest schema AND
+  Validate an X19 plugin (plugin.yaml manifest schema AND
   declared-vs-actually-registered capabilities) using
   `x19 plugins validate`. Drop this into your plugin repo's CI:
 

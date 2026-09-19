@@ -13,7 +13,7 @@ In exchange:
 - You need a **Meta Business account** (not personal WhatsApp).
 - The bot operates on a dedicated business phone number, not your personal number.
 - The X19 gateway needs a **public HTTPS URL** so Meta can deliver inbound messages via webhook.
-- Replies more than 24 hours after the user's last message require a pre-approved **template** (this is Meta's "customer service window" rule, not a X19 limit).
+- Replies more than 24 hours after the user's last message require a pre-approved **template** (this is Meta's "customer service window" rule, not an X19 limit).
 
 If those constraints don't work for your use case, the [Baileys bridge integration](./whatsapp.md) is the alternative — personal account, no public URL needed, but unofficial and ban-prone.
 

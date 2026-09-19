@@ -432,7 +432,7 @@ _RESPONSE_PARSERS: Dict[str, Callable[[Dict[str, Any]], Optional[Dict[str, Any]]
 
 
 def _parse_response(event: str, stdout: str) -> Optional[Dict[str, Any]]:
-    """Translate stdout JSON into a X19 wire-shape dict, or ``None``."""
+    """Translate stdout JSON into an X19 wire-shape dict, or ``None``."""
     stdout = (stdout or "").strip()
     if not stdout:
         return None

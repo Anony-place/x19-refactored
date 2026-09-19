@@ -302,7 +302,7 @@ _CREDENTIAL_FILE_NAMES = (
 _READ_DENIED_DIRS = (
     ("mcp-tokens",
      "is the X19 MCP token directory and cannot be read directly.",
-     "is a X19 MCP token file and cannot be read directly."),
+     "is an X19 MCP token file and cannot be read directly."),
     ("browser-profile",
      "is the X19 real-profile browser snapshot directory (copied cookies/logins) and cannot be read directly.",
      "is inside the X19 real-profile browser snapshot (copied cookies/logins) and cannot be read directly."),
@@ -343,7 +343,7 @@ def get_read_block_error(path: str) -> Optional[str]:
         )
     elif any(resolved in _resolve_each(hd / name for hd in x19_dirs) for name in _CREDENTIAL_FILE_NAMES):
         reason = (
-            "is a X19 credential store and cannot be read directly. Provider tools "
+            "is an X19 credential store and cannot be read directly. Provider tools "
             "consume these credentials through internal channels." + _DID_SUFFIX
         )
     else:

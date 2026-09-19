@@ -759,7 +759,7 @@ class TestProfileHomeExemptsX19Root:
     def test_only_a_real_x19_root_is_exempt(self, tmp_path, monkeypatch, approvals):
         """Negatives hold with a named profile active: a checkout's ``.x19/config.yaml`` and
         protected basenames stay gated (fail-closed, unwritten), and a coincidental
-        ``.../profiles/<name>`` tree that is NOT a X19 root never exempts its parent."""
+        ``.../profiles/<name>`` tree that is NOT an X19 root never exempts its parent."""
         import tools.file_tools_write_guards as ft
         from x19_constants import reset_x19_home_override, set_x19_home_override
 

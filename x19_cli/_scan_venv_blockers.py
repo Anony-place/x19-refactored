@@ -163,7 +163,7 @@ def _is_pausable_gateway(cmdline: str) -> bool:
 
 
 def _is_updater_owned_backend(pid: int, cmdline: str) -> bool:
-    """True when *pid* is a X19 backend the CLI updater can stop (positive ledger identity).
+    """True when *pid* is an X19 backend the CLI updater can stop (positive ledger identity).
 
     The gateway exemption above keeps ``gateway run`` holders out of the blocker list because the updater's
     own pause machinery stops and resumes them. ``x19 serve`` / ``x19 dashboard`` backends had no such

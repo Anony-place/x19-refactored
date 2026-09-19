@@ -1501,7 +1501,7 @@ function Install-Git {
         } else {
             Write-Warn "Git is on PATH, but its Git Bash installation could not be located."
         }
-        Write-Info "Trying a X19-managed PortableGit install instead..."
+        Write-Info "Trying an X19-managed PortableGit install instead..."
     }
 
     # Download PortableGit into $X19Home\git.  Always works as long as
@@ -1760,9 +1760,9 @@ function Test-Node {
         return $true
     }
 
-    Write-Info "Using a X19-managed Node.js installation instead..."
+    Write-Info "Using an X19-managed Node.js installation instead..."
 
-    # Prefer a X19-managed Node from a previous run over a too-old system one.
+    # Prefer an X19-managed Node from a previous run over a too-old system one.
     $managedNode = "$X19Home\node\node.exe"
     if ((Test-Path $managedNode) -and (Test-NodeVersionOk (& $managedNode --version))) {
         $version = & $managedNode --version

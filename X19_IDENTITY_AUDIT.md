@@ -14,10 +14,10 @@ $ python scripts/x19_residue_audit.py --strict
 X19 legacy-identity residue audit
 ==============================================================
 tracked files containing 'hermes': 94
-total occurrences (lines):          326
+total occurrences (lines):          329
 
   model-identifier              169 line(s) across 59 file(s)
-  audit-tooling                 111 line(s) across 2 file(s)
+  audit-tooling                 114 line(s) across 2 file(s)
   third-party-url                30 line(s) across 23 file(s)
   contributor-attribution         6 line(s) across 6 file(s)
   third-party-dependency          6 line(s) across 1 file(s)
@@ -40,7 +40,7 @@ CI gate. `--json` emits the same data machine-readably.
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
 | Corpus | every git-tracked file: **13,911** |
 | Files with a match | **94** |
-| Lines with a match | **326** |
+| Lines with a match | **329** |
 | Non-Latin matches | **0**, outside the detector and this report |
 | Unjustified | **0** |
 
@@ -55,7 +55,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 94 files and 326 lines over the same 13,911 tracked files. Two
+   the same 94 files and 329 lines over the same 13,911 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
@@ -100,9 +100,9 @@ One line in this class deserves specific mention because it was the site of a
 real bug — see
 [the model-family detector](#4-the-model-family-detector-could-never-fire).
 
-### `audit-tooling` — 111 lines / 2 files
+### `audit-tooling` — 114 lines / 2 files
 
-The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (87
+The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (90
 lines). A detector must spell the thing it detects: the token appears in
 `TOKEN`, in every classification pattern, and in the comments explaining them.
 This document quotes the occurrences it classifies — including the adversarial
@@ -110,7 +110,7 @@ probes that must keep failing — so it contains the token by construction.
 
 Both are reported as their own class rather than excluded from the scan, so the
 accounting stays complete and the totals keep matching a plain `git grep`: all
-326 lines are classified, none are silently dropped. Excluding them instead
+329 lines are classified, none are silently dropped. Excluding them instead
 would make the headline numbers unverifiable by anyone running the obvious
 command.
 
@@ -363,8 +363,9 @@ verified to have a real markdown source file; none was missing.
 
 `CONTRIBUTING.md` linked `/docs/guides/build-a-x19-plugin`, which works only via
 the client-side redirect declared in `docusaurus.config.ts`. It now points at the
-redirect's own target, `/docs/developer-guide/plugins` — the page whose title is
-already "Build a X19 Plugin".
+redirect's own target, `/docs/developer-guide/plugins` — the page titled "Build an
+X19 Plugin" (see section 20). The redirect's `from:` slug is a URL and was left
+alone.
 
 ### 12. Renamed repository slugs resolved to 404s
 
@@ -803,6 +804,36 @@ restored. Verification: 258 targeted tests pass; the `tests/plugins` +
 `tests/skills` + `tests/test_x19` batch went from 93 failures to 91 with no new
 ones; the telegram and messaging batch is byte-identical before and after (317
 pre-existing failures, all environmental).
+
+### 20. The rename broke article agreement, in English and in Hungarian
+
+A one-word product name that starts with a vowel sound changes the article in
+front of it. Upstream wrote `a Hermes` 238 times and `an Hermes` never, which is
+correct English: "Hermes" starts with a consonant sound. The rename produced
+`a X19` at 263 sites against 3 correct `an X19` — X is pronounced "ex", so every
+one of them was wrong. Nothing failed, nothing was flagged, and each site still
+read almost plausibly, which is why this survived every earlier pass: it is
+visible only to a reader, and only in prose.
+
+Fixed 255 occurrences across 192 files (`a X19` → `an X19`, `A X19` → `An X19`),
+including the documentation page title "Build an X19 Plugin" and the 25 link texts
+pointing at it. Two languages needed different treatment:
+
+- **Hungarian** inflects its definite article for a following vowel, so upstream's
+  `a Hermes csapattal` was right and `a X19 csapattal` is not — X is "iksz". The 5
+  sites in `locales/hu.yaml` and `web/src/i18n/hu.ts` became `az X19`.
+- **Spanish** was deliberately left alone. Its 3 sites are the preposition `a`
+  ("Contribuir a X19", "acceso a X19"), not an article; "fixing" them would have
+  introduced the error instead of removing it.
+
+The remaining locales were checked and need nothing: Portuguese and Galician
+`o X19` (50 sites), Spanish and French `un X19`, German `der X19` / `die X19` and
+Dutch `een X19` do not inflect for a following vowel sound in these constructions.
+
+The match requires a space on both sides, so nothing hyphenated or underscored was
+touched: URL slugs such as `/guides/build-a-x19-plugin`, environment variables and
+code identifiers are unchanged, and the plugins page keeps its address through its
+own `slug:` frontmatter while its displayed title changes.
 
 ## Protected items (deliberately not renamed)
 

@@ -1,6 +1,6 @@
 """Auto-installation of LSP server binaries.
 
-Installs go to a X19-owned staging dir, ``<X19_HOME>/lsp/bin/``, so the
+Installs go to an X19-owned staging dir, ``<X19_HOME>/lsp/bin/``, so the
 user's global toolchain stays untouched.  Strategies: ``auto`` (install with
 the best available package manager), ``manual`` / ``off`` (probe only; a
 missing binary skips the server and ``x19 lsp status`` reports it).

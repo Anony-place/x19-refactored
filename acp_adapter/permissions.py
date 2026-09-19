@@ -100,7 +100,7 @@ def await_permission(
 
 def make_approval_callback(request_permission_fn: Callable, loop: asyncio.AbstractEventLoop,
                            session_id: str, timeout: float = 60.0) -> Callable[..., str]:
-    """Return a X19 approval callback (``command, description, **kw`` as used by
+    """Return an X19 approval callback (``command, description, **kw`` as used by
     ``tools.approval.prompt_dangerous_approval()``) that bridges to the ACP
     connection's ``request_permission`` coroutine on ``loop``; auto-denies after ``timeout`` s."""
 

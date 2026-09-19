@@ -10,7 +10,7 @@ Contract (agreed with the Mnemosyne team, Sep 2026): the union of every enabled 
 is resolved together with X19' declared ranges; a candidate that has no solution is refused without
 touching the live venv or disabling anything already installed. After an update, the union is
 re-applied; if core moved and the union no longer resolves, non-memory plugins are dropped first and
-disabled with a loud warning, because a X19 that boots without memory reads as data loss.
+disabled with a loud warning, because an X19 that boots without memory reads as data loss.
 
 Lifted in shape from ethernet8023's ``pm/plugin_declarations.py`` / ``pm/workspace.py`` (#102765).
 """

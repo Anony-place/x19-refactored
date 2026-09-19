@@ -1,7 +1,7 @@
 name: x19-terminal
 repo: https://github.com/Adolanium/x19-terminal
 sha: 43658bf3c883178bf035d2163f7f541500d17407
-description: Run the X19 terminal interface in a X19 Desktop workspace tab.
+description: Run the X19 terminal interface in an X19 Desktop workspace tab.
 maintainer: Adolanium
 tier: community
 category: desktop

@@ -1,6 +1,6 @@
-# Themes / Skins — Author a X19 Color Theme
+# Themes / Skins — Author an X19 Color Theme
 
-Author a X19 **skin** — one YAML file that themes the CLI, the TUI, and the
+Author an X19 **skin** — one YAML file that themes the CLI, the TUI, and the
 desktop GUI at once. The skin engine (`x19_cli/skin_engine.py`) resolves the
 active skin and the gateway pushes it to every surface, so a file dropped in
 `~/.x19/skins/` is the theme analogue of a plugin: no code, all surfaces. This

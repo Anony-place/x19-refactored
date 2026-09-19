@@ -192,7 +192,7 @@ def _record_codex_app_server_compaction(agent, turn, *, approx_tokens: int | Non
 # The app-server bypasses the X19 tool loop, so the bridge translates JSON-RPC notifications
 # into the callbacks the standard runtime fires (tool_progress_callback, _fire_stream_delta, ...).
 
-# Item types that project to a X19 tool_call (keep in sync with agent/transports/codex_event_projector.py
+# Item types that project to an X19 tool_call (keep in sync with agent/transports/codex_event_projector.py
 # so UI names match recorded names). webSearch is codex's built-in tool: no projector entry, still gets a bubble.
 _CODEX_TOOL_ITEM_TYPES = frozenset({"commandExecution", "fileChange", "mcpToolCall", "dynamicToolCall", "webSearch"})
 # Internal MCP server wrapping X19' native tools: its inner dispatch has no tool_progress_callback, so the

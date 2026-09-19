@@ -139,7 +139,7 @@ class _RelayPluginConfigurationLoadError(RuntimeError):
 
 @dataclass
 class RelaySession:
-    """One isolated Relay scope stack owned by a X19 session."""
+    """One isolated Relay scope stack owned by an X19 session."""
 
     session_id: str
     parent_session_id: str = ""
@@ -206,7 +206,7 @@ class _ProcessRelayPluginConfiguration:
         self._lock = threading.RLock()
         self._owners: set[int] = set()
         self._state = _RelayPluginConfigurationState.UNINITIALIZED
-        self._relay: Any = None  # set while a X19-owned configuration is active
+        self._relay: Any = None  # set while an X19-owned configuration is active
         self._activation: Any = None
 
     def acquire(self, owner: Any, relay: Any) -> _RelayPluginConfigurationState:
@@ -364,7 +364,7 @@ class RelayRuntime:
             self._execution_consumers.discard(consumer)
 
     def managed_execution_enabled(self) -> bool:
-        """Return whether a X19-managed consumer needs the Relay pipeline."""
+        """Return whether an X19-managed consumer needs the Relay pipeline."""
         with self._execution_consumers_lock:
             return bool(self._execution_consumers)
 
@@ -826,7 +826,7 @@ _CURRENT_TURN: contextvars.ContextVar[RelayTurnContext | None] = contextvars.Con
     "x19_relay_turn", default=None
 )
 
-# >0 while the native pipeline is mid-dispatch of a X19 tool/LLM callback. Nested managed
+# >0 while the native pipeline is mid-dispatch of an X19 tool/LLM callback. Nested managed
 # execution there is structurally broken (the pipeline binds its Futures to the OUTER call's
 # loop, blocked inside the synchronous callback), so resolve_execution_context() bypasses Relay.
 # A ContextVar so the marker follows copy_context() into worker threads / per-thread loops.
@@ -1153,7 +1153,7 @@ def resolve_execution_context(session_id: str) -> tuple[RelayRuntime | None, Rel
     # still records the tool-level event.
     if _MANAGED_CALLBACK_DEPTH.get() > 0 or not relay_instrumentation_enabled():
         # A managed Relay callback is already executing on this logical call path (e.g. the native
-        # ``tools.execute`` pipeline is mid-dispatch of a X19 tool). Nested managed execution here is
+        # ``tools.execute`` pipeline is mid-dispatch of an X19 tool). Nested managed execution here is
         # structurally impossible: the native pipeline binds its Futures to the OUTER call's event loop,
         # which is blocked inside the synchronous tool callback until the tool returns. A nested managed LLM
         # call (the vision_analyze auxiliary path) therefore awaits a foreign-loop Future that can never

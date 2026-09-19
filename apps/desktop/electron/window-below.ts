@@ -1,4 +1,4 @@
-// window-below.ts — which OS window sits directly underneath a X19 window.
+// window-below.ts — which OS window sits directly underneath an X19 window.
 //
 // Backs the desktop-gated `read_window_below` tool: the renderer receives
 // `window.read.request` from the gateway, asks main over IPC, and answers

@@ -2762,7 +2762,7 @@ def get_env_value(key: str) -> Optional[str]:
 
 
 def get_env_value_prefer_dotenv(key: str) -> Optional[str]:
-    """Resolve a X19-managed credential preferring ``~/.x19/.env`` over ``os.environ``, so a
+    """Resolve an X19-managed credential preferring ``~/.x19/.env`` over ``os.environ``, so a
     deliberate .env edit beats a stale value inherited from the parent shell."""
     return load_env().get(key) or _scoped_environ_get(key)
 

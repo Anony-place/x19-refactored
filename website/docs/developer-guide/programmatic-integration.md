@@ -169,7 +169,7 @@ probe policy:
   cache and probe all saved custom providers so live catalogs repopulate fully.
 
 Use `/v1/models` for OpenAI-client compatibility. Use `/api/model/options` or
-`model.options` when you are building a X19-aware model picker.
+`model.options` when you are building an X19-aware model picker.
 
 `POST /v1/runs/{id}/steer` is the HTTP equivalent of X19 `/steer`: it does not create a new user turn or immediately rewrite the assistant output already in flight. Instead, the text is appended to the live run and becomes visible to the agent after the next tool boundary, so it can course-correct without discarding the current tool-calling loop.
 

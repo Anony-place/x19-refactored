@@ -13,7 +13,7 @@ metadata:
 
 # Actual Computer Setup Skill
 
-Sets up [actual.inc](https://actual.inc) (Actual Computer) as a X19 inference
+Sets up [actual.inc](https://actual.inc) (Actual Computer) as an X19 inference
 provider. Actual turns the user's own hardware into a private inference cluster
 and exposes an OpenAI-compatible API two ways: a hosted end-to-end-encrypted
 relay at `https://api.actual.inc` (authenticated with an `ac_` key), and a local

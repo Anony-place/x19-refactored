@@ -455,7 +455,7 @@ def _orphaned_desktop_backend_pids(matches: list[tuple[int, str, str]]) -> list[
 
     Killing a Desktop-owned ``serve`` is futile (the app respawns it), but a straggler whose Desktop is gone
     would dead-end the update with "X19 is still running" and zero open windows. Qualifies only if cmdline
-    is a X19 backend AND the parent is demonstrably gone (PID missing or reused). Tree-aware: holders inside
+    is an X19 backend AND the parent is demonstrably gone (PID missing or reused). Tree-aware: holders inside
     an accepted root's tree fold into it; only roots are returned (``taskkill /T`` reaps descendants). Any
     live-parent backend, unjustified non-backend, unprovable case, or no psutil -> ``None``. Never raises.
 

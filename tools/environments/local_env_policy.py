@@ -70,7 +70,7 @@ def _build_provider_env_blocklist() -> frozenset:
     # every scrub surface, so an import-time discard would leak BUZZ_PRIVATE_KEY into
     # non-terminal children; the Buzz carve-out is terminal-only and context-gated
     # (``_is_terminal_first_party_env``).
-    # It is set and owned by the user's Claude Code install (subscription OAuth), not a X19-managed
+    # It is set and owned by the user's Claude Code install (subscription OAuth), not an X19-managed
     # inference credential — Claude subscription auth is not a working X19 provider path. It arrives via
     # the registry loop above (anthropic api_key_env_vars), so remove it explicitly. See #55878.
     blocked.discard("CLAUDE_CODE_OAUTH_TOKEN")
@@ -113,7 +113,7 @@ _X19_PROVIDER_ENV_BLOCKLIST = _build_provider_env_blocklist()
 # treats these names like profile-scoped passthrough names (see
 # ``LocalEnvironment._additional_profile_scoped_passthrough_names``) so they never persist in the shared
 # terminal snapshot across profiles. Contrast with CLAUDE_CODE_OAUTH_TOKEN above, which is discarded from
-# the blocklist entirely because it is NOT a X19 credential; these ARE X19-managed first-party
+# the blocklist entirely because it is NOT an X19 credential; these ARE X19-managed first-party
 # platform credentials, so they stay IN the blocklist for every non-terminal surface. See issue #78026 (Buzz
 # agents could not use ``buzz`` from the terminal tool) and #76243 (Buzz Desktop managed agent wakes but
 # cannot reply).

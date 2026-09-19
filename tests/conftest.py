@@ -273,7 +273,7 @@ _X19_BEHAVIORAL_VARS = frozenset({
     "X19_VOICE_TTS",
     "X19_YOLO_MODE",
     # Injected into subprocess envs by the terminal tool (_make_run_env), so
-    # any test run launched FROM a X19 session inherits them and
+    # any test run launched FROM an X19 session inherits them and
     # x19_constants home-resolution helpers prefer them over monkeypatched
     # HOME (test_subprocess_home_isolation red locally, green on CI).
     "X19_REAL_HOME",
@@ -1104,7 +1104,7 @@ def _wal_is_usable() -> bool:
 
     This matters because the interpreter running the tests and the interpreter
     running X19 can link DIFFERENT SQLite versions: a repo ``.venv`` on
-    3.50.4 (vulnerable → DELETE) alongside a X19 managed runtime on 3.53.1
+    3.50.4 (vulnerable → DELETE) alongside an X19 managed runtime on 3.53.1
     (fixed → WAL). The same test then passes in one and fails in the other.
 
     IMPORTANT: this must NOT import ``x19_state``. That module computes

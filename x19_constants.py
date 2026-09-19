@@ -120,7 +120,7 @@ _HOME_KEY_CACHE: dict[str, str] = {}
 
 
 def x19_home_key(path: str | Path | None = None) -> str:
-    """Stable registry key for a X19 home/profile dir.
+    """Stable registry key for an X19 home/profile dir.
 
     ``strict=False`` so profiles whose directories don't exist yet still get a key.
 
@@ -344,7 +344,7 @@ def get_bundled_skills_dir(default: Path | None = None) -> Path:
 
 
 def get_x19_dir(new_subpath: str, old_name: str, *, home: Path | None = None) -> Path:
-    """Resolve a X19 subdirectory, honouring a populated legacy ``<old_name>/`` (no migration).
+    """Resolve an X19 subdirectory, honouring a populated legacy ``<old_name>/`` (no migration).
 
     An empty legacy dir does NOT count (install scaffolds, manual mkdir) so it cannot shadow the new path.
 
@@ -660,7 +660,7 @@ def _run_node_bootstrap(func: str, *, timeout: int, **extra_env: str) -> bool:
 
 
 def bootstrap_x19_managed_node() -> str | None:
-    """Install a X19-managed Node tree under ``$X19_HOME/node`` and return its npm path.
+    """Install an X19-managed Node tree under ``$X19_HOME/node`` and return its npm path.
 
     X19 never modifies a user-owned toolchain (system, nvm, brew, Nix) that fails ``engines``.
     """

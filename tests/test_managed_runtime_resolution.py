@@ -187,7 +187,7 @@ def test_no_unreviewed_bare_managed_runtime_lookups():
     ]
 
     assert not unexpected, (
-        "Bare PATH lookup for a X19-managed runtime.\n\n"
+        "Bare PATH lookup for an X19-managed runtime.\n\n"
         + "\n".join(f"  {rel}:{lineno}  which({cmd!r})" for rel, cmd, lineno in unexpected)
         + "\n\n$X19_HOME/bin (uv) and $X19_HOME/node are not on an "
         "arbitrary process's PATH, so this resolves a system copy — or nothing "

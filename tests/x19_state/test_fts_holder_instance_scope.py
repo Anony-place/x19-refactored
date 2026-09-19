@@ -53,7 +53,7 @@ DEMO_VENV_ARGV = [
     "gateway",
 ]
 
-# A X19-shaped argv with no absolute paths: cannot disprove that this
+# An X19-shaped argv with no absolute paths: cannot disprove that this
 # process touches our state.db, so it must stay fail-closed.
 AMBIGUOUS_ARGV = ["x19", "gateway", "run"]
 

@@ -189,7 +189,7 @@ you want to opt into.
 ### Updating the catalog manifest
 
 MCPs are never auto-updated. Re-run `x19 mcp install <name>` to refresh
-after a X19 update if a manifest version changed.
+after an X19 update if a manifest version changed.
 
 To add an MCP to the catalog, open a PR against
 [`optional-mcps/`](https://github.com/Anony-place/x19-refactored/tree/main/optional-mcps).
@@ -898,7 +898,7 @@ Or if you installed X19 in a specific location:
 
 ### Available tools
 
-The MCP server exposes 10 tools, matching OpenClaw's channel bridge surface plus a X19-specific channel browser:
+The MCP server exposes 10 tools, matching OpenClaw's channel bridge surface plus an X19-specific channel browser:
 
 | Tool | Description |
 |------|-------------|

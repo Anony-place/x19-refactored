@@ -261,7 +261,7 @@ Leave it there when the runtime is X19.
 
 Two behaviors combine on this path. The `x19-acp` toolset includes `terminal`
 and `execute_code`, and Buzz's ACP bridge answers X19' permission requests
-itself with `allow_once` rather than surfacing them. A X19 in Buzz
+itself with `allow_once` rather than surfacing them. An X19 in Buzz
 therefore runs shell commands on the host without prompting. I asked one to run
 `rm -rf` against a scratch directory and it deleted it, no prompt anywhere.
 

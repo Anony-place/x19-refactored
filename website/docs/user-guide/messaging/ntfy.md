@@ -12,7 +12,7 @@ ntfy makes a great lightweight push channel for X19: subscribe to a topic from t
 - The [ntfy mobile app](https://ntfy.sh/docs/subscribe/phone/) installed and subscribed to that topic
 - Optional: a self-hosted ntfy server, or an `ntfy.sh` account token for private/reserved topics
 
-That's it. No SDK, no daemon, no Node.js. The adapter uses `httpx` which is already a X19 dependency.
+That's it. No SDK, no daemon, no Node.js. The adapter uses `httpx` which is already an X19 dependency.
 
 ## Configure X19
 

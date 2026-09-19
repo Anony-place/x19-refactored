@@ -1889,7 +1889,7 @@ cmd_doctor = _forward_command("cmd_doctor", "x19_cli.doctor", "run_doctor", doc=
 cmd_dump = _forward_command("cmd_dump", "x19_cli.dump", "run_dump", doc='Dump setup summary for support/debugging.')
 cmd_debug = _forward_command("cmd_debug", "x19_cli.debug", "run_debug", doc='Debug tools (share report, etc.).')
 cmd_skin = _forward_command("cmd_skin", "x19_cli.skin_cmd", "skin_command", doc='Skin management (list / use / set).')
-cmd_import = _forward_command("cmd_import", "x19_cli.backup", "run_import", doc='Restore a X19 backup from a zip file.')
+cmd_import = _forward_command("cmd_import", "x19_cli.backup", "run_import", doc='Restore an X19 backup from a zip file.')
 cmd_dashboard_register = _forward_command("cmd_dashboard_register", "x19_cli.dashboard_register", "cmd_dashboard_register", doc='Register a self-hosted dashboard OAuth client with Nous Portal.')
 cmd_gateway_enroll = _forward_command("cmd_gateway_enroll", "x19_cli.gateway_enroll", "cmd_gateway_enroll", doc='Enroll a self-hosted gateway with a relay connector.')
 cmd_prompt_size = _forward_command("cmd_prompt_size", "x19_cli.prompt_size", "cmd_prompt_size", doc='Show a byte/char breakdown of the system prompt + tool schemas.')

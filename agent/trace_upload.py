@@ -1,4 +1,4 @@
-"""Upload a X19 session transcript to Hugging Face as an agent trace, re-emitted in the **Claude Code
+"""Upload an X19 session transcript to Hugging Face as an agent trace, re-emitted in the **Claude Code
 JSONL** shape the HF Agent Trace Viewer auto-detects (https://huggingface.co/docs/hub/agent-traces).
 Deterministic, zero LLM turns. Private by default: traces can carry prompts, tool output, local paths and
 secrets, so the dataset is created private and every text body passes the secret redactor (``force=True``)

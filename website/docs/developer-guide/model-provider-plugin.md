@@ -317,7 +317,7 @@ skipped by the provider scan — they belong to the `PluginManager`. A broken
 entry point is isolated — it is logged at warning level and skipped, and never
 blocks discovery of the other providers.
 
-See [Building a X19 Plugin](/developer-guide/plugins#distribute-via-pip) for the full entry-points setup.
+See [Building an X19 Plugin](/developer-guide/plugins#distribute-via-pip) for the full entry-points setup.
 
 ## Related pages
 
@@ -325,4 +325,4 @@ See [Building a X19 Plugin](/developer-guide/plugins#distribute-via-pip) for the
 - [Adding Providers](/developer-guide/adding-providers) — end-to-end checklist for new inference backends (covers both the fast plugin path and the full CLI/auth integration)
 - [Memory Provider Plugins](/developer-guide/memory-provider-plugin)
 - [Context Engine Plugins](/developer-guide/context-engine-plugin)
-- [Building a X19 Plugin](/developer-guide/plugins) — general plugin authoring
+- [Building an X19 Plugin](/developer-guide/plugins) — general plugin authoring

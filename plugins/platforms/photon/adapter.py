@@ -31,7 +31,7 @@ else:
     try:
         import httpx
         HTTPX_AVAILABLE = True
-    except ImportError:  # pragma: no cover - httpx is already a X19 dep
+    except ImportError:  # pragma: no cover - httpx is already an X19 dep
         HTTPX_AVAILABLE = False
         httpx = None
 

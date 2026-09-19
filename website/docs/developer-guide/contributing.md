@@ -22,7 +22,7 @@ We value contributions in this order:
 
 ## Common contribution paths
 
-- Building a custom/local tool without modifying X19 core? Start with [Build a X19 Plugin](../developer-guide/plugins/index.md)
+- Building a custom/local tool without modifying X19 core? Start with [Build an X19 Plugin](../developer-guide/plugins/index.md)
 - Building a new built-in core tool for X19 itself? Start with [Adding Tools](./adding-tools.md)
 - Building a new skill? Start with [Creating Skills](./creating-skills.md)
 - Building a new inference provider? Start with [Adding Providers](./adding-providers.md)

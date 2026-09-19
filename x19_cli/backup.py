@@ -749,13 +749,13 @@ def _run_backup_locked(args, x19_root: Path) -> None:
 # --- Import ---
 
 def _validate_backup_zip(zf: zipfile.ZipFile) -> tuple[bool, str]:
-    """Check that a zip looks like a X19 backup."""
+    """Check that a zip looks like an X19 backup."""
     names = zf.namelist()
     if not names:
         return False, "zip archive is empty"
     # Telltale files a x19 home has — at the root or one level deep (zipped directory).
     if not any(Path(n).name in {"config.yaml", ".env", "state.db"} for n in names):
-        return False, "zip does not appear to be a X19 backup (no config.yaml, .env, or state databases found)"
+        return False, "zip does not appear to be an X19 backup (no config.yaml, .env, or state databases found)"
     return True, ""
 
 
@@ -817,7 +817,7 @@ def _extract_member_atomically(
 def _count_session_rows(path: Path) -> Optional[Tuple[int, int]]:
     """``(sessions, messages)`` in session database *path*; read-only, best effort.
 
-    ``None`` means "unknown" (missing, not a X19 session store, unreadable) — never "zero":
+    ``None`` means "unknown" (missing, not an X19 session store, unreadable) — never "zero":
     acting on an unreadable database would mask the very loss this count exists to surface.
     Same contract as :func:`_count_cron_jobs`.
     """
@@ -967,7 +967,7 @@ def _import_members(
 
 
 def run_import(args) -> None:
-    """Restore a X19 backup from a zip file."""
+    """Restore an X19 backup from a zip file."""
     zip_path = Path(args.zipfile).expanduser().resolve()
     if not zip_path.is_file():
         print(f"Error: File not found: {zip_path}")

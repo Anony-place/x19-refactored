@@ -4,7 +4,7 @@ The write-health probe's failure used to be reported as "FTS write corruption" u
 routing operators to `--fix` / `sessions repair` (FTS rebuilds that cannot repair canonical-table
 damage) and to the .malformed-backup beside the DB (a snapshot of the same corrupt file). The
 discriminator maps integrity_check damage through sqlite_master.rootpage and keeps the FTS path
-only when every damaged object is a X19 FTS shadow.
+only when every damaged object is an X19 FTS shadow.
 """
 
 import contextlib

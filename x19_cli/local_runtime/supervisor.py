@@ -107,7 +107,7 @@ def _direct_io_args(executable: Path) -> tuple[str, ...]:
 
 
 class LlamaServerSupervisor:
-    """Own one llama-server router process for the life of a X19 session."""
+    """Own one llama-server router process for the life of an X19 session."""
 
     # A model that has gone quiet gets its VRAM back after this long. A constant, not a knob:
     # long enough that an active conversation never trips it, short enough that a wandered-off

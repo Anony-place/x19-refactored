@@ -686,7 +686,7 @@ _APPROVAL_CHOICE_TO_DECISION = {"once": "accept", "session": "acceptForSession",
 
 
 def _approval_choice_to_codex_decision(choice: str) -> str:
-    """Map a X19 approval choice onto codex's approval decision wire value."""
+    """Map an X19 approval choice onto codex's approval decision wire value."""
     return _APPROVAL_CHOICE_TO_DECISION.get(choice, "decline")
 
 

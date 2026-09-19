@@ -192,7 +192,7 @@ _OUR_WRAPPER_RE = re.compile(r"""\bx19(?:\.(?:exe|cmd|bat))?['"]?\s+-p\s""", re.
 
 
 def _is_our_wrapper(path: Path) -> bool:
-    """True when *path* reads as a X19-generated wrapper (invokes ``x19 -p``)."""
+    """True when *path* reads as an X19-generated wrapper (invokes ``x19 -p``)."""
     try:
         return bool(_OUR_WRAPPER_RE.search(path.read_text(encoding="utf-8")))
     except Exception:
@@ -1172,7 +1172,7 @@ _X19_CONSOLE_SCRIPT_NAMES = frozenset({"x19", "x19-agent", "x19-acp"})
 
 
 def _is_x19_argv(argv: list) -> bool:
-    """True for a X19 process: entrypoint marker in argv, executable named ``x19*``,
+    """True for an X19 process: entrypoint marker in argv, executable named ``x19*``,
     or a python interpreter directly exec'ing a known ``x19`` console-script shim."""
     joined = " ".join(argv)
     exe_name = os.path.basename(argv[0]).lower()

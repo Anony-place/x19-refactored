@@ -95,7 +95,7 @@ Create named Bots with their own model, memory, skills, routines, and chats, the
 Extend X19 with your own tools and reusable skill packages.
 
 1. [Plugins](/user-guide/features/plugins)
-2. [Build a X19 Plugin](/developer-guide/plugins)
+2. [Build an X19 Plugin](/developer-guide/plugins)
 3. [Tools Overview](/user-guide/features/tools)
 4. [Skills Overview](/user-guide/features/skills)
 5. [MCP (Model Context Protocol)](/user-guide/features/mcp)

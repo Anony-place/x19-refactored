@@ -71,7 +71,7 @@ x19 [global-options] <command> [subcommand/options]
 | `x19 debug` | Debug tools — upload logs and system info for support. |
 | `x19 backup` | Back up X19 home directory to a zip file. |
 | `x19 checkpoints` | Inspect / prune / clear `~/.x19/checkpoints/` (the shadow store used by `/rollback`). Run with no args for a status overview. |
-| `x19 import` | Restore a X19 backup from a zip file. |
+| `x19 import` | Restore an X19 backup from a zip file. |
 | `x19 logs` | View, tail, and filter agent/gateway/error log files. |
 | `x19 config` | Show, edit, migrate, and query configuration files. |
 | `x19 skin` | List, switch, and tweak display skins. |
@@ -1094,7 +1094,7 @@ See [Checkpoints and `/rollback`](../user-guide/checkpoints-and-rollback.md) for
 x19 import <zipfile> [options]
 ```
 
-Restore a previously created X19 backup into your X19 home directory. All files in the archive overwrite existing files in your X19 home; `--force` only skips the confirmation prompt that fires when the target already has a X19 installation.
+Restore a previously created X19 backup into your X19 home directory. All files in the archive overwrite existing files in your X19 home; `--force` only skips the confirmation prompt that fires when the target already has an X19 installation.
 
 | Option | Description |
 |--------|-------------|
@@ -1564,7 +1564,7 @@ Git installs also record only their canonical source, exact installed revision, 
 pin status in the profile-local `plugins/.install-metadata.json` sidecar. It does
 not contain plugin config, environment values, secrets, or capability grants.
 
-See [Plugins](../user-guide/features/plugins.md) and [Build a X19 Plugin](../developer-guide/plugins/index.md).
+See [Plugins](../user-guide/features/plugins.md) and [Build an X19 Plugin](../developer-guide/plugins/index.md).
 
 ## `x19 tools`
 

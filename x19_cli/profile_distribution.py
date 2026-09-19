@@ -254,7 +254,7 @@ def _stage_source(source: str, workdir: Path) -> Tuple[Path, str]:
         shutil.rmtree(staged / ".git", ignore_errors=True)
         missing = (
             f"No {MANIFEST_FILENAME} at the root of {src_str!r}. "
-            "This repository is not a X19 profile distribution."
+            "This repository is not an X19 profile distribution."
         )
     elif (path_guess := Path(src_str).expanduser()).is_dir():
         staged = path_guess.resolve()
@@ -313,7 +313,7 @@ def plan_install(source: str, workdir: Path, override_name: Optional[str] = None
     manifest = read_manifest(staged)
     if manifest is None:
         raise DistributionError(
-            f"No {MANIFEST_FILENAME} found at the distribution root — this source is not a X19 distribution."
+            f"No {MANIFEST_FILENAME} found at the distribution root — this source is not an X19 distribution."
         )
     check_x19_requires(manifest.x19_requires, x19_version)  # fail fast
     canon = _canon_valid(override_name or manifest.name)

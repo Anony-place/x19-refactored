@@ -180,7 +180,7 @@ All env vars are documented in `plugin.yaml`. The most important:
   `/healthz` readiness check, `0600`, removed on stop/failed start). Also
   note that shared/free-tier Photon lines cannot INITIATE conversations
   with numbers that never texted the line — that's Photon-side policy, not
-  a X19 limitation.
+  an X19 limitation.
 
 ## Upgrading spectrum-ts
 

@@ -103,14 +103,14 @@ class TestProviderEnvBlocklist:
             assert var not in result_env, f"{var} leaked into subprocess env"
 
     def test_bedrock_bearer_token_is_stripped(self):
-        """The Bedrock-specific bearer token is a X19 inference secret
+        """The Bedrock-specific bearer token is an X19 inference secret
         (analogous to OPENAI_API_KEY) and must not leak into subprocesses.
 
         Regression for #32314: AWS_BEARER_TOKEN_BEDROCK leaked into terminal /
         execute_code children because the ``bedrock`` ProviderConfig declares
         ``api_key_env_vars=()`` (auth_type="aws_sdk") and the blocklist builder
         only consulted that field. The reporter caught it when ``opencode
-        models`` run inside a X19 terminal enumerated the entire Bedrock
+        models`` run inside an X19 terminal enumerated the entire Bedrock
         catalog off the leaked bearer token.
         """
         result_env = _run_with_env(extra_os_env={
@@ -763,7 +763,7 @@ class TestPythonpathSelectiveStrip:
 
     @pytest.mark.windows_only
     def test_windows_x19_owned_paths_stripped(self):
-        """On Windows, a X19 venv site-packages entry written with
+        """On Windows, an X19 venv site-packages entry written with
         backslashes is stripped by the same X19-owned check, while a
         user Windows path is preserved.  Windows-only: POSIX ``Path`` does
         not split on backslashes, so this cannot be meaningfully simulated
@@ -1469,7 +1469,7 @@ class TestBlocklistCoverage:
 
     def test_claude_code_oauth_token_is_inheritable(self):
         """CLAUDE_CODE_OAUTH_TOKEN is owned by the user's Claude Code install
-        (subscription OAuth), not a X19 inference credential. Stripping it
+        (subscription OAuth), not an X19 inference credential. Stripping it
         made agent-spawned ``claude`` fall through to the shared Keychain /
         ~/.claude credential store and clobber the user's interactive login
         on auth failure (#55878). It must stay inheritable."""

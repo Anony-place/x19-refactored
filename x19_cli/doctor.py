@@ -1,4 +1,4 @@
-"""``x19 doctor`` — diagnose (and with --fix, repair) a X19 install.
+"""``x19 doctor`` — diagnose (and with --fix, repair) an X19 install.
 
 ``run_doctor`` walks ``DOCTOR_CHECKS`` in order; each check prints its own rows and returns a ``Finding``.
 Check bodies live in the ``doctor_*`` siblings.

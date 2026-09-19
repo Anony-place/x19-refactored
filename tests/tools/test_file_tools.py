@@ -1084,7 +1084,7 @@ class TestSecretFileReadRedaction:
 
     @pytest.fixture
     def x19_home(self, tmp_path, monkeypatch):
-        """A X19 home with no ``.x19`` segment, like ``%LOCALAPPDATA%\\x19``."""
+        """An X19 home with no ``.x19`` segment, like ``%LOCALAPPDATA%\\x19``."""
         import agent.file_safety as file_safety
 
         home = tmp_path / "x19"

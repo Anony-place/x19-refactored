@@ -408,7 +408,7 @@ def _process_command_is_x19(pid: int) -> bool:
 def pid_is_x19(pid: int, *, expected_start_time: int | None = None) -> bool:
     """Whether it is safe to use ``taskkill`` for *pid*.
 
-    The PID must be valid, currently exist, and identify a X19 process. When the caller captured
+    The PID must be valid, currently exist, and identify an X19 process. When the caller captured
     a start-time fingerprint before the destructive action, the live process must still have the
     same ``(pid, start_time)`` identity. Any ambiguity fails closed.
     """

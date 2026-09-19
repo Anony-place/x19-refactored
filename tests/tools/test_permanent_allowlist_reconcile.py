@@ -5,7 +5,7 @@ call at the bottom of the module), and `load_permanent()` only ever unions into
 `_permanent_approved` — nothing removes. `save_permanent_allowlist()` then wrote
 that in-memory set straight back over `config["command_allowlist"]`.
 
-So a hand edit made while a X19 process is live was undone by the next
+So a hand edit made while an X19 process is live was undone by the next
 `[a]lways`, in both directions at once: an entry the operator ADDED on disk was
 deleted, and an entry they REMOVED — the documented way to withdraw a standing
 approval — came back.

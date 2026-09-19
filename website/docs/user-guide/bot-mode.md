@@ -10,7 +10,7 @@ description: "Turn your X19 profiles into a roster of named Bots — each with i
 Bot Mode ships **built into the [desktop app](./desktop.md)** and is **on by default** — no install needed. It appears as a **Bots** tab next to Sessions in the left sidebar, with a **Routines** tile docked beside the conversation while the Bots tab is active.
 
 :::tip A Bot is a profile
-There is no new primitive to learn: a Bot **is** a X19 profile — isolated config, memory, skills, credentials, and chat history under `~/.x19/profiles/<name>/`. Bot Mode is a UI over that primitive, so everything you do in it is visible from the CLI too: `x19 -p <bot> chat` opens the same agent, and Bot routines appear in `x19 cron list`. No core patches, no background daemons, no extra storage.
+There is no new primitive to learn: a Bot **is** an X19 profile — isolated config, memory, skills, credentials, and chat history under `~/.x19/profiles/<name>/`. Bot Mode is a UI over that primitive, so everything you do in it is visible from the CLI too: `x19 -p <bot> chat` opens the same agent, and Bot routines appear in `x19 cron list`. No core patches, no background daemons, no extra storage.
 
 See [Profiles, agents, and bots](./profiles.md#profiles-agents-and-bots) for how
 Bot Mode relates to messaging bots and delegated subagents.

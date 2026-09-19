@@ -6,7 +6,7 @@ description: >
   ntfy push-notification gateway adapter for X19.
   Subscribes to a topic on ntfy.sh or any self-hosted ntfy server via
   HTTP streaming, and publishes replies via HTTP POST. Lightweight —
-  no external SDK, only httpx (already a X19 dependency).
+  no external SDK, only httpx (already an X19 dependency).
 
   ntfy has no native user-identity primitive; the adapter treats each
   topic as a single trusted channel and never derives user identity

@@ -102,7 +102,7 @@ class TestDeclaredConversationScope:
     def test_scope_never_carries_the_raw_key(self, db):
         """The scope leaves the process verbatim (sticky id, x-grok-conv-id).
 
-        A session id is a X19-internal token; a session KEY embeds the
+        A session id is an X19-internal token; a session KEY embeds the
         platform, chat and user identifiers, so it is hashed first.
         """
         db.create_session(RUN_1, source="api_server")

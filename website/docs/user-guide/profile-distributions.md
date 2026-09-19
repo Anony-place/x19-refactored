@@ -30,7 +30,7 @@ The two aren't exclusive. Plenty of authors dogfood a profile, `/export` it to a
 
 ## What this means
 
-Before distributions, sharing a X19 meant sending someone:
+Before distributions, sharing an X19 meant sending someone:
 
 1. Your SOUL.md
 2. A list of skills to install

@@ -97,7 +97,7 @@ _OPENROUTER_URL = "https://openrouter.ai/api/v1"
 
 
 def create_environment(env_type: str = "local", image: str = "python:3.11-slim", cwd: str = "/tmp", timeout: int = 60, **kwargs):
-    """Create a X19 execution environment (``local`` ignores ``image``/``kwargs``)."""
+    """Create an X19 execution environment (``local`` ignores ``image``/``kwargs``)."""
     if env_type == "local":
         from tools.environments.local import LocalEnvironment
         return LocalEnvironment(cwd=cwd, timeout=timeout)
@@ -123,7 +123,7 @@ def _gpt_content(msg: Dict[str, Any], content: str) -> str:
 
 
 class MiniSWERunner:
-    """Tool-calling agent loop over a X19 execution environment, emitting X19 trajectories."""
+    """Tool-calling agent loop over an X19 execution environment, emitting X19 trajectories."""
 
     def __init__(self, model: str = "anthropic/claude-sonnet-4.6", base_url: str = None, api_key: str = None,
                  env_type: str = "local", image: str = "python:3.11-slim", cwd: str = "/tmp",

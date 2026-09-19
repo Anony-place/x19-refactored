@@ -287,7 +287,7 @@ run stalling in Phase 2.
   browser backend to `127.0.0.1:9222`. Use a **dedicated debug profile** (`chrome-debug`), NOT the
   operator's Default Chrome profile, and have the operator sign into their webmail (and any needed
   broker accounts) in that profile once. That single browser then carries residential IP + real
-  fingerprint + logged-in sessions, which is precisely what Phase-2 flows need. (This is a X19-side
+  fingerprint + logged-in sessions, which is precisely what Phase-2 flows need. (This is an X19-side
   browser setup, not a `pdd` config value; `browser_backend` above only selects the Phase-1 scan
   browser.) **The skill launches this for you: `pdd.py cdp`** finds a Chrome/Chromium/Brave/Edge
   binary, starts it detached on the dedicated profile, waits for the debug port, and prints the CDP

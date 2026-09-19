@@ -25,7 +25,7 @@ This is a presentation recipe, not a listing search service or an investment val
 
 ## Prerequisites
 
-- A X19 desktop conversation for native cards; the backend may be local or remote.
+- An X19 desktop conversation for native cards; the backend may be local or remote.
 - Property details supplied by the user or verified through `web_search`, `web_extract`, or the browser tools available in this session.
 - No additional API keys or dependencies are required for card formatting.
 

@@ -24,7 +24,7 @@ The adapter holds no Raft credentials — only a per-session shared token for lo
 - The **Raft CLI** installed and logged in to that External Agent profile
 - **aiohttp** — Python package (included in X19 `[all]` extras)
 
-In Raft, open the Agents menu, create an External Agent, and follow the setup card to install the Raft CLI and log in the agent profile. Once the agent is created, Raft shows a X19 setup guide with the environment variables and configuration needed to start the gateway.
+In Raft, open the Agents menu, create an External Agent, and follow the setup card to install the Raft CLI and log in the agent profile. Once the agent is created, Raft shows an X19 setup guide with the environment variables and configuration needed to start the gateway.
 
 ---
 

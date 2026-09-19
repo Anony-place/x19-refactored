@@ -534,7 +534,7 @@ class TestRequestedIdIsNeverRewritten:
 
 
 class TestValidateCodex900kVariants:
-    """`-900k` is a X19 picker convention: valid variants come from the
+    """`-900k` is an X19 picker convention: valid variants come from the
     catalog; ineligible aliases are hard-rejected BEFORE the hidden-slug
     soft-accept (#92797 review)."""
 
@@ -565,7 +565,7 @@ class TestValidateCodex900kVariants:
 # -- probe_api_models — Cloudflare UA mitigation --------------------------------
 
 class TestProbeApiModelsUserAgent:
-    """Probing custom /v1/models must send a X19 User-Agent.
+    """Probing custom /v1/models must send an X19 User-Agent.
 
     Some custom Claude proxies (e.g. ``packyapi.com``) sit behind Cloudflare with
     Browser Integrity Check enabled. The default ``Python-urllib/3.x`` signature

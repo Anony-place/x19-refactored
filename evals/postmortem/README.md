@@ -3,7 +3,7 @@
 The scripts that produced every number in tracking issue #103563 and the "Independent review
 (round 2)" sections of its 13 PRs. Two halves:
 
-- **`forensics/`** reads a *copy* of a X19 `state.db` (plus rotated `agent.log*` and git) and
+- **`forensics/`** reads a *copy* of an X19 `state.db` (plus rotated `agent.log*` and git) and
   recomputes the *observed* figures for any run: where the money went, per-call cache behaviour,
   nested-delegate timeouts, batch-join delivery delay, tool friction, `/goal` loop behaviour, and the
   post-open rework inventory. It needs no model calls and no network.
@@ -18,7 +18,7 @@ replay). Do not add the modeled figures to the observed ones; see §5 of #103563
 
 ## Requirements
 
-- A X19 checkout with its venv (`.venv/bin/python`). NeMo Relay is not required for the forensics;
+- An X19 checkout with its venv (`.venv/bin/python`). NeMo Relay is not required for the forensics;
   it is what the run itself used for the wire captures in `live_ab/cache_prefix_wire.py`.
 - For forensics: a **copy** of `~/.x19/state.db` (never point at the live file; `sqlite3 state.db ".backup copy.db"`
   or `cp` while X19 is idle) and, optionally, the rotated `~/.x19/logs/agent.log*`.

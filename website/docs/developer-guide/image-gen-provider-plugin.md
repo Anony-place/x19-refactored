@@ -9,7 +9,7 @@ description: "How to build an image-generation backend plugin for X19"
 Image-gen provider plugins register a backend that services every `image_generate` tool call — DALL·E, gpt-image, Grok, Flux, Imagen, Stable Diffusion, fal, Replicate, a local ComfyUI rig, anything. Built-in providers (OpenAI, OpenAI-Codex, xAI, FAL, Krea, DeepInfra, OpenRouter, Meta Model API) all ship as plugins. You can add a new one, or override a bundled one, by dropping a directory into `plugins/image_gen/<name>/`.
 
 :::tip
-Image-gen is one of several **backend plugins** X19 supports. The others (with more specialized ABCs) are [Memory Provider Plugins](/developer-guide/memory-provider-plugin), [Context Engine Plugins](/developer-guide/context-engine-plugin), and [Model Provider Plugins](/developer-guide/model-provider-plugin). General tool/hook/CLI plugins live in [Build a X19 Plugin](/developer-guide/plugins).
+Image-gen is one of several **backend plugins** X19 supports. The others (with more specialized ABCs) are [Memory Provider Plugins](/developer-guide/memory-provider-plugin), [Context Engine Plugins](/developer-guide/context-engine-plugin), and [Model Provider Plugins](/developer-guide/model-provider-plugin). General tool/hook/CLI plugins live in [Build an X19 Plugin](/developer-guide/plugins).
 :::
 
 ## How discovery works
@@ -313,4 +313,4 @@ my-backend-imggen = "my_backend_imggen_package"
 
 - [Image Generation](/user-guide/features/image-generation) — user-facing feature documentation
 - [Plugins overview](/user-guide/features/plugins) — all plugin types at a glance
-- [Build a X19 Plugin](/developer-guide/plugins) — general tools/hooks/slash commands guide
+- [Build an X19 Plugin](/developer-guide/plugins) — general tools/hooks/slash commands guide

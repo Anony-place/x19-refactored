@@ -33,7 +33,7 @@ The following is the complete skill definition that X19 loads when this skill is
 
 > **Catalog stub.** This entry is maintained upstream at
 > [pbakaus/impeccable](https://github.com/pbakaus/impeccable): the project
-> ships and verifies a X19-native skill bundle under `.x19/skills/`.
+> ships and verifies an X19-native skill bundle under `.x19/skills/`.
 > `x19 skills install impeccable` pulls the current bundle live from that
 > repo (quarantined and scanned like any hub install) — this directory holds
 > only the catalog metadata, so the vendored copy can never go stale.

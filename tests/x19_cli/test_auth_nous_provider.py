@@ -791,7 +791,7 @@ def test_refresh_token_reuse_detection_surfaces_actionable_message():
     ``error_description`` containing "reuse detected", X19 must surface an
     actionable message explaining that an external process consumed the
     refresh token.  The default opaque "Refresh token reuse detected; please
-    re-authenticate" string led users to report this as a X19 persistence
+    re-authenticate" string led users to report this as an X19 persistence
     bug when the true cause is external RT consumption (monitoring scripts,
     custom self-heal hooks).
     """

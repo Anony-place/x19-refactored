@@ -291,7 +291,7 @@ def _validate_static_catalog(req: _Request) -> Optional[dict[str, Any]]:
         from agent.model_metadata import CODEX_CONTEXT_VARIANT_SUFFIX, is_codex_context_variant
 
         # Ineligible ``-900k`` aliases must be rejected BEFORE the hidden-slug soft-accept:
-        # the suffix is a X19 picker convention, so an unknown `*-900k` can never be a real
+        # the suffix is an X19 picker convention, so an unknown `*-900k` can never be a real
         # hidden provider slug — soft-accepting one silently runs at 272K on a different model.
         if req.lookup.strip().lower().endswith(CODEX_CONTEXT_VARIANT_SUFFIX) and req.lookup not in set(catalog):
             if is_codex_context_variant(req.lookup):

@@ -74,7 +74,7 @@ def test_bundle_path_init_override_not_leaked_into_init_options(monkeypatch, tmp
     )
     spec = srv._spawn_powershell_es(str(tmp_path), ctx)
     assert spec is not None
-    # bundlePath is a X19-internal resolution key — it must not be sent
+    # bundlePath is an X19-internal resolution key — it must not be sent
     # to the server as an LSP initializationOption.
     assert "bundlePath" not in spec.initialization_options
     assert spec.initialization_options.get("foo") == "bar"

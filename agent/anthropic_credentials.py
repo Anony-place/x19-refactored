@@ -230,7 +230,7 @@ def _read_claude_code_credentials_from_keychain() -> Optional[Dict[str, Any]]:
 def claude_code_credentials_path() -> Path:
     """Claude Code's shared OAuth file; every profile reads/writes this same path. Honours ``CLAUDE_CONFIG_DIR``
     like the Claude CLI itself (blank = unset, as in ``x19_cli.foreign_sessions``), so pointing it at an
-    empty directory opts a X19 process out of borrowing the login."""
+    empty directory opts an X19 process out of borrowing the login."""
     override = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
     root = Path(override).expanduser() if override else Path.home() / ".claude"
     return root / ".credentials.json"

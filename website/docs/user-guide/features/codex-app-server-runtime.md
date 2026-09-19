@@ -169,7 +169,7 @@ uses:
 
 ## Enabling
 
-In a X19 session:
+In an X19 session:
 
 ```
 /codex-runtime codex_app_server

@@ -132,7 +132,7 @@ def _resolve_mcp_invocation(driver_cmd: str, *, timeout: float = 6.0) -> Tuple[s
     Surface 8 of Anony-place/x19-refactored#47072: instead of hardcoding ``["mcp"]`` we ask the driver itself
     via ``cua-driver manifest`` (trycua/cua#1961). The manifest carries a stable ``mcp_invocation`` pointer
     with both ``command`` and ``args``, so a future cua-driver that renames or relocates the subcommand
-    keeps working without a X19 patch.
+    keeps working without an X19 patch.
     When ``computer_use.no_overlay`` is enabled (or auto-detected — macOS, headless/WSL2/X11 Linux),
     ``--no-overlay`` is appended to suppress the cursor overlay rendering loop that can consume CPU
     indefinitely when idle (#28152, #47032). Older drivers that don't recognise the flag will reject it;

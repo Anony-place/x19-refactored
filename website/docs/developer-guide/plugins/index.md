@@ -1,11 +1,11 @@
 ---
 sidebar_label: "Build a Plugin"
 slug: /developer-guide/plugins
-title: "Build a X19 Plugin"
+title: "Build an X19 Plugin"
 description: "Step-by-step guide to building a complete X19 plugin with tools, hooks, data files, and skills"
 ---
 
-# Build a X19 Plugin
+# Build an X19 Plugin
 
 This guide walks through building a complete X19 plugin from scratch. By the end you'll have a working plugin with multiple tools, lifecycle hooks, shipped data files, and a bundled skill — everything the plugin system supports.
 
@@ -339,7 +339,7 @@ When both exist the `pyproject.toml` wins. What X19 does with them:
   and strips anything else. Afterwards X19 walks every profile's enabled plugins and reinstalls
   their declared dependencies. If the union no longer resolves (a core pin moved), non-memory
   plugins are dropped one at a time until it does; each dropped plugin is **disabled with a loud
-  message** naming it, and memory providers are kept over everything else, because a X19 that
+  message** naming it, and memory providers are kept over everything else, because an X19 that
   boots without memory looks like data loss.
 - **`x19 plugins update`** re-runs the install for whatever the new revision declares.
 - **`--no-deps`** on `x19 plugins install` skips all of this for one plugin (no conflict gate,

@@ -8,7 +8,7 @@ from typing import Callable
 def build_import_cmd_parser(subparsers, *, cmd_import: Callable) -> None:
     """Attach the ``import`` subcommand to ``subparsers``."""
     import_parser = subparsers.add_parser(
-        "import", help="Restore a X19 backup from a zip file",
+        "import", help="Restore an X19 backup from a zip file",
         description="Extract a previously created X19 backup into your "
         "X19 home directory, restoring configuration, skills, "
         "sessions, and data")

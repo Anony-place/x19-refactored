@@ -1,6 +1,6 @@
 """Context-local state for delegate_task child execution.
 
-A X19 process may itself be a Kanban dispatcher worker with X19_KANBAN_* in
+An X19 process may itself be a Kanban dispatcher worker with X19_KANBAN_* in
 os.environ. In-process delegate_task children and cron jobs fired via
 ``cronjob(action="run")`` are NOT dispatcher-owned, so identity gates must fail
 closed for them without mutating the process-global environment.

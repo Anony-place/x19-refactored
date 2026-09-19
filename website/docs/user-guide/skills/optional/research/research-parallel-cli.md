@@ -33,7 +33,7 @@ The following is the complete skill definition that X19 loads when this skill is
 
 Use `parallel-cli` when the user explicitly wants Parallel, or when a terminal-native workflow would benefit from Parallel's vendor-specific stack for web search, extraction, deep research, enrichment, entity discovery, or monitoring.
 
-This is an optional third-party workflow, not a X19 core capability.
+This is an optional third-party workflow, not an X19 core capability.
 
 Important expectations:
 - Parallel is a paid service with a free tier, not a fully free local tool.

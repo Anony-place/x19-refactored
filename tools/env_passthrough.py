@@ -35,7 +35,7 @@ _config_passthrough: dict[str, frozenset[str]] = {}
 
 
 def _is_x19_provider_credential(name: str) -> bool:
-    """True if ``name`` is a X19-managed provider credential per
+    """True if ``name`` is an X19-managed provider credential per
     ``_X19_PROVIDER_ENV_BLOCKLIST`` or a dynamic X19-internal secret
     (AUXILIARY_*_API_KEY / _BASE_URL, GATEWAY_RELAY_*). Skill-declared
     ``required_environment_variables`` must not override this — that was the

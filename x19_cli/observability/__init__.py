@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def observe_lifecycle(hook_name: str, **kwargs: Any) -> None:
-    """Dispatch a X19 lifecycle event to built-in observability features."""
+    """Dispatch an X19 lifecycle event to built-in observability features."""
     from . import relay_shared_metrics
 
     try:

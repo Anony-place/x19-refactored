@@ -237,7 +237,7 @@ export function createPortalSession({
   // must not close the window before the portal can replace it.
   async function openPortalLoginWindow(): Promise<void> {
     if (!isReady()) {
-      throw new Error('Desktop is not ready to start a X19 Cloud sign-in.')
+      throw new Error('Desktop is not ready to start an X19 Cloud sign-in.')
     }
 
     const sess = getOauthSession()

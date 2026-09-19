@@ -126,7 +126,7 @@ X19 has **two** model commands that serve different purposes:
 | Command | Where to run | What it does |
 |---------|-------------|--------------|
 | **`x19 model`** | Your terminal (outside any session) | Full setup wizard — add providers, run OAuth, enter API keys, configure endpoints |
-| **`/model`** | Inside a X19 chat session | Quick switch between **already-configured** providers and models |
+| **`/model`** | Inside an X19 chat session | Quick switch between **already-configured** providers and models |
 
 If you're trying to switch to a provider you haven't set up yet (e.g. you only have OpenRouter configured and want to use Anthropic), you need `x19 model`, not `/model`. Exit your session first (`Ctrl+C` or `/quit`), run `x19 model`, complete the provider setup, then start a new session.
 
@@ -1441,7 +1441,7 @@ providers:
     catalog_provider: deepseek   # metadata lookups use DeepSeek's catalog entries
 ```
 
-`catalog_provider` accepts a X19 provider id (`deepseek`, `anthropic`, `openai`, …) or a models.dev id. It affects metadata lookups only — requests still go to your `api` URL with your credentials — and an explicit `model_overrides` entry for the same model still wins.
+`catalog_provider` accepts an X19 provider id (`deepseek`, `anthropic`, `openai`, …) or a models.dev id. It affects metadata lookups only — requests still go to your `api` URL with your credentials — and an explicit `model_overrides` entry for the same model still wins.
 
 Switch between them mid-session with the triple syntax:
 

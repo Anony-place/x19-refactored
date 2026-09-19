@@ -1310,7 +1310,7 @@ def _nous_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]:
     except Exception:
         pass
     # Live failed / no creds: the docs-hosted manifest — NOT the in-repo snapshot — so newly added
-    # Portal models still surface without a X19 release.
+    # Portal models still surface without an X19 release.
     return get_curated_nous_model_ids() or None
 
 

@@ -56,7 +56,7 @@ def _sanitize_url(url: str | None) -> str | None:
 
 
 def profile_host_key(profile: str | None) -> str:
-    """Return the safe Honcho host key for a X19 profile."""
+    """Return the safe Honcho host key for an X19 profile."""
     if not profile or profile in {"default", "custom"}:
         return HOST
     sanitized = "".join(c if c.isalnum() or c in "_-" else "_" for c in profile).strip("_")

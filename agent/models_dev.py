@@ -165,7 +165,7 @@ def _configured_catalog_provider(provider: str) -> Optional[str]:
 
 
 def _models_dev_id(provider: str) -> Optional[str]:
-    """models.dev provider id for a X19 provider id, or None. A custom provider reaches the
+    """models.dev provider id for an X19 provider id, or None. A custom provider reaches the
     catalog only through its configured ``catalog_provider`` alias (#112649)."""
     key = (provider or "").strip()
     mdev_id = PROVIDER_TO_MODELS_DEV.get(key)
@@ -177,7 +177,7 @@ def _models_dev_id(provider: str) -> Optional[str]:
             # A mistyped alias must not leak into ModelInfo.provider_id; the row stays on its own slug.
             if (key, alias) not in _UNKNOWN_CATALOG_PROVIDER_WARNED:
                 _UNKNOWN_CATALOG_PROVIDER_WARNED.add((key, alias))
-                logger.warning("providers.%s: catalog_provider %r is neither a X19 provider id nor a "
+                logger.warning("providers.%s: catalog_provider %r is neither an X19 provider id nor a "
                                "models.dev id; ignoring", key, alias)
             mdev_id = None
     return mdev_id
@@ -496,7 +496,7 @@ def _registry_models(mdev_id: str, *, allow_network: bool) -> Optional[Dict[str,
 
 
 def _get_provider_models(provider: str, *, allow_network: bool = False) -> Optional[Dict[str, Any]]:
-    """Resolve a X19 provider ID to its models dict, or None if unknown.
+    """Resolve an X19 provider ID to its models dict, or None if unknown.
     ``allow_network`` defaults to False — hot-path callers must never block."""
     mdev_id = _models_dev_id(provider)
     return _registry_models(mdev_id, allow_network=allow_network) if mdev_id else None

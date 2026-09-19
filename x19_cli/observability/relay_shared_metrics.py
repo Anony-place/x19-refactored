@@ -207,7 +207,7 @@ class _Runtime:
         )
 
     def start_task(self, event: dict[str, Any]) -> _TaskRun | None:
-        """Open one Relay function scope for a X19 task run."""
+        """Open one Relay function scope for an X19 task run."""
         task_key = _session_pair(event, "task_id")
         if task_key is None:
             return None

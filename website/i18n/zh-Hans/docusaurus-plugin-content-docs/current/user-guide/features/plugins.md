@@ -217,9 +217,9 @@ Memory provider 和 context engine 是 **provider 插件** — 每种类型同�
 
 | 想要添加… | 方式 | 编写指南 |
 |---|---|---|
-| LLM 可调用的**工具** | Python 插件 — `ctx.register_tool()` | [Build a X19 Plugin](/developer-guide/plugins) · [Adding Tools](/developer-guide/adding-tools) |
-| **生命周期 hook**（LLM 前后、会话开始/结束、工具过滤） | Python 插件 — `ctx.register_hook()` | [Hooks reference](/user-guide/features/hooks) · [Build a X19 Plugin](/developer-guide/plugins) |
-| CLI / gateway 的**斜杠命令** | Python 插件 — `ctx.register_command()` | [Build a X19 Plugin](/developer-guide/plugins) · [Extending the CLI](/developer-guide/extending-the-cli) |
+| LLM 可调用的**工具** | Python 插件 — `ctx.register_tool()` | [Build an X19 Plugin](/developer-guide/plugins) · [Adding Tools](/developer-guide/adding-tools) |
+| **生命周期 hook**（LLM 前后、会话开始/结束、工具过滤） | Python 插件 — `ctx.register_hook()` | [Hooks reference](/user-guide/features/hooks) · [Build an X19 Plugin](/developer-guide/plugins) |
+| CLI / gateway 的**斜杠命令** | Python 插件 — `ctx.register_command()` | [Build an X19 Plugin](/developer-guide/plugins) · [Extending the CLI](/developer-guide/extending-the-cli) |
 | `x19 <thing>` 的**子命令** | Python 插件 — `ctx.register_cli_command()` | [Extending the CLI](/developer-guide/extending-the-cli) |
 | 插件附带的**skill** | Python 插件 — `ctx.register_skill()` | [Creating Skills](/developer-guide/creating-skills) |
 | **推理后端**（LLM provider：OpenAI 兼容、Codex、Anthropic-Messages、Bedrock） | Provider 插件 — 在 `plugins/model-providers/<name>/` 中调用 `register_provider(ProviderProfile(...))` | **[Model Provider Plugins](/developer-guide/model-provider-plugin)** · [Adding Providers](/developer-guide/adding-providers) |

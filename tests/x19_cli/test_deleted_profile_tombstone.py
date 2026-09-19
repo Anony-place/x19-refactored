@@ -287,7 +287,7 @@ class TestNamedProfileHome:
     def test_unrelated_profiles_dir_is_not_named(self, tmp_path):
         # Review point 1 regression: a custom home like
         # /srv/profiles/buildcache must NOT be treated as a named profile —
-        # its parent is not a X19 home, so logging must keep mkdir-ing.
+        # its parent is not an X19 home, so logging must keep mkdir-ing.
         custom_home = tmp_path / "srv" / "profiles" / "buildcache"
         assert named_profile_home(custom_home) is None
         assert named_profile_home(custom_home / "logs") is None

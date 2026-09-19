@@ -377,7 +377,7 @@ def _read_json(path: Path) -> Optional[dict]:
 
 
 def check_for_updates(*, passive: bool = False) -> Optional[int]:
-    """Check whether a X19 update is available.
+    """Check whether an X19 update is available.
 
     If ``X19_REVISION`` is set (nix builds embed it), compare it to upstream main; otherwise
     compare the local checkout's HEAD. Both go through the GitHub API, never ``git fetch``.

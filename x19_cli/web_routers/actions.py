@@ -256,7 +256,7 @@ _NON_APPLYABLE_MESSAGES = {
 
 @router.get("/api/x19/update/check")
 async def check_x19_update(force: bool = False):
-    """Report whether a X19 update is available, without applying it.
+    """Report whether an X19 update is available, without applying it.
 
     Returns install_method ('apt'|'git'|'docker'|'nix'|'nixos'|'unknown'),
     current_version, behind (commits behind, 0 = up to date, -1 = unknown count,

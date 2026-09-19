@@ -114,7 +114,7 @@ gateway:
     header:                "**Hibakeresési jelentés feltöltve:**"
     auto_delete:           "⏱ A beillesztések 6 óra múlva automatikusan törlődnek."
     full_logs_hint:        "Teljes naplók feltöltéséhez használd a `x19 debug share` parancsot a CLI-ből."
-    share_hint:            "Oszd meg ezeket a hivatkozásokat a X19 csapattal támogatásért."
+    share_hint:            "Oszd meg ezeket a hivatkozásokat az X19 csapattal támogatásért."
 
   deny:
     stale:                 "❌ Parancs elutasítva (a jóváhagyás elavult)."
@@ -385,7 +385,7 @@ Future messages in this room will use that transcript until `/reset` or another 
   update:
     platform_not_messaging:  "✗ A /update csak üzenetküldő platformokról érhető el. Futtasd a `x19 update` parancsot a terminálból."
     not_git_repo:            "✗ Nem git-tárhely — frissítés nem lehetséges."
-    x19_cmd_not_found:    "✗ Nem sikerült megtalálni a `x19` parancsot. A X19 fut, de a frissítőparancs nem találta a futtatható fájlt a PATH-on vagy a jelenlegi Python interpreteren keresztül. Próbáld futtatni a `x19 update` parancsot manuálisan a terminálban."
+    x19_cmd_not_found:    "✗ Nem sikerült megtalálni a `x19` parancsot. Az X19 fut, de a frissítőparancs nem találta a futtatható fájlt a PATH-on vagy a jelenlegi Python interpreteren keresztül. Próbáld futtatni a `x19 update` parancsot manuálisan a terminálban."
     start_failed:            "✗ Nem sikerült elindítani a frissítést: {error}"
     starting:                "☤ X19 frissítés indítása… A folyamatot itt fogom közvetíteni."
 

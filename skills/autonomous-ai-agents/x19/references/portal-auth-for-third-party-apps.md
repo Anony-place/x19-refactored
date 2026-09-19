@@ -9,7 +9,7 @@ them in order before proposing solutions.
 
 ---
 
-## Layer 1 — Is this thing a X19 plugin, or a separate app?
+## Layer 1 — Is this thing an X19 plugin, or a separate app?
 
 This is the question to answer FIRST. The "OpenViking" case in particular
 trips agents up.

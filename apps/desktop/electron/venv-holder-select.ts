@@ -18,7 +18,7 @@ export function hasWindowsPathPrefix(exePath: string, venvScriptsDir: string): b
 }
 
 /**
- * True when a process is a X19-owned venv daemon: its exe lives under
+ * True when a process is an X19-owned venv daemon: its exe lives under
  * `<venv>\Scripts\` (ordinal case-insensitive prefix) AND its cmdline
  * references `hindsight_api.main` (the memory daemon the memory plugin
  * spawns DETACHED — it outlives X19 and holds venv shims mapped).

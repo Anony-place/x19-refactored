@@ -94,7 +94,7 @@ class _ManagedAttempt:
         )
 
     def run_callback(self, callback: Callable[..., Any], *args: Any) -> Any:
-        """Run a X19 callback in a fresh copy of the captured context.
+        """Run an X19 callback in a fresh copy of the captured context.
         Relay can invoke callbacks while another still owns the captured Context (hence the
         copy); nested relay calls run unmanaged — see relay_runtime.managed_callback_guard."""
         def guarded() -> Any:

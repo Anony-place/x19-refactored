@@ -2995,7 +2995,7 @@ class TestAuxiliaryPoolRotationRetry:
 class TestAnthropicAuxiliaryReasoningTranslation:
     """Native Anthropic aux adapters must receive normalized X19 reasoning.
 
-    MoA slot reasoning is carried through call_llm as a X19
+    MoA slot reasoning is carried through call_llm as an X19
     ``reasoning_config``. The native Anthropic Messages path cannot consume the
     generic OpenAI-style ``extra_body.reasoning`` fallback, so assert the final
     ``messages.create`` kwargs contain Anthropic's provider-aware wire shape.

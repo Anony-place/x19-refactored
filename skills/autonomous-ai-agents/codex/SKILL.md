@@ -80,7 +80,7 @@ process(action="kill", session_id="<id>")
 
 ## X19 Gateway Caveat
 
-When invoking the Codex CLI from a X19 gateway/service context (for example,
+When invoking the Codex CLI from an X19 gateway/service context (for example,
 Telegram-driven agent sessions), Codex `workspace-write` sandboxing may fail even
 when the same command works in the user's interactive shell. A typical symptom is
 bubblewrap/user-namespace errors such as `setting up uid map: Permission denied`

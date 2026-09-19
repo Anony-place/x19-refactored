@@ -166,7 +166,7 @@ def _warn_if_openclaw_running(auto_yes: bool) -> None:
 
 
 def _warn_if_gateway_running(auto_yes: bool) -> None:
-    """Warn if a X19 gateway has connected platforms (token conflicts, e.g. Telegram 409)."""
+    """Warn if an X19 gateway has connected platforms (token conflicts, e.g. Telegram 409)."""
     from gateway.status import get_running_pid, read_runtime_status
     platforms = ((read_runtime_status() or {}).get("platforms") or {}) if get_running_pid() else {}
     connected = [name for name, info in platforms.items()
