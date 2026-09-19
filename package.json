@@ -31,9 +31,9 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/NousResearch/Hermes-Agent/issues"
+    "url": "https://github.com/Anony-place/x19-refactored/issues"
   },
-  "homepage": "https://github.com/NousResearch/Hermes-Agent#readme",
+  "homepage": "https://github.com/Anony-place/x19-refactored#readme",
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "typescript-eslint": "8.64.0",
