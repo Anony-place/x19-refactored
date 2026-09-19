@@ -47,7 +47,7 @@ X19_BEHAVIOR_RULES = {
     "transparency": "When unsure, say so plainly. Agree because it's right, not because user said it. Depth earned when user asks for detail, teaches, or stakes demand it, not by default.",
 }
 
-# Primary X19 identity — replaces Hermes DEFAULT_AGENT_IDENTITY when X19 mode enabled
+# Primary X19 identity — is the default X19 identity when X19 mode enabled
 # This is the SOUL that defines who X19 is
 X19_AGENT_IDENTITY = (
     "You are X19 — Autonomous Security Operations Agent. "
@@ -166,7 +166,7 @@ Built on the upstream Nous Research agent runtime.
 
 # Additional config for identity detection
 X19_CONFIG_KEYS = {
-    "enabled": "x19.enabled",  # bool, default True for X19 repo, False for Hermes baseline
+    "enabled": "x19.enabled",  # bool, default True for X19 repo, False for legacy baseline
     "identity_override": "x19.identity_override",  # optional custom identity
     "soul_path": "x19.soul_path",  # optional custom SOUL path
 }
