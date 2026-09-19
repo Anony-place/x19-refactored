@@ -30,9 +30,9 @@ def read_only_db_uri(db_path) -> str:
 logger = logging.getLogger(__name__)
 
 _IS_WINDOWS = sys.platform == "win32"
-_HERMES_EXECUTABLES = frozenset({"hermes", "x19", "hermes-acp"})
-_HERMES_PYTHON_MODULES = frozenset({"acp_adapter", "hermes_cli.main"})
-_HERMES_PYTHON_SCRIPTS = frozenset({"hermes_cli/main.py", "run_agent.py"})
+_HERMES_EXECUTABLES = frozenset({"x19", "x19", "x19-acp"})
+_HERMES_PYTHON_MODULES = frozenset({"acp_adapter", "x19_cli.main"})
+_HERMES_PYTHON_SCRIPTS = frozenset({"x19_cli/main.py", "run_agent.py"})
 _PYTHON_SHORT_OPTIONS_WITH_OPERANDS = frozenset({"Q", "W", "X"})
 _PYTHON_LONG_OPTIONS_WITH_OPERANDS = frozenset(
     {"--check-hash-based-pycs", "--jit"}
@@ -104,7 +104,7 @@ def _python_execution_target(argv: Sequence[str]) -> Optional[Tuple[str, str]]:
     return None
 
 
-def _looks_like_hermes(argv: Sequence[str]) -> bool:
+def _looks_like_x19(argv: Sequence[str]) -> bool:
     """Return whether argv identifies a supported X19 execution target."""
     if not argv:
         return False
@@ -135,7 +135,7 @@ def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
     """Return whether argv proves the process belongs to a DIFFERENT instance.
 
     ``state.db`` lives at the X19_HOME root, so an absolute-path token
-    containing a ``/.hermes`` segment (or naming a ``state.db``/WAL/SHM under
+    containing a ``/.x19`` segment (or naming a ``state.db``/WAL/SHM under
     some other parent) identifies that token's own X19 home.  When at least
     one such token exists AND no token references this instance's state.db,
     its sidecars, or its home directory, the process provably works on a
@@ -173,7 +173,7 @@ def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
             normalized = os.path.normcase(os.path.normpath(path_token))
             if normalized in ours or normalized.startswith(this_home + os.sep):
                 return False
-            if "/.hermes" in normalized or normalized.endswith("/.hermes"):
+            if "/.x19" in normalized or normalized.endswith("/.x19"):
                 other_home_seen = True
             elif os.path.basename(normalized) in (
                 "state.db",
@@ -234,7 +234,7 @@ def foreign_state_db_holders(db_path: Path) -> List[Tuple[int, str]]:
                     argv = _read_proc_argv(pid)
                     if (
                         argv is not None
-                        and _looks_like_hermes(argv)
+                        and _looks_like_x19(argv)
                         and not _argv_scoped_to_other_home(argv, db_path)
                     ):
                         cmdline = " ".join(argv)
@@ -250,7 +250,7 @@ def foreign_state_db_holders(db_path: Path) -> List[Tuple[int, str]]:
                         argv = _read_proc_argv(pid)
                         if (
                             argv is not None
-                            and _looks_like_hermes(argv)
+                            and _looks_like_x19(argv)
                             and not _argv_scoped_to_other_home(argv, db_path)
                         ):
                             holders.append(
@@ -274,7 +274,7 @@ def foreign_state_db_holders(db_path: Path) -> List[Tuple[int, str]]:
                             argv = _read_proc_argv(pid)
                             if (
                                 argv is not None
-                                and _looks_like_hermes(argv)
+                                and _looks_like_x19(argv)
                                 and not _argv_scoped_to_other_home(argv, db_path)
                             ):
                                 holders.append(
