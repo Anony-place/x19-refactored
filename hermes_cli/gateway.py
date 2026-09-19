@@ -5,7 +5,7 @@ Handles: x19 gateway [run|start|stop|restart|status|install|uninstall|setup]
 
 import asyncio
 import contextlib
-from hermes_cli.cli_output import line_input
+from x19_cli.cli_output import line_input
 import json
 import logging
 import os
@@ -19,7 +19,7 @@ import textwrap
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from hermes_cli import setup_platforms
+from x19_cli import setup_platforms
 
 # UV's bundled Python ships a minimal PATH; ensure launchctl/systemctl are discoverable.
 if os.name == "posix":
@@ -45,9 +45,9 @@ from gateway.restart import (
     resolve_restart_exit_wait_budget,
     resolve_systemd_timeout_stop_sec,
 )
-from hermes_cli.config import (
+from x19_cli.config import (
     get_env_value,
-    get_hermes_home,
+    get_x19_home,
     is_managed,
     managed_error,
     read_raw_config,
@@ -55,8 +55,8 @@ from hermes_cli.config import (
     write_platform_config_field,
 )
 
-# display_hermes_home is imported lazily: hermes_constants may be a cached pre-update version.
-from hermes_cli.setup import (
+# display_x19_home is imported lazily: x19_constants may be a cached pre-update version.
+from x19_cli.setup import (
     print_header,
     print_info,
     print_success,
@@ -66,7 +66,7 @@ from hermes_cli.setup import (
     prompt_choice,
     prompt_yes_no,
 )
-from hermes_cli.colors import Colors, color
+from x19_cli.colors import Colors, color
 
 logger = logging.getLogger(__name__)
 
@@ -576,7 +576,7 @@ def _scan_gateway_pids(
     from gateway.status import (
         looks_like_gateway_command_line, looks_like_gateway_runtime_command_line, profile_flag_value,
     )
-    current_home = str(get_hermes_home().resolve())
+    current_home = str(get_x19_home().resolve())
     # Forward slashes on both sides of the X19_HOME= match (mirrors gateway.status).
     current_home_lc = current_home.lower().replace("\\", "/")
     current_profile_arg = _profile_arg(current_home)
@@ -589,7 +589,7 @@ def _scan_gateway_pids(
             # Token equality, not substring: `-p ops` must not claim (or SIGTERM) an `-p ops-2` gateway.
             return (
                 profile_flag_value(command_lc) == current_profile_name_lc
-                or f"hermes_home={current_home_lc}" in command_lc
+                or f"x19_home={current_home_lc}" in command_lc
             )
 
         # Default profile: accept unless argv advertises another profile in any spelling the CLI
@@ -598,7 +598,7 @@ def _scan_gateway_pids(
         # wmic/CIM), so only a non-matching explicit X19_HOME= disqualifies.
         if profile_flag_value(command_lc) is not None:
             return False
-        return not ("hermes_home=" in command_lc and f"hermes_home={current_home_lc}" not in command_lc)
+        return not ("x19_home=" in command_lc and f"x19_home={current_home_lc}" not in command_lc)
 
     def _consider(pid: int, command: str) -> None:
         matches_runtime = looks_like_gateway_command_line(command) or (
@@ -684,7 +684,7 @@ def _windows_process_listing() -> str | None:
     # slow-WMI machines where the full Win32_Process scan exceeds its budget (#87134). bounded_probe_run
     # also hides the console window: this scan runs inside the windowless pythonw.exe gateway/desktop
     # backend, so a bare wmic/powershell spawn would flash a conhost window on every watchdog probe.
-    from hermes_cli._subprocess_compat import bounded_probe_run
+    from x19_cli._subprocess_compat import bounded_probe_run
     wmic_path = shutil.which("wmic")
     result = None
     if wmic_path is not None:
@@ -755,7 +755,7 @@ def find_profile_gateway_processes(exclude_pids: set | None = None, *, strict: b
     processes: list[ProfileGatewayProcess] = []
     try:
         from gateway.status import get_running_pid, get_running_pid_identity_strict
-        from hermes_cli.profiles import list_profiles
+        from x19_cli.profiles import list_profiles
     except Exception:
         if strict:
             raise
@@ -884,7 +884,7 @@ def find_windows_gateway_services(
 
 
 def _gateway_run_args_for_profile(profile: str) -> list[str]:
-    args = [get_python_path(), "-m", "hermes_cli.main"]
+    args = [get_python_path(), "-m", "x19_cli.main"]
     if profile != "default":
         args.extend(["--profile", profile])
     args.extend(["gateway", "run", "--replace"])
@@ -954,7 +954,7 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
     (the watcher would die with the CLI console), so ``windows_detach_popen_kwargs()`` supplies flags."""
     if old_pid <= 0 or not run_argv:
         return False
-    from hermes_cli._subprocess_compat import windows_detach_flags_without_breakaway, windows_detach_popen_kwargs
+    from x19_cli._subprocess_compat import windows_detach_flags_without_breakaway, windows_detach_popen_kwargs
 
     # Windows: ``run_argv`` leads with the venv's console ``python.exe`` — the interpreter we want:
     # the watcher respawns it under CREATE_NO_WINDOW detach flags so the gateway owns one hidden
@@ -966,7 +966,7 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
     respawn_env_overlay: dict[str, str] = {}
     if sys.platform == "win32":
         try:
-            from hermes_cli.gateway_windows import windowless_gateway_restart_spec
+            from x19_cli.gateway_windows import windowless_gateway_restart_spec
             run_argv, respawn_cwd, respawn_env_overlay = windowless_gateway_restart_spec(list(run_argv))
         except Exception:
             # Fall back to the original argv: a visible window beats a failed respawn.
@@ -980,7 +980,7 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
         import subprocess
         import sys
         import time
-        from hermes_cli._subprocess_compat import (
+        from x19_cli._subprocess_compat import (
             _WINDOWS_GATEWAY_BREAKAWAY_ENV, windows_detach_flags, windows_detach_flags_without_breakaway,
         )
 
@@ -1002,9 +1002,9 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
         _stdio_target = subprocess.DEVNULL
         _stdio_fh = None
         try:
-            from hermes_cli.config import get_hermes_home
+            from x19_cli.config import get_x19_home
             from pathlib import Path
-            _log_dir = Path(get_hermes_home()) / "logs"
+            _log_dir = Path(get_x19_home()) / "logs"
             _log_dir.mkdir(parents=True, exist_ok=True)
             _stdio_fh = open(_log_dir / "gateway-stdio.log", "ab", buffering=0)
             _stdio_target = _stdio_fh
@@ -1017,7 +1017,7 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
         # gateway dies when that job tears down. See _subprocess_compat.windows_detach_flags().
         _popen_kwargs = {{"stdout": _stdio_target, "stderr": _stdio_target}}
         # Anchor at the stable working dir and overlay the env (VIRTUAL_ENV / PYTHONPATH /
-        # X19_HOME) the windowless base interpreter needs to import hermes_cli. Empty on POSIX.
+        # X19_HOME) the windowless base interpreter needs to import x19_cli. Empty on POSIX.
         if _respawn_cwd:
             _popen_kwargs["cwd"] = _respawn_cwd
         _base_env = {{**os.environ, **_respawn_env_overlay}}
@@ -1102,7 +1102,7 @@ def _systemctl_show(properties: tuple[str, ...], *, system: bool) -> dict[str, s
     return _parse_kv_pairs(result.stdout.splitlines()) if result.returncode == 0 else {}
 
 
-def _hermes_home_pinned_by_unit(unit_path: Path) -> str | None:
+def _x19_home_pinned_by_unit(unit_path: Path) -> str | None:
     """``X19_HOME`` pinned by the unit file at *unit_path*, or None when absent/unreadable."""
     try:
         text = unit_path.read_text(encoding="utf-8")
@@ -1117,18 +1117,18 @@ def _hermes_home_pinned_by_unit(unit_path: Path) -> str | None:
     return None
 
 
-def _hermes_home_from_systemd_unit_file(system: bool = False) -> str | None:
+def _x19_home_from_systemd_unit_file(system: bool = False) -> str | None:
     """``X19_HOME`` from the on-disk unit file - what refresh/compare already read, and reliable under ``sudo``."""
-    return _hermes_home_pinned_by_unit(get_systemd_unit_path(system=system))
+    return _x19_home_pinned_by_unit(get_systemd_unit_path(system=system))
 
 
-def _sync_hermes_home_from_systemd_unit(system: bool) -> None:
+def _sync_x19_home_from_systemd_unit(system: bool) -> None:
     """Adopt a system-scope unit's ``X19_HOME``: under ``sudo`` it is stripped and HOME=/root, so
-    get_hermes_home() would pick the wrong profile for runtime-status/PID reads."""
+    get_x19_home() would pick the wrong profile for runtime-status/PID reads."""
     if not system:
         return
     # On-disk unit first; ``systemctl show`` for units that only exist in the manager.
-    unit_home = (_hermes_home_from_systemd_unit_file(system=True) or "").strip()
+    unit_home = (_x19_home_from_systemd_unit_file(system=True) or "").strip()
     if not unit_home:
         env_line = _systemctl_show(("Environment",), system=True).get("Environment", "")
         unit_home = _parse_kv_pairs(env_line.split()).get("X19_HOME", "").strip()
@@ -1391,7 +1391,7 @@ def _probe_launchd_service_running() -> bool:
 
 def _s6_gateway_snapshot(gateway_pids: tuple[int, ...]) -> GatewayRuntimeSnapshot | None:
     """Snapshot for an s6-supervised container gateway, or None when s6 isn't the service manager."""
-    from hermes_cli.service_manager import detect_service_manager, get_service_manager
+    from x19_cli.service_manager import detect_service_manager, get_service_manager
     if detect_service_manager() != "s6":
         return None
     service_name = f"gateway-{_current_profile_name()}"
@@ -1423,7 +1423,7 @@ def get_gateway_runtime_snapshot(system: bool = False) -> GatewayRuntimeSnapshot
     if is_termux():
         return GatewayRuntimeSnapshot(manager="Termux / manual process", gateway_pids=gateway_pids)
 
-    from hermes_constants import is_container
+    from x19_constants import is_container
     if is_linux() and is_container():
         # Report s6 supervision under our /init; other container runtimes keep "docker (foreground)".
         try:
@@ -1499,7 +1499,7 @@ def _print_served_ingress_urls(profile: str | None = None) -> None:
     """Callback URLs of inbound-port platforms the live multiplexer serves for secondary profiles
     (the value to paste into the Twilio / LINE / Teams / BlueBubbles console)."""
     try:
-        from hermes_cli.gateway_multiplex_served import format_ingress_url_lines, served_profile_ingress_urls
+        from x19_cli.gateway_multiplex_served import format_ingress_url_lines, served_profile_ingress_urls
         urls = served_profile_ingress_urls(profile)
     except Exception:
         return
@@ -1516,7 +1516,7 @@ def _print_unserved_shared_ingress(profile: str | None) -> None:
     """Shared-ingress platforms (WhatsApp/Relay) this served profile enabled that the multiplexer runs
     only on the default profile — the ``whatsapp: not served under multiplex`` line."""
     try:
-        from hermes_cli.gateway_multiplex_served import served_profile_unserved_platforms
+        from x19_cli.gateway_multiplex_served import served_profile_unserved_platforms
         unserved = served_profile_unserved_platforms(profile or "")
     except Exception:
         return
@@ -1531,7 +1531,7 @@ def _print_unserved_shared_ingress(profile: str | None) -> None:
 def _print_other_profiles_gateway_status() -> None:
     """Print other profiles' running gateways at the bottom of ``x19 gateway status``."""
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from x19_cli.profiles import get_active_profile_name
         current = get_active_profile_name()
         other_processes = [p for p in find_profile_gateway_processes() if p.profile != current]
         if not other_processes:
@@ -1547,7 +1547,7 @@ def _print_other_profiles_gateway_status() -> None:
 def _gateway_list() -> None:
     """List every profile and whether its gateway is running."""
     try:
-        from hermes_cli.profiles import list_profiles, get_active_profile_name
+        from x19_cli.profiles import list_profiles, get_active_profile_name
     except Exception:
         print("Unable to list profiles.")
         return
@@ -1661,7 +1661,7 @@ def _reap_unsupervised_gateway_orphans(extra_exclude: set | None = None) -> bool
     # (#86098, #87001).
     if is_windows():
         try:
-            from hermes_cli.gateway_windows import get_task_name  # profile-aware task name
+            from x19_cli.gateway_windows import get_task_name  # profile-aware task name
             _task_name = get_task_name()
         except Exception:
             _task_name = "X19_Gateway"
@@ -1838,7 +1838,7 @@ def stop_profile_gateway() -> bool:
         # gateway's graceful-stop IPC, so wait for it before force-killing a
         # wedged process.
         from gateway.status import get_process_start_time
-        from hermes_cli.gateway_windows import (
+        from x19_cli.gateway_windows import (
             _drain_gateway_pid,
             _force_terminate_known_gateway_pids,
             _windows_stop_drain_timeout,
@@ -1883,7 +1883,7 @@ def is_linux() -> bool:
     return sys.platform.startswith("linux")
 
 
-from hermes_constants import is_container, is_termux, is_wsl
+from x19_constants import is_container, is_termux, is_wsl
 
 
 def _wsl_systemd_operational() -> bool:
@@ -1922,7 +1922,7 @@ def is_windows() -> bool:
 
 def _gw_windows():
     """Lazily import :mod:`x19_cli.gateway_windows` (Windows-only service backend)."""
-    from hermes_cli import gateway_windows
+    from x19_cli import gateway_windows
     return gateway_windows
 
 
@@ -2020,7 +2020,7 @@ def _windows_gateway_breakaway_state() -> bool | None:
     """Consume private spawn metadata without guessing for older launchers."""
     if not is_windows():
         return None
-    from hermes_cli._subprocess_compat import _WINDOWS_GATEWAY_BREAKAWAY_ENV
+    from x19_cli._subprocess_compat import _WINDOWS_GATEWAY_BREAKAWAY_ENV
     return {"1": True, "0": False}.get(os.environ.pop(_WINDOWS_GATEWAY_BREAKAWAY_ENV, None))
 
 
@@ -2049,9 +2049,9 @@ def _profile_name_from_home(home: Path, default: Path) -> str | None:
 def _native_service_homes() -> set[Path]:
     """This process's native default home plus, when root under sudo, the invoking user's (see
     ``_profile_suffix`` for why sudo matters)."""
-    from hermes_constants import _get_platform_default_hermes_home, sudo_invoker_default_home
+    from x19_constants import _get_platform_default_x19_home, sudo_invoker_default_home
 
-    homes = {_get_platform_default_hermes_home().resolve()}
+    homes = {_get_platform_default_x19_home().resolve()}
     sudo_home = sudo_invoker_default_home()
     if sudo_home is not None:
         homes.add(sudo_home.resolve())
@@ -2073,7 +2073,7 @@ def _bare_unit_pinned_home() -> Path | None:
     """
     if not is_linux() or os.geteuid() != 0:  # windows-footgun: ok — behind is_linux()
         return None
-    pinned = _hermes_home_pinned_by_unit(_SYSTEM_UNIT_DIR / f"{_SERVICE_BASE}.service")
+    pinned = _x19_home_pinned_by_unit(_SYSTEM_UNIT_DIR / f"{_SERVICE_BASE}.service")
     if not pinned:
         return None
     try:
@@ -2089,24 +2089,24 @@ def _profile_suffix() -> str:
     Bare-name owners: this process's platform-native default (``~/.x19``), under sudo the invoking
     user's native default, and the home pinned by an installed ``x19-gateway.service``. Under sudo the
     naming basis moves MID-COMMAND — sudo strips X19_HOME and sets HOME=/root, then
-    ``_sync_hermes_home_from_systemd_unit()`` adopts the unit's own X19_HOME into ``os.environ`` — so a
+    ``_sync_x19_home_from_systemd_unit()`` adopts the unit's own X19_HOME into ``os.environ`` — so a
     basis derived from the process alone names one unit before the adoption and another after it. The
     unit-pinned check must precede the profile branch: ``sudo x19 gateway install --system`` resolves
     the BARE name from root's default, then pins the invoking user's remapped home, so the bare unit
     legitimately carries a ``<root>/profiles/<name>`` home.
 
-    The bare name is deliberately NOT tied to ``get_default_hermes_root()``: that helper treats any
+    The bare name is deliberately NOT tied to ``get_default_x19_root()``: that helper treats any
     X19_HOME outside ``~/.x19`` (Docker ``/opt/data``, a temp dir) as "the root itself", which let a
     temp-home harness resolve to the default profile's ``x19-gateway`` unit and uninstall the
     production gateway. Service names are host-wide identities; a home with no installed bare unit and
     no native default keeps its own suffix.
     """
     import hashlib
-    from hermes_constants import get_default_hermes_root
-    home = get_hermes_home().resolve()
+    from x19_constants import get_default_x19_root
+    home = get_x19_home().resolve()
     if home in _native_service_homes() or home == _bare_unit_pinned_home():
         return ""
-    name = _profile_name_from_home(home, get_default_hermes_root().resolve())
+    name = _profile_name_from_home(home, get_default_x19_root().resolve())
     return name or hashlib.sha256(str(home).encode()).hexdigest()[:8]
 
 
@@ -2114,16 +2114,16 @@ def _current_profile_name() -> str:
     """Profile id relative to the profile ROOT: ``default`` for the root itself (Docker's ``/opt/data``
     included), ``<name>`` for ``<root>/profiles/<name>``, else the service hash. s6 slots and the
     multiplexer ask which PROFILE this is; ``_profile_suffix()`` answers which HOST SERVICE this is."""
-    from hermes_constants import profile_name_for_home
-    return profile_name_for_home(get_hermes_home()) or _profile_suffix()
+    from x19_constants import profile_name_for_home
+    return profile_name_for_home(get_x19_home()) or _profile_suffix()
 
 
-def _profile_arg(hermes_home: str | None = None, default_root: str | Path | None = None) -> str:
-    """``--profile <name>`` for ``<root>/profiles/<name>``, else "". *hermes_home*/*default_root* let a
+def _profile_arg(x19_home: str | None = None, default_root: str | Path | None = None) -> str:
+    """``--profile <name>`` for ``<root>/profiles/<name>``, else "". *x19_home*/*default_root* let a
     sudo/root process generate a unit for another user (the defaults would refer to root)."""
-    from hermes_constants import get_default_hermes_root
-    home = Path(hermes_home or str(get_hermes_home())).resolve()
-    default = Path(default_root).resolve() if default_root else get_default_hermes_root().resolve()
+    from x19_constants import get_default_x19_root
+    home = Path(x19_home or str(get_x19_home())).resolve()
+    default = Path(default_root).resolve() if default_root else get_default_x19_root().resolve()
     if home == default:
         return ""
     name = _profile_name_from_home(home, default)
@@ -2343,7 +2343,7 @@ def _run_systemctl(args: list[str], *, system: bool = False, **kwargs) -> subpro
     try:
         return subprocess.run(_systemctl_cmd(system) + args, **kwargs)
     except FileNotFoundError:
-        from hermes_cli.gateway_command_errors import SystemctlUnavailableError
+        from x19_cli.gateway_command_errors import SystemctlUnavailableError
         raise SystemctlUnavailableError() from None
 
 
@@ -2367,12 +2367,12 @@ def has_conflicting_systemd_units() -> bool:
 
 
 # Legacy pre-rename names: explicit allowlist (NOT a glob) so profile and third-party units never match.
-_LEGACY_SERVICE_NAMES: tuple[str, ...] = ("hermes.service",)
+_LEGACY_SERVICE_NAMES: tuple[str, ...] = ("x19.service",)
 
 # ExecStart markers identifying a unit as running our gateway; a legacy unit is flagged only if one matches.
 _LEGACY_UNIT_EXECSTART_MARKERS: tuple[str, ...] = (
-    "hermes_cli.main gateway",
-    "hermes_cli/main.py gateway",
+    "x19_cli.main gateway",
+    "x19_cli/main.py gateway",
     "gateway/run.py",
     " x19 gateway ",
     "/x19 gateway ",
@@ -2384,7 +2384,7 @@ def _legacy_unit_search_paths() -> list[tuple[bool, Path]]:
     return [(False, Path.home() / ".config" / "systemd" / "user"), (True, _SYSTEM_UNIT_DIR)]
 
 
-def _find_legacy_hermes_units() -> list[tuple[str, Path, bool]]:
+def _find_legacy_x19_units() -> list[tuple[str, Path, bool]]:
     """``[(unit_name, unit_path, is_system)]`` for legacy gateway units (e.g. ``x19.service``), which
     fight the current unit for the bot token (SIGTERM flap loop). Explicit name allowlist + ExecStart
     marker check so profile/third-party units never match; no mutation.
@@ -2408,14 +2408,14 @@ def _find_legacy_hermes_units() -> list[tuple[str, Path, bool]]:
     return results
 
 
-def has_legacy_hermes_units() -> bool:
+def has_legacy_x19_units() -> bool:
     """Return True when any legacy X19 gateway unit files exist."""
-    return bool(_find_legacy_hermes_units())
+    return bool(_find_legacy_x19_units())
 
 
 def print_legacy_unit_warning() -> None:
     """Warn about installed legacy gateway units; prints nothing when there are none."""
-    legacy = _find_legacy_hermes_units()
+    legacy = _find_legacy_x19_units()
     if not legacy:
         return
     print_warning("Legacy X19 gateway unit(s) detected from an older install:")
@@ -2427,10 +2427,10 @@ def print_legacy_unit_warning() -> None:
     print_info("    x19 gateway migrate-legacy")
 
 
-def remove_legacy_hermes_units(interactive: bool = True, dry_run: bool = False) -> tuple[int, list[Path]]:
+def remove_legacy_x19_units(interactive: bool = True, dry_run: bool = False) -> tuple[int, list[Path]]:
     """Stop, disable, and remove legacy gateway units. ``interactive=False`` skips the prompt; ``dry_run``
     only lists. Returns ``(removed_count, remaining_paths)`` (remaining: e.g. system-scope when not root)."""
-    legacy = _find_legacy_hermes_units()
+    legacy = _find_legacy_x19_units()
     if not legacy:
         print("No legacy X19 gateway units found.")
         return 0, []
@@ -2625,7 +2625,7 @@ def ensure_gateway_service(context: str = "setup") -> bool:
     """Install and start a user-scope gateway service without prompting (``x19 setup``/``import``).
     A zero-platform gateway is a supported degraded mode (cron runs), so this never gates on messaging
     config. Never raises; True when a service is installed and running."""
-    from hermes_constants import is_container
+    from x19_constants import is_container
     if is_container():
         # Containers use restart policies, not service managers.
         print_info("Start the gateway to bring your bots online:")
@@ -2741,7 +2741,7 @@ def launchd_gateway_labels_for_install() -> list[str]:
     the profile layout, NOT by globbing ``~/Library/LaunchAgents``, so a sandboxed X19_HOME never
     restarts another install's fleet. Names that can't map to a suffix are skipped."""
     import re as _re
-    from hermes_cli.profiles import list_profiles
+    from x19_cli.profiles import list_profiles
     root_label: list[str] = []
     profile_labels: list[str] = []
     for profile in list_profiles():
@@ -2768,12 +2768,12 @@ def get_python_path() -> str:
     venv = _detect_venv_dir()
     if venv is not None:
         try:
-            from hermes_constants import venv_python_path
+            from x19_constants import venv_python_path
         except ImportError:
-            # Update-boundary: a gateway restarted mid-update can hold a stale hermes_constants
-            # without this symbol; see _reload_hermes_constants() in hermes_cli/managed_uv.py.
-            from hermes_cli.managed_uv import _reload_hermes_constants
-            venv_python_path = _reload_hermes_constants().venv_python_path
+            # Update-boundary: a gateway restarted mid-update can hold a stale x19_constants
+            # without this symbol; see _reload_x19_constants() in x19_cli/managed_uv.py.
+            from x19_cli.managed_uv import _reload_x19_constants
+            venv_python_path = _reload_x19_constants().venv_python_path
 
         venv_python = venv_python_path(venv, windows=is_windows())
         if venv_python.exists():
@@ -2841,19 +2841,19 @@ def _remap_path_for_user(path: str, target_home_dir: str) -> str:
         return str(p)
 
 
-def _hermes_home_for_target_user(target_home_dir: str) -> str:
+def _x19_home_for_target_user(target_home_dir: str) -> str:
     """Remap the current X19_HOME (root's, under sudo) to the target user's equivalent:
-    ``/root/.hermes[/profiles/x]`` → ``/home/alice/.hermes[/profiles/x]``; custom paths kept as-is."""
-    current_hermes_raw = os.environ.get("X19_HOME", "").strip()
-    current_x19 = Path(current_hermes_raw).expanduser() if current_hermes_raw else get_hermes_home()
+    ``/root/ .x19[/profiles/x]`` → ``/home/alice/ .x19[/profiles/x]``; custom paths kept as-is."""
+    current_x19_raw = os.environ.get("X19_HOME", "").strip()
+    current_x19 = Path(current_x19_raw).expanduser() if current_x19_raw else get_x19_home()
     # Keep paths lexical: resolving a non-existent path can bake a different X19_HOME into the unit.
-    current_default = Path.home() / ".hermes"
-    target_default = Path(target_home_dir) / ".hermes"
+    current_default = Path.home() / " .x19"
+    target_default = Path(target_home_dir) / " .x19"
     try:
         # Default ~/.x19 or a profile/subdir of it → preserve the relative structure under the target.
-        return str(target_default / current_hermes.relative_to(current_default))
+        return str(target_default / current_x19.relative_to(current_default))
     except ValueError:
-        return str(current_hermes)  # Completely custom path (not under ~/.x19) — keep as-is
+        return str(current_x19)  # Completely custom path (not under ~/.x19) — keep as-is
 
 
 def _build_service_path_dirs(project_root: Path | None = None) -> list[str]:
@@ -2874,8 +2874,8 @@ def _build_service_path_dirs(project_root: Path | None = None) -> list[str]:
     elif sys.prefix != sys.base_prefix:
         candidates.append(str(Path(sys.prefix) / "bin"))
 
-    hermes_home = get_hermes_home()
-    extras = (project_root / "node_modules" / ".bin", hermes_home / "node" / "bin", hermes_home / "node_modules" / ".bin")
+    x19_home = get_x19_home()
+    extras = (project_root / "node_modules" / ".bin", x19_home / "node" / "bin", x19_home / "node_modules" / ".bin")
     for extra in extras:
         if _is_dir(extra):
             candidates.append(str(extra))
@@ -2887,7 +2887,7 @@ def _stable_service_working_dir() -> str:
     irrelevant to ``-m`` resolution, and a pinned transient checkout rots: systemd fails at CHDIR
     (status=200) before Python loads, so the unit self-heal never runs and Restart=always crash-loops."""
     try:
-        home = get_hermes_home()
+        home = get_x19_home()
         if home and Path(home).is_dir():
             return str(Path(home).resolve())
     except Exception:
@@ -2895,13 +2895,13 @@ def _stable_service_working_dir() -> str:
     return str(PROJECT_ROOT)
 
 
-def _systemd_watchdog_seconds(hermes_home: str | Path | None = None) -> int:
+def _systemd_watchdog_seconds(x19_home: str | Path | None = None) -> int:
     """Resolve the managed-overlay-aware watchdog setting for a service home."""
     override_token = reset_home_override = None
-    if hermes_home is not None:
-        from hermes_constants import (reset_hermes_home_override, set_hermes_home_override)
-        override_token = set_hermes_home_override(hermes_home)
-        reset_home_override = reset_hermes_home_override
+    if x19_home is not None:
+        from x19_constants import (reset_x19_home_override, set_x19_home_override)
+        override_token = set_x19_home_override(x19_home)
+        reset_home_override = reset_x19_home_override
     try:
         config = load_gateway_config()
         return coerce_systemd_watchdog_seconds(getattr(config, "systemd_watchdog_seconds", 0))
@@ -2913,12 +2913,12 @@ def _systemd_watchdog_seconds(hermes_home: str | Path | None = None) -> int:
             reset_home_override(override_token)
 
 
-def _append_node_dir_for_service(path_entries: list[str], hermes_root: Path | None = None) -> None:
-    """Append the Node dir a service unit should use: managed ``<hermes_root>/node`` (profile-scoped)
+def _append_node_dir_for_service(path_entries: list[str], x19_root: Path | None = None) -> None:
+    """Append the Node dir a service unit should use: managed ``<x19_root>/node`` (profile-scoped)
     first — a unit survives reboots, so baking a shell-PATH Node is permanent breakage — else PATH lookup."""
-    from hermes_constants import (hermes_managed_node_tree_present, iter_hermes_node_dirs)
-    managed_node_present = hermes_managed_node_tree_present(hermes_root)
-    for directory in iter_hermes_node_dirs(hermes_root) if managed_node_present else ():
+    from x19_constants import (x19_managed_node_tree_present, iter_x19_node_dirs)
+    managed_node_present = x19_managed_node_tree_present(x19_root)
+    for directory in iter_x19_node_dirs(x19_root) if managed_node_present else ():
         entry = str(directory)
         try:
             present = directory.is_dir()
@@ -2962,22 +2962,22 @@ def generate_systemd_unit(system: bool = False, run_as_user: str | None = None) 
 
     if system:
         username, group_name, home_dir, uid = _system_service_identity(run_as_user)
-        hermes_home = _hermes_home_for_target_user(home_dir)
-        # Profile arg relative to the TARGET user's ~/.x19 when hermes_home lives under it.
-        target_root = Path(home_dir) / ".hermes"
+        x19_home = _x19_home_for_target_user(home_dir)
+        # Profile arg relative to the TARGET user's ~/.x19 when x19_home lives under it.
+        target_root = Path(home_dir) / " .x19"
         try:
-            Path(hermes_home).resolve().relative_to(target_root.resolve())
-            profile_arg = _profile_arg(hermes_home, default_root=target_root)
+            Path(x19_home).resolve().relative_to(target_root.resolve())
+            profile_arg = _profile_arg(x19_home, default_root=target_root)
         except ValueError:
-            profile_arg = _profile_arg(hermes_home)
+            profile_arg = _profile_arg(x19_home)
         # Remap paths under the calling user's home (/root/) to the target user's so the service can read them.
         python_path = _remap_path_for_user(python_path, home_dir)
-        working_dir = str(hermes_home) if hermes_home else _remap_path_for_user(working_dir, home_dir)
+        working_dir = str(x19_home) if x19_home else _remap_path_for_user(working_dir, home_dir)
         venv_dir = _remap_path_for_user(venv_dir, home_dir)
         path_entries = [_remap_path_for_user(p, home_dir) for p in path_entries]
         # Managed Node for the TARGET user's tree, prepended so it outranks remapped shell-PATH entries.
         _target_node_entries: list[str] = []
-        _append_node_dir_for_service(_target_node_entries, Path(hermes_home) if hermes_home else None)
+        _append_node_dir_for_service(_target_node_entries, Path(x19_home) if x19_home else None)
         path_entries = [e for e in _target_node_entries if e not in path_entries] + path_entries
         user_home = Path(home_dir)
         identity_lines = f"User={username}\nGroup={group_name}\n"
@@ -2992,13 +2992,13 @@ def generate_systemd_unit(system: bool = False, run_as_user: str | None = None) 
         )
         wanted_by = "multi-user.target"
     else:
-        hermes_home = str(get_hermes_home().resolve())
-        profile_arg = _profile_arg(hermes_home)
+        x19_home = str(get_x19_home().resolve())
+        profile_arg = _profile_arg(x19_home)
         user_home = Path.home()
         identity_lines = env_lines = ordering_lines = ""
         wanted_by = "default.target"
 
-    watchdog_seconds = _systemd_watchdog_seconds(hermes_home)
+    watchdog_seconds = _systemd_watchdog_seconds(x19_home)
     systemd_type, systemd_watchdog_directives = "simple", ""
     if watchdog_seconds > 0:
         systemd_type, systemd_watchdog_directives = "notify", f"NotifyAccess=main\nWatchdogSec={watchdog_seconds}s\n"
@@ -3014,11 +3014,11 @@ Wants=network-online.target
 
 [Service]
 Type={systemd_type}
-{systemd_watchdog_directives}{identity_lines}ExecStart={python_path} -m hermes_cli.main{f" {profile_arg}" if profile_arg else ""} gateway run
+{systemd_watchdog_directives}{identity_lines}ExecStart={python_path} -m x19_cli.main{f" {profile_arg}" if profile_arg else ""} gateway run
 WorkingDirectory={working_dir}
 {env_lines}Environment="PATH={sane_path}"
 Environment="VIRTUAL_ENV={venv_dir}"
-Environment="X19_HOME={hermes_home}"
+Environment="X19_HOME={x19_home}"
 Environment="HERMES_SUPERVISED_CHILD=1"
 Restart=always
 RestartSec=5
@@ -3069,9 +3069,9 @@ def _normalize_launchd_plist_for_comparison(text: str) -> str:
 
 def systemd_unit_is_current(system: bool = False) -> bool:
     # X19_HOME sync chokepoint for every compare/regenerate path: under `sudo … --system` it is often
-    # stripped to /root/.hermes, so refresh would rewrite a correct unit and status warn forever.
+    # stripped to /root/ .x19, so refresh would rewrite a correct unit and status warn forever.
     # Idempotent; the os.environ mutation persists for later runtime reads (restart's PID/drain).
-    _sync_hermes_home_from_systemd_unit(system=system)
+    _sync_x19_home_from_systemd_unit(system=system)
 
     unit_path = get_systemd_unit_path(system=system)
     if not unit_path.exists():
@@ -3134,7 +3134,7 @@ def refresh_systemd_unit_if_needed(system: bool = False) -> bool:
 
     # Test safety belt: the user unit path is under Path.home(), which conftest does NOT sandbox, and a
     # pytest-tmp X19_HOME baked into the developer's real unit breaks their gateway on next reboot.
-    if not system and any(m in new_unit for m in ("/pytest-of-", '/hermes_test"', "/hermes_test/")):
+    if not system and any(m in new_unit for m in ("/pytest-of-", '/x19_test"', "/x19_test/")):
         return False
 
     # Structural variant: refuse ANY temp-dir X19_HOME (manual E2E homes lack the pytest markers).
@@ -3314,12 +3314,12 @@ def systemd_install(
         _require_root_for_system_service("install")
 
     # Offer to remove legacy units first: alongside the new unit they flap-fight for the bot token.
-    if has_legacy_hermes_units():
+    if has_legacy_x19_units():
         print()
         print_legacy_unit_warning()
         print()
         if non_interactive or prompt_yes_no("Remove the legacy unit(s) before installing?", True):
-            remove_legacy_hermes_units(interactive=False)
+            remove_legacy_x19_units(interactive=False)
             print()
 
     unit_path = get_systemd_unit_path(system=system)
@@ -3328,7 +3328,7 @@ def systemd_install(
 
     # Existing system units already pin X19_HOME; adopt it before any regenerate.
     if unit_path.exists():
-        _sync_hermes_home_from_systemd_unit(system=system)
+        _sync_x19_home_from_systemd_unit(system=system)
 
     if unit_path.exists() and not force:
         if not systemd_unit_is_current(system=system):
@@ -3399,13 +3399,13 @@ def _systemd_scope_preamble(
 def _systemd_unit_belongs_to_current_home(system: bool = False) -> bool:
     """False (with a warning) when the installed unit pins a X19_HOME other than this process's: the
     service name then resolved to ANOTHER install's gateway, and stop/disable/unlink would take it down."""
-    _sync_hermes_home_from_systemd_unit(system=system)  # sudo strips X19_HOME; adopt the unit's first
-    unit_home = _hermes_home_from_systemd_unit_file(system=system)
-    if unit_home is None or Path(unit_home).expanduser().resolve() == get_hermes_home().resolve():
+    _sync_x19_home_from_systemd_unit(system=system)  # sudo strips X19_HOME; adopt the unit's first
+    unit_home = _x19_home_from_systemd_unit_file(system=system)
+    if unit_home is None or Path(unit_home).expanduser().resolve() == get_x19_home().resolve():
         return True
     print_warning(
         f"Refusing to remove {get_systemd_unit_path(system=system)}: it runs X19_HOME={unit_home}, "
-        f"but this process has X19_HOME={get_hermes_home()}"
+        f"but this process has X19_HOME={get_x19_home()}"
     )
     return False
 
@@ -3448,7 +3448,7 @@ def systemd_start(system: bool = False):
 
 def systemd_stop(system: bool = False):
     system = _systemd_scope_preamble("stop", system)
-    _sync_hermes_home_from_systemd_unit(system=system)
+    _sync_x19_home_from_systemd_unit(system=system)
     _mark_planned_stop()
     try:
         _run_systemctl(["stop", get_service_name()], system=system, check=True, timeout=90)
@@ -3520,7 +3520,7 @@ def _systemd_graceful_restart_action(system: bool, pid: int) -> str | None:
         f"⏳ {scope_label} service restarting gracefully (PID {pid}) — "
         f"waiting up to {wait_budget:.0f}s for in-flight turns + drain..."
     )
-    from hermes_cli.update_cmd_drain_report import drain_progress_reporter
+    from x19_cli.update_cmd_drain_report import drain_progress_reporter
     if not _graceful_restart_via_sigusr1(pid, wait_budget, on_progress=drain_progress_reporter(budget_s=wait_budget)):
         print(f"⚠ Graceful restart did not complete within {int(wait_budget)}s; forcing a service restart...")
         return "restart"
@@ -3585,7 +3585,7 @@ def systemd_status(deep: bool = False, system: bool = False, full: bool = False)
         print_systemd_scope_conflict_warning()
         print()
 
-    if has_legacy_hermes_units():
+    if has_legacy_x19_units():
         print_legacy_unit_warning()
         print()
 
@@ -3748,7 +3748,7 @@ def _launchctl_bootstrap(domain: str, plist_path, label: str, *, timeout: int = 
 
 def _launchd_reload_log_path() -> Path:
     """Path the launchd reload watchdog tails for persistent-orphan detection."""
-    return get_hermes_home() / "logs" / "launchd-reload.log"
+    return get_x19_home() / "logs" / "launchd-reload.log"
 
 
 def _append_launchd_reload_log(message: str) -> None:
@@ -3806,7 +3806,7 @@ def _retry_launchctl_bootstrap_until_registered(
 # launchd-unsupported marker: written when the domain can't be managed (exit 5/125, macOS 26+) so
 # `launchd_status()` can explain missing supervision; cleared on successful bootstrap/kickstart.
 def _launchd_unsupported_marker_path() -> Path:
-    return get_hermes_home() / ".gateway-launchd-unsupported"
+    return get_x19_home() / ".gateway-launchd-unsupported"
 
 
 def _write_launchd_unsupported_marker() -> None:
@@ -3831,8 +3831,8 @@ def _launchd_unsupported_marker_exists() -> bool:
 
 
 def _gateway_run_command() -> list[str]:
-    """Build ``python -m hermes_cli.main [--profile X] gateway run --replace``, honoring the active profile."""
-    return [get_python_path(), "-m", "hermes_cli.main", *_profile_arg().split(), "gateway", "run", "--replace"]
+    """Build ``python -m x19_cli.main [--profile X] gateway run --replace``, honoring the active profile."""
+    return [get_python_path(), "-m", "x19_cli.main", *_profile_arg().split(), "gateway", "run", "--replace"]
 
 
 def _timestamped_stderr_gateway_command(error_log: Path, *, external_supervisor: bool = False) -> list[str]:
@@ -3857,7 +3857,7 @@ def _timestamped_stderr_gateway_command(error_log: Path, *, external_supervisor:
         inner = [part for part in inner if part != "--replace"]
         if "--external-supervisor" not in inner:
             inner.append("--external-supervisor")
-    return [get_python_path(), "-m", "hermes_cli.stderr_timestamp", "--error-log", str(error_log), "--", *inner]
+    return [get_python_path(), "-m", "x19_cli.stderr_timestamp", "--error-log", str(error_log), "--", *inner]
 
 
 def _spawn_detached_gateway() -> bool:
@@ -3869,8 +3869,8 @@ def _spawn_detached_gateway() -> bool:
     gateway.log, stderr is timestamped into gateway.error.log, and the PID is tracked via the gateway.pid
     file that `run_gateway` writes, so stop/status/restart keep working.
     """
-    from hermes_cli._subprocess_compat import windows_detach_popen_kwargs
-    log_dir = get_hermes_home() / "logs"
+    from x19_cli._subprocess_compat import windows_detach_popen_kwargs
+    log_dir = get_x19_home() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     try:
         with open(log_dir / "gateway.log", "ab") as out:
@@ -3887,7 +3887,7 @@ def _spawn_detached_gateway() -> bool:
 def _launchd_fallback_to_detached(reason: str, *, exit_on_failure: bool = True) -> bool:
     """Start the gateway detached when launchd can't manage it; on failure print the manual workaround
     and (by default) exit 1."""
-    from hermes_constants import display_hermes_home as _dhh
+    from x19_constants import display_x19_home as _dhh
     _write_launchd_unsupported_marker()
     print(f"⚠ launchd cannot manage the gateway on this macOS version ({reason}).")
     if _spawn_detached_gateway():
@@ -3913,8 +3913,8 @@ def _launchd_degrade_or_raise(exc: subprocess.CalledProcessError, what: str) -> 
 def generate_launchd_plist() -> str:
     # Stable cwd anchor — never the volatile source checkout (same rot risk as systemd's WorkingDirectory).
     working_dir = _stable_service_working_dir()
-    hermes_home = str(get_hermes_home().resolve())
-    log_dir = get_hermes_home() / "logs"
+    x19_home = str(get_x19_home().resolve())
+    log_dir = get_x19_home() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     label = get_launchd_label()
     venv_dir = _service_venv_dir()
@@ -3934,7 +3934,7 @@ def generate_launchd_plist() -> str:
     # rewrite would otherwise strip a manual limit and reintroduce EMFILE crashes.
     nofile_block = ""
     try:
-        from hermes_cli.resource_limits import configured_nofile_soft_limit
+        from x19_cli.resource_limits import configured_nofile_soft_limit
         nofile_target = configured_nofile_soft_limit()
     except Exception:
         nofile_target = None
@@ -3969,7 +3969,7 @@ def generate_launchd_plist() -> str:
         <key>VIRTUAL_ENV</key>
         <string>{venv_dir}</string>
         <key>X19_HOME</key>
-        <string>{hermes_home}</string>
+        <string>{x19_home}</string>
         <key>HERMES_SUPERVISED_CHILD</key>
         <string>1</string>
     </dict>
@@ -4166,11 +4166,11 @@ def launchd_install(force: bool = False):
             else:
                 # The plist was rewritten but launchd never registered it (or the write was refused):
                 # a success line here would hide an unloaded service with no KeepAlive.
-                from hermes_constants import display_hermes_home
+                from x19_constants import display_x19_home
                 print(
                     "⚠ Service definition could not be reloaded with launchd. "
                     "Run 'x19 gateway install --force' or check "
-                    f"{display_hermes_home()}/logs/launchd-reload.log for details."
+                    f"{display_x19_home()}/logs/launchd-reload.log for details."
                 )
             return
         print(f"Service already installed at: {plist_path}")
@@ -4196,7 +4196,7 @@ def launchd_install(force: bool = False):
     print()
     print("Next steps:")
     print("  x19 gateway status             # Check status")
-    from hermes_constants import display_hermes_home as _dhh
+    from x19_constants import display_x19_home as _dhh
     print(f"  tail -f {_dhh()}/logs/gateway.log  # View logs")
 
 
@@ -4354,7 +4354,7 @@ def launchd_restart():
             # surfaces with no other feedback (desktop updater) read silence as "update stuck".
             wait_budget = _get_restart_exit_wait_budget()
             print(f"→ Stopping gateway (PID {pid}) — draining in-flight runs (up to {wait_budget:.0f}s)...")
-            from hermes_cli.update_cmd_drain_report import drain_progress_reporter
+            from x19_cli.update_cmd_drain_report import drain_progress_reporter
             if _graceful_restart_via_sigusr1(pid, wait_budget, on_progress=drain_progress_reporter(budget_s=wait_budget)):
                 # KeepAlive revives a planned exit, so do NOT kickstart (-k would kill the replacement) —
                 # but a clean exit doesn't prove supervision, so verify a replacement PID appears first.
@@ -4482,7 +4482,7 @@ def launchd_status(deep: bool = False):
             print(f"  Detached gateway process is running (PID {fallback_pid})")
 
     if deep:
-        log_file = get_hermes_home() / "logs" / "gateway.log"
+        log_file = get_x19_home() / "logs" / "gateway.log"
         if log_file.exists():
             print()
             print("Recent logs:")
@@ -4499,7 +4499,7 @@ def _truthy_env(value: str | None) -> bool:
 
 
 def _is_official_docker_checkout() -> bool:
-    return str(PROJECT_ROOT) == "/opt/hermes" and (PROJECT_ROOT / "docker" / "entrypoint.sh").is_file()
+    return str(PROJECT_ROOT) == "/opt/x19" and (PROJECT_ROOT / "docker" / "entrypoint.sh").is_file()
 
 
 def _running_under_gateway_supervisor() -> bool:
@@ -4523,16 +4523,16 @@ def named_profile_served_by_running_multiplexer(profile_name: str | None = None)
         return False
 
     try:
-        from hermes_constants import get_default_hermes_root
-        default_root = get_default_hermes_root()
+        from x19_constants import get_default_x19_root
+        default_root = get_default_x19_root()
     except Exception:
         return False
 
     try:
-        from hermes_cli.gateway_multiplex_served import live_default_gateway_pid, recorded_served_profiles
+        from x19_cli.gateway_multiplex_served import live_default_gateway_pid, recorded_served_profiles
         if live_default_gateway_pid() is None:
             return False
-        from hermes_cli.profiles import normalize_profile_name
+        from x19_cli.profiles import normalize_profile_name
         # The live gateway's own record wins: the CLI process cannot see an env-only opt-in on the
         # default profile (`x19 -p X` loads X's .env) and a config edit after start is not live yet.
         # Only a record without the key (pre-multiplex writer) falls through to config derivation.
@@ -4542,7 +4542,7 @@ def named_profile_served_by_running_multiplexer(profile_name: str | None = None)
 
         # No record (older gateway): only an EXPLICIT opt-in counts. The unset default is settled by
         # the gateway at boot (it may have stayed standalone); a CLI process must not guess it on.
-        from hermes_cli.gateway_multiplex_mode import explicit_multiplex_flag
+        from x19_cli.gateway_multiplex_mode import explicit_multiplex_flag
         return explicit_multiplex_flag(default_root) is True  # a multiplexer serves every named profile
     except Exception:
         logger.debug("Multiplexer-serving probe failed", exc_info=True)
@@ -4673,9 +4673,9 @@ def _guard_existing_gateway_process_conflict(replace: bool = False) -> None:
             stale = _read_pid_record()
             if stale is not None and not _pid_record_belongs_to_current_profile(stale):
                 logger.warning(
-                    "PID file belongs to another profile (hermes_home=%s). "
+                    "PID file belongs to another profile (x19_home=%s). "
                     "The old gateway may still be running under that profile.",
-                    stale.get("hermes_home", "<unknown>"),
+                    stale.get("x19_home", "<unknown>"),
                 )
         except Exception:
             pass
@@ -4697,9 +4697,9 @@ def _guard_official_docker_root_gateway() -> None:
 
     print_error("Refusing to run the X19 gateway as root inside the official Docker image.")
     print(
-        "  The image entrypoint normally drops privileges to the 'hermes' user. "
+        "  The image entrypoint normally drops privileges to the 'x19' user. "
         "If you override entrypoint in Docker Compose, include "
-        "/opt/hermes/docker/entrypoint.sh before the X19 command."
+        "/opt/x19/docker/entrypoint.sh before the X19 command."
     )
     print(
         "  Running the gateway as root can leave root-owned files in "
@@ -4715,13 +4715,13 @@ def _apply_startup_watchdog_config() -> None:
     vars bridge it because the argv fast-path arms before config loads, and explicit env wins. arm() is
     idempotent, so a config timeout needs disarm+re-arm. GatewayRunner disarms once the loop is live."""
     try:
-        from hermes_startup_watchdog import (
+        from x19_startup_watchdog import (
             ENV_STARTUP_WATCHDOG, ENV_STARTUP_WATCHDOG_TIMEOUT_S, arm_startup_watchdog,
             disarm_startup_watchdog, startup_watchdog_disabled,
         )
         _sw_timeout_bridged = False
         try:
-            from hermes_cli.config import load_config as _sw_load_config
+            from x19_cli.config import load_config as _sw_load_config
             _gw_cfg = (_sw_load_config() or {}).get("gateway", {}) or {}
             if ENV_STARTUP_WATCHDOG not in os.environ and not _gw_cfg.get("startup_watchdog", True):
                 os.environ[ENV_STARTUP_WATCHDOG] = "0"
@@ -4767,7 +4767,7 @@ def _make_exit_diag():
         if os.environ.get("HERMES_GATEWAY_EXIT_DIAG", "1") != "1":
             return
         try:
-            from hermes_constants import get_hermes_home as _ghh
+            from x19_constants import get_x19_home as _ghh
             log_dir = _ghh() / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             line = {
@@ -4791,7 +4791,7 @@ def _respawn_storm_backoff() -> None:
         _max_starts = 5
         _win = 120.0
         try:
-            from hermes_cli.config import load_config
+            from x19_cli.config import load_config
             _cfg = load_config()
             _gw = _cfg.get("gateway") if isinstance(_cfg, dict) else None
             _rs = _gw.get("respawn_storm") if isinstance(_gw, dict) else None
@@ -4818,7 +4818,7 @@ def _respawn_storm_backoff() -> None:
             )
             # Tell the startup watchdog the backoff sleep is intentional, not a parked deadlock.
             try:
-                from hermes_startup_watchdog import kick_startup_watchdog
+                from x19_startup_watchdog import kick_startup_watchdog
                 kick_startup_watchdog(extra_s=_storm.backoff_s)
             except Exception:
                 pass
@@ -4925,7 +4925,7 @@ _PLATFORMS = [
         "setup_instructions": [
             "1. In Mattermost: Integrations → Bot Accounts → Add Bot Account",
             "   (System Console → Integrations → Bot Accounts must be enabled)",
-            "2. Give it a username (e.g. hermes) and copy the bot token",
+            "2. Give it a username (e.g. x19) and copy the bot token",
             "3. Works with any self-hosted Mattermost instance — enter your server URL",
             "4. To find your user ID: click your avatar (top-left) → Profile",
             "   Your user ID is displayed there — click it to copy.",
@@ -5026,7 +5026,7 @@ def _all_platforms() -> list[dict]:
     running gateway; user-installed ones still need ``plugins.enabled`` (untrusted code). Matrix is
     hidden on Windows: python-olm has no wheel or native build (use WSL)."""
     try:
-        from hermes_cli.plugins import discover_plugins
+        from x19_cli.plugins import discover_plugins
         discover_plugins()
     except Exception as e:
         logger.debug("plugin discovery failed during platform enumeration: %s", e)
@@ -5119,7 +5119,7 @@ def _runtime_health_lines() -> list[str]:
         lines.append(f"⏳ Gateway draining for {action} ({count} active agent(s))")
         work = state.get("active_work")
         if isinstance(work, list) and work:
-            from hermes_cli.update_cmd_drain_report import describe_active_work_unit
+            from x19_cli.update_cmd_drain_report import describe_active_work_unit
             lines.extend(f"     • {describe_active_work_unit(u)}" for u in work if isinstance(u, dict))
     elif gateway_state == "stopped" and exit_reason:
         lines.append(f"⚠ Last shutdown reason: {exit_reason}")
@@ -5216,7 +5216,7 @@ def _telegram_auto_setup(token_var: str) -> tuple[bool, object]:
     if prompt("  Choice [1/2]", default="1").strip() != "1":
         return False, None
     try:
-        from hermes_cli.telegram_managed_bot import (
+        from x19_cli.telegram_managed_bot import (
             auto_setup_telegram_bot_result, is_valid_telegram_bot_token,
         )
     except ImportError:
@@ -5283,7 +5283,7 @@ def _prompt_allowlist_var(var: dict, platform_key: str, auto_owner_user_id) -> s
 
 def _setup_standard_platform(platform: dict):
     """Interactive setup for Telegram, Discord, or Slack."""
-    from hermes_cli.setup_hidden_env import is_setup_hidden_env as _is_setup_hidden_env
+    from x19_cli.setup_hidden_env import is_setup_hidden_env as _is_setup_hidden_env
     emoji, label, token_var = platform["emoji"], platform["label"], platform["token_var"]
     _print_setup_header(f"{emoji} {label}")
 
@@ -5350,7 +5350,7 @@ def _setup_standard_platform(platform: dict):
 
 
 def _running_under_s6() -> bool:
-    from hermes_cli.service_manager import detect_service_manager
+    from x19_cli.service_manager import detect_service_manager
     return detect_service_manager() == "s6"
 
 
@@ -5425,7 +5425,7 @@ def _setup_weixin():
         return
 
     try:
-        credentials = asyncio.run(qr_login(str(get_hermes_home())))
+        credentials = asyncio.run(qr_login(str(get_x19_home())))
     except KeyboardInterrupt:
         print()
         print_warning("  Weixin setup cancelled.")
@@ -5680,8 +5680,8 @@ def _setup_signal():
 
 
 def _builtin_setup_fn(key: str):
-    """Resolve a built-in platform's setup function; late-bound to dodge the hermes_cli.setup cycle."""
-    from hermes_cli import setup as _s
+    """Resolve a built-in platform's setup function; late-bound to dodge the x19_cli.setup cycle."""
+    from x19_cli import setup as _s
     return {
         # telegram/discord/slack/whatsapp/dingtalk/feishu/wecom setup_fns come from their plugins.
         "bluebubbles": setup_platforms._setup_bluebubbles,
@@ -5812,7 +5812,7 @@ def _wizard_service_status_block() -> None:
         print_systemd_scope_conflict_warning()
         print()
 
-    if supports_systemd_services() and has_legacy_hermes_units():
+    if supports_systemd_services() and has_legacy_x19_units():
         print_legacy_unit_warning()
         print()
 
@@ -5895,7 +5895,7 @@ def _wizard_post_setup() -> None:
         if is_wsl():
             reason, home = "wsl", ""
         elif is_termux():
-            from hermes_constants import display_hermes_home as _dhh
+            from x19_constants import display_x19_home as _dhh
             reason, home = "termux", _dhh()
         else:
             reason, home = "unsupported", ""
@@ -5936,7 +5936,7 @@ def gateway_setup():
 def _dispatch_via_service_manager_if_s6(action: str, profile: str | None = None) -> bool:
     """Dispatch start/stop/restart via s6 inside an s6 container; True iff dispatched (caller returns).
     Profile defaults to the current one; missing slot / s6 errors become actionable CLI messages."""
-    from hermes_cli.service_manager import (
+    from x19_cli.service_manager import (
         GatewayNotRegisteredError, detect_service_manager, get_service_manager,
         register_unregistered_profile_gateway,
     )
@@ -5970,7 +5970,7 @@ def _dispatch_all_via_service_manager_if_s6(action: str) -> bool:
     """Dispatch ``--all`` stop/restart to every registered profile gateway under s6; True iff dispatched.
     A bare pkill is seen by s6-supervise as a crash and restarted ~1s later; the service manager flips
     ``want up``/``want down`` correctly. ``start --all`` is not a CLI surface."""
-    from hermes_cli.service_manager import (detect_service_manager, get_service_manager)
+    from x19_cli.service_manager import (detect_service_manager, get_service_manager)
     if detect_service_manager() != "s6" or action not in ("stop", "restart"):
         return False
     mgr = get_service_manager()
@@ -6009,7 +6009,7 @@ def gateway_command(args):
         sys.exit(1)
     except (subprocess.CalledProcessError, RuntimeError) as e:
         # systemctl exited non-zero or is missing entirely: guidance, not a traceback.
-        from hermes_cli.gateway_command_errors import explain_service_failure
+        from x19_cli.gateway_command_errors import explain_service_failure
         lines = explain_service_failure(e)
         if lines is None:
             raise
@@ -6048,8 +6048,8 @@ def _maybe_redirect_run_to_s6_supervision(args) -> bool:
         # The supervised gateway's lifetime is independent of this process — s6-supervise restarts it on
         # crash, and we don't want the container to exit when the gateway flaps. The CMD process keeps /init
         # alive until `docker stop` sends SIGTERM, at which point /init runs stage 3 shutdown (which tears
-        # down the supervised gateway cleanly). Prefer `sleep infinity` (matches the static main-hermes
-        # service's pattern in docker/s6-rc.d/main-hermes/run, and frees the Python interpreter — the
+        # down the supervised gateway cleanly). Prefer `sleep infinity` (matches the static main-x19
+        # service's pattern in docker/s6-rc.d/main-x19/run, and frees the Python interpreter — the
         # heartbeat is a tiny `sleep` process, not a resident interpreter). But `os.execvp` does a PATH
         # lookup for the `sleep` binary and historically crashed the whole container with FileNotFoundError
         # when PATH was empty/truncated/clobbered at this point — e.g. after user customizations rewrote
@@ -6439,7 +6439,7 @@ def _cmd_restart(args):
     # `gateway run --external-supervisor`) restarts by exiting back to it: the stop + foreground
     # run below would stamp this CLI's PID as the gateway and wedge every respawn (#110637).
     from gateway.status import get_running_pid
-    from hermes_cli.gateway_supervised_restart import (
+    from x19_cli.gateway_supervised_restart import (
         gateway_declares_external_supervisor, restart_externally_supervised_gateway,
     )
     supervised_pid = get_running_pid()
@@ -6495,7 +6495,7 @@ def _cmd_status(args):
     full = getattr(args, "full", False)
     system = getattr(args, "system", False)
     snapshot = get_gateway_runtime_snapshot(system=system)
-    from hermes_cli.profiles import get_active_profile_name
+    from x19_cli.profiles import get_active_profile_name
 
     _windows_service_installed = is_windows() and _gw_windows().is_installed()
     if not snapshot.running and named_profile_served_by_running_multiplexer():
@@ -6540,17 +6540,17 @@ def _cmd_list(args):
 
 
 def _cmd_migrate_legacy(args):
-    """Stop, disable, and remove legacy X19 gateway unit files (e.g. hermes.service)."""
+    """Stop, disable, and remove legacy X19 gateway unit files (e.g. x19.service)."""
     dry_run = getattr(args, "dry_run", False)
     yes = getattr(args, "yes", False)
     if not supports_systemd_services() and not is_macos():
         print("Legacy unit migration only applies to systemd-based Linux hosts.")
         return
-    remove_legacy_hermes_units(interactive=not yes, dry_run=dry_run)
+    remove_legacy_x19_units(interactive=not yes, dry_run=dry_run)
 
 
 def _cmd_migrate(args):
-    from hermes_cli.gateway_migrate import cmd_migrate
+    from x19_cli.gateway_migrate import cmd_migrate
     cmd_migrate(args)
 
 
@@ -6596,7 +6596,7 @@ def __getattr__(name):  # PEP 562 — lazy so no import cycles
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     import importlib
-    from hermes_cli.plugin_compat import warn_once
+    from x19_cli.plugin_compat import warn_once
     warn_once(__name__, name, *target)
     return getattr(importlib.import_module(target[0]), target[1])
 # ---- END PLUGIN-COMPAT ----
