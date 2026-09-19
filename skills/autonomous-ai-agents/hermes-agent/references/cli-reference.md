@@ -1,12 +1,12 @@
-# Hermes CLI Reference
+# X19 CLI Reference
 
-Live sources when anything looks stale: `hermes --help`, `hermes <command> --help`,
-https://hermes-agent.nousresearch.com/docs/reference/cli-commands
+Live sources when anything looks stale: `x19 --help`, `x19 <command> --help`,
+https://x19.nousresearch.com/docs/reference/cli-commands
 
 ### Global Flags
 
 ```
-hermes [flags] [command]        (no subcommand = interactive chat)
+x19 [flags] [command]        (no subcommand = interactive chat)
 
   --version, -V             Show version
   -z, --oneshot PROMPT      One-shot: print ONLY the final response (for scripts/pipes)
@@ -27,7 +27,7 @@ hermes [flags] [command]        (no subcommand = interactive chat)
 ### Chat
 
 ```
-hermes chat [flags]
+x19 chat [flags]
   -q, --query TEXT          Single query, non-interactive
   --image PATH              Attach a local image to a single query
   -Q, --quiet               Suppress banner, spinner, tool previews
@@ -40,112 +40,112 @@ hermes chat [flags]
 ### Configuration
 
 ```
-hermes setup [section]      Wizard (model|tts|terminal|gateway|tools|agent)
-hermes model                Interactive model/provider picker
-hermes fallback [add|remove|list]  Fallback provider chain
-hermes config [show|edit|get|set|unset|path|env-path|check|migrate]
-hermes login / logout       OAuth sign-in / clear stored auth
-hermes doctor [--fix]       Check dependencies and config
-hermes status [--all]       Component status
+x19 setup [section]      Wizard (model|tts|terminal|gateway|tools|agent)
+x19 model                Interactive model/provider picker
+x19 fallback [add|remove|list]  Fallback provider chain
+x19 config [show|edit|get|set|unset|path|env-path|check|migrate]
+x19 login / logout       OAuth sign-in / clear stored auth
+x19 doctor [--fix]       Check dependencies and config
+x19 status [--all]       Component status
 ```
 
 ### Tools & Skills
 
 ```
-hermes tools [list|enable NAME|disable NAME]   Per-platform toolsets (curses UI with no args)
+x19 tools [list|enable NAME|disable NAME]   Per-platform toolsets (curses UI with no args)
 
-hermes skills list|browse|search QUERY|inspect ID
-hermes skills install ID    Hub identifier OR a direct https://…/SKILL.md URL
-hermes skills config        Enable/disable skills per platform
-hermes skills check|update|uninstall|publish PATH
-hermes skills tap add REPO  Add a GitHub repo as a skill source
-hermes bundles              Skill bundles (one /<name> alias loads several skills)
+x19 skills list|browse|search QUERY|inspect ID
+x19 skills install ID    Hub identifier OR a direct https://…/SKILL.md URL
+x19 skills config        Enable/disable skills per platform
+x19 skills check|update|uninstall|publish PATH
+x19 skills tap add REPO  Add a GitHub repo as a skill source
+x19 bundles              Skill bundles (one /<name> alias loads several skills)
 ```
 
 ### MCP Servers
 
 ```
-hermes mcp add NAME (--url or --command) | remove | list | test NAME
-hermes mcp catalog | install NAME     Curated catalog install
-hermes mcp configure NAME             Toggle tool selection
-hermes mcp serve                      Run Hermes as an MCP server
+x19 mcp add NAME (--url or --command) | remove | list | test NAME
+x19 mcp catalog | install NAME     Curated catalog install
+x19 mcp configure NAME             Toggle tool selection
+x19 mcp serve                      Run X19 as an MCP server
 ```
 Details (transport, tool discovery, catalog): `references/native-mcp.md`.
 
 ### Gateway (Messaging Platforms)
 
 ```
-hermes gateway run|install|start|stop|restart|status|setup
+x19 gateway run|install|start|stop|restart|status|setup
 ```
 
-20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `hermes photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
-Docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
+20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `x19 photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
+Docs: https://x19.nousresearch.com/docs/user-guide/messaging/
 
 ### Sessions
 
 ```
-hermes sessions list|browse|rename ID TITLE|delete ID|export OUT|prune|stats
+x19 sessions list|browse|rename ID TITLE|delete ID|export OUT|prune|stats
 ```
 
 ### Cron / Webhooks
 
 ```
-hermes cron list|create SCHED|edit ID|pause|resume|run ID|remove|status
+x19 cron list|create SCHED|edit ID|pause|resume|run ID|remove|status
     Schedules: '30m', 'every 2h', '0 9 * * *', ISO timestamp
-hermes webhook subscribe NAME|list|remove NAME|test NAME
+x19 webhook subscribe NAME|list|remove NAME|test NAME
 ```
 Webhook payloads/routes: `references/webhooks.md`.
 
 ### Profiles
 
 ```
-hermes profile list|create NAME (--clone|--clone-all|--clone-from)|use|show|delete
-hermes profile rename A B | alias NAME | export NAME | import FILE
-hermes profile migrate-identity A B   Retry a completed rename's session/routing identity migration
+x19 profile list|create NAME (--clone|--clone-all|--clone-from)|use|show|delete
+x19 profile rename A B | alias NAME | export NAME | import FILE
+x19 profile migrate-identity A B   Retry a completed rename's session/routing identity migration
 ```
 
 ### Credentials & Pools
 
 ```
-hermes auth                 Interactive credential manager
-hermes auth add [PROVIDER]  Add OAuth or API-key credential (nous, openai-codex, qwen-oauth, …)
-hermes auth list|remove P IDX|reset PROVIDER|status
+x19 auth                 Interactive credential manager
+x19 auth add [PROVIDER]  Add OAuth or API-key credential (nous, openai-codex, qwen-oauth, …)
+x19 auth list|remove P IDX|reset PROVIDER|status
 ```
 Multiple credentials per provider form a pool that rotates automatically and skips exhausted keys.
 
 ### Other
 
 ```
-hermes desktop / gui        Native desktop app
-hermes dashboard            Web admin panel + embedded chat (--stop / --status)
-hermes proxy                OpenAI-compatible local proxy backed by an OAuth provider
-hermes portal               Quick setup / sign in via Nous Portal
-hermes kanban <verb>        Multi-agent work-queue board
-hermes project              Named multi-folder workspaces
-hermes skin list|use|set    Switch/tweak skins (see references/themes.md)
-hermes pets <verb>          Pet mascots (see references/petdex.md)
-hermes memory setup|status|off|reset   Memory provider
-hermes secrets bitwarden|onepassword   External secret stores
-hermes moa                  Mixture-of-Agents slots
-hermes hooks / security / backup / import / checkpoints / console
-hermes logs [-f] [errors]   View agent/error logs
-hermes send                 One-off message through a gateway platform
-hermes pairing / plugins / insights / journey / computer-use
-hermes acp                  ACP server (IDE integration)
-hermes completion bash|zsh|fish
-hermes update / uninstall / claw migrate
+x19 desktop / gui        Native desktop app
+x19 dashboard            Web admin panel + embedded chat (--stop / --status)
+x19 proxy                OpenAI-compatible local proxy backed by an OAuth provider
+x19 portal               Quick setup / sign in via Nous Portal
+x19 kanban <verb>        Multi-agent work-queue board
+x19 project              Named multi-folder workspaces
+x19 skin list|use|set    Switch/tweak skins (see references/themes.md)
+x19 pets <verb>          Pet mascots (see references/petdex.md)
+x19 memory setup|status|off|reset   Memory provider
+x19 secrets bitwarden|onepassword   External secret stores
+x19 moa                  Mixture-of-Agents slots
+x19 hooks / security / backup / import / checkpoints / console
+x19 logs [-f] [errors]   View agent/error logs
+x19 send                 One-off message through a gateway platform
+x19 pairing / plugins / insights / journey / computer-use
+x19 acp                  ACP server (IDE integration)
+x19 completion bash|zsh|fish
+x19 update / uninstall / claw migrate
 ```
 
-Plugin- and provider-supplied subcommands (e.g. `hermes photon setup`) only appear once their plugin is installed/active.
+Plugin- and provider-supplied subcommands (e.g. `x19 photon setup`) only appear once their plugin is installed/active.
 
 ### Where to Find Things
 
 | Looking for... | Location |
 |---|---|
-| Config options | `hermes config edit` · [Configuration docs](https://hermes-agent.nousresearch.com/docs/user-guide/configuration) |
-| Tools / toolsets | `hermes tools list` · [Tools reference](https://hermes-agent.nousresearch.com/docs/reference/tools-reference) |
-| Skills catalog | `hermes skills browse` · [Skills catalog](https://hermes-agent.nousresearch.com/docs/reference/skills-catalog) |
-| Provider setup | `hermes model` · [Providers guide](https://hermes-agent.nousresearch.com/docs/integrations/providers) |
-| Env variables | `hermes config env-path` · [Env vars reference](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) |
-| Gateway logs | `~/.hermes/logs/gateway.log` (or `hermes logs`) |
-| Sessions | `hermes sessions browse` (reads state.db) |
+| Config options | `x19 config edit` · [Configuration docs](https://x19.nousresearch.com/docs/user-guide/configuration) |
+| Tools / toolsets | `x19 tools list` · [Tools reference](https://x19.nousresearch.com/docs/reference/tools-reference) |
+| Skills catalog | `x19 skills browse` · [Skills catalog](https://x19.nousresearch.com/docs/reference/skills-catalog) |
+| Provider setup | `x19 model` · [Providers guide](https://x19.nousresearch.com/docs/integrations/providers) |
+| Env variables | `x19 config env-path` · [Env vars reference](https://x19.nousresearch.com/docs/reference/environment-variables) |
+| Gateway logs | `~/.x19/logs/gateway.log` (or `x19 logs`) |
+| Sessions | `x19 sessions browse` (reads state.db) |
