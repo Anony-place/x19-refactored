@@ -750,6 +750,27 @@ Stated plainly, so the "zero" is not over-read:
   modules this transformation never touched (vision routing, welcome-tier copy,
   cron scheduler-provider resolution), each confirmed failing at the pre-work
   commit via a detached worktree.
+- **The test environment was rebuilt partway through, so read the numbers with
+  that in mind.** The restore that reverted the plugin dashboards also took the
+  dependency environment and the git history with it. The suite calibrations
+  quoted above were measured in the earlier, fully provisioned one. Re-verified
+  afterwards in a minimal environment — pytest, pyyaml, httpx, psutil,
+  python-dotenv, pydantic, requests, rich, fastapi, prompt_toolkit and openai,
+  not the full `.[all,dev]` set — these pass: 38 plugin-dashboard and catalog
+  tests, 1,732 skills tests, 199 installer and console-script tests, 131
+  organization-runtime and constants tests, 1,331 state-layer tests.
+  Thirteen state-layer tests fail, every one in the WAL, corruption-repair or
+  FTS-rebuild paths of a subsystem this work never touched. Four were
+  missing-dependency errors that cleared as dependencies were added; the rest
+  report preconditions this sandbox cannot meet — "fixture precondition: -wal
+  sidecar must survive with pending frames", "database disk image is malformed" —
+  and the count moves between twelve and thirteen across identical runs. None of
+  the eight files involved references anything changed here.
+  The branch point is not a usable baseline for them: at `81b98cb` the state
+  tests were already partly renamed and import `x19_constants`, a module that did
+  not exist under that name yet, so 107 of the ~110 files fail at collection and
+  only 74 tests run at all, against 1,331 passing now. That half-renamed state is
+  the root cause of most of what this report documents.
 - **It verifies absence of a name, not correctness of behaviour.** The
   functional regressions in this report were found *because* each string was
   read in context and asked what it did. The scan flags candidates; the tests
