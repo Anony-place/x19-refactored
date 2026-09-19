@@ -221,10 +221,10 @@ def relay_display_name() -> Optional[str]:
         except Exception:  # noqa: BLE001 - branding absence must never crash boot
             value = ""
         # The stock brand is identical on every default install: forwarding it would
-        # prefix every reply "**X19:**" and shadow the connector's
+        # prefix every reply "**X19 Agent:**" and shadow the connector's
         # linked-owner fallback, which actually disambiguates. Only a customized
         # name is forwarded.
-        if value == "X19":
+        if value == "X19 Agent":
             value = ""
     # Mirror the connector's ingest sanitization (trim + 64-char cap).
     return value[:64] or None

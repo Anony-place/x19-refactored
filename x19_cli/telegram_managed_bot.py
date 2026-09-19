@@ -15,7 +15,7 @@ import httpx
 # Nous-hosted pairing API; override for PoC/staging with TELEGRAM_ONBOARDING_URL.
 DEFAULT_API_URL = "https://anony-place.github.io/x19-refactored"
 TELEGRAM_ONBOARDING_URL_ENV = "TELEGRAM_ONBOARDING_URL"
-DEFAULT_BOT_NAME = "X19"
+DEFAULT_BOT_NAME = "X19 Agent"
 DEFAULT_POLL_TIMEOUT = 180
 POLL_INTERVAL = 2
 

@@ -443,7 +443,7 @@ def run_gui_uninstall(args):
     print()
     if agent_is_installed(x19_home):
         print(color("Kept intact:", Colors.GREEN, Colors.BOLD))
-        print(f"  • The X19 at {x19_home / 'x19'}")
+        print(f"  • The X19 agent at {x19_home / 'x19'}")
         print(f"  • Your config, sessions, and secrets under {x19_home}")
         print()
 

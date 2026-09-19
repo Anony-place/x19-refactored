@@ -14,10 +14,10 @@ $ python scripts/x19_residue_audit.py --strict
 X19 legacy-identity residue audit
 ==============================================================
 tracked files containing 'hermes': 94
-total occurrences (lines):          319
+total occurrences (lines):          326
 
   model-identifier              169 line(s) across 59 file(s)
-  audit-tooling                 104 line(s) across 2 file(s)
+  audit-tooling                 111 line(s) across 2 file(s)
   third-party-url                30 line(s) across 23 file(s)
   contributor-attribution         6 line(s) across 6 file(s)
   third-party-dependency          6 line(s) across 1 file(s)
@@ -40,7 +40,7 @@ CI gate. `--json` emits the same data machine-readably.
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
 | Corpus | every git-tracked file: **13,911** |
 | Files with a match | **94** |
-| Lines with a match | **319** |
+| Lines with a match | **326** |
 | Non-Latin matches | **0**, outside the detector and this report |
 | Unjustified | **0** |
 
@@ -55,7 +55,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 94 files and 319 lines over the same 13,911 tracked files. Two
+   the same 94 files and 326 lines over the same 13,911 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
@@ -100,9 +100,9 @@ One line in this class deserves specific mention because it was the site of a
 real bug — see
 [the model-family detector](#4-the-model-family-detector-could-never-fire).
 
-### `audit-tooling` — 104 lines / 2 files
+### `audit-tooling` — 111 lines / 2 files
 
-The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (80
+The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (87
 lines). A detector must spell the thing it detects: the token appears in
 `TOKEN`, in every classification pattern, and in the comments explaining them.
 This document quotes the occurrences it classifies — including the adversarial
@@ -110,7 +110,7 @@ probes that must keep failing — so it contains the token by construction.
 
 Both are reported as their own class rather than excluded from the scan, so the
 accounting stays complete and the totals keep matching a plain `git grep`: all
-319 lines are classified, none are silently dropped. Excluding them instead
+326 lines are classified, none are silently dropped. Excluding them instead
 would make the headline numbers unverifiable by anyone running the obvious
 command.
 
@@ -710,6 +710,99 @@ No test asserted on the bundled skill set, so nothing needed updating; the audit
 was re-run afterwards and is unchanged at zero residue.
 
 ---
+
+### 19. The two-word product name became one word, and the code that computed it disagreed
+
+Section 14 was about two *different* identifiers collapsing onto one string. This
+is the same shape applied to a single identifier: the rename mapped the product's
+two-word persona name onto its one-word product name. Upstream carried 140 quoted
+`"Hermes Agent"`-family literals (`"Hermes Agent"`, `"Hermes agent"`,
+`"hermes agent"`, `"hermes-agent"`). The transformed tree carried **zero** quoted
+`"X19 Agent"` literals. That asymmetry is the tell: a rename that renders a
+two-word name as one word leaves no residue and no duplicate — every site still
+parses, and most still read plausibly.
+
+It is a defect rather than a rebranding choice because the persona name is not
+only written as a literal, it is also *computed*: `_branding()` in
+`x19_cli/skin_engine.py` returns `f"{who} Agent"`, so the default skin's
+`agent_name` is `"X19 Agent"` — and `"Ares Agent"`, `"Poseidon Agent"` for the
+alternate skins, which is why the one test asserting the value kept failing while
+its neighbours asserting `"Ares Agent"` passed. The literals were flattened; the
+computed value was not. Wherever code compared against or defaulted to that value,
+the two sides no longer agreed.
+
+**The relay forwarded the stock brand on every reply.** `gateway/relay/__init__.py`
+reads `get_branding("agent_name")` and suppresses it when it equals the stock
+brand, because — as the comment above the check says — forwarding it would prefix
+every reply `**X19 Agent:**` and shadow the connector's linked-owner fallback. The
+comparison had become `if value == "X19":`, which the real value `"X19 Agent"`
+never satisfies, so the suppression never fired. The covering test did not catch
+it: its fake branding had been flattened the same way (`return "X19" if key ==
+"agent_name"`), so test and code agreed with each other and disagreed with the
+runtime. Both restored; verified by calling `relay_display_name()` directly — a
+stock install now returns `None` and a customized name is still forwarded.
+
+**The OAuth sanitizer stopped matching the name it exists to strip.**
+`_OAUTH_SYSTEM_REPLACEMENTS` in `agent/anthropic_adapter.py` scrubbed the product
+name out of system prompts on the Anthropic OAuth path, where the docstring says it
+avoids server-side content filters. Three distinct sources — `"Hermes Agent"`,
+`"Hermes agent"`, `"hermes-agent"` — became `("X19", "Claude Code")` written
+twice plus `("x19", "claude-code")`: a four-entry table holding three distinct
+strings, one of them a duplicate pair. The persona name it was built to remove was
+no longer in it, and the bare `"x19"` entry mangled `x19-agent` into
+`claude-code-agent`. Restored to four distinct entries mirroring upstream.
+
+**Two tests were already failing.** `photon/test_auth.py::test_find_project_by_name_case_insensitive`
+— the fixture kept the lowercase variant `"x19 agent"` while `DEFAULT_PROJECT_NAME`
+had collapsed to `"X19"`, so the case-insensitive lookup had nothing to match.
+`test_google_meet_plugin.py::test_looks_like_human_speaker` — the fixture listed the
+bot's own name as `"x19 agent"` but passed the bot name as `"X19"`, so the bot
+classified its own voice as a human speaker, which is the barge-in case the
+function exists to prevent. Both pass now.
+
+**Smaller sites.** The project-slug assertions in `test_projects_db.py` (`"X19
+Agent"` slugifies to `x19-agent`, not `x19`); the ACP `clientInfo` name; help text
+in `plugins/google_meet/tools.py` and `plugins/platforms/photon/cli.py` that stated
+a default which had changed underneath it; the uninstaller's "The X19 at …" line;
+and the external display names — `X-Title` attribution headers across nine
+provider modules, the Meet guest name, the email subject, the Home Assistant notification title, the
+Matrix device name, the Telegram bot name, the A2A provider organization, the
+FastAPI title — each restored with the tests that assert it. In all, 75 lines
+across 48 files.
+
+**What was deliberately left alone.** Not every `X19` is a collapsed persona name,
+and telling them apart is the whole job:
+
+- The distribution *is* named `x19` (`pyproject.toml`), so dist-derived
+  identifiers are correct as they stand: the codex `originator`, the ACP
+  `Implementation(name=…)`, Gemini's `_API_CLIENT`, `pip install 'x19[otlp]'`, the
+  `x19-petdex` User-Agent. Upstream's `hermes-agent` was the dist name there, not
+  the persona.
+- The version banner. `cli.py`, the ACP `/version` command, the desktop's remote
+  parser and its tests all say `X19 v…`; the chain is self-consistent end to end,
+  so `test_kanban_db.py`'s `assert "X19" in r.stdout` is right and was left.
+- The system-prompt identity sentence, "You are X19, built by Nous Research", and
+  the two tests asserting it.
+- Skill frontmatter `author: X19` (30 files) together with the linter rule that
+  treats `X19` as the canonical agent author and the eleven tests requiring a human
+  to be credited first. Restoring the linter's exemption to `"X19 Agent"` without
+  the data would have made it warn on all thirty files, telling them to use a value
+  they already had; the pair is coherent as it stands.
+- The Slack bot display name, whose upstream literal was bare `"Hermes"`.
+- 289 prose and comment sites where `X19` reads correctly, and the 1,024
+  upstream-repository URL references that are protected third-party names.
+
+**How it was found.** By counting, not by reading: `git grep` for quoted
+agent-name literals at the branch point returned 140; the same grep on the
+transformed tree returned 0 for `"X19 Agent"` against 354 bare `"X19"`. Each
+upstream line was then aligned to its current counterpart with `difflib` and its
+string literals mapped positionally, so a literal only changed where upstream had
+the two-word or hyphenated form — which is why `client_name="x19"` (upstream
+`"hermes"`) was correctly left untouched while `client_title` on the same line was
+restored. Verification: 258 targeted tests pass; the `tests/plugins` +
+`tests/skills` + `tests/test_x19` batch went from 93 failures to 91 with no new
+ones; the telegram and messaging batch is byte-identical before and after (317
+pre-existing failures, all environmental).
 
 ## Protected items (deliberately not renamed)
 

@@ -25,7 +25,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     """Wire up `x19 photon ...` subcommands."""
     subs = parser.add_subparsers(dest="photon_command", required=False)
     p_setup = subs.add_parser("setup", help="First-time setup (device login + project + user + sidecar)")
-    p_setup.add_argument("--project-name", default=None, help="Project name (default: 'X19')")
+    p_setup.add_argument("--project-name", default=None, help="Project name (default: 'X19 Agent')")
     p_setup.add_argument("--phone", default=None, help="Your E.164 phone number (e.g. +15551234567)")
     p_setup.add_argument("--first-name", default=None)
     p_setup.add_argument("--last-name", default=None)

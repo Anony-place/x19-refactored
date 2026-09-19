@@ -59,7 +59,7 @@ def relay_plugin_payload_from_legacy_env(env: Mapping[str, Any]) -> dict[str, An
     if _truthy(env.get("X19_NEMO_RELAY_ATIF_ENABLED")):
         kwargs: dict[str, Any] = {
             "enabled": True,
-            "agent_name": _s(env, "X19_NEMO_RELAY_ATIF_AGENT_NAME", "X19"),
+            "agent_name": _s(env, "X19_NEMO_RELAY_ATIF_AGENT_NAME", "X19 Agent"),
             "model_name": _s(env, "X19_NEMO_RELAY_ATIF_MODEL_NAME", "unknown"),
             "filename_template": _s(env, "X19_NEMO_RELAY_ATIF_FILENAME_TEMPLATE", "x19-atif-{session_id}.json"),
         }

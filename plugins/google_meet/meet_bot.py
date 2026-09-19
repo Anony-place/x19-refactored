@@ -311,7 +311,7 @@ def _config_from_env() -> _BotConfig:
         out_dir=Path(out_raw) if out_raw else None,
         headed=env("X19_MEET_HEADED", "").lower() in {"1", "true", "yes"},
         auth_state=env("X19_MEET_AUTH_STATE", "").strip(),
-        guest_name=env("X19_MEET_GUEST_NAME", "X19"),
+        guest_name=env("X19_MEET_GUEST_NAME", "X19 Agent"),
         duration_s=_parse_duration(env("X19_MEET_DURATION", "")),
         realtime=env("X19_MEET_MODE", "transcribe").strip().lower() == "realtime",
         # X19_MEET_REALTIME_KEY is resolved by process_manager.start() via the parent's

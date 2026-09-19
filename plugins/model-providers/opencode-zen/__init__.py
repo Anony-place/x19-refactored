@@ -15,7 +15,7 @@ from providers.base import ProviderProfile
 # default_headers so they survive model switches and credential rotation.
 _ATTRIBUTION_HEADERS = {
     "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
-    "X-Title": "X19",
+    "X-Title": "X19 Agent",
     "User-Agent": f"X19Agent/{_X19_VERSION}",
 }
 

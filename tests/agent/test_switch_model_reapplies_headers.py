@@ -70,7 +70,7 @@ def test_switch_away_from_headered_provider_clears_stale_headers(mock_ctx_len):
     agent = _make_agent(provider="openrouter", base_url="https://openrouter.ai/api/v1")
     agent._client_kwargs["default_headers"] = {
         "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
-        "X-Title": "X19",
+        "X-Title": "X19 Agent",
     }
 
     agent.switch_model(

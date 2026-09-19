@@ -161,7 +161,7 @@ class TestFireworksAuxiliary:
         assert client is not None
         headers = kwargs.get("default_headers", {})
         assert headers["HTTP-Referer"] == "https://anony-place.github.io/x19-refactored"
-        assert headers["X-Title"] == "X19"
+        assert headers["X-Title"] == "X19 Agent"
         assert kwargs["base_url"] == "https://api.fireworks.ai/inference/v1"
 
     def test_client_sends_x19_user_agent(self, monkeypatch):

@@ -297,7 +297,7 @@ def _beta_header(betas: list) -> Dict[str, str]:
 def _attribution_headers() -> Dict[str, str]:
     """Same client-attribution set sent to OpenRouter / Vercel AI Gateway / Fireworks."""
     return {
-        "HTTP-Referer": "https://anony-place.github.io/x19-refactored", "X-Title": "X19",
+        "HTTP-Referer": "https://anony-place.github.io/x19-refactored", "X-Title": "X19 Agent",
         "User-Agent": f"X19Agent/{_X19_VERSION}",
     }
 
@@ -467,8 +467,8 @@ def _oauth_wire_namer(anthropic_tools: List[Dict[str, Any]]):
 
 
 _OAUTH_SYSTEM_REPLACEMENTS = (
-    ("X19", "Claude Code"), ("X19", "Claude Code"),
-    ("x19", "claude-code"), ("Nous Research", "Anthropic"),
+    ("X19 Agent", "Claude Code"), ("X19 agent", "Claude Code"),
+    ("x19-agent", "claude-code"), ("Nous Research", "Anthropic"),
 )
 
 

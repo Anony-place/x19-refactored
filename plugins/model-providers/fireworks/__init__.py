@@ -35,7 +35,7 @@ fireworks = FireworksProfile(
     # survive switch_model and credential rotation.
     default_headers={
         "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
-        "X-Title": "X19",
+        "X-Title": "X19 Agent",
         "User-Agent": f"X19Agent/{_X19_VERSION}",
     },
     default_aux_model="accounts/fireworks/models/glm-5p2",

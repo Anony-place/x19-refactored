@@ -184,7 +184,7 @@ class CodexAppServerSession:
             return self._thread_id
         if self._client is None:
             self._client = self._client_factory(codex_bin=self._codex_bin, codex_home=self._codex_home)
-        self._client.initialize(client_name="x19", client_title="X19", client_version=_get_x19_version())
+        self._client.initialize(client_name="x19", client_title="X19 Agent", client_version=_get_x19_version())
         # Permissions are NOT sent on thread/start: codex gates ``thread/start.permissions``
         # behind experimentalApi + a matching ``[permissions]`` table in ~/.codex/config.toml.
         result = self._client.request("thread/start", {"cwd": self._cwd}, timeout=15)

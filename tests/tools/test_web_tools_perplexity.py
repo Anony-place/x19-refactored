@@ -22,7 +22,7 @@ def _assert_x19_identity_headers(headers):
     from x19_cli import __version__
 
     assert headers["HTTP-Referer"] == "https://anony-place.github.io/x19-refactored"
-    assert headers["X-Title"] == "X19"
+    assert headers["X-Title"] == "X19 Agent"
     assert headers["User-Agent"] == f"X19Agent/{__version__}"
     assert headers["X-Pplx-Integration"] == "x19"
 

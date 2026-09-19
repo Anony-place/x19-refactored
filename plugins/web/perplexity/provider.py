@@ -52,7 +52,7 @@ _KEY_URL = "https://www.perplexity.ai/account/api"
 # request; the call already carries the user's own API key.
 _HEADERS = {
     "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
-    "X-Title": "X19",
+    "X-Title": "X19 Agent",
     "User-Agent": f"X19Agent/{_X19_VERSION}",
     "X-Pplx-Integration": "x19",
 }

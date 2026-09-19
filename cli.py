@@ -2296,7 +2296,7 @@ def _build_compact_banner() -> str:
     if (getattr(_skin, "name", "default") if _skin else "default") == "default":
         tiny_line = "☤ NOUS X19"
     else:
-        tiny_line = _skin.get_branding("agent_name", "X19") if _skin else "X19"
+        tiny_line = _skin.get_branding("agent_name", "X19 Agent") if _skin else "X19 Agent"
     line1 = f"{tiny_line} - AI Agent Framework"
 
     if os.environ.get("X19_FAST_STARTUP_BANNER") == "1":

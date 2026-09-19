@@ -274,7 +274,7 @@ class HomeAssistantAdapter(BasePlatformAdapter):
         reads from the same WS connection.
         """
         url = f"{self._hass_url}/api/services/persistent_notification/create"
-        payload = {"title": "X19", "message": content[:self.MAX_MESSAGE_LENGTH]}
+        payload = {"title": "X19 Agent", "message": content[:self.MAX_MESSAGE_LENGTH]}
 
         async def _post(session) -> SendResult:
             async with session.post(

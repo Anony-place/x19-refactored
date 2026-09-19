@@ -1113,7 +1113,7 @@ class CLITuiMixin:
         import signal as _sig
         from prompt_toolkit.application import run_in_terminal
         from x19_cli.skin_engine import get_active_skin
-        agent_name = get_active_skin().get_branding("agent_name", "X19")
+        agent_name = get_active_skin().get_branding("agent_name", "X19 Agent")
         msg = f"\n{agent_name} has been suspended. Run `fg` to bring {agent_name} back."
 
         def _suspend():

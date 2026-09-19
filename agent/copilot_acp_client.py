@@ -52,7 +52,7 @@ _PROMPT_PREAMBLE = (
 _INITIALIZE_PARAMS = {
     "protocolVersion": 1,
     "clientCapabilities": {"fs": {"readTextFile": True, "writeTextFile": True}},
-    "clientInfo": {"name": "x19", "title": "X19", "version": "0.0.0"},
+    "clientInfo": {"name": "x19-agent", "title": "X19 Agent", "version": "0.0.0"},
 }
 _DEPRECATED_CLI_ERROR = (
     "X19 ACP mode requires the NEW GitHub Copilot CLI (github.com/github/copilot-cli), but the binary it just "

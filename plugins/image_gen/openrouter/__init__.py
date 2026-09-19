@@ -173,7 +173,7 @@ _ATTRIBUTION_HEADERS = {
     "Content-Type": "application/json",
     # OpenRouter attribution headers (harmless against Nous Portal).
     "HTTP-Referer": "https://github.com/Anony-place/x19-refactored",
-    "X-Title": "X19",
+    "X-Title": "X19 Agent",
 }
 
 

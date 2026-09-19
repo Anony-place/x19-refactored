@@ -69,7 +69,7 @@ class TestBuildAnthropicClient:
             kwargs = mock_sdk.Anthropic.call_args[1]
             headers = kwargs["default_headers"]
             assert headers["HTTP-Referer"] == "https://anony-place.github.io/x19-refactored"
-            assert headers["X-Title"] == "X19"
+            assert headers["X-Title"] == "X19 Agent"
             assert headers["User-Agent"].startswith("X19Agent/")
             # Auth branch is unchanged: x-api-key via api_key, betas kept.
             assert kwargs["api_key"] == "sk-opencode-secret"

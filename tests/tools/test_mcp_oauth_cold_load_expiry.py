@@ -258,7 +258,7 @@ async def test_initialize_seeds_token_expiry_time_from_stored_tokens(
 
     metadata = OAuthClientMetadata(
         redirect_uris=[AnyUrl("http://127.0.0.1:12345/callback")],
-        client_name="X19",
+        client_name="X19 Agent",
     )
     provider = _X19_PROVIDER_CLS(
         server_name="srv",
@@ -330,7 +330,7 @@ async def test_initialize_marks_zero_ttl_cold_loaded_token_invalid(
         server_url="https://example.com/mcp",
         client_metadata=OAuthClientMetadata(
             redirect_uris=[AnyUrl("http://127.0.0.1:12345/callback")],
-            client_name="X19",
+            client_name="X19 Agent",
         ),
         storage=storage,
         redirect_handler=_noop_redirect,
@@ -466,7 +466,7 @@ async def test_initialize_prefetches_oauth_metadata_when_missing(
 
     metadata = OAuthClientMetadata(
         redirect_uris=[AnyUrl("http://127.0.0.1:12345/callback")],
-        client_name="X19",
+        client_name="X19 Agent",
     )
     provider = _X19_PROVIDER_CLS(
         server_name="srv",
@@ -530,7 +530,7 @@ async def test_initialize_skips_prefetch_when_no_tokens(tmp_path, monkeypatch):
     storage = X19TokenStorage("srv")  # empty — no tokens on disk
     metadata = OAuthClientMetadata(
         redirect_uris=[AnyUrl("http://127.0.0.1:12345/callback")],
-        client_name="X19",
+        client_name="X19 Agent",
     )
     provider = _X19_PROVIDER_CLS(
         server_name="srv",

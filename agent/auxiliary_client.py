@@ -830,7 +830,7 @@ _PROVIDERS_WITHOUT_VISION: frozenset = frozenset({"kimi-coding", "kimi-coding-cn
 # OpenRouter app attribution (always sent). `X-Title` is what the dashboard reads.
 _OR_HEADERS_BASE = {
     "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
-    "X-Title": "X19",
+    "X-Title": "X19 Agent",
     "X-OpenRouter-Categories": "productivity,cli-agent",
 }
 
@@ -898,7 +898,7 @@ from x19_cli import __version__ as _X19_VERSION
 
 _AI_GATEWAY_HEADERS = {
     "HTTP-Referer": "https://anony-place.github.io/x19-refactored",
-    "X-Title": "X19",
+    "X-Title": "X19 Agent",
     "User-Agent": f"X19Agent/{_X19_VERSION}",
 }
 
