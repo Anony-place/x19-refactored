@@ -6,8 +6,8 @@ alcance para los informes de vulnerabilidades.
 
 ## 1. Reportar una Vulnerabilidad
 
-Reporta de forma privada a través de [GitHub Security Advisories](https://github.com/Anony-place/x19-refactored/security/advisories/new)
-o **security@x19.local**. No abras issues públicos para
+Reporta de forma privada a través de [GitHub Security Advisories](https://github.com/Anony-place/x19-refactored/security/advisories/new).
+No abras issues públicos para
 vulnerabilidades de seguridad. **X19 no opera un programa de
 recompensas por errores.**
 
@@ -320,7 +320,6 @@ La decisión de fortalecimiento más importante es hacer coincidir el aislamient
 
 - **Ventana de divulgación coordinada:** 90 días desde el informe, o hasta que se
   publique una corrección, lo que ocurra primero.
-- **Canal:** el hilo GHSA o correspondencia por email con
-  security@x19.local.
+- **Canal:** el hilo GHSA.
 - **Crédito:** los reportadores reciben crédito en las notas de versión a menos que
   se solicite anonimato.

@@ -36,7 +36,7 @@ _IN_NIX_BUILD = os.environ.get("X19_NIX_BUILD") == "1"
 _BLOCK_MESSAGE = (
     "Building wheels or sdists for x19 is not supported.\n"
     "X19 is distributed via the shell installer, Docker image, or Nix.\n"
-    "See: https://x19.security.local/docs/getting-started/installation\n"
+    "See: https://anony-place.github.io/x19-refactored/docs/getting-started/installation\n"
     "\n"
     "If you are developing, use an editable install instead:\n"
     "  uv sync          # or: uv pip install -e .\n"

@@ -6,8 +6,8 @@ scope for vulnerability reports.
 
 ## 1. Reporting a Vulnerability
 
-Report privately via [GitHub Security Advisories](https://github.com/Anony-place/x19-refactored/security/advisories/new)
-or **security@x19.local**. Do not open public issues for
+Report privately via [GitHub Security Advisories](https://github.com/Anony-place/x19-refactored/security/advisories/new).
+Do not open public issues for
 security vulnerabilities. **X19 does not operate a bug
 bounty program.**
 
@@ -329,7 +329,6 @@ that:
 
 - **Coordinated disclosure window:** 90 days from report, or until a
   fix is released, whichever comes first.
-- **Channel:** the GHSA thread or email correspondence with
-  security@x19.local.
+- **Channel:** the GHSA thread.
 - **Credit:** reporters are credited in release notes unless
   anonymity is requested.

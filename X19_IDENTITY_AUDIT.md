@@ -12,12 +12,12 @@ checked into the repository so the result can be re-verified at any time.
 $ python scripts/x19_residue_audit.py --strict
 X19 legacy-identity residue audit
 ==============================================================
-tracked files containing 'hermes': 93
-total occurrences (lines):          312
+tracked files containing 'hermes': 94
+total occurrences (lines):          318
 
   model-identifier              169 line(s) across 59 file(s)
-  audit-tooling                  98 line(s) across  2 file(s)
-  third-party-url                29 line(s) across 22 file(s)
+  audit-tooling                 103 line(s) across  2 file(s)
+  third-party-url                30 line(s) across 23 file(s)
   contributor-attribution         6 line(s) across  6 file(s)
   third-party-dependency          6 line(s) across  1 file(s)
   historical-corpus               2 line(s) across  1 file(s)
@@ -40,8 +40,8 @@ CI gate. `--json` emits the same data machine-readably.
 | Token searched | `hermes`, case-insensitive |
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
 | Corpus | every git-tracked file: **13,918** |
-| Files with a match | **93** |
-| Lines with a match | **312** |
+| Files with a match | **94** |
+| Lines with a match | **318** |
 | Non-Latin matches | **0**, outside the detector and this report |
 | Unjustified | **0** |
 
@@ -56,7 +56,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 93 files and 312 lines over the same 13,918 tracked files. Two
+   the same 94 files and 318 lines over the same 13,918 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
@@ -101,9 +101,9 @@ One line in this class deserves specific mention because it was the site of a
 real bug — see
 [the model-family detector](#4-the-model-family-detector-could-never-fire).
 
-### `audit-tooling` — 98 lines / 2 files
+### `audit-tooling` — 103 lines / 2 files
 
-The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (74
+The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (79
 lines). A detector must spell the thing it detects: the token appears in
 `TOKEN`, in every classification pattern, and in the comments explaining them.
 This document quotes the occurrences it classifies — including the adversarial
@@ -111,11 +111,11 @@ probes that must keep failing — so it contains the token by construction.
 
 Both are reported as their own class rather than excluded from the scan, so the
 accounting stays complete and the totals keep matching a plain `git grep`: all
-312 lines are classified, none are silently dropped. Excluding them instead
+318 lines are classified, none are silently dropped. Excluding them instead
 would make the headline numbers unverifiable by anyone running the obvious
 command.
 
-### `third-party-url` — 29 lines / 22 files
+### `third-party-url` — 30 lines / 23 files
 
 External repositories and documentation we link to or vendor from, where the
 name belongs to the other project. Each was resolved over the network rather
@@ -510,6 +510,84 @@ instruction when an update or uninstall fails, and the desktop app prints it in
 five languages when a remote host has no X19 installed — so the broken URL was
 in user-facing runtime output, not just prose.
 
+### 16. A workspace restore resurrected files the transformation had deleted
+
+Late in the work the sandbox was re-cloned at the branch point and the workspace
+restored on top of it. Every commit this transformation was built from was
+discarded — the branch had never been pushed, so the history was unrecoverable —
+but the file contents survived, and the tree was re-committed in full.
+
+The restore was not faithful in one respect, and the audit caught it: it brought
+back two directories the transformation had removed, and with them 608 lines of
+residue that had already been fixed once.
+
+`plugins/hermes-achievements/dashboard/dist/` reappeared alongside its own
+rename target `plugins/x19-achievements/`, so the plugin existed twice — once
+under the legacy name and once without the dashboard bundle its manifest
+declares (`entry: dist/index.js`, `css: dist/style.css`). The achievements
+plugin was therefore broken in a second way: the manifest pointed at files that
+were not there.
+
+`plugins/kanban/dashboard/dist/` came back with its original contents, which is
+the defect recorded in section 2 all over again. Both bundles read
+`window.__HERMES_PLUGIN_SDK__`, `window.__HERMES_PLUGINS__`,
+`window.__HERMES_SESSION_TOKEN__`, the header `X-Hermes-Session-Token`, the
+cookie `hermes_session_at` and the route `/api/plugins/hermes-achievements`,
+while the host provides `__X19_PLUGIN_SDK__`, `__X19_PLUGINS__`,
+`__X19_SESSION_TOKEN__`, `X-X19-Session-Token`, `x19_session_at` and
+`/api/plugins/x19-achievements` — each of those host-side names verified present
+in `apps/desktop/src/sdk/runtime.ts`, `web/src/plugins/registry.test.ts` and
+`plugins/x19-achievements/dashboard/plugin_api.py`. Read against the host, both
+dashboards resolve to `undefined`: they cannot register, cannot authenticate and
+call a route that does not exist.
+
+Repaired again, and this time verified rather than assumed: the achievements
+bundle was moved back to the path its manifest declares and the empty legacy
+directory removed; the SDK globals, auth header, cookie, API route, drag-drop
+MIME type, storage key, database path, ~200 CSS class names and custom
+properties, and the user-facing copy were all repointed; and the two
+documentation links went to the canonical site, both pages confirmed present.
+`node --check` parses both scripts, both manifests resolve to files that exist,
+and the upstream MIT attribution to the original author
+(`github.com/PCinkusz/hermes-achievements`) is intact in both bundles — it is the
+only occurrence of the token left in either.
+
+The methodological point is worth keeping: these are `dist/` files with no build
+step, so they are hand-written source and nothing regenerates them. A restore, a
+merge or a careless checkout can silently revert them, and the only thing that
+notices is a scan that runs afterwards. This audit is that scan.
+
+### 17. Two more addresses that cannot exist
+
+Found by sweeping every host in the repository containing the product name —
+which the token scan cannot do, because none of these strings contain the token.
+
+`setup.py` printed `https://x19.security.local/docs/getting-started/installation`
+in the message shown to anyone who tries to build a wheel or an sdist. `.local`
+is reserved for link-local name resolution and cannot appear in public DNS, so
+the one person most likely to need the installation guide was handed a URL that
+cannot resolve. Repointed at the canonical site; the target page exists.
+
+`SECURITY.md` and `SECURITY.es.md` each advertised `security@x19.local` twice —
+once as an alternative reporting channel and once as the disclosure channel
+("the GHSA thread or email correspondence with security@x19.local"). No mail
+domain ending in `.local` is deliverable, so a vulnerability reporter who chose
+the email path would have heard nothing back, in a document whose entire purpose
+is to be reachable. No replacement address exists in this repository and
+inventing one would be worse than removing it, so both files now name the one
+channel that works — GitHub Security Advisories, whose URL correctly points at
+this repository — in both languages.
+
+Not changed, and recorded here rather than quietly left: four references to
+`https://x19-assets.nousresearch.com/X19-Setup.{dmg,exe}` in the desktop install
+e2e harness. That host was renamed from an upstream artifact CDN, and this
+repository publishes no workflow that builds or uploads those installers, so
+neither the renamed host nor the original can be assumed to serve an X19
+artifact. The references are defaults for `workflow_dispatch`-only jobs — never
+triggered automatically — and are overridable per run. Guessing a replacement
+would be a worse failure than leaving a known-unverifiable default and saying so;
+see [Limitations](#limitations).
+
 ---
 
 ## Protected items (deliberately not renamed)
@@ -520,7 +598,7 @@ in user-facing runtime output, not just prose.
 | `.mailmap`, `contributors/emails/*` (23 paths) | Git-history contributor attribution. Rewriting it falsifies who contributed. |
 | Six `NousResearch/hermes-*` companion repos | Upstream projects, not ours to rename; all resolve 200, the `x19-*` spellings 404. |
 | `hermes-parser`, `hermes-estree` in `package-lock.json` | Facebook/Meta npm packages, transitive via `eslint-plugin-react-hooks`. Renaming corrupts the lockfile and breaks `npm ci`. |
-| Nous model names (173 lines) | Provider artifacts. Renaming breaks model resolution, pricing and fallback chains. |
+| Nous model names (169 lines) | Provider artifacts. Renaming breaks model resolution, pricing and fallback chains. |
 | `Adolanium/hermes-nous-prices`, `PCinkusz/hermes-achievements` | Upstream third-party repositories; the second is an MIT attribution requirement. |
 | `github@nadyahermes.anonaddy.com` in `scripts/release.py` | A contributor's alias-domain address in release-notes credit. |
 | Jailbreak-template corpus | Verbatim third-party research text whose value depends on being unaltered. |
@@ -597,6 +675,17 @@ Stated plainly, so the "zero" is not over-read:
   clean. They were found by a separate sweep that resolved every host by DNS and
   every documentation link against the repository's own file tree and over HTTP.
   That sweep is not automated and not repeatable as a gate; the residue scan is.
+- **Some hosts cannot be verified from here, and are named rather than fixed.**
+  This sandbox resolves and reaches `github.com` but not
+  `raw.githubusercontent.com` or `anony-place.github.io`, so the canonical site
+  and the raw installer paths are verified from the repository's own build and
+  deploy configuration — `docusaurus.config.ts` for the host, `deploy-site.yml`
+  for what is actually published — rather than by request. One host is not
+  verifiable by either route: `x19-assets.nousresearch.com`, in four
+  manual-trigger desktop e2e jobs, renamed from an upstream artifact CDN that
+  this repository publishes nothing to. It is left alone and recorded in
+  [section 17](#17-two-more-addresses-that-cannot-exist) instead of being
+  replaced with a guess.
 - **Tracked files only.** Build output, `node_modules` and other ignored
   artifacts are not scanned; they are not part of the repository and are
   regenerated from the sources that are. The plugin `dist/` files that were
