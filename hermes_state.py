@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SQLite state store for Hermes Agent: session metadata, message history, model
+"""SQLite state store for X19: session metadata, message history, model
 config, FTS5 search. WAL mode (concurrent readers + one writer); compression
 splits sessions via parent_session_id chains; sessions are source-tagged
 ('cli', 'telegram', ...). Batch-runner / RL trajectories live elsewhere.
@@ -110,8 +110,8 @@ class SessionResumeTooLargeError(ValueError):
         self.scope = scope
         super().__init__(
             f"This session is too long to reload safely ({message_count} messages; limit {limit}). "
-            "Start a fresh chat and use `hermes sessions export` to keep a copy, or raise the limit "
-            "with `hermes config set sessions.max_resume_messages 0`."
+            "Start a fresh chat and use `x19 sessions export` to keep a copy, or raise the limit "
+            "with `x19 config set sessions.max_resume_messages 0`."
         )
 
 
@@ -177,13 +177,13 @@ _READ_ONLY_IOERR_RETRY_ATTEMPTS, _READ_ONLY_IOERR_RETRY_BACKOFF_S = 3, 0.05
 
 def _default_db_path() -> Path:
     """Default state DB path at CALL time: a re-pointed ``DEFAULT_DB_PATH`` wins, else
-    ``get_hermes_home()`` is resolved fresh (a runtime HERMES_HOME redirect works regardless of import)."""
+    ``get_hermes_home()`` is resolved fresh (a runtime X19_HOME redirect works regardless of import)."""
     return DEFAULT_DB_PATH if DEFAULT_DB_PATH != _IMPORT_DEFAULT_DB_PATH else get_hermes_home() / "state.db"
 
 
 # Live-DB guard knobs live HERE (not in hermes_state_guard): the hermetic conftest monkeypatches
-# ``hermes_state._STATE_DB_GUARD_BYPASS`` (``@pytest.mark.live_system_guard_bypass`` escape hatch)
-# and ``_EXTRA_DENY_ROOTS`` (the pre-sandbox root, so custom-HERMES_HOME deployments are covered).
+# ``x19_state._STATE_DB_GUARD_BYPASS`` (``@pytest.mark.live_system_guard_bypass`` escape hatch)
+# and ``_EXTRA_DENY_ROOTS`` (the pre-sandbox root, so custom-X19_HOME deployments are covered).
 _STATE_DB_GUARD_BYPASS = False
 _STATE_DB_GUARD_EXTRA_DENY_ROOTS: Tuple[Path, ...] = ()
 
@@ -193,7 +193,7 @@ def _ensure_test_isolation(db_path: Path) -> None:
     (env OR ancestry) resolves a production DB.
 
     Env alone is not enough: a child spawned with a rebuilt environment loses ``PYTEST_*`` and
-    ``HERMES_HOME`` together, which is precisely the state in which it writes to production (#82770).
+    ``X19_HOME`` together, which is precisely the state in which it writes to production (#82770).
     """
     if _STATE_DB_GUARD_BYPASS or os.environ.get(_STATE_DB_GUARD_BYPASS_ENV) or not _in_test_context():
         return
@@ -211,10 +211,10 @@ def _ensure_test_isolation(db_path: Path) -> None:
         if _is_production_state_db(resolved, root):
             raise RuntimeError(
                 "live-system guard: test attempted to open production "
-                f"state.db at {resolved} (under real Hermes root {root}). "
-                "Tests must run against a temporary HERMES_HOME — pass an "
+                f"state.db at {resolved} (under real X19 root {root}). "
+                "Tests must run against a temporary X19_HOME — pass an "
                 "explicit tmp db_path or let the hermetic conftest redirect "
-                "HERMES_HOME. If this test genuinely needs the live database, mark it with "
+                "X19_HOME. If this test genuinely needs the live database, mark it with "
                 "@pytest.mark.live_system_guard_bypass — or, for a spawned "
                 f"child process, export {_STATE_DB_GUARD_BYPASS_ENV}=1 in "
                 "its environment."
@@ -234,7 +234,7 @@ def _secure_state_db_files(db_path: Path, *, create_main: bool = False) -> None:
     connection to the same database. A lock-losing close in one process lets a
     sibling's connection take the shared-memory DMS exclusively at its own
     close, checkpoint, and unlink the sidecars while long-lived holders
-    (gateway, desktop ``hermes serve``) keep using the deleted inodes.
+    (gateway, desktop ``x19 serve``) keep using the deleted inodes.
     """
     if os.name == "nt":
         return
@@ -351,22 +351,22 @@ _SESSION_DB_CONSEQUENCE = "Sessions will not be saved until this is fixed."
 _NETWORK_DRIVE_HINT = " If the database lives on a network drive, move it to a local disk."
 _NETWORK_DRIVE_GLOSS = "the session database could not be opened; it may be on a network or unsupported drive"
 _NETWORK_DRIVE_ACTION = (
-    "Move it to a local disk (`hermes {profile_arg}doctor` shows where it is), then start Hermes again."
+    "Move it to a local disk (`x19 {profile_arg}doctor` shows where it is), then start X19 again."
 )
 
 
 def format_session_db_unavailable(
-    prefix: str = "Hermes can't open its session history right now",
+    prefix: str = "X19 can't open its session history right now",
     *,
     details: bool = False,
 ) -> str:
     """User-facing one-liner: ``<prefix>: <gloss>. <consequence> <action>[ network hint]``.
 
-    The cause table lives in ``hermes_state_user_copy`` so CLI, gateway and TUI agree. Chat
+    The cause table lives in ``x19_state_user_copy`` so CLI, gateway and TUI agree. Chat
     surfaces (gateway, TUI) get the one-liner; ``details=True`` (the CLI banner) appends a
     ``Details: <raw cause>`` line for the raw SQLite text. Network filesystems (NFS/SMB/FUSE/ZFS)
     cannot host SQLite's write-ahead log: when the raw cause carries one of those markers the
-    message names the network-drive suspicion, because ``hermes doctor --fix`` cannot repair a
+    message names the network-drive suspicion, because ``x19 doctor --fix`` cannot repair a
     mount — only moving the file can."""
     from hermes_constants import profile_cli_selector
 
@@ -374,7 +374,7 @@ def format_session_db_unavailable(
     cause = get_last_init_error()
     if not cause:
         return (
-            f"{prefix}. {_SESSION_DB_CONSEQUENCE} Run `hermes {profile_arg}doctor` to check the "
+            f"{prefix}. {_SESSION_DB_CONSEQUENCE} Run `x19 {profile_arg}doctor` to check the "
             "storage location."
         )
     from hermes_state_user_copy import describe_storage_failure
@@ -409,7 +409,7 @@ def _close_time_checkpoint_configurable() -> bool:
 
 
 def divert_session_transcript_jsonl(session_id: str, messages) -> "Optional[Path]":
-    """Append pending messages to HERMES_HOME/sessions/<id>.jsonl (state.db was replaced under a
+    """Append pending messages to X19_HOME/sessions/<id>.jsonl (state.db was replaced under a
     live process). Returns the path, or None if nothing to write."""
     sid = str(session_id or "").strip()
     if not sid or not messages:
@@ -454,7 +454,7 @@ class SessionDB(
     )
 
     # ── Write-contention tuning ──
-    # SQLite's deterministic busy handler convoys under many hermes processes: keep its
+    # SQLite's deterministic busy handler convoys under many x19 processes: keep its
     # timeout short (1s) and retry with random jitter. Patience is TIME-based (a sibling
     # legitimately holds the lock for seconds: checkpoint at close, VACUUM, recovery, FTS
     # optimize); attempt-counted budgets destroyed turns on a healthy store. Transcript
@@ -663,7 +663,7 @@ class SessionDB(
             if not repair_state_db_schema(self.db_path).get("repaired"):
                 raise
             self._connect_and_init_with_lock_patience()
-        # FTS optimization is OPT-IN (`hermes db optimize`); no background worker races session lifecycle.
+        # FTS optimization is OPT-IN (`x19 db optimize`); no background worker races session lifecycle.
         self._ensure_db_file_generation()
         if self._wal_active:
             # OFD copies of the two POSIX locks that keep a sibling's close from unlinking this WAL
@@ -725,10 +725,10 @@ class SessionDB(
         qpath = quarantine_invalid_state_db(self.db_path, already_locked=already_locked)
         where = f"moved aside to {qpath}" if qpath else "left in place (it could not be moved aside)"
         msg = (
-            f"state.db was empty or damaged ({zsize} bytes) and has been {where}; Hermes started with a "
+            f"state.db was empty or damaged ({zsize} bytes) and has been {where}; X19 started with a "
             "fresh, empty session database. To bring old sessions back, run "
-            f"`hermes sessions recover --source {qpath or self.db_path} --inspect-only`, or restore a "
-            "snapshot with `/snapshot list` then `/snapshot restore <id>` (terminal `hermes` chat only)."
+            f"`x19 sessions recover --source {qpath or self.db_path} --inspect-only`, or restore a "
+            "snapshot with `/snapshot list` then `/snapshot restore <id>` (terminal `x19` chat only)."
         )
         logger.error(msg)
         _set_last_init_error(msg)
@@ -1014,7 +1014,7 @@ class SessionDB(
                             continue
                         # Say what actually happened, not disk/permission damage.
                         raise sqlite3.OperationalError(
-                            f"database is locked (another Hermes process held the "
+                            f"database is locked (another X19 process held the "
                             f"state.db write lock for over {patience_s:.0f}s — "
                             "likely a long maintenance operation such as VACUUM, "
                             "a large WAL checkpoint, or an older pre-update "
@@ -1267,7 +1267,7 @@ class SessionDB(
             "state.db %s reported structural corruption outside the FTS "
             "indexes (%s); quarantining this handle: no further writes, no "
             "automatic reopen, no explicit WAL checkpoint at close. Stop the "
-            "gateway and run `hermes sessions recover --source %s --inspect-only`.", self.db_path, exc,
+            "gateway and run `x19 sessions recover --source %s --inspect-only`.", self.db_path, exc,
             self.db_path,
         )
         err = self._corrupt_error()
@@ -1431,7 +1431,7 @@ class SessionDB(
 
         Drains queued token deltas first (the background writer needs the connection). Read-only connections
         never request a checkpoint. See #45383.
-        When this instance is shared (opened via ``hermes_state_registry.acquire``), ``close()`` RELEASES one
+        When this instance is shared (opened via ``x19_state_registry.acquire``), ``close()`` RELEASES one
         refcount instead of tearing down the connection: the registry owns the lifecycle and only closes on
         the final release (#90837). This prevents one caller's close from tearing down the writer connection
         that other callers in the same process are still using — while still letting legacy ``close()`` call
@@ -1464,7 +1464,7 @@ class SessionDB(
                     logger.warning(
                         "Skipping the close-time WAL checkpoint for %s: this "
                         "handle observed %s. Take a snapshot of state.db, -wal and -shm "
-                        "before restarting, then run `hermes sessions recover --source %s --inspect-only`.",
+                        "before restarting, then run `x19 sessions recover --source %s --inspect-only`.",
                         self.db_path, quarantine_reason, self.db_path,
                     )
                 elif not self.read_only and not generation_lost:  # PASSIVE, not TRUNCATE (see docstring)
