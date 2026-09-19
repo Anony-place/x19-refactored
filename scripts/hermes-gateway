@@ -173,7 +173,7 @@ def generate_launchd_plist() -> str:
     python_path = get_python_path()
     script_path = get_gateway_script_path()
     working_dir = str(PROJECT_DIR)
-    log_dir = Path.home() / ".hermes" / "logs"
+    log_dir = Path.home() / ".x19" / "logs"
     
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -222,7 +222,7 @@ def install_launchd():
     plist_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Ensure log directory exists
-    log_dir = Path.home() / ".hermes" / "logs"
+    log_dir = Path.home() / ".x19" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"Installing launchd service to: {plist_path}")
@@ -297,7 +297,7 @@ def run_gateway():
     # Startup-liveness watchdog (OOF-298): arm before importing the gateway
     # graph so an import-time or pre-loop deadlock still gets respawned.
     try:
-        from hermes_startup_watchdog import arm_startup_watchdog
+        from x19_startup_watchdog import arm_startup_watchdog
         arm_startup_watchdog()
     except Exception:
         pass
