@@ -6,7 +6,7 @@
 # Uses uv for desktop/server setup and Python's stdlib venv + pip on Termux.
 #
 # Usage:
-#   ./setup-hermes.sh
+#   ./setup-x19.sh
 #
 # This script:
 # 1. Detects desktop/server vs Android/Termux setup path
@@ -87,8 +87,8 @@ else
         # full, etc.) instead of "✗ Failed to install uv" with zero
         # diagnostic.  Two-stage to avoid `curl | sh` masking curl
         # failures (sh exits 0 on empty stdin under no pipefail).
-        _uv_log="$(mktemp 2>/dev/null || echo "/tmp/hermes-uv-install.$$.log")"
-        _uv_installer="$(mktemp 2>/dev/null || echo "/tmp/hermes-uv-installer.$$.sh")"
+        _uv_log="$(mktemp 2>/dev/null || echo "/tmp/x19-uv-install.$$.log")"
+        _uv_installer="$(mktemp 2>/dev/null || echo "/tmp/x19-uv-installer.$$.sh")"
         if ! curl -LsSf https://astral.sh/uv/install.sh -o "$_uv_installer" 2>"$_uv_log"; then
             echo -e "${RED}✗${NC} Failed to download uv installer."
             sed 's/^/    /' "$_uv_log" >&2
@@ -384,12 +384,12 @@ fi
 
 echo -e "${CYAN}→${NC} Setting up x19 command..."
 
-HERMES_BIN="$SCRIPT_DIR/venv/bin/hermes"
+X19_BIN="$SCRIPT_DIR/venv/bin/x19"
 COMMAND_LINK_DIR="$(get_command_link_dir)"
 COMMAND_LINK_DISPLAY_DIR="$(get_command_link_display_dir)"
 mkdir -p "$COMMAND_LINK_DIR"
-ln -sf "$HERMES_BIN" "$COMMAND_LINK_DIR/hermes"
-echo -e "${GREEN}✓${NC} Symlinked x19 → $COMMAND_LINK_DISPLAY_DIR/hermes"
+ln -sf "$X19_BIN" "$COMMAND_LINK_DIR/hermes"
+echo -e "${GREEN}✓${NC} Symlinked x19 → $COMMAND_LINK_DISPLAY_DIR/x19"
 
 if is_termux; then
     export PATH="$COMMAND_LINK_DIR:$PATH"
@@ -436,7 +436,7 @@ fi
 # Seed bundled skills into ~/.x19/skills/
 # ============================================================================
 
-HERMES_SKILLS_DIR="${X19_HOME:-$HOME/.hermes}/skills"
+HERMES_SKILLS_DIR="${X19_HOME:-$HOME/.x19}/skills"
 mkdir -p "$HERMES_SKILLS_DIR"
 
 echo ""
