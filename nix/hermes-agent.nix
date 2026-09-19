@@ -42,22 +42,22 @@ let
     extraDependencyGroups:
     callPackage ./python.nix {
       inherit uv2nix pyproject-nix pyproject-build-systems;
-      pythonSrc = hermesNpmLib.pythonSrc;
+      pythonSrc = x19NpmLib.pythonSrc;
       dependency-groups = [ "all" ] ++ extraDependencyGroups;
     };
 
-  hermesVenv = (mkX19Venv extraDependencyGroups).venv;
+  x19Venv = (mkX19Venv extraDependencyGroups).venv;
 
-  hermesNpmLib = callPackage ./lib.nix {
+  x19NpmLib = callPackage ./lib.nix {
     inherit npm-lockfile-fix;
   };
 
-  hermesTui = callPackage ./tui.nix {
-    inherit hermesNpmLib;
+  x19Tui = callPackage ./tui.nix {
+    inherit x19NpmLib;
   };
 
-  hermesWeb = callPackage ./web.nix {
-    inherit hermesNpmLib;
+  x19Web = callPackage ./web.nix {
+    inherit x19NpmLib;
   };
 
   bundledSkills = lib.cleanSourceWith {
@@ -95,7 +95,7 @@ let
   };
 
   runtimeDeps = [
-    hermesNpmLib.nodejs
+    x19NpmLib.nodejs
     ripgrep
     git
     openssh
@@ -126,7 +126,7 @@ let
 
     # Collect core venv package names
     core = set()
-    venv_sp = pathlib.Path('${hermesVenv}/${sitePackagesPath}')
+    venv_sp = pathlib.Path('${x19Venv}/${sitePackagesPath}')
     for di in venv_sp.glob('*.dist-info'):
         meta = di / 'METADATA'
         if meta.exists():
@@ -178,12 +178,12 @@ stdenv.mkDerivation (finalAttrs: {
     ln -s ${bundledPlugins} $out/share/x19/plugins
     ln -s ${bundledLocales} $out/share/x19/locales
     ln -s ${bundledOptionalMcps} $out/share/x19/optional-mcps
-    ln -s ${hermesWeb} $out/share/x19/web_dist
-    ln -s ${hermesTui}/lib/hermes-tui $out/ui-tui
+    ln -s ${x19Web} $out/share/x19/web_dist
+    ln -s ${x19Tui}/lib/x19-tui $out/ui-tui
 
     ${lib.concatMapStringsSep "\n"
       (name: ''
-        makeWrapper ${hermesVenv}/bin/${name} $out/bin/${name} \
+        makeWrapper ${x19Venv}/bin/${name} $out/bin/${name} \
           --suffix PATH : "${runtimePath}" \
           --set HERMES_BUNDLED_SKILLS $out/share/x19/skills \
           --set HERMES_OPTIONAL_SKILLS $out/share/x19/optional-skills \
@@ -193,8 +193,8 @@ stdenv.mkDerivation (finalAttrs: {
           --set HERMES_WEB_DIST $out/share/x19/web_dist \
           --set HERMES_TUI_DIR $out/ui-tui \
           --set-default HERMES_BIN $out/bin/x19 \
-          --set HERMES_PYTHON ${hermesVenv}/bin/python3 \
-          --set HERMES_NODE ${lib.getExe hermesNpmLib.nodejs}${
+          --set HERMES_PYTHON ${x19Venv}/bin/python3 \
+          --set HERMES_NODE ${lib.getExe x19NpmLib.nodejs}${
             # Fold the line continuation INTO the optionalString: a bare
             # `\` on the line above an empty expansion would dangle onto a
             # blank line, ending the makeWrapper command early and running
@@ -208,15 +208,15 @@ stdenv.mkDerivation (finalAttrs: {
           }
       '')
       [
-        "hermes"
         "x19"
-        "hermes-acp"
+        "x19"
+        "x19-acp"
       ]
     }
 
     ${lib.optionalString (extraPythonPackages != [ ]) ''
       echo "=== Checking for plugin/core package collisions ==="
-      ${hermesVenv}/bin/python3 -c "${checkPackageCollisions}"
+      ${x19Venv}/bin/python3 -c "${checkPackageCollisions}"
       echo "=== No collisions ==="
     ''}
 
@@ -229,10 +229,10 @@ stdenv.mkDerivation (finalAttrs: {
     in
     {
       inherit
-        hermesTui
-        hermesWeb
-        hermesNpmLib
-        hermesVenv
+        x19Tui
+        x19Web
+        x19NpmLib
+        x19Venv
         ;
 
       # `x19Desktop` references `finalAttrs.finalPackage` (this whole
@@ -243,7 +243,7 @@ stdenv.mkDerivation (finalAttrs: {
       # runtime PATH (ripgrep/git/ffmpeg/etc).  No re-implementation
       # of the agent resolution in the desktop wrapper.
       hermesDesktop = callPackage ./desktop.nix {
-        inherit hermesNpmLib electron;
+        inherit x19NpmLib electron;
         hermesAgent = finalAttrs.finalPackage;
       };
 
@@ -264,7 +264,7 @@ stdenv.mkDerivation (finalAttrs: {
   meta = with lib; {
     description = "AI agent with advanced tool-calling capabilities";
     homepage = "https://github.com/NousResearch/x19";
-    mainProgram = "hermes";
+    mainProgram = "x19";
     license = licenses.mit;
     platforms = platforms.unix;
   };
