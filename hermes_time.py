@@ -1,7 +1,7 @@
-"""Timezone-aware clock for Hermes.
+"""Timezone-aware clock for X19.
 
 ``now()`` returns a tz-aware datetime in the user's configured IANA timezone. Resolution order:
-``HERMES_TIMEZONE`` env var, then ``timezone`` in ``~/.hermes/config.yaml``, else server-local
+``X19_TIMEZONE`` env var, then ``timezone`` in ``~/.x19/config.yaml``, else server-local
 time. Invalid timezone values log a warning and fall back — never crash.
 """
 
@@ -17,7 +17,7 @@ from hermes_constants import get_config_path
 logger = logging.getLogger(__name__)
 
 # Cache keyed by timezone *source* identity. This process can multiplex profiles by switching
-# HERMES_HOME, so one unkeyed global would leak the first profile's timezone into later
+# X19_HOME, so one unkeyed global would leak the first profile's timezone into later
 # profile-scoped work (e.g. the desktop multiplex cron ticker persisting another profile's
 # ``next_run_at``). Entries are published atomically under ``_cache_lock`` as one
 # ``identity -> (name, ZoneInfo | None)`` value, so racing resolvers can never publish a mixed
@@ -27,14 +27,14 @@ _tz_cache: Dict[Tuple[str, str], Tuple[str, Optional[ZoneInfo]]] = {}
 
 
 def _env_timezone() -> str:
-    """``HERMES_TIMEZONE`` when it may speak for the active profile. Under the multiplexed
+    """``X19_TIMEZONE`` when it may speak for the active profile. Under the multiplexed
     gateway the env var holds only the DEFAULT profile's value (bridged from its config.yaml at
     startup), so every routed profile must read its own config.yaml instead."""
     from agent.secret_scope import is_multiplex_active  # lazy: secret_scope pulls in more than a clock needs
 
     if is_multiplex_active():
         return ""
-    return os.getenv("HERMES_TIMEZONE", "").strip()
+    return os.getenv("X19_TIMEZONE", "").strip()
 
 
 def _timezone_cache_identity() -> Tuple[str, str]:
