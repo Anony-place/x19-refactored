@@ -30,7 +30,7 @@ def read_only_db_uri(db_path) -> str:
 logger = logging.getLogger(__name__)
 
 _IS_WINDOWS = sys.platform == "win32"
-_X19_EXECUTABLES = frozenset({"x19", "x19", "x19-acp"})
+_X19_EXECUTABLES = frozenset({"x19", "x19-agent", "x19-acp"})
 _X19_PYTHON_MODULES = frozenset({"acp_adapter", "x19_cli.main"})
 _X19_PYTHON_SCRIPTS = frozenset({"x19_cli/main.py", "run_agent.py"})
 _PYTHON_SHORT_OPTIONS_WITH_OPERANDS = frozenset({"Q", "W", "X"})
