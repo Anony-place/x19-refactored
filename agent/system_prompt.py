@@ -370,8 +370,8 @@ def _ambient_file_safety_profile_name() -> str:
 
 
 def _active_profile_line(agent: Any) -> str:
-    """Name the running profile so the agent doesn't conflate ``~/.hermes/skills``
-    (default) with ``~/.hermes/profiles/<active>/skills``.  Resolved from the
+    """Name the running profile so the agent doesn't conflate ``~/.x19/skills``
+    (default) with ``~/.x19/profiles/<active>/skills``.  Resolved from the
     agent's OWN home first (a build thread that lost the ContextVar would
     otherwise print "default" for a bot profile)."""
     _agent_home_path = _agent_home(agent)
@@ -684,7 +684,7 @@ def _context_files_part(agent: Any, ctx_len: Optional[int], soul_loaded: bool) -
     when set (gateway); None lets discovery fall back to the launch dir.  The
     install-tree fallback is only legitimate for cli/tui where the launch dir
     IS the user's shell cwd; desktop-pinned launch dirs are treated as the
-    fallback they really are so the guard can reject Hermes's bundled AGENTS.md."""
+    fallback they really are so the guard can reject the bundled X19 AGENTS.md."""
     if agent.skip_context_files:
         return []
     launch_artifact = getattr(agent, "_context_cwd_is_launch_artifact", False)
