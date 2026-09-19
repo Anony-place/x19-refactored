@@ -1,9 +1,9 @@
-"""Windows UTF-8 bootstrap for Hermes entry points (no-op on POSIX).
+"""Windows UTF-8 bootstrap for X19 entry points (no-op on POSIX).
 
 Windows binds stdio to the console code page (cp1252), so ``print("café")`` raises
 ``UnicodeEncodeError``, and Python children inherit the same default unless
 ``PYTHONUTF8``/``PYTHONIOENCODING`` are set. Import this module first in every entry
-point (``hermes``, ``hermes-agent``, ``hermes-acp``, ``gateway.run``, ``batch_runner``,
+point (``x19``, ``x19``, ``x19-acp``, ``gateway.run``, ``batch_runner``,
 ``cron/scheduler``). It does NOT re-exec with ``-X utf8``: ``open()`` in the current
 process still needs an explicit ``encoding="utf-8"`` (ruff ``PLW1514``). POSIX is left
 alone deliberately — users' ``LANG``/``LC_*`` choices are respected.
@@ -56,8 +56,8 @@ def suppress_platform_ver_console() -> None:
     and Python 3.11.0/3.11.1 (no ``encoding="locale"`` fix) strict-utf-8-decodes the OEM
     code page output under PEP 540 mode and raises (#69413). Returning the inputs makes
     ``win32_ver()`` fall back to ``sys.getwindowsversion()`` — same data, no subprocess.
-    Mirrors ``hermes_cli._subprocess_compat.suppress_platform_ver_console`` for callers
-    that never import ``hermes_cli.main``; double application is harmless.
+    Mirrors ``x19_cli._subprocess_compat.suppress_platform_ver_console`` for callers
+    that never import ``x19_cli.main``; double application is harmless.
     """
     if not _IS_WINDOWS:
         return
@@ -75,17 +75,17 @@ def suppress_platform_ver_console() -> None:
 
 
 def harden_import_path(src_root: str | None = None) -> None:
-    """Stop a package in the current directory from shadowing Hermes modules.
+    """Stop a package in the current directory from shadowing X19 modules.
 
-    Hermes ships top-level modules with common names (``utils``, ``proxy``, ``ui``); a
+    X19 ships top-level modules with common names (``utils``, ``proxy``, ``ui``); a
     project with its own ``utils/`` launched from its directory would win the import.
     The cwd reaches ``sys.path`` as ``""``/``"."`` (script/``-m`` launches) AND as an
     absolute path (venv activation, PYTHONPATH), so both are handled: relative forms are
-    dropped and the Hermes root is *relocated* to the front, not merely inserted when
+    dropped and the X19 root is *relocated* to the front, not merely inserted when
     absent. ``src_root`` defaults to this module's directory (the repo root for every
     shipped entry point), so no spawner env var is required.
     """
-    root = src_root or os.environ.get("HERMES_PYTHON_SRC_ROOT") or os.path.dirname(
+    root = src_root or os.environ.get("X19_PYTHON_SRC_ROOT") or os.path.dirname(
         os.path.abspath(__file__)
     )
 
@@ -97,14 +97,14 @@ def harden_import_path(src_root: str | None = None) -> None:
 
 
 def activate_durable_lazy_target() -> None:
-    """Put the durable lazy-install dir (``HERMES_LAZY_INSTALL_TARGET``) on ``sys.path``.
+    """Put the durable lazy-install dir (``X19_LAZY_INSTALL_TARGET``) on ``sys.path``.
 
     Immutable Docker images seal the venv and redirect lazy installs to the data volume;
     packages installed there on a previous run must be importable before any backend
     imports its SDK. Appends to the END of ``sys.path`` so the core venv always wins name
     collisions (see ``tools.lazy_deps``). Never raises; unset target is a no-op.
     """
-    if not os.environ.get("HERMES_LAZY_INSTALL_TARGET", "").strip():
+    if not os.environ.get("X19_LAZY_INSTALL_TARGET", "").strip():
         return
     try:
         from tools import lazy_deps
