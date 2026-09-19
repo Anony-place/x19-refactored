@@ -1,5 +1,5 @@
 // The desktop REST/WS client, split by domain under src/api/. This module is
-// the compatibility barrel: every helper keeps its historical `@/hermes`
+// the compatibility barrel: every helper keeps its historical `@/x19`
 // import path while the implementations live in focused files.
 // client is the one module with internals: profileScoped / connectionScoped /
 // capabilityScoped are shared across api/ but must not reach call sites, or
@@ -7,8 +7,8 @@
 export {
   getApiRequestConnection,
   getApiRequestProfile,
-  hermesApi,
-  HermesGateway,
+  x19Api,
+  X19Gateway,
   profileScopeKey,
   PROMPT_SUBMIT_REQUEST_TIMEOUT_MS,
   setApiRequestConnection,
@@ -65,8 +65,8 @@ export type {
   ElevenLabsVoice,
   ElevenLabsVoicesResponse,
   EnvVarInfo,
-  HermesConfig,
-  HermesConfigRecord,
+  X19Config,
+  X19ConfigRecord,
   LogsResponse,
   McpCatalogEntry,
   McpCatalogResponse,
@@ -129,4 +129,4 @@ export type {
   WebhookEnableResponse,
   WebhookRoute,
   WebhooksResponse
-} from '@/types/hermes'
+} from '@/types/x19'
