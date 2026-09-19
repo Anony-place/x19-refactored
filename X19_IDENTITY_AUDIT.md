@@ -588,6 +588,50 @@ triggered automatically — and are overridable per run. Guessing a replacement
 would be a worse failure than leaving a known-unverifiable default and saying so;
 see [Limitations](#limitations).
 
+### 18. Eight bundled skills belonged to the retired security-ops product
+
+`skills/x19/` held eight skills — `api-assessment`, `auth-testing`, `evidence`,
+`offensive-team`, `recon`, `reporting`, `verification`, `web-assessment` — left
+over from the framing this repository no longer has, in which X19 was a security
+operations product rather than a general executive orchestrator. Removed, with
+the case checked rather than assumed:
+
+- **Every one declared a toolset that does not exist** — `x19-all`, `x19-api`,
+  `x19-auth`, `x19-evidence`, `x19-recon`, `x19-verification`, `x19-web`. None
+  is in `toolsets.TOOLSETS`. The convention is not invented: a bare `toolsets:`
+  key is also used by `optional-skills/security/web-pentest` and
+  `oss-forensics`, and both of those name only real toolsets (`terminal`, `web`,
+  `browser`, `file`, `delegation`). These eight were the only skills in the tree
+  naming toolsets that belonged to the deleted layer.
+- **Nothing referenced them.** All eight declared names — `x19-offensive-team`
+  and the rest — return zero hits outside their own directory, across code,
+  docs, catalogs, tests and CI. No generated skill index listed them.
+- **They contradicted the real organization.** `offensive-team` described
+  "Boss→Managers→Specialists" and "X19 BOSS / COMMANDER", against the actual
+  X19 → X22 → workers hierarchy and the role catalog in `x19/org/roles.py`.
+- **They were live surface, not dead files.** The installer syncs bundled skills
+  into `~/.x19/skills/` via `tools/skills_sync.py`, whose bundled root is the
+  repository's `skills/`, and its fallback copies that directory wholesale;
+  `agent/learning_graph.py` also scans it as its base root. So all eight reached
+  every install.
+- **A product-named category in a domain-named tree.** Every other bundled
+  category is a domain — `apple`, `creative`, `devops`, `email`, `media`,
+  `note-taking`, `productivity`, `research`, `social-media`,
+  `software-development`, `web`. `x19` was the only one named after the product.
+
+The security capability is not lost, which is the part worth stating: it lives
+where the repository actually puts it. The organization has a `security` worker
+role with `security_review`, `vulnerability_analysis`, `secret_scanning` and
+`threat_modelling`, and `optional-skills/security/` ships six opt-in skills —
+`web-pentest`, `godmode`, `oss-forensics`, `sherlock`, `unbroker`, `1password`.
+`web-pentest` is the one `offensive-team` named as its own related skill, and it
+covers the same ground with valid toolsets. Offensive-security tooling being
+opt-in rather than bundled into every install is also the repository's existing
+position, and these eight were bundled.
+
+No test asserted on the bundled skill set, so nothing needed updating; the audit
+was re-run afterwards and is unchanged at zero residue.
+
 ---
 
 ## Protected items (deliberately not renamed)
