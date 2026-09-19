@@ -10,22 +10,21 @@ checked into the repository so the result can be re-verified at any time.
 
 ```
 $ python scripts/x19_residue_audit.py --strict
+
 X19 legacy-identity residue audit
 ==============================================================
 tracked files containing 'hermes': 94
-total occurrences (lines):          318
+total occurrences (lines):          319
 
   model-identifier              169 line(s) across 59 file(s)
-  audit-tooling                 103 line(s) across  2 file(s)
+  audit-tooling                 104 line(s) across 2 file(s)
   third-party-url                30 line(s) across 23 file(s)
-  contributor-attribution         6 line(s) across  6 file(s)
-  third-party-dependency          6 line(s) across  1 file(s)
-  historical-corpus               2 line(s) across  1 file(s)
-  legacy-token-guard              2 line(s) across  2 file(s)
+  contributor-attribution         6 line(s) across 6 file(s)
+  third-party-dependency          6 line(s) across 1 file(s)
+  historical-corpus               2 line(s) across 1 file(s)
+  legacy-token-guard              2 line(s) across 2 file(s)
 
 RESIDUE: none. Every remaining occurrence is a justified class.
-$ echo $?
-0
 ```
 
 `--strict` exits non-zero if any line fails to classify, so this is usable as a
@@ -39,9 +38,9 @@ CI gate. `--json` emits the same data machine-readably.
 | --- | --- |
 | Token searched | `hermes`, case-insensitive |
 | Non-Latin spellings searched | 10 — Urdu, Arabic, Chinese (simplified + traditional), Japanese katakana, Korean hangul, Russian cyrillic, Greek, Hebrew, Thai |
-| Corpus | every git-tracked file: **13,918** |
+| Corpus | every git-tracked file: **13,911** |
 | Files with a match | **94** |
-| Lines with a match | **318** |
+| Lines with a match | **319** |
 | Non-Latin matches | **0**, outside the detector and this report |
 | Unjustified | **0** |
 
@@ -56,7 +55,7 @@ make the result trustworthy:
    text/binary split cannot be hiding an occurrence.
 2. **The count was cross-checked by a second implementation.** A Python walk
    over `git ls-files`, reading raw bytes and counting matching lines, reports
-   the same 94 files and 318 lines over the same 13,918 tracked files. Two
+   the same 94 files and 319 lines over the same 13,911 tracked files. Two
    independent methods agreeing is what
    makes "zero" a claim rather than an assumption.
 3. **The classifier is narrow and was probed for loopholes.** Each justification
@@ -101,9 +100,9 @@ One line in this class deserves specific mention because it was the site of a
 real bug — see
 [the model-family detector](#4-the-model-family-detector-could-never-fire).
 
-### `audit-tooling` — 103 lines / 2 files
+### `audit-tooling` — 104 lines / 2 files
 
-The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (79
+The scanner (`scripts/x19_residue_audit.py`, 24 lines) and this report (80
 lines). A detector must spell the thing it detects: the token appears in
 `TOKEN`, in every classification pattern, and in the comments explaining them.
 This document quotes the occurrences it classifies — including the adversarial
@@ -111,7 +110,7 @@ probes that must keep failing — so it contains the token by construction.
 
 Both are reported as their own class rather than excluded from the scan, so the
 accounting stays complete and the totals keep matching a plain `git grep`: all
-318 lines are classified, none are silently dropped. Excluding them instead
+319 lines are classified, none are silently dropped. Excluding them instead
 would make the headline numbers unverifiable by anyone running the obvious
 command.
 
@@ -464,6 +463,20 @@ not recognize a bare interpreter exec'ing the `x19-agent` shim, and the
 uninstaller never removed the `x19-agent` wrapper. All four restored to
 `{"x19", "x19-agent", "x19-acp"}`, matching `[project.scripts]` exactly.
 
+**The process-holder scan could not see the agent.** The same collapsed literal
+appeared in a fifth place, `x19_state_holders.py`, doing different work:
+`_X19_EXECUTABLES = frozenset({"x19", "x19", "x19-acp"})`. `_looks_like_x19()`
+uses that set to decide whether a process is X19's own, and that decision drives
+the WAL-holder scan and the safe-shutdown path. With `x19-agent` missing, an
+agent holding the session database was never recognized as one of ours. This is
+the sharpest of the five, because `install.sh` had just been fixed to install the
+`x19-agent` launcher again: the runtime would create precisely the processes the
+scan could not see. Nothing covered it — no test referenced `_X19_EXECUTABLES` —
+so `tests/x19_state/test_x19_state_holders_entrypoints.py` now derives the
+expected set from `[project.scripts]` in `pyproject.toml`, which makes adding an
+entrypoint without teaching holder detection about it a test failure. Reverting
+the one-line fix fails three of its eight tests.
+
 **The Docker group remap addressed a user that does not exist.** `Dockerfile`
 creates the runtime user with `useradd -u 10000 -m -d /opt/data x19`, but
 `docker/stage2-hook.sh` ran `groupmod -o -g "$X19_GID" hermes`, `id -G hermes`
@@ -485,6 +498,70 @@ references survive — `Hermes 3/4`, `Hermes 3 & 4`, `Hermes 4 405B`,
 `/`, `&`, `.` or a space after the digit, never `>`. The four shell lines were
 fixed at source, so `model-identifier` fell by exactly four (173 → 169) and no
 other line changed class.
+
+**Sweeping for the shape, not the string.** Four of the five collapses above were
+found by reading a flagged line in context; the fifth was not flagged at all,
+because `{"x19", "x19", "x19-acp"}` contains no legacy token and a string scan
+cannot see it. So the repository was swept mechanically for the shape the bug
+leaves behind — the same member twice in one literal, or the same name bound
+twice in one scope:
+
+| Surface | Files | Examined | Duplicate hits |
+| --- | --- | --- | --- |
+| Python dict keys (AST) | 6,624 | 73,701 dict literals | 77 — 1 fixed, 76 benign |
+| Python set members (AST) | 6,624 | 4,286 set literals | 8 — the collapsed `frozenset` above and one duplicated test block, both fixed |
+| Python names bound twice in one scope | 6,624 | every module and class body | 19 — 2 fixed, 17 intentional |
+| JSON keys | 140 | every object, nested | 0 |
+| YAML keys | 349 | every mapping, nested | 0 |
+| JS/TS object-literal keys | 3,544 | every object literal | 0 |
+| JS/TS class, interface, enum, function members | 3,544 | every declaration | 2 — both overload lists |
+
+Two more real duplicates came out of that sweep, both the same shape: a member
+written twice where the second silently wins. `tools/cronjob_tools.py` declared
+`"type": "string"` twice in the `schedule` property of the cron tool's JSON schema
+— identical values, so the schema was correct, but an edit to the first line would
+have been swallowed by the second. `tests/x19_cli/test_skin_engine.py` listed the
+seven `status-bar*` classes twice inside the `required` set of a `issubset`
+assertion, so the set held 38 distinct members written as 45. Both duplicates
+removed; the 76 cron schema and tool tests pass, as does the skin-engine test
+that owns the set.
+
+Lists and tuples were scanned too — 49,878 and 76,716 of them — and are excluded
+from the table deliberately: a repeated member there is ordinary data, not a
+collapse, since position carries meaning. Only dict keys and set members are
+places where a duplicate *removes* information. The JSON pass used TypeScript's
+JSON parser rather than `json.loads` because three `tsconfig` files contain
+comments, which strict JSON rejects; all 140 parse clean under it.
+
+The benign and intentional counts are worth naming, because they are what a
+naive sweep reports and what a reader must not mistake for defects: 74 duplicate
+keys in the contributor-email map in `scripts/release.py` (attribution data,
+protected), 2 in `plugins/platforms/matrix/adapter.py` (the infinity emoji written
+both literally and as `"\u267e\ufe0f"`, with the same value, so reaction parsing
+accepts either spelling), `@overload` stubs preceding an implementation,
+`@property`/`@x.setter` pairs, and TypeScript interface overload lists such as
+`ReadableLike.on`.
+
+The largest group needed checking rather than assuming. `tui_gateway/methods_*.py`
+defines handlers as `def _(...)` under a registering decorator, so the local name
+is deliberately discarded and a duplicate-name scan reports 199 collisions. This
+is where a real collapse would hide best — the definitions legitimately share one
+name, so an overwritten handler would be invisible to the residue audit *and* to
+the definition sweep. Each was therefore resolved through its decorator: all 199
+module-level `def _` carry a registering decorator (`@method`, `@_session_method`,
+`@_pet_method`, `@_rpc`, `@_mcp_rpc`, `@_scoped_rpc`, `@_room_method` and six
+more), none is undecorated, and the names they register — `session.title`,
+`handoff.state`, `org.audit` — are 199 distinct RPC names. The dispatch table is
+intact. The eight further decorator arguments that are not names but error codes
+(`_catch(5021)`, `_with_db(5007, session_scoped=True)`) were checked too: two
+methods share code 5007 because both need the session database, and they register
+different RPC names.
+
+The two test-file duplicates
+that were real — an empty `TestAuxiliaryMaxTokensParam` stub shadowed by the real
+class 4,300 lines later, and `_DiscordMediaFailureAdapter` defined twice
+byte-identically — changed no behaviour, but both were traps: a test added to the
+shadowed copy would never have been collected. Both sweeps are now clean.
 
 ### 15. The installer URL this audit's own sweep had just broken
 
@@ -781,3 +858,15 @@ Stated plainly, so the "zero" is not over-read:
   process-holder recognition cases — plus one `windows_only` test that had been
   skipped into brokenness and one boundary probe that tested nothing at all.
   All are now passing.
+- **The collapsed-name class is invisible to it by construction.** A rename that
+  maps two identifiers onto one leaves no legacy token behind, so a scan for
+  `hermes` cannot flag it: `frozenset({"x19", "x19", "x19-acp"})` is a clean
+  two-element set as far as this audit is concerned, and the fifth instance
+  (section 14) was found by an AST sweep, not by the audit or by any test. The
+  sweeps tabulated in section 14 are the mitigation, and they were run once by
+  hand; nothing in CI repeats them, so a future rename could reintroduce the same
+  defect and this audit would still report zero residue. The only durable guard
+  added is `tests/x19_state/test_x19_state_holders_entrypoints.py`, which ties
+  `_X19_EXECUTABLES` to `[project.scripts]` and therefore fails if a console
+  script is added without holder detection learning about it. Extending that
+  pattern to the other four sets named in section 14 would close the gap.
