@@ -333,7 +333,7 @@ def detect_install_method(project_root: Optional[Path] = None) -> str:
     The supported installs self-identify via the code-scoped stamp: - the curl installer
     (scripts/install.sh, the README/website install command) git-clones the repo and stamps ``git`` next to
     the code; - the published ``nousresearch/x19`` image bakes a ``docker`` stamp into
-    ``/opt/hermes`` at build time. An unsupported manual install dropped into a container (no stamp) falls
+    ``/opt/x19`` at build time. An unsupported manual install dropped into a container (no stamp) falls
     through to the ``.git`` checks and behaves like any off-path install. See issue #34397.
     """
     # The stamp is a property of the running code tree (parent of hermes_cli/), NOT of $X19_HOME,
@@ -480,8 +480,8 @@ def get_container_exec_info() -> Optional[dict]:
     return {
         "backend": info.get("backend", "docker"),
         "container_name": info.get("container_name", "x19"),
-        "exec_user": info.get("exec_user", "hermes"),
-        "hermes_bin": info.get("hermes_bin", "/data/current-package/bin/hermes")}
+        "exec_user": info.get("exec_user", "x19"),
+        "x19_bin": info.get("x19_bin", "/data/current-package/bin/hermes")}
 
 
 # ---- Config paths / X19_HOME skeleton ----
@@ -3995,7 +3995,7 @@ def _install_method_project_root(project_root: Optional[Path] = None) -> Path:
     """Resolve the directory that holds the *running code* (the install tree).
 
     This is the parent of ``x19_cli/`` — i.e. the git checkout for source
-    installs, ``/opt/hermes`` inside the published image. It is a property of
+    installs, ``/opt/x19`` inside the published image. It is a property of
     the running interpreter, NOT of ``$X19_HOME``, which is why a
     code-scoped stamp here is immune to two installs sharing one data
     directory.
@@ -4013,7 +4013,7 @@ def stamp_install_method(method: str, project_root: Optional[Path] = None) -> No
     the full rationale.
 
     Best-effort: if the install tree is read-only (e.g. the immutable
-    ``/opt/hermes`` in the published image, which instead bakes the stamp at
+    ``/opt/x19`` in the published image, which instead bakes the stamp at
     build time) the write silently no-ops and detection falls back to its
     other signals.
     """
