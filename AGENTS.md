@@ -179,7 +179,7 @@ session-scoped. Assert the GUI session gets the tool **with the env var absent**
 ```bash
 source .venv/bin/activate   # or: source venv/bin/activate
 ```
-`scripts/run_tests.sh` probes `.venv`, then `venv`, then `$HOME/.hermes/x19/venv`
+`scripts/run_tests.sh` probes `.venv`, then `venv`, then `$HOME/.x19/x19/venv`
 (worktrees sharing the main checkout's venv).
 
 ## Project Structure
@@ -271,7 +271,7 @@ families: `x19_state.py` (21), `gateway/run.py` (15), `tools/mcp_tool.py` (15),
 - **Never hardcode `~/.x19`.** `get_x19_home()` for code paths, `display_x19_home()`
   for user-facing text (both from `x19_constants`). Hardcoding breaks profiles (5 bugs in
   PR #3575). Profile operations themselves are HOME-anchored
-  (`_get_profiles_root()` = `Path.home()/.hermes/profiles`) so `x19 -p x profile list`
+  (`_get_profiles_root()` = `Path.home()/.x19/profiles`) so `x19 -p x profile list`
   sees all profiles — intentional, not a bug.
 - **One process may serve many profiles; code that runs outside a turn binds the owning
   profile scope explicitly.** A profile = home + secret scope + terminal scope, bound by
@@ -359,13 +359,13 @@ scripts/run_tests.sh -v --tb=long                       # pytest flags pass thro
   ```python
   @pytest.fixture
   def profile_env(tmp_path, monkeypatch):
-      home = tmp_path / ".hermes"; home.mkdir()
+      home = tmp_path / ".x19"; home.mkdir()
       monkeypatch.setattr(Path, "home", lambda: tmp_path)
       monkeypatch.setenv("X19_HOME", str(home))
       return home
   ```
   Tests that `patch.object(Path, "home", ...)` must ALSO set `X19_HOME` — code reads the
-  env var, not `Path.home()/.hermes`.
+  env var, not `Path.home()/.x19`.
 
 ### Don't fake the host OS
 
