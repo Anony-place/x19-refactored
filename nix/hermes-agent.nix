@@ -1,9 +1,9 @@
-# nix/hermes-agent.nix — Overridable Hermes Agent package
+# nix/x19.nix — Overridable X19 package
 #
 # callPackage auto-wires nixpkgs args; flake inputs are passed explicitly.
 # Users override via:
-#   pkgs.hermes-agent.override { extraPythonPackages = [...]; }
-#   pkgs.hermes-agent.override { extraDependencyGroups = [ "hindsight" ]; }
+#   pkgs.x19.override { extraPythonPackages = [...]; }
+#   pkgs.x19.override { extraDependencyGroups = [ "hindsight" ]; }
 {
   lib,
   stdenv,
@@ -38,7 +38,7 @@
   extraDependencyGroups ? [ ],
 }:
 let
-  mkHermesVenv =
+  mkX19Venv =
     extraDependencyGroups:
     callPackage ./python.nix {
       inherit uv2nix pyproject-nix pyproject-build-systems;
@@ -46,7 +46,7 @@ let
       dependency-groups = [ "all" ] ++ extraDependencyGroups;
     };
 
-  hermesVenv = (mkHermesVenv extraDependencyGroups).venv;
+  hermesVenv = (mkX19Venv extraDependencyGroups).venv;
 
   hermesNpmLib = callPackage ./lib.nix {
     inherit npm-lockfile-fix;
@@ -149,7 +149,7 @@ let
                 if line.startswith('Name:'):
                     pkg = canonical(line.split(':', 1)[1].strip())
                     if pkg in core:
-                        print(f'ERROR: plugin package \"{pkg}\" collides with a package in hermes sealed venv', file=sys.stderr)
+                        print(f'ERROR: plugin package \"{pkg}\" collides with a package in x19 sealed venv', file=sys.stderr)
                         print(f'  from: {di}', file=sys.stderr)
                         print(f'  Remove this dependency from extraPythonPackages.', file=sys.stderr)
                         sys.exit(1)
@@ -159,7 +159,7 @@ let
   '';
 in
 stdenv.mkDerivation (finalAttrs: {
-  pname = "hermes-agent";
+  pname = "x19";
   version = (fromTOML (builtins.readFile ../pyproject.toml)).project.version;
 
   dontUnpack = true;
@@ -172,27 +172,27 @@ stdenv.mkDerivation (finalAttrs: {
     # Symlinks, not copies: these are all store paths already, and the
     # wrapper env vars just hold paths.  Symlinking keeps this derivation
     # near-instant when only the venv changed, with an identical closure.
-    mkdir -p $out/share/hermes-agent $out/bin
-    ln -s ${bundledSkills} $out/share/hermes-agent/skills
-    ln -s ${bundledOptionalSkills} $out/share/hermes-agent/optional-skills
-    ln -s ${bundledPlugins} $out/share/hermes-agent/plugins
-    ln -s ${bundledLocales} $out/share/hermes-agent/locales
-    ln -s ${bundledOptionalMcps} $out/share/hermes-agent/optional-mcps
-    ln -s ${hermesWeb} $out/share/hermes-agent/web_dist
+    mkdir -p $out/share/x19 $out/bin
+    ln -s ${bundledSkills} $out/share/x19/skills
+    ln -s ${bundledOptionalSkills} $out/share/x19/optional-skills
+    ln -s ${bundledPlugins} $out/share/x19/plugins
+    ln -s ${bundledLocales} $out/share/x19/locales
+    ln -s ${bundledOptionalMcps} $out/share/x19/optional-mcps
+    ln -s ${hermesWeb} $out/share/x19/web_dist
     ln -s ${hermesTui}/lib/hermes-tui $out/ui-tui
 
     ${lib.concatMapStringsSep "\n"
       (name: ''
         makeWrapper ${hermesVenv}/bin/${name} $out/bin/${name} \
           --suffix PATH : "${runtimePath}" \
-          --set HERMES_BUNDLED_SKILLS $out/share/hermes-agent/skills \
-          --set HERMES_OPTIONAL_SKILLS $out/share/hermes-agent/optional-skills \
-          --set HERMES_BUNDLED_PLUGINS $out/share/hermes-agent/plugins \
-          --set HERMES_BUNDLED_LOCALES $out/share/hermes-agent/locales \
-          --set HERMES_OPTIONAL_MCPS $out/share/hermes-agent/optional-mcps \
-          --set HERMES_WEB_DIST $out/share/hermes-agent/web_dist \
+          --set HERMES_BUNDLED_SKILLS $out/share/x19/skills \
+          --set HERMES_OPTIONAL_SKILLS $out/share/x19/optional-skills \
+          --set HERMES_BUNDLED_PLUGINS $out/share/x19/plugins \
+          --set HERMES_BUNDLED_LOCALES $out/share/x19/locales \
+          --set HERMES_OPTIONAL_MCPS $out/share/x19/optional-mcps \
+          --set HERMES_WEB_DIST $out/share/x19/web_dist \
           --set HERMES_TUI_DIR $out/ui-tui \
-          --set-default HERMES_BIN $out/bin/hermes \
+          --set-default HERMES_BIN $out/bin/x19 \
           --set HERMES_PYTHON ${hermesVenv}/bin/python3 \
           --set HERMES_NODE ${lib.getExe hermesNpmLib.nodejs}${
             # Fold the line continuation INTO the optionalString: a bare
@@ -209,7 +209,7 @@ stdenv.mkDerivation (finalAttrs: {
       '')
       [
         "hermes"
-        "hermes-agent"
+        "x19"
         "hermes-acp"
       ]
     }
@@ -225,7 +225,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   passthru =
     let
-      devPython = (mkHermesVenv (extraDependencyGroups ++ [ "dev" ])).editableVenv;
+      devPython = (mkX19Venv (extraDependencyGroups ++ [ "dev" ])).editableVenv;
     in
     {
       inherit
@@ -235,11 +235,11 @@ stdenv.mkDerivation (finalAttrs: {
         hermesVenv
         ;
 
-      # `hermesDesktop` references `finalAttrs.finalPackage` (this whole
+      # `x19Desktop` references `finalAttrs.finalPackage` (this whole
       # derivation, after all overrides are applied) so the desktop wrapper
       # can prepend its `/bin` to PATH.  The desktop's resolver step 4
-      # ("existing hermes on PATH") then picks up the fully wrapped
-      # `hermes` binary — venv with all deps, bundled skills/plugins,
+      # ("existing x19 on PATH") then picks up the fully wrapped
+      # `x19` binary — venv with all deps, bundled skills/plugins,
       # runtime PATH (ripgrep/git/ffmpeg/etc).  No re-implementation
       # of the agent resolution in the desktop wrapper.
       hermesDesktop = callPackage ./desktop.nix {
@@ -263,7 +263,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = with lib; {
     description = "AI agent with advanced tool-calling capabilities";
-    homepage = "https://github.com/NousResearch/hermes-agent";
+    homepage = "https://github.com/NousResearch/x19";
     mainProgram = "hermes";
     license = licenses.mit;
     platforms = platforms.unix;
