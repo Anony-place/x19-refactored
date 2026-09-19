@@ -17,7 +17,7 @@ from pathlib import Path
 
 _profile_fallback_warned: bool = False
 _UNSET = object()
-_HERMES_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_HERMES_HOME_OVERRIDE", default=_UNSET)
+_X19_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_X19_HOME_OVERRIDE", default=_UNSET)
 
 # TUI busy-indicator styles (CLI /indicator, TUI gateway config, /help registry).
 # Keep in sync with INDICATOR_STYLES / DEFAULT_INDICATOR_STYLE in ui-tui/src/app/interfaces.ts.
@@ -26,22 +26,22 @@ DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
 
 def set_hermes_home_override(path: str | Path | None) -> Token:
-    """Set a context-local Hermes home override and return its reset token.
+    """Set a context-local X19 home override and return its reset token.
 
     Deliberately does not mutate ``os.environ`` (shared by every thread in the process).
     """
     value: str | object = _UNSET if path is None else str(path)
-    return _HERMES_HOME_OVERRIDE.set(value)
+    return _X19_HOME_OVERRIDE.set(value)
 
 
 def reset_hermes_home_override(token: Token) -> None:
-    """Restore the previous context-local Hermes home override."""
-    _HERMES_HOME_OVERRIDE.reset(token)
+    """Restore the previous context-local X19 home override."""
+    _X19_HOME_OVERRIDE.reset(token)
 
 
 def get_hermes_home_override() -> str | None:
-    """Return the active context-local Hermes home override, if any."""
-    override = _HERMES_HOME_OVERRIDE.get()
+    """Return the active context-local X19 home override, if any."""
+    override = _X19_HOME_OVERRIDE.get()
     return str(override) if override is not _UNSET and override else None
 
 
@@ -57,7 +57,7 @@ def _get_platform_default_hermes_home() -> Path:
 def sudo_invoker_default_home() -> Path | None:
     """The invoking user's native X19 home when this process is root under ``sudo``, else None.
 
-    sudo strips HERMES_HOME and sets HOME=/root, so the process's own default is root's; the profile
+    sudo strips X19_HOME and sets HOME=/root, so the process's own default is root's; the profile
     store and the system service being operated on belong to SUDO_USER.
     """
     if not hasattr(os, "geteuid") or os.geteuid() != 0:
@@ -74,7 +74,7 @@ def sudo_invoker_default_home() -> Path | None:
 
 
 def _warn_profile_fallback_once() -> None:
-    """Warn once when HERMES_HOME is unset but a non-default profile is sticky-active (wrong fallback)."""
+    """Warn once when X19_HOME is unset but a non-default profile is sticky-active (wrong fallback)."""
     global _profile_fallback_warned
     if _profile_fallback_warned:
         return
@@ -89,11 +89,11 @@ def _warn_profile_fallback_once() -> None:
         # Direct stderr, not logging: runs at import time (often before logging is
         # configured) and root-logger propagation would double-emit.
         msg = (
-            f"[X19_HOME fallback] X19_HOME/HERMES_HOME are unset but active "
+            f"[X19_HOME fallback] X19_HOME/X19_HOME are unset but active "
             f"profile is {active!r}. Falling back to {fallback_home}, which "
             f"is the DEFAULT profile — not {active!r}. Any data this "
             f"process writes will land in the wrong profile. The "
-            f"subprocess spawner should pass HERMES_HOME explicitly "
+            f"subprocess spawner should pass X19_HOME explicitly "
             f"(see issue #18594)."
         )
         with contextlib.suppress(Exception):
@@ -102,11 +102,11 @@ def _warn_profile_fallback_once() -> None:
 
 
 def get_hermes_home() -> Path:
-    """X19 home: override → X19_HOME → legacy HERMES_HOME → canonical platform default."""
+    """X19 home: override → X19_HOME → legacy X19_HOME → canonical platform default."""
     override = get_hermes_home_override()
     if override:
         return Path(override)
-    if not (os.environ.get("X19_HOME", "").strip() or os.environ.get("HERMES_HOME", "").strip()):
+    if not (os.environ.get("X19_HOME", "").strip() or os.environ.get("X19_HOME", "").strip()):
         _warn_profile_fallback_once()
     return get_process_hermes_home()
 
@@ -120,7 +120,7 @@ _HOME_KEY_CACHE: dict[str, str] = {}
 
 
 def hermes_home_key(path: str | Path | None = None) -> str:
-    """Stable registry key for a Hermes home/profile dir.
+    """Stable registry key for a X19 home/profile dir.
 
     ``strict=False`` so profiles whose directories don't exist yet still get a key.
 
@@ -156,26 +156,26 @@ def get_process_hermes_home() -> Path:
     For process-level assets (theme YAML, dashboard plugin manifests) that must stay visible while a
     request is scoped to another profile (e.g. embedded ``/chat`` under ``--open-profile``).
     """
-    val = os.environ.get("X19_HOME", "").strip() or os.environ.get("HERMES_HOME", "").strip()
+    val = os.environ.get("X19_HOME", "").strip() or os.environ.get("X19_HOME", "").strip()
     return Path(val) if val else _get_platform_default_hermes_home()
 
 
-# Hermes-managed runtime downloads at the root of a home (GGUF models, llama.cpp runtimes,
+# X19-managed runtime downloads at the root of a home (GGUF models, llama.cpp runtimes,
 # managed Node): re-downloadable on demand and routinely tens to hundreds of GB. Shared by
 # ``hermes backup`` (excludes them) and ``profile create --clone-all`` (skips them from the
 # default profile) so the two lists cannot drift apart.
 LOCAL_RUNTIME_ROOT_DIRS: frozenset[str] = frozenset({"models", "runtimes", "node"})
 
-# get_default_hermes_root() memo keyed on (native home, HERMES_HOME) so it stays
-# fresh when a test or plugin mutates HERMES_HOME; saves ~80us/call at 31+ sites.
+# get_default_hermes_root() memo keyed on (native home, X19_HOME) so it stays
+# fresh when a test or plugin mutates X19_HOME; saves ~80us/call at 31+ sites.
 _default_hermes_root_memo: "tuple[str, str, Path] | None" = None
 
 
 def get_default_hermes_root() -> Path:
-    """Root Hermes dir for profile-level ops: ``<root>`` when ``HERMES_HOME=<root>/profiles/<name>``."""
+    """Root Hermes dir for profile-level ops: ``<root>`` when ``X19_HOME=<root>/profiles/<name>``."""
     global _default_hermes_root_memo
     native_home = _get_platform_default_hermes_home()
-    env_home = os.environ.get("HERMES_HOME", "")
+    env_home = os.environ.get("X19_HOME", "")
     memo = _default_hermes_root_memo
     if memo is not None and memo[:2] == (str(native_home), env_home):
         return memo[2]
@@ -183,8 +183,8 @@ def get_default_hermes_root() -> Path:
     if env_home:
         env_path = Path(env_home)
         try:
-            env_path.resolve().relative_to(native_home.resolve())  # under ~/.hermes (normal or profile mode)
-        except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else HERMES_HOME itself
+            env_path.resolve().relative_to(native_home.resolve())  # under ~/.x19 (normal or profile mode)
+        except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else X19_HOME itself
             result = env_path.parent.parent if env_path.parent.name == "profiles" else env_path
     _default_hermes_root_memo = (str(native_home), env_home, result)
     return result
@@ -192,14 +192,14 @@ def get_default_hermes_root() -> Path:
 
 # Tombstone lives beside the profile dir (not inside) so a stale mkdir or rmtree cannot erase it.
 _DELETED_PROFILES_DIR = ".deleted"
-# Files marking a real Hermes home; arbitrary dirs with a ``profiles`` segment lack them.
-_HERMES_HOME_MARKERS = ("config.yaml", ".env", "state.db")
+# Files marking a real X19 home; arbitrary dirs with a ``profiles`` segment lack them.
+_X19_HOME_MARKERS = ("config.yaml", ".env", "state.db")
 
 
 def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
     """True when *profiles_dir* is provably ``<hermes-home>/profiles``.
 
-    Accepts the classic ``~/.hermes`` layout, a root carrying Hermes-home marker files, a
+    Accepts the classic ``~/.x19`` layout, a root carrying Hermes-home marker files, a
     ``profiles/.deleted`` tombstone dir (only ``profile delete`` creates it), or the default root.
     """
     root = profiles_dir.parent
@@ -207,7 +207,7 @@ def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
         return True
     try:
         if (profiles_dir / _DELETED_PROFILES_DIR).is_dir() or any(
-            (root / marker).exists() for marker in _HERMES_HOME_MARKERS
+            (root / marker).exists() for marker in _X19_HOME_MARKERS
         ):
             return True
     except OSError:
@@ -221,7 +221,7 @@ def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
 def named_profile_home(path: str | Path) -> Path | None:
     """Return ``<root>/profiles/<name>`` when *path* is that home or under it.
 
-    Requires ``<name>`` not to start with ``.`` and the ``profiles`` parent to be a real Hermes home;
+    Requires ``<name>`` not to start with ``.`` and the ``profiles`` parent to be a real X19 home;
     a default home whose path merely contains a ``profiles`` segment is not a named profile.
     """
     current = Path(path)
@@ -322,7 +322,7 @@ def _packaged_dir(env_var: str, default: Path | None, subdir: str) -> Path:
     """Resolve a package-manager-relocatable directory.
 
     Order: *env_var* (Nix wrapper / explicit override) → caller ``default`` (source checkout) →
-    ``<HERMES_HOME>/<subdir>``.
+    ``<X19_HOME>/<subdir>``.
     """
     override = os.getenv(env_var, "").strip()
     return Path(override) if override else default if default is not None else get_hermes_home() / subdir
@@ -359,7 +359,7 @@ def get_hermes_dir(new_subpath: str, old_name: str, *, home: Path | None = None)
 
 
 def iter_hermes_node_dirs(home: Path | None = None) -> list[Path]:
-    """Hermes-managed Node dirs in lookup order; both Windows and POSIX shapes so migrated installs work.
+    """X19-managed Node dirs in lookup order; both Windows and POSIX shapes so migrated installs work.
 
     Keep in sync with hermesManagedNodePathEntries() in apps/desktop/electron/backend-env.ts.
     """
@@ -412,7 +412,7 @@ def _run_version_probe(argv: list[str], **kwargs):
 
 
 def _version_probe_ok(path: str) -> bool:
-    """True when ``<path> --version`` exits 0 under the Hermes-managed Node PATH."""
+    """True when ``<path> --version`` exits 0 under the X19-managed Node PATH."""
     result = _run_version_probe([path, "--version"], env=with_hermes_node_path())
     return result is not None and result.returncode == 0
 
@@ -441,7 +441,7 @@ def node_tool_runnable(path: str | None) -> bool:
 
 
 def hermes_managed_node_tree_present(home: Path | None = None) -> bool:
-    """Return True when any Hermes-managed node/npm/npx shim exists on disk."""
+    """Return True when any X19-managed node/npm/npx shim exists on disk."""
     names = [n for c in ("node", "npm", "npx") for n in _candidate_node_command_names(c)]
     return next(_iter_managed_node_candidates(names, home), None) is not None
 
@@ -466,7 +466,7 @@ def managed_node_tree_in_use(home: Path | None = None) -> bool:
     """True when a running process executes from the managed Node tree.
 
     Windows locks running executables against delete/overwrite, so the updater must not rewrite
-    ``%HERMES_HOME%\\node`` while the desktop app holds it (``[WinError 5]`` on ``npm.cmd``).
+    ``%X19_HOME%\\node`` while the desktop app holds it (``[WinError 5]`` on ``npm.cmd``).
 
     Always ``False`` on POSIX, which has no equivalent lock semantics. See #80926.
     """
@@ -514,7 +514,7 @@ def _print_managed_node_in_use_notice() -> None:
         return
     _managed_node_in_use_notice_printed = True
     print(
-        "→ Hermes-managed Node.js is in use by a running app; deferring its "
+        "→ X19-managed Node.js is in use by a running app; deferring its "
         "upgrade until the app is closed (re-run `hermes update` afterwards).", flush=True,
     )
 
@@ -602,7 +602,7 @@ def _swap_node_tree(target: Path, staged: Path) -> bool | None:
 
 
 def _heal_managed_node_windows(home: Path | None = None) -> bool | None:
-    """Redownload the portable Node zip into ``%HERMES_HOME%\\node`` on Windows.
+    """Redownload the portable Node zip into ``%X19_HOME%\\node`` on Windows.
 
     ``True`` on success, ``False`` on genuine failure (offline, bad archive), ``None`` when the
     tree is in use and the heal is deferred — callers must not record the once-per-process attempt
@@ -651,7 +651,7 @@ def _run_node_bootstrap(func: str, *, timeout: int, **extra_env: str) -> bool:
     try:
         result = subprocess.run(
             ["bash", "-c", f'source "{_NODE_BOOTSTRAP_SCRIPT}" && {func}'],
-            env={**os.environ, "HERMES_HOME": str(get_hermes_home()), **extra_env},
+            env={**os.environ, "X19_HOME": str(get_hermes_home()), **extra_env},
             capture_output=True, timeout=timeout, check=False,
         )
     except (OSError, subprocess.SubprocessError):
@@ -660,7 +660,7 @@ def _run_node_bootstrap(func: str, *, timeout: int, **extra_env: str) -> bool:
 
 
 def bootstrap_hermes_managed_node() -> str | None:
-    """Install a Hermes-managed Node tree under ``$HERMES_HOME/node`` and return its npm path.
+    """Install a X19-managed Node tree under ``$X19_HOME/node`` and return its npm path.
 
     Hermes never modifies a user-owned toolchain (system, nvm, brew, Nix) that fails ``engines``.
     """
@@ -678,7 +678,7 @@ def bootstrap_hermes_managed_node() -> str | None:
 
 
 def heal_hermes_managed_node() -> bool:
-    """Redownload Hermes-managed Node when the tree exists but is broken; at most once per process.
+    """Redownload X19-managed Node when the tree exists but is broken; at most once per process.
 
     A Windows in-use deferral does NOT record the attempt so a later call can heal once free.
 
@@ -718,7 +718,7 @@ def _managed_node_tree_outdated(home: Path | None = None) -> bool:
 
 
 def find_hermes_node_executable(command: str) -> str | None:
-    """Hermes-managed Node/npm path, healing broken/outdated trees; heal failure still returns old Node."""
+    """X19-managed Node/npm path, healing broken/outdated trees; heal failure still returns old Node."""
     names = _candidate_node_command_names(command)
     resolved, broken_present = _first_runnable_managed(names)
     needs_heal = broken_present or (resolved is not None and _managed_node_tree_outdated())
@@ -758,7 +758,7 @@ def find_node_executable(command: str) -> str | None:
 
 
 def with_hermes_node_path(env: dict[str, str] | None = None) -> dict[str, str]:
-    """Return *env* with Hermes-managed Node directories prepended to PATH."""
+    """Return *env* with X19-managed Node directories prepended to PATH."""
     merged = dict(os.environ if env is None else env)
     parts = [p for p in merged.get("PATH", "").split(os.pathsep) if p]
     for entry in reversed([str(path) for path in iter_hermes_node_dirs() if path.is_dir()]):
@@ -813,7 +813,7 @@ def _legacy_path_has_content(path: Path) -> bool:
 
 
 def display_hermes_home(home: Path | None = None) -> str:
-    """User-facing ``~/`` display string for HERMES_HOME (``~/.hermes/profiles/coder``).
+    """User-facing ``~/`` display string for X19_HOME (``~/.x19/profiles/coder``).
 
     ``home`` overrides the lookup for callers that run before the CLI has applied the sticky
     ``active_profile`` (``get_hermes_home()`` would emit the wrong-profile fallback warning there).
@@ -830,18 +830,18 @@ def profile_cli_selector() -> str:
     """``-p <name> `` (trailing space) pinning copy-pasteable ``hermes ...`` guidance to the
     active NAMED profile, else ``""``: a bare ``hermes`` follows the sticky ``active_profile``
     file, which can name a different database than the one that failed (#105887). A custom
-    home outside the profile tree has no selector (only HERMES_HOME names it)."""
+    home outside the profile tree has no selector (only X19_HOME names it)."""
     name = profile_name_for_home(get_hermes_home())
     return f"-p {name} " if name and name != "default" else ""
 
 
 def secure_parent_dir(path: Path) -> None:
-    """Chmod ``0o700`` on *path*'s parent, refusing ``/`` and top-level dirs (misresolved HERMES_HOME)."""
+    """Chmod ``0o700`` on *path*'s parent, refusing ``/`` and top-level dirs (misresolved X19_HOME)."""
     parent = path.parent.resolve()
     if parent == Path("/") or len(parent.parts) < 3:
         return
     # Refuse the install tree: chmod 0700 breaks hermes-user traversal in Docker (UID 10000).
-    # A credential file here means HERMES_HOME misresolved; surface it (caused production lockouts).
+    # A credential file here means X19_HOME misresolved; surface it (caused production lockouts).
     # See #25821, #93050.
     if parent == _INSTALL_ROOT or _INSTALL_ROOT in parent.parents:
         import logging
@@ -868,8 +868,8 @@ def _norm_home_path(path: str | None) -> str:
 
 
 def _profile_home_path(env: dict[str, str] | None = None) -> str | None:
-    """Return ``{HERMES_HOME}/home`` when the profile-home directory exists."""
-    hermes_home = get_hermes_home_override() or (env or {}).get("HERMES_HOME") or os.getenv("HERMES_HOME")
+    """Return ``{X19_HOME}/home`` when the profile-home directory exists."""
+    hermes_home = get_hermes_home_override() or (env or {}).get("X19_HOME") or os.getenv("X19_HOME")
     if not hermes_home:
         return None
     profile_home = os.path.join(hermes_home, "home")
@@ -906,7 +906,7 @@ def get_real_home(env: dict[str, str] | None = None) -> str:
     """The OS user's real home, avoiding the Hermes profile HOME.
 
     ``HOME`` belongs to the OS account and external CLIs keeping credentials under ``~``; a parent
-    already running with ``HOME={HERMES_HOME}/home`` is repaired back when possible.
+    already running with ``HOME={X19_HOME}/home`` is repaired back when possible.
     """
     profile_home = _profile_home_path(env)
     seen: set[str] = set()
@@ -928,7 +928,7 @@ def get_subprocess_home(env: dict[str, str] | None = None) -> str | None:
     """Subprocess ``HOME`` override, or ``None``.
 
     ``auto``: hosts keep real HOME (repairing a profile-home parent), containers use
-    ``{HERMES_HOME}/home``; ``real``: always real HOME; ``profile``: always the profile home.
+    ``{X19_HOME}/home``; ``real``: always real HOME; ``profile``: always the profile home.
     """
     env = env or {}
     profile_home = _profile_home_path(env)
@@ -1167,17 +1167,17 @@ def _root_mount_has_marker(path: str, markers: tuple[str, ...]) -> bool:
 
 
 def get_config_path() -> Path:
-    """Return the path to ``config.yaml`` under HERMES_HOME."""
+    """Return the path to ``config.yaml`` under X19_HOME."""
     return get_hermes_home() / "config.yaml"
 
 
 def get_skills_dir() -> Path:
-    """Return the path to the skills directory under HERMES_HOME."""
+    """Return the path to the skills directory under X19_HOME."""
     return get_hermes_home() / "skills"
 
 
 def get_env_path() -> Path:
-    """Return the path to the ``.env`` file under HERMES_HOME."""
+    """Return the path to the ``.env`` file under X19_HOME."""
     return get_hermes_home() / ".env"
 
 
