@@ -98,13 +98,13 @@ END;
 
 def fts5_cjk_so_path() -> Path:
     """Location of the cjk_unicode61 loadable extension."""
-    env = os.getenv("HERMES_FTS5_CJK_SO")
+    env = os.getenv("X19_FTS5_CJK_SO")
     return Path(env).expanduser() if env else get_x19_home() / "lib" / "libfts5_cjk.so"
 
 
 def _cjk_fts_config_enabled() -> bool:
     """config.yaml ``sessions.cjk_fts`` (default on) for the profile being served."""
-    value = routed_sessions_setting("cjk_fts", "HERMES_CJK_FTS")
+    value = routed_sessions_setting("cjk_fts", "X19_CJK_FTS")
     return value is None or str(value).strip().lower() not in ("0", "false", "off", "no")
 
 
