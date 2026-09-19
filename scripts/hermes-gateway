@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-Hermes Gateway - Standalone messaging platform integration.
+X19 Gateway - Standalone messaging platform integration.
 
 This is the proper entry point for running the gateway as a service.
 NOT tied to the CLI - runs independently.
 
 Usage:
     # Run in foreground (for testing)
-    ./scripts/hermes-gateway
+    ./scripts/x19-gateway
     
     # Install as systemd service
-    ./scripts/hermes-gateway install
+    ./scripts/x19-gateway install
     
     # Manage the service
-    ./scripts/hermes-gateway start
-    ./scripts/hermes-gateway stop
-    ./scripts/hermes-gateway restart
-    ./scripts/hermes-gateway status
+    ./scripts/x19-gateway start
+    ./scripts/x19-gateway stop
+    ./scripts/x19-gateway restart
+    ./scripts/x19-gateway status
     
     # Uninstall
-    ./scripts/hermes-gateway uninstall
+    ./scripts/x19-gateway uninstall
 """
 
 import argparse
@@ -45,8 +45,8 @@ if env_path.exists():
 # Service Configuration
 # =============================================================================
 
-SERVICE_NAME = "hermes-gateway"
-SERVICE_DESCRIPTION = "Hermes Agent Gateway - Messaging Platform Integration"
+SERVICE_NAME = "x19-gateway"
+SERVICE_DESCRIPTION = "X19 Gateway - Messaging Platform Integration"
 
 def get_systemd_unit_path() -> Path:
     """Get the path for the systemd user service file."""
@@ -54,7 +54,7 @@ def get_systemd_unit_path() -> Path:
 
 def get_launchd_plist_path() -> Path:
     """Get the path for the launchd plist file (macOS)."""
-    return Path.home() / "Library" / "LaunchAgents" / f"ai.hermes.gateway.plist"
+    return Path.home() / "Library" / "LaunchAgents" / f"ai.x19.gateway.plist"
 
 def get_python_path() -> str:
     """Get the path to the Python interpreter."""
@@ -180,7 +180,7 @@ def generate_launchd_plist() -> str:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>ai.hermes.gateway</string>
+    <string>ai.x19.gateway</string>
     
     <key>ProgramArguments</key>
     <array>
@@ -234,11 +234,11 @@ def install_launchd():
     print(f"✓ Service installed and loaded")
     print(f"")
     print(f"To view logs:")
-    print(f"  tail -f ~/.hermes/logs/gateway.log")
+    print(f"  tail -f ~/.x19/logs/gateway.log")
     print(f"")
     print(f"To manage the service:")
-    print(f"  launchctl start ai.hermes.gateway")
-    print(f"  launchctl stop ai.hermes.gateway")
+    print(f"  launchctl start ai.x19.gateway")
+    print(f"  launchctl stop ai.x19.gateway")
 
 def uninstall_launchd():
     """Uninstall the launchd service (macOS)."""
@@ -256,16 +256,16 @@ def uninstall_launchd():
 
 def launchd_status():
     """Show launchd service status."""
-    subprocess.run(["launchctl", "list", "ai.hermes.gateway"])
+    subprocess.run(["launchctl", "list", "ai.x19.gateway"])
 
 def launchd_start():
     """Start the launchd service."""
-    subprocess.run(["launchctl", "start", "ai.hermes.gateway"], check=True)
+    subprocess.run(["launchctl", "start", "ai.x19.gateway"], check=True)
     print(f"✓ Service started")
 
 def launchd_stop():
     """Stop the launchd service."""
-    subprocess.run(["launchctl", "stop", "ai.hermes.gateway"], check=True)
+    subprocess.run(["launchctl", "stop", "ai.x19.gateway"], check=True)
     print(f"✓ Service stopped")
 
 def launchd_restart():
@@ -302,7 +302,7 @@ def run_gateway():
     except Exception:
         pass
     from gateway.run import start_gateway
-    print("Starting Hermes Gateway...")
+    print("Starting X19 Gateway...")
     print("Press Ctrl+C to stop.")
     print()
     asyncio.run(start_gateway())
@@ -314,24 +314,24 @@ def run_gateway():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Hermes Gateway - Messaging Platform Integration",
+        description="X19 Gateway - Messaging Platform Integration",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
     # Run in foreground (for testing)
-    ./scripts/hermes-gateway run
+    ./scripts/x19-gateway run
     
     # Install as system service
-    ./scripts/hermes-gateway install
+    ./scripts/x19-gateway install
     
     # Manage the service
-    ./scripts/hermes-gateway start
-    ./scripts/hermes-gateway stop
-    ./scripts/hermes-gateway restart
-    ./scripts/hermes-gateway status
+    ./scripts/x19-gateway start
+    ./scripts/x19-gateway stop
+    ./scripts/x19-gateway restart
+    ./scripts/x19-gateway status
     
     # Uninstall
-    ./scripts/hermes-gateway uninstall
+    ./scripts/x19-gateway uninstall
 
 Configuration:
     Set environment variables in .env file or system environment:
@@ -339,7 +339,7 @@ Configuration:
     - DISCORD_BOT_TOKEN
     - WHATSAPP_ENABLED
     
-    Or create ~/.hermes/gateway.json for advanced configuration.
+    Or create ~/.x19/gateway.json for advanced configuration.
 """
     )
     
@@ -370,7 +370,7 @@ Configuration:
             install_launchd()
         else:
             print("Service installation not supported on this platform.")
-            print("Please run manually: ./scripts/hermes-gateway run")
+            print("Please run manually: ./scripts/x19-gateway run")
             sys.exit(1)
     
     elif args.command == "uninstall":
