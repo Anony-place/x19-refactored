@@ -6,8 +6,8 @@ author: X19 + Teknium
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
-    tags: [hermes, setup, configuration, multi-agent, spawning, cli, gateway, bots, bot-mode, features, themes, skins, desktop-plugins, tui-widgets, petdex, development]
+  x19:
+    tags: [x19, setup, configuration, multi-agent, spawning, cli, gateway, bots, bot-mode, features, themes, skins, desktop-plugins, tui-widgets, petdex, development]
     homepage: https://github.com/NousResearch/x19
     related_skills: [claude-code, codex, opencode]
 ---
@@ -49,7 +49,7 @@ Never answer "X19 can't do that" from memory. X19 ships far more than this skill
 curl -fsSL https://x19.nousresearch.com/install.sh | bash
 
 # Interactive chat (default surface; set display.interface: tui to launch the Ink TUI instead)
-hermes
+x19
 
 # Single query
 x19 chat -q "What is the capital of France?"
@@ -94,7 +94,7 @@ Profiles use `~/.x19/profiles/<name>/` with the same layout. When a profile is a
 | In-session slash commands | `references/slash-commands.md` |
 | Provider setup, API keys, OAuth | `references/providers-and-models.md` |
 | config.yaml sections, toolsets, voice/STT/TTS | `references/configuration.md` |
-| AGENTS.md / .hermes.md / CLAUDE.md project rules | `references/project-context-files.md` |
+| AGENTS.md / .x19.md / CLAUDE.md project rules | `references/project-context-files.md` |
 | Secret redaction, PII, approval modes, "reset permissions" | `references/security-privacy.md` |
 | Delegation, cron, curator, kanban | `references/background-systems.md` |
 | MCP servers (add, catalog, `x19 mcp`) | `references/native-mcp.md` |
@@ -145,7 +145,7 @@ X19 uses prompt_toolkit, which requires a real terminal. Use tmux for interactiv
 
 ```
 # Start
-terminal(command="tmux new-session -d -s agent1 -x 120 -y 40 'hermes'", timeout=10)
+terminal(command="tmux new-session -d -s agent1 -x 120 -y 40 'x19'", timeout=10)
 
 # Wait for startup, then send a message
 terminal(command="sleep 8 && tmux send-keys -t agent1 'Build a FastAPI auth service' Enter", timeout=15)
@@ -209,5 +209,5 @@ terminal(command="tmux new-session -d -s resumed 'x19 --resume 20260225_143052_a
 - **Never break prompt caching** — don't change past context, toolsets, or the system prompt mid-conversation. The only exception is context compression.
 - **Message role alternation** — never two assistant or two user messages in a row; only `tool` results can repeat.
 - **Secrets in `.env`, settings in `config.yaml`** — never tell a user to put a non-credential setting in `.env`.
-- **Profile-safe paths** — `get_hermes_home()` in code, `$X19_HOME` when resolving paths in a session.
+- **Profile-safe paths** — `get_x19_home()` in code, `$X19_HOME` when resolving paths in a session.
 - **Never hand-edit `config.yaml` for the user** — use `x19 config set KEY VAL`; a stray indent can corrupt the file and break the live gateway.
